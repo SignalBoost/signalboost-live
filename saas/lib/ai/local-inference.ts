@@ -770,8 +770,36 @@ function usefulTurn(turn: LocalModelTurnResult | null): boolean {
 async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: LocalInferenceConfig): Promise<LocalModelTurnResult | null> {
   const { firstUsefulWithHedge } = await import('./interactiveProviderHedge.ts')
   let managedError: unknown = null
+  const hedgeStartedAt = Date.now()
+  const providerTiming: Record<'primary' | 'backup', { startedAfterMs: number; finishedAfterMs: number | null; useful: boolean | null }> = {
+    primary: { startedAfterMs: -1, finishedAfterMs: null, useful: null },
+    backup: { startedAfterMs: -1, finishedAfterMs: null, useful: null },
+  }
+  const observed = async (provider: 'primary' | 'backup', call: () => Promise<LocalModelTurnResult | null>): Promise<LocalModelTurnResult | null> => {
+    const timing = providerTiming[provider]
+    timing.startedAfterMs = Date.now() - hedgeStartedAt
+    try {
+      const result = await call()
+      timing.useful = usefulTurn(result)
+      return result
+    } catch (error) {
+      timing.useful = false
+      throw error
+    } finally {
+      timing.finishedAfterMs = Date.now() - hedgeStartedAt
+      console.info('[cos-interactive-provider-stage]', JSON.stringify({
+        feature: args.usageContext?.feature || 'unattributed_local_inference',
+        purpose: args.usageContext?.purpose || null,
+        provider,
+        startOffsetMs: timing.startedAfterMs,
+        endOffsetMs: timing.finishedAfterMs,
+        durationMs: timing.finishedAfterMs - timing.startedAfterMs,
+        useful: timing.useful,
+      }))
+    }
+  }
   const outcome = await firstUsefulWithHedge<LocalModelTurnResult>({
-    primary: async () => {
+    primary: () => observed('primary', async () => {
       const runpod = await import('./cos/runpodPrimaryInference.ts')
       if (!runpod.runpodPrimaryEnabled()) return null
       const { recordCosLatencyStage } = await import('./cos/cosLatencyStages.ts')
@@ -824,8 +852,8 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
           console.warn('[cos-interactive-runpod-slot-release]', error instanceof Error ? error.message : String(error))
         })
       }
-    },
-    backup: () => callConfiguredModelTurn(args, { ...config, fallbackFromOwned: true }).catch(error => { managedError = error; return null }),
+    }),
+    backup: () => observed('backup', () => callConfiguredModelTurn(args, { ...config, fallbackFromOwned: true }).catch(error => { managedError = error; return null })),
     // Fresh grounded answers are latency-sensitive: the 20s generic hedge plus
     // managed prefill was producing >35s answer calls. Start the governed backup
     // after 8s, without cancelling a useful owned-model answer. Explicit owner
@@ -840,6 +868,9 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
     purpose: args.usageContext?.purpose || null,
     winner: outcome.winner === 'primary' ? 'runpod' : outcome.winner === 'backup' ? 'managed_backup' : 'none',
     managedBackupStarted: outcome.backupStarted,
+    elapsedMs: Date.now() - hedgeStartedAt,
+    primary: providerTiming.primary,
+    backup: providerTiming.backup,
   }))
   // Nothing usable from either provider: surface the managed error exactly as the managed-only path did
   // (truncation, cost-governance), so callers keep their existing handling.

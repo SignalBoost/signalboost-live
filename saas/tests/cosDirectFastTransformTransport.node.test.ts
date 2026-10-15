@@ -17,8 +17,8 @@ test('middleware fast edits delegate to the canonical COS editor', () => {
   assert.match(primary, /!fastEditAlreadyAttempted&&isFastTextTransform\(input/)
   assert.match(primary, /feature:'cos_fast_text_transform'/)
   assert.match(primary, /deepseek-ai\/DeepSeek-V4-Flash-0731/)
-  assert.match(primary, /FAST_TEXT_TRANSFORM_ATTEMPT_MS = 9_000/)
-  assert.match(primary, /FAST_TEXT_TRANSFORM_TIMEOUT_MS = 18_000/)
+  assert.match(primary, /FAST_TEXT_TRANSFORM_ATTEMPT_MS = 7_000/)
+  assert.match(primary, /FAST_TEXT_TRANSFORM_TIMEOUT_MS = 15_000/)
 })
 
 

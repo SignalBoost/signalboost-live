@@ -262,7 +262,23 @@ export async function executeSignalBoostRepositoryRepair(input: {
     // feature/implementation work has no legitimate failing baseline to manufacture, so it runs
     // through the same repository workspace/runner but must still mutate source and pass fresh
     // task-specific verification before BuilderToolLoop can return success.
-    const selectedProofCommand = engineeringTask ? null : discoverRepositoryRepairProofCommand(target, (await durableSession.listFiles(input.workspaceId)).map(file => file.path))
+    let selectedProofCommand = engineeringTask ? null : discoverRepositoryRepairProofCommand(target, (await durableSession.listFiles(input.workspaceId)).map(file => file.path))
+    if (!engineeringTask && !selectedProofCommand && typeof durableSession.searchFiles === 'function') {
+      // The reported failure may name a symbol or diagnostic but not its test path.
+      // Search actual repository contents; do not pick an arbitrary passing suite.
+      const terms = [...target.symbolHints, ...target.failureEvidence.flatMap(line =>
+        [...line.matchAll(/\\b(?:builder|cos|workspace|repository)_[a-z][a-z0-9_]{5,100}\\b/g)].map(match => match[0]))]
+        .filter(term => term.length >= 8).slice(0, 4)
+      const matches = new Set<string>()
+      for (const term of terms) {
+        const found = await durableSession.searchFiles(input.workspaceId, term)
+        for (const path of found) {
+          const candidate = path.replace(/^saas\\//, '')
+          if (/^(?:tests|test)\\/.+\\.(?:test|spec)\\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(candidate)) matches.add(candidate)
+        }
+      }
+      if (matches.size === 1) selectedProofCommand = `node --experimental-strip-types --test ${[...matches][0]}`
+    }
     if (!engineeringTask && !selectedProofCommand) {
       // No failing test or runnable narrow proof was identified. Stop rather than letting
       // the model substitute an unrelated passing test and misreport non-reproduction.

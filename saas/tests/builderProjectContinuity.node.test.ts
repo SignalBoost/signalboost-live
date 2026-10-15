@@ -179,3 +179,15 @@ test('cron retains generation-fenced stale running reconciliation and one-job ad
   assert.match(cron, /blockedByActiveClaim/)
   assert.match(cron, /const selected = blockedByActiveClaim \? null : jobs\[0\]/)
 })
+
+test('saved workspace selection retrieves same-owner active job without a second POST', () => {
+  const store = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
+  const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
+  const page = readFileSync(new URL('../app/dashboard/developer/page.tsx', import.meta.url), 'utf8')
+  assert.match(store, /export async function readLatestBuilderWorkspaceJob/)
+  assert.match(store, /\.eq\('user_id', input\.userId\)\.eq\('workspace_id', input\.workspaceId\)/)
+  assert.match(route, /const previous = await readLatestBuilderWorkspaceJob/)
+  assert.match(route, /previous\.status === 'paused'/)
+  assert.match(route, /resumable: true, reply: runningReply\(previous\.id\)/)
+  assert.match(page, /if \(data\.activeJobId\) void restoreJob\(data\.activeJobId\)/)
+})

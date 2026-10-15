@@ -113,3 +113,14 @@ test('COS worker preserves direct text transformation usage context into local i
   assert.match(source, /request\.usageContext === undefined[\s\S]*usageContext: request\.usageContext/)
 })
 
+
+test('short edits with quoted thread context use one-model direct editor, not multi-stage advisor', () => {
+  const source = readFileSync(join(process.cwd(), 'lib/ai/cos/directTextTransformation.ts'), 'utf8')
+  const eligible = source.slice(source.indexOf('function isLatencySensitiveShortEdit('), source.indexOf('function provenance('))
+  assert.doesNotMatch(eligible, /if \(referenceContext\) return false/)
+  const fast = source.slice(source.indexOf('if (isLatencySensitiveShortEdit('), source.indexOf('// Register classification and validated editorial skills'))
+  assert.match(fast, /REFERENCE CONTEXT \(read only; never rewrite or include in the answer\)/)
+  assert.match(fast, /referenceContext\.slice\(0, 3500\)/)
+  assert.match(fast, /maxTokens: 900/)
+  assert.doesNotMatch(fast, /tryStrategicNeuralCommunicationTransformation/)
+})

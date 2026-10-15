@@ -7,6 +7,7 @@ import {
   FAST_EDIT_REVIEW_INSTRUCTIONS,
   parseFastEditReview,
   runSelfReviewedEdit,
+  formatIndependentEditReviewPrompt,
 } from '../lib/ai/cos/selfReviewTextEdit.ts'
 
 const contexts = [
@@ -139,4 +140,17 @@ test('a failed edit pass is retried once in the same turn, and the reviewer gets
   assert.doesNotMatch(primary, /FULL USER REQUEST:\\\\n/)
   assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /do not give up: keep only the sentences that are clearly written by the user/)
   assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /"unresolved" only when no user-authored material to edit can be found at all/)
+})
+
+test('editorial model independently reviews whole user request with actual line boundaries', () => {
+  const request = ['edit - please improve my note.', '', 'Prior context:', 'Please send an update.'].join('\n')
+  const candidate = 'Please improve my note.'
+  const text = formatIndependentEditReviewPrompt(request, candidate)
+  assert.ok(text.includes('<<<USER_REQUEST\n' + request + '\nUSER_REQUEST'))
+  assert.ok(text.includes('<<<PRELIMINARY_EDIT\n' + candidate + '\nPRELIMINARY_EDIT'))
+  assert.equal(text.includes('\\n'), false)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /independently reconstruct the intended editing task/)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /grammatical or minimally corrected draft is not automatically/)
+  const source = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  assert.match(source, /prompt:formatIndependentEditReviewPrompt\(userRequest,candidate\)/)
 })

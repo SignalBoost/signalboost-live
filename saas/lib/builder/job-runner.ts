@@ -199,8 +199,13 @@ async function terminalFailure(job: BuilderJobRecord, error: string, trace: read
   const safeTrace = publicTrace(trace)
   const workspace = createSupabaseBuilderWorkspace(job.userId)
   const plainReply = `${repairAwareFailureReply(job, error, safeTrace)}\n\n${builderNextAction(error, trace)}`
-  if (workspace) await workspace.writeFile(job.workspaceId, 'builder-result.txt', `${plainReply.trim()}\n`).catch(() => undefined)
-  const files = workspace ? await workspace.listFiles(job.workspaceId).then(items => items.map(item => item.path)).catch(() => []) : []
+  // A missing or unreadable prior workspace is a real blocker, not a reason
+  // to create an empty replacement through writeFile/listFiles.
+  const unavailablePriorSource = error.startsWith('builder_existing_source_') || error === 'builder_existing_workspace_missing'
+  if (workspace && !unavailablePriorSource) await workspace.writeFile(job.workspaceId, 'builder-result.txt', `${plainReply.trim()}\n`).catch(() => undefined)
+  const files = workspace && !unavailablePriorSource
+    ? await workspace.listFiles(job.workspaceId).then(items => items.map(item => item.path)).catch(() => [])
+    : []
   const reply = historyReply(plainReply, job.workspaceId, files)
   await finishBuilderJob({
     jobId: job.id,
@@ -499,8 +504,13 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     // doing any work: never invent a replacement project from an empty listing.
     if (job.metadata.requiresExistingSource === true) {
       let paths: string[]
-      try { paths = (await workspace.listFiles(job.workspaceId)).map(file => file.path) }
-      catch {
+      try {
+        if (!await workspace.hasWorkspace(job.workspaceId)) {
+          await terminalFailure(job, 'builder_existing_workspace_missing')
+          return
+        }
+        paths = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
+      } catch {
         await terminalFailure(job, 'builder_existing_source_read_unavailable')
         return
       }

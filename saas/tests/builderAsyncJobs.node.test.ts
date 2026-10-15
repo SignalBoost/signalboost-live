@@ -186,3 +186,10 @@ test('allowed identical writes do not consume the mutation budget or reset verif
   assert.match(source, /writeCount \+= 1/)
   assert.match(source, /alreadyPresent !== true/)
 })
+
+test('stale edit target recovery re-reads the current file and bounds retries', () => {
+  const source = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
+  assert.match(source, /message === 'builder_edit_target_not_found'/)
+  assert.match(source, /builder_edit_target_recovery_exhausted/)
+  assert.match(source, /await this\.workspace\.readFile\(input\.workspaceId, path\)/)
+})

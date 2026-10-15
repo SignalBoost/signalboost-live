@@ -539,7 +539,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
                 {run.stage === 'completed' && run.artifactRepo && <button className="underline" onClick={() => download(run.runId)}>{copy.downloadModel}</button>}
               </div>
               <LabCustomerModelPassport run={run} language={language} />
-              {run.stage === 'completed' && <LabCustomerHoldoutEvaluation key={run.runId} language={language} />}
+              {run.stage === 'completed' && <LabCustomerHoldoutEvaluation key={run.runId} language={language} runId={run.runId} baseModel={run.baseModel} trainedModel={run.tunedModelId || run.artifactRepo || ""} />}
               {run.stage === 'completed' && (run.tunedModelId || run.artifactRevision) && <LabCustomerResponseComparison key={run.runId} language={language} baseModel={run.baseModel} trainedModel={run.tunedModelId || run.artifactRepo || run.artifactRevision || '—'} />}
               {files[run.runId] && (
                 <ul className="mt-2 space-y-1">

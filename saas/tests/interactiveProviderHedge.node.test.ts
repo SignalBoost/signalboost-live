@@ -1,6 +1,7 @@
 // saas/tests/interactiveProviderHedge.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import { firstUsefulWithHedge } from '../lib/ai/interactiveProviderHedge.ts'
 
 const later = <T>(ms: number, value: T) => new Promise<T>(resolve => setTimeout(() => resolve(value), ms))
@@ -64,4 +65,19 @@ test('when neither provider answers the outcome is honestly empty', async () => 
   })
   assert.equal(outcome.winner, 'none')
   assert.equal(useful(outcome.result), false)
+})
+
+test('production provider race emits per-attempt timing without changing hedge policy', () => {
+  const source = readFileSync(new URL('../lib/ai/local-inference.ts', import.meta.url), 'utf8')
+  const start = source.indexOf('async function runpodFirstInteractiveTurn(')
+  const end = source.indexOf('export async function callLocalModelTurn(', start)
+  const lane = source.slice(start, end)
+  assert.match(lane, /\[cos-interactive-provider-stage\]/)
+  assert.match(lane, /startOffsetMs: timing\.startedAfterMs/)
+  assert.match(lane, /endOffsetMs: timing\.finishedAfterMs/)
+  assert.match(lane, /purpose: args\.usageContext\?\.purpose/)
+  assert.match(lane, /primary: \(\) => observed\('primary'/)
+  assert.match(lane, /backup: \(\) => observed\('backup'/)
+  assert.match(lane, /firstUsefulWithHedge/)
+  assert.match(lane, /8_000 : interactiveManagedBackupAfterMs\(\)/)
 })

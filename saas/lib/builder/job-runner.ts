@@ -27,6 +27,7 @@ import { VercelSandboxBuilderRunner } from './vercel-sandbox-runner.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { executeSignalBoostRepositoryRepair } from './repository-repair.ts'
 import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from './repository-repair-target.ts'
+import { inspectBuilderContinuationSource } from './continuation-source.ts'
 import { builderAutoMergeSnapshotPort } from './repository-repair-snapshot-host.ts'
 import { retrieveValidatedCognitiveSkills, type CognitiveSkillContextResult } from '@/lib/ai/cos/cognitiveSkillContext'
 import { recordVerifiedCognitiveProductionOutcome } from '@/lib/ai/cos/cognitiveProductionOutcome'
@@ -199,8 +200,13 @@ async function terminalFailure(job: BuilderJobRecord, error: string, trace: read
   const safeTrace = publicTrace(trace)
   const workspace = createSupabaseBuilderWorkspace(job.userId)
   const plainReply = `${repairAwareFailureReply(job, error, safeTrace)}\n\n${builderNextAction(error, trace)}`
-  if (workspace) await workspace.writeFile(job.workspaceId, 'builder-result.txt', `${plainReply.trim()}\n`).catch(() => undefined)
-  const files = workspace ? await workspace.listFiles(job.workspaceId).then(items => items.map(item => item.path)).catch(() => []) : []
+  // A missing or unreadable prior workspace is a real blocker, not a reason
+  // to create an empty replacement through writeFile/listFiles.
+  const unavailablePriorSource = error.startsWith('builder_existing_source_') || error === 'builder_existing_workspace_missing'
+  if (workspace && !unavailablePriorSource) await workspace.writeFile(job.workspaceId, 'builder-result.txt', `${plainReply.trim()}\n`).catch(() => undefined)
+  const files = workspace && !unavailablePriorSource
+    ? await workspace.listFiles(job.workspaceId).then(items => items.map(item => item.path)).catch(() => [])
+    : []
   const reply = historyReply(plainReply, job.workspaceId, files)
   await finishBuilderJob({
     jobId: job.id,
@@ -493,6 +499,22 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     if (!workspace) {
       await terminalFailure(job, 'builder_job_storage_unavailable')
       return
+    }
+    // Conversation continuations may be admitted when their initial file list
+    // was transiently empty. The claimed worker must read source again before
+    // doing any work: never invent a replacement project from an empty listing.
+    if (job.metadata.requiresExistingSource === true) {
+      const source = await inspectBuilderContinuationSource({
+        hasWorkspace: () => workspace.hasWorkspace(job.workspaceId),
+        listPaths: async () => (await workspace.listFiles(job.workspaceId)).map(file => file.path),
+      })
+      if (source.status !== 'ready') {
+        const reason = source.status === 'workspace_missing' ? 'builder_existing_workspace_missing'
+          : source.status === 'read_unavailable' ? 'builder_existing_source_read_unavailable'
+          : 'builder_existing_source_unavailable'
+        await terminalFailure(job, reason)
+        return
+      }
     }
 
     const cognitive = await retrieveValidatedCognitiveSkills(job.objective, { specialistFamily: 'software' }).catch(error => {

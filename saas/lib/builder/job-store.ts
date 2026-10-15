@@ -111,6 +111,23 @@ export async function readBuilderEvidenceJob(input: EvidenceLookup): Promise<Bui
   return data ? toJob(data) : null
 }
 
+/** Most recent job for an explicitly selected workspace, scoped to its owner.
+ * A saved workspace can be reopened in a new browser conversation without
+ * forgetting a still-running job. Never select across tenants.
+ */
+export async function readLatestBuilderWorkspaceJob(input: {
+  userId: string; workspaceId: string
+}): Promise<BuilderJobRecord | null> {
+  if (!UUID.test(input.userId) || !UUID.test(input.workspaceId)) return null
+  const db = serviceClient()
+  if (!db) throw new Error('builder_job_storage_unavailable')
+  const { data, error } = await db.from('builder_jobs').select(JOB_SELECT)
+    .eq('user_id', input.userId).eq('workspace_id', input.workspaceId)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle()
+  if (error) throw new Error('builder_workspace_job_read_failed')
+  return data ? toJob(data) : null
+}
+
 export async function enqueueBuilderJob(input: {
   jobId: string
   workspaceId: string

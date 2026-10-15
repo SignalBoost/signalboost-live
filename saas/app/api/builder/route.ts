@@ -7,7 +7,7 @@ import { isOperationalLogEvidence, isPastedOperationalLog } from '@/lib/ai/cos/p
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
-import { builderPollMayResume, builderSoleResumableJob, enqueueBuilderJob, getBuilderJobForUser, readBuilderEvidenceJob } from '@/lib/builder/job-store'
+import { builderPollMayResume, builderSoleResumableJob, enqueueBuilderJob, getBuilderJobForUser, readBuilderEvidenceJob, readLatestBuilderWorkspaceJob } from '@/lib/builder/job-store'
 import { runBuilderJob, selfHealingCapacityJob } from '@/lib/builder/job-runner'
 import { hasWorkspaceSource, isOwnerRepairWithoutSource, parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
@@ -89,6 +89,7 @@ export async function GET(request: Request) {
         return noStore({
           jobId: job.id,
           workspaceId: job.workspaceId,
+          conversationId: job.conversationId,
           status: job.status,
           progress: {
             phase: job.checkpoint?.verificationPending === true ? 'verification'
@@ -113,6 +114,7 @@ export async function GET(request: Request) {
         ...(job.result || {}),
         jobId: job.id,
         workspaceId: job.workspaceId,
+        conversationId: job.conversationId,
         status: job.status,
         ...(job.error ? { error: job.error } : {}),
       })
@@ -134,10 +136,19 @@ export async function GET(request: Request) {
   }
   if (!UUID.test(workspaceId)) return noStore({ error: 'Invalid workspace id.' }, { status: 400 })
   try {
+    if (!await workspace.hasWorkspace(workspaceId)) {
+      return noStore({ error: 'Workspace not found.' }, { status: 404 })
+    }
     const files = (await workspace.listFiles(workspaceId)).map(file => file.path)
-    return noStore({ workspaceId, files })
+    const latest = await readLatestBuilderWorkspaceJob({ userId: access.userId, workspaceId })
+    const prior = latest?.metadata.platformRepair === true ? null : latest
+    return noStore({ workspaceId, files,
+      ...(prior ? { conversationId: prior.conversationId,
+        ...(prior.status === 'queued' || prior.status === 'running' || prior.status === 'paused'
+          ? { activeJobId: prior.id, activeStatus: prior.status } : {}) } : {}),
+    })
   } catch {
-    return noStore({ error: 'Workspace not found.' }, { status: 404 })
+    return noStore({ error: 'Unable to read workspace files right now.' }, { status: 503 })
   }
 }
 
@@ -225,12 +236,36 @@ export async function POST(request: Request) {
       requestedWorkspaceId: newProjectRequested ? undefined : requestedWorkspaceId,
       hasNewSource: files.length > 0, repositoryImport: Boolean(repositoryTarget),
     }, readBuilderEvidenceJob)
-    if (project.blocked) return noStore({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: project.blocked === 'busy' ? 409 : 503 })
+    if (project.blocked === 'busy' && project.activeJobId && project.workspaceId) {
+      // One conversation keeps its existing durable job; a follow-up must not
+      // fork a new workspace or ask the customer to submit the same task again.
+      return noStore({
+        jobId: project.activeJobId, workspaceId: project.workspaceId, conversationId,
+        status: project.activeStatus || 'running',
+        resumable: true, reply: runningReply(project.activeJobId),
+      }, { status: 202 })
+    }
+    if (project.blocked) return noStore({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: 503 })
     workspaceId = project.workspaceId || workspaceId
+    // A saved workspace may be opened from another browser conversation.
+    // Its owner's active claim always wins; never start a competing job
+    // against the same files because a new tab generated a different id.
+    if (!newProjectRequested && requestedWorkspaceId) {
+      const previous = await readLatestBuilderWorkspaceJob({
+        userId: access.userId, workspaceId: requestedWorkspaceId,
+      })
+      if (previous && previous.metadata.platformRepair !== true
+        && (previous.status === 'queued' || previous.status === 'running' || previous.status === 'paused')) {
+        return noStore({
+          jobId: previous.id, workspaceId: previous.workspaceId, conversationId: previous.conversationId,
+          status: previous.status, resumable: true, reply: runningReply(previous.id),
+        }, { status: 202 })
+      }
+    }
 
     // An owner repair with no source anywhere goes to the platform repository at the deployed
     // revision instead of an empty workspace that can only answer "attach your source".
-    if (access.isOwner && files.length === 0 && !repositoryTarget && !project.context) {
+    if (access.isOwner && files.length === 0 && !repositoryTarget && !project.context && !(project.workspaceId || requestedWorkspaceId)) {
       const selectedWorkspaceId = project.workspaceId || requestedWorkspaceId
       const sourceWorkspace = selectedWorkspaceId ? createSupabaseBuilderWorkspace(access.userId) : null
       // A storage failure counts as "has files": never reroute a workspace whose contents are unknown.
@@ -278,15 +313,26 @@ export async function POST(request: Request) {
       return noStore({ error: 'Builder storage is unavailable.', reply }, { status: 503 })
     }
 
-    // An explicitly selected saved project must contain editable source. New builds use a
-    // fresh workspace and must not be blocked merely because it starts empty.
-    if (!newProjectRequested && (project.workspaceId || requestedWorkspaceId) && files.length === 0) {
-      let existingFiles
-      try { existingFiles = await workspace.listFiles(workspaceId) }
-      catch { return noStore({ error: 'Unable to verify selected workspace source files. No job was created.', execution_allowed: false }, { status: 503 }) }
-      if (!hasWorkspaceSource(existingFiles.map(file => file.path)) && !repositoryTarget) {
-        return noStore({ error: 'Selected workspace is empty. Choose the original project or connect/import the repository.', execution_allowed: false }, { status: 422 })
+    // A workspace's current file listing is not the whole source of truth:
+    // prior jobs in this same authenticated conversation prove continuity.
+    // Defer a transient empty listing to the claimed worker, where actual
+    // source availability is rechecked before any coding tool can run.
+    const continuationWorkspace = !newProjectRequested && !repositoryTarget && files.length === 0
+      && Boolean(project.workspaceId || requestedWorkspaceId)
+    if (continuationWorkspace) {
+      // Verify the workspace is owned by this user without creating one.
+      // A blank or failed file listing is not proof that the project was deleted.
+      let exists: boolean
+      try { exists = await workspace.hasWorkspace(workspaceId) }
+      catch {
+        return noStore({ error: 'Unable to verify selected workspace ownership right now.', execution_allowed: false }, { status: 503 })
       }
+      if (!exists) {
+        return noStore({ error: 'Selected workspace does not exist. No job was created.', execution_allowed: false }, { status: 404 })
+      }
+      try { await workspace.listFiles(workspaceId) }
+      catch { console.warn('[builder_continuation_source_list_deferred]', { workspaceId }) }
+      // Claimed worker re-reads the existing workspace before making any edits.
     }
 
     await workspace.ensureWorkspace(workspaceId)
@@ -325,8 +371,10 @@ export async function POST(request: Request) {
               logEvidence: true,
               passiveLogEvidence,
               repositoryAuthority: false,
+              ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
             }
-          : { ...(project.context ? { projectContext: project.context } : {}) },
+          : { ...(project.context ? { projectContext: project.context } : {}),
+              ...(continuationWorkspace ? { requiresExistingSource: true } : {}) },
       ownerAuthorized: access.isOwner === true,
       runningReply: reply,
     })
@@ -338,6 +386,7 @@ export async function POST(request: Request) {
     return noStore({
       jobId,
       workspaceId,
+      conversationId,
       status: 'queued',
       reply,
     }, { status: 202 })

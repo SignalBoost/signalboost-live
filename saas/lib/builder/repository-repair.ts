@@ -262,11 +262,19 @@ export async function executeSignalBoostRepositoryRepair(input: {
     // feature/implementation work has no legitimate failing baseline to manufacture, so it runs
     // through the same repository workspace/runner but must still mutate source and pass fresh
     // task-specific verification before BuilderToolLoop can return success.
+    const selectedProofCommand = engineeringTask ? null : repositoryRepairProofCommand(target)
+    if (!engineeringTask && !selectedProofCommand) {
+      // No failing test or runnable narrow proof was identified. Stop rather than letting
+      // the model substitute an unrelated passing test and misreport non-reproduction.
+      const existingFiles = (await workspace.listFiles(input.workspaceId)).map(file => file.path)
+      return failedPayload({ error: 'builder_regression_evidence_required', workspaceId: input.workspaceId,
+        files: existingFiles, trace: [], baseCommitSha: target.fullCommitSha })
+    }
     const proofController = engineeringTask ? null : createRepositoryRepairProofController({
       ai: governedAi,
       workspace: durableSession,
       runner: repositoryRunner,
-      proofCommand: repositoryRepairProofCommand(target),
+      proofCommand: selectedProofCommand,
     })
 
     const result = await new BuilderToolLoop(

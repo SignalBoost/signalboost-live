@@ -78,5 +78,9 @@ export function evaluateRegressionGate(objective: string, trace: readonly Builde
   if (repair < 0) return { satisfied: false, reason: 'make the smallest source repair after the reproduced proof failure' }
   const passed = proofRuns.find(({ item, index, command }) => index > repair && item.ok && command === failed.command)
   if (!passed) return { satisfied: false, reason: 'rerun the same proof command after the repair and show it passes' }
+  // A later failed rerun on the same source revision supersedes an earlier pass.
+  // Otherwise a repair may be declared verified while its latest full proof is red.
+  const latestSameProof = proofRuns.findLast(({ index, command }) => index > repair && command === failed.command)
+  if (!latestSameProof?.item.ok) return { satisfied: false, reason: 'the latest rerun of the reproduced proof failed; repair and verify again' }
   return { satisfied: true }
 }

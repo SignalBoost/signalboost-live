@@ -559,7 +559,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       const executionProvenance=authoritativeProvenance(null,{invoked:false})
       ;(executionProvenance as any).local_reasoning={invoked:true,model:fast.reasonerLabel,confidence:fast.reviewVerdict==='self_reviewed'?0.75:0.95}
       ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,provider:null,model:fast.reasonerLabel,from_cache:false}
-      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:fast.reply,source:'local_cos_reasoning',confidence:1,provenance:executionProvenance,externalAiInvoked:false})
+      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:fast.reply,source:'local_cos_reasoning',confidence:fast.reviewVerdict==='self_reviewed'?0.75:0.95,provenance:executionProvenance,externalAiInvoked:false})
       return NextResponse.json({ok:true,reply:fast.reply,source:'cos-fast-text-transform',confidence_score:fast.reviewVerdict==='self_reviewed'?0.75:0.95,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
     // Explicit edits are fully specified. Never send these into the general

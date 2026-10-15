@@ -7,6 +7,8 @@ const now = new Date('2026-10-15T12:00:00.000Z')
 test('definition queries preserve product identifiers without unrelated current-event modifiers', () => {
   for (const question of [
     'What is REA - Reverse Engineer Anything and how does it work?',
+    'What is REA?',
+    'What is MCP?',
     'Explain the Kubernetes platform and how it works',
     'What is the FastAPI framework used for?',
   ]) {

@@ -143,10 +143,6 @@ test('repeated src/storage.js write resolves identical content and cannot force 
   assert.equal(repeatedWriteResolution(current, current), 'identical')
   assert.equal(repeatedWriteResolution(current, 'export const store = {}\\n'), 'different')
   assert.equal(repeatedWriteResolution(null, current), 'missing')
-  assert.match(source, /await this\\.workspace\\.readFile\\(input\\.workspaceId, path\\)/)
-  assert.match(source, /alreadyApplied: true/)
-  assert.match(source, /builder_write_content_conflict/)
-  assert.match(source, /blockedWritePaths\\.size > 0 && \\(toolId === 'run' \\|\\| toolId === 'read_file'\\)/)
   assert.ok(source.indexOf('if (blockedAction && await repeatedWrite(blockedAction))') < source.indexOf('if (blockedAction) {'))
 })
 

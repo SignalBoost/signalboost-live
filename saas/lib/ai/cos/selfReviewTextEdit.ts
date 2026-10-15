@@ -15,6 +15,7 @@ export const FAST_EDIT_AUTHOR_INSTRUCTIONS = [
   'For edit, rewrite, or polish, substantially improve awkward syntax, fragmented sentences, grammar, clarity, and flow. Do not return merely a lightly corrected transcription when the draft needs a genuine rewrite.',
   'Preserve the author’s meaning, voice, uncertainty, facts, names, numbers, dates, intended action, recipients, and responsibility. Never invent a new fact or commitment.',
   'Deliver only a polished, ready-to-use final text with natural paragraph breaks and appropriate correspondence formatting when applicable. Do not include your analysis or the source material.',
+  'Before returning, silently critique your own draft for edit quality, correct authorship and intent, accidental inclusion of context, and missing or invented commitments. Fix any defects yourself. Do not include this evaluation in the answer.',
   'Return strict JSON: {"answer":"<finished text>","confidence":0.0}.',
 ].join('\n')
 
@@ -29,7 +30,7 @@ export const FAST_EDIT_REVIEW_INSTRUCTIONS = [
   'Return one strict JSON object with a verdict of "pass", "repaired", or "unresolved" and an "answer" string. Example: {"verdict":"repaired","answer":"<final edited text>"}. Use an empty answer only for unresolved. No explanation.',
 ].join('\n')
 
-export type FastEditReviewVerdict = 'pass' | 'repaired'
+export type FastEditReviewVerdict = 'pass' | 'repaired' | 'self_reviewed'
 export type FastEditReviewedAnswer = { answer: string; verdict: FastEditReviewVerdict }
 
 /** Parses model review output; empty, malformed, or unresolved reviews are not approvals. */
@@ -52,9 +53,19 @@ export async function runSelfReviewedEdit(input: {
   userRequest: string
   draft: () => Promise<string | null>
   review: (args: { userRequest: string; candidate: string }) => Promise<string | null>
+  // Only enable when the drafting model was explicitly instructed to
+  // self-check its complete final answer before responding. The independent
+  // reviewer is a quality improvement, not a single point of failure.
+  selfReviewedDraft?: boolean
 }): Promise<FastEditReviewedAnswer | null> {
   const candidate = (await input.draft())?.trim()
   if (!candidate) return null
   const reviewed = await input.review({ userRequest: input.userRequest, candidate })
-  return parseFastEditReview(reviewed)
+  const independent = parseFastEditReview(reviewed)
+  if (independent) return independent
+  // Do not replace a finished model-authored edit with a generic refusal
+  // merely because the *optional* reviewer timed out. An explicit reviewer
+  // rejection remains a rejection, not an approval.
+  if (reviewed) return null
+  return input.selfReviewedDraft ? {answer:candidate,verdict:'self_reviewed'} : null
 }

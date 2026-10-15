@@ -10,6 +10,10 @@ const outDir=process.env.ITMOUNTS_ACCEPTANCE_OUTPUT_DIR || 'artifacts/launch-acc
 mkdirSync(outDir,{recursive:true})
 const cases=[
   ['lab_university_authorization','tests/itmountsLabUniversityExecution.node.test.ts'],
+  ['lab_training_event_tenant_contract','tests/labCustomerRunTimeline.node.test.ts'],
+  ['lab_diagnostics_owner_contract','tests/labOrganizationDiagnostics.node.test.ts'],
+  ['lab_observation_redaction','tests/labObservabilityFailureCorrelation.node.test.ts'],
+  ['lab_safe_recovery_guidance','tests/labFailureGuidance.node.test.ts'],
   ['lab_experiment_start','tests/itmountsLabExperimentStart.node.test.ts'],
   ['byoi_scope','tests/itmountsLabByoiScope.node.test.ts'],
   ['byoi_execution','tests/itmountsLabByoiExecution.node.test.ts'],
@@ -29,7 +33,7 @@ for(const [id,file] of cases){
   results.push({id,scope:'repository_contract',status,startedAt:started,finishedAt:new Date().toISOString(),exitCode:run.status,error:run.error?.message?.slice(0,160)||null,diagnostic:status==='PASS'?null:(run.stderr||run.stdout||'').slice(-1600)})
   console.log(JSON.stringify({id,status,exitCode:run.status,diagnostic:status==='PASS'?undefined:(run.stderr||run.stdout||'').slice(-1000)}))
 }
-const outstanding=['live_public_http','owner_login','organization_creation','cross_tenant_live_requests','real_experiment','provider_execution_receipt','training_or_distillation_receipt','evaluation','artifact_retrieval','stripe_test_webhook_settlement','controlled_recovery','exact_revision_rollback']
+const outstanding=['live_public_http','owner_login','organization_creation','cross_tenant_live_requests','authenticated_trace_and_diagnostics','unauthenticated_trace_and_diagnostics','real_experiment','provider_execution_receipt','training_or_distillation_receipt','evaluation','artifact_retrieval','stripe_test_webhook_settlement','controlled_recovery','exact_revision_rollback']
 const report={schema:'itmounts-launch-acceptance-v1',revision,generatedAt:new Date().toISOString(),environment:'CI',realCustomerDataUsed:false,externalProviderSpendAuthorized:false,contractTests:results,liveAcceptance:outstanding.map(id=>({id,status:'NOT_RUN',evidenceRef:null})),releaseReady:false,reason:'Live authenticated production transaction evidence has not been supplied or executed'}
 writeFileSync(join(outDir,'report.json'),JSON.stringify(report,null,2)+'\n')
 if(results.some(x=>x.status!=='PASS'))process.exitCode=1

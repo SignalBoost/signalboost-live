@@ -727,8 +727,8 @@ function interactiveRunpodFirstEligible(args: LocalModelCallArgs, config: LocalI
 }
 
 function interactiveManagedBackupAfterMs(): number {
-  const value = Number(process.env.COS_INTERACTIVE_MANAGED_BACKUP_AFTER_MS || '20000')
-  return Number.isFinite(value) ? Math.max(1000, Math.min(60000, value)) : 20000
+  const value = Number(process.env.COS_INTERACTIVE_MANAGED_BACKUP_AFTER_MS || '8000')
+  return Number.isFinite(value) ? Math.max(1000, Math.min(60000, value)) : 8000
 }
 
 // OWNED REASONER WINDOW (2026-09-29). The RunPod reasoner is Ollama started by scripts/runpod-cos-reasoner.sh

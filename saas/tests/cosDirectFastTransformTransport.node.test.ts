@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { FAST_TEXT_EDITOR_SYSTEM_PROMPT, fastTextTransformPrompt, isFastTextTransform } from '../lib/ai/cos/fastTextTransformIntent.ts'
+import { isFastTextTransform } from '../lib/ai/cos/fastTextTransformIntent.ts'
 import { splitQuotedEmailThread } from '../lib/ai/cos/quotedEmailThread.ts'
 
 test('middleware fast edits delegate to the canonical COS editor', () => {
@@ -84,22 +84,11 @@ test('questions inside a pasted email thread do not turn an edit into a new ques
   )
 })
 
-test('the fast editor edits only the draft and receives the thread as read-only context', () => {
-  const prompt = fastTextTransformPrompt(QUOTED_THREAD_EDIT)
-  const [draft, rest] = prompt.split('REFERENCE CONTEXT')
-  assert.match(draft, /<<<DRAFT\nedit - Thank you Sam[\s\S]*\nDRAFT/)
-  assert.doesNotMatch(draft, /From: Reviewer/)
-  assert.match(rest, /never edit, quote, summarize, or include it in the answer/)
-  assert.match(rest, /<<<CONTEXT\nFrom: Reviewer, Alex/)
-  assert.match(rest, /Please let us know if you have any questions or concerns\.\nCONTEXT$/)
-  // A draft without a quoted thread is sent unchanged.
-  assert.equal(fastTextTransformPrompt('edit - they came last week.'), 'edit - they came last week.')
-  // Full-context editing is performed by COS, without rule-based draft extraction.
+test('the fast lane gives COS the complete request, without rule-based draft extraction', () => {
   const primary = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
   assert.match(primary, /userRequest:input/)
   assert.match(primary, /prompt:input,/)
-  assert.doesNotMatch(primary, /const fastPrompt=fastTextTransformPrompt/)
-
+  assert.doesNotMatch(primary, /fastTextTransformPrompt/)
 })
 
 // Owner report 2026-10-15 ("it did a terrible editing"): the edit returned the replied-to person's
@@ -127,12 +116,7 @@ test('a handling banner above a quoted header belongs to the thread, not the dra
   assert.equal(splitQuotedEmailThread('edit - Confidential matters aside, thanks.').referenceContext, null)
 })
 
-test('the fast editor edits only the user draft and returns none of the replied-to message', () => {
-  assert.match(FAST_TEXT_EDITOR_SYSTEM_PROMPT, /FIND THE USER'S OWN DRAFT/)
-  assert.match(FAST_TEXT_EDITOR_SYSTEM_PROMPT, /may begin in the middle of a line/)
-  assert.match(FAST_TEXT_EDITOR_SYSTEM_PROMPT, /signature block/)
-  assert.match(FAST_TEXT_EDITOR_SYSTEM_PROMPT, /RETURN ONLY THE EDITED DRAFT/)
-  assert.match(FAST_TEXT_EDITOR_SYSTEM_PROMPT, /Never add facts, promises/)
+test('the fast editor drafts and is independently reviewed against the whole request', () => {
   const primary = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
   assert.match(primary, /systemPrompt:FAST_EDIT_AUTHOR_INSTRUCTIONS,/)
   assert.match(primary, /systemPrompt:FAST_EDIT_REVIEW_INSTRUCTIONS,/)

@@ -77,7 +77,7 @@ test('generic semantic and editorial quality contract is model-led, not tied to 
   assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /substantive/)
   const source = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
   const fast = source.slice(source.indexOf('async function runFastTextTransform('), source.indexOf('export const FAST_AUTHORING_TIMEOUT_MS'))
-  assert.match(fast, /runSelfReviewedEdit\\(/)
+  assert.match(fast, /runSelfReviewedEdit\(/)
   assert.match(fast, /prompt:input,/)
   assert.match(fast, /fast_editor_quality_review/)
   assert.doesNotMatch(fast, /return\\{reply:parsed\\.answer|const fastPrompt=fastTextTransformPrompt/)

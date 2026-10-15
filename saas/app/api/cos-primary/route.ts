@@ -177,7 +177,7 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
           jsonObject:true,
           usageContext:{feature:'cos_fast_text_transform',purpose:'fast_editor_quality_review'},
           systemPrompt:FAST_EDIT_REVIEW_INSTRUCTIONS,
-          prompt:`FULL USER REQUEST:\\n${userRequest}\\n\\nEDITED DRAFT TO EVALUATE AND REPAIR:\\n${candidate}`,
+          prompt:`FULL USER REQUEST:\n${userRequest}\n\nEDITED DRAFT TO EVALUATE AND REPAIR:\n${candidate}`,
         },{...config,model:reviewerModel||model,timeoutMs:reviewMs,fallbackFromOwned:true}).catch(()=>null)
       },
     })
@@ -901,7 +901,11 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // Last ordinary-task rescue before any failed-closed path. This is intentionally broader than
   // authoring: explanation, analysis, planning, and other low-risk tasks should still receive a
   // useful answer when the primary confidence gate declined to release one.
-  if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&!hasAttachments&&!isCosCodingObjective(input)){
+  // A text edit is never rescued by free completion: with the edit lanes exhausted, the rescue model
+  // writes a new message of its own (production 2026-10-15: an invented "Please find the TA
+  // attached" email in place of the owner's two-sentence reply). Fail honestly instead.
+  const textEditRequest=isFastTextTransform(input,{previousAssistant:precedingAssistant})
+  if(!requestedAction&&!textEditRequest&&(!requiresFreshEvidence||freshMissUseLocal)&&!hasAttachments&&!isCosCodingObjective(input)){
     const completionRescue=await timeCosStage('primary:completion_rescue',()=>runCompletionFirstRescue(input,language,cosAudience(isPrivileged)))
     if(completionRescue)return completionFirstResponse(startedAt,input,completionRescue,'cos-completion-first-rescue')
   }

@@ -88,3 +88,17 @@ test('generic semantic and editorial quality contract is model-led, not tied to 
   assert.doesNotMatch(fast, /return\\{reply:parsed\\.answer|const fastPrompt=fastTextTransformPrompt/)
   assert.match(fast, /return null/)
 })
+
+// Production 2026-10-15: the owner's long email edit failed review, fell through to free completion,
+// and came back as an invented email ("Please find the TA attached"). Review repairs ambiguous scope
+// instead of giving up, and an edit is never handed to free completion.
+test('ambiguous draft boundaries are repaired, and edits never fall through to free completion', () => {
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /do not give up: keep only the sentences that are clearly written by the user/)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /"unresolved" only when no user-authored material to edit can be found at all/)
+  const primary = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  assert.match(primary, /const textEditRequest=isFastTextTransform\(input,\{previousAssistant:precedingAssistant\}\)/)
+  assert.match(primary, /if\(!requestedAction&&!textEditRequest&&[^\n]*\)\{\n\s*const completionRescue=/)
+  // The reviewer receives real line breaks, not the two characters "\n".
+  assert.match(primary, /prompt:`FULL USER REQUEST:\\n\$\{userRequest\}\\n\\nEDITED DRAFT TO EVALUATE AND REPAIR:\\n\$\{candidate\}`/)
+  assert.doesNotMatch(primary, /FULL USER REQUEST:\\\\n/)
+})

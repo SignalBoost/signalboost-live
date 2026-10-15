@@ -14,6 +14,34 @@ const REPLY_ATTRIBUTION_RE = /^\s*(?:on\s+.+\s+wrote|el\s+.+\s+escribi[oó]|em\s
 const FROM_HEADER_RE = /^\s*(?:from|de|od|от)\s*:\s*\S/iu
 const THREAD_HEADER_RE = /^\s*(?:sent|enviado|enviada|wys[łl]ano|отправлено|to|para|do|кому|cc|dw|копия|subject|asunto|assunto|temat|тема)\s*:/iu
 
+// A copied Outlook thread can carry the previous sender's signature, inline
+// image placeholder and confidentiality banner *before* the first From header.
+// Those belong to the quote, not to the user's draft. Require both a contact
+// detail and a copied-mail marker so an ordinary sender's own sign-off survives.
+const CONTACT_DETAIL_RE = /^\\s*(?:teams|telephone|phone|mobile|cell|tel|email|e-mail|fax)\\s*:\\s*\\S|[\\w.+-]+@[\\w.-]+\\.[a-z]{2,}/iu
+const COPIED_MAIL_MARKER_RE = /^\\s*(?:(?:sbu|cui)\\s*[-–—]\\s*(?:privacy|pii|confidential)|(?:sbu|cui)\\s*[-–—]\\s*(?:confidential|sensitive)|image|logo|cid:[^\\s]+)\\s*$/iu
+
+function copiedSignaturePrelude(lines: string[], fromIndex: number): number {
+  const lower = Math.max(0, fromIndex - 18)
+  const preceding = lines.slice(lower, fromIndex)
+  if (!preceding.some(line => CONTACT_DETAIL_RE.test(line))
+    || !preceding.some(line => COPIED_MAIL_MARKER_RE.test(line))) return fromIndex
+
+  // Only a short footer-like segment immediately before the forwarded header
+  // is movable. Never swallow a preceding paragraph with question punctuation
+  // or several sentences.
+  for (let index = lower; index < fromIndex; index += 1) {
+    if (index > 0 && lines[index - 1].trim()) continue
+    const nonempty = lines.slice(index, fromIndex).map(line => line.trim()).filter(Boolean)
+    if (nonempty.length < 3 || nonempty.length > 12) continue
+    if (nonempty.some(line => line.length > 100 || /[?!]/.test(line))) continue
+    if (!nonempty.some(line => CONTACT_DETAIL_RE.test(line))) continue
+    if (!nonempty.some(line => COPIED_MAIL_MARKER_RE.test(line))) continue
+    return index
+  }
+  return fromIndex
+}
+
 function quotedThreadBoundary(lines: string[]): number | null {
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]
@@ -22,7 +50,7 @@ function quotedThreadBoundary(lines: string[]): number | null {
     if (!FROM_HEADER_RE.test(line)) continue
     const lookahead = lines.slice(index + 1, Math.min(lines.length, index + 13))
     const headerCount = lookahead.filter(candidate => THREAD_HEADER_RE.test(candidate)).length
-    if (headerCount >= 2) return index
+    if (headerCount >= 2) return copiedSignaturePrelude(lines, index)
   }
   return null
 }

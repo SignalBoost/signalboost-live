@@ -168,6 +168,9 @@ export function stableKnowledgeQuestionNeedsNoPlanner(prompt: string, previousAs
   // request capabilities, not to spend a model turn rediscovering that definitions/mechanisms do
   // not need live tools. Mutable/current, action, repository and personal-history language stays
   // on the planner path.
+  // Unknown acronym identification can name a specific project, not an evergreen concept.
+  // Let the capability planner decide if a lookup is necessary; do not force a web search.
+  if (/^(?:what(?: is|'s)|define|explain)\\s+[A-Z][A-Z0-9-]{1,9}(?:\\s*[?.!]|$)/.test(String(prompt || '').trim())) return false
   const questionShape = /^(?:what|why|how|explain|define|describe|compare|when|where)\b/.test(text)
   if (!questionShape) return false
   if (/\b(?:today|current|currently|latest|live|now|this (?:week|month|year)|price|weather|schedule|availability|near me|my (?:account|email|calendar|files?|repo|repository|project)|deploy|commit|merge|pull request|pr\b|fix|change|create|send|book|buy|cancel|delete|update)\b/.test(text)) return false

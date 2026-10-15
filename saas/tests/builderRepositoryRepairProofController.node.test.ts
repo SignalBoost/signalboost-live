@@ -301,3 +301,38 @@ test('without a host proof a policy-blocked broad suite does not pin a proof or 
   assert.equal(result.trace.some(item => item.ok && item.toolId === 'edit_file'), false)
   assert.equal((await workspace.readFile('broad', 'lib/app.js'))?.content, 'module.exports = "unchanged"')
 })
+
+test('production 2026-10-15: blocked npm test plus an unrelated passing test continues to a reproduced repair', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('prod', 'lib/app.js', 'module.exports = "broken"')
+  await workspace.writeFile('prod', 'tests/agentGateway.node.test.ts', 'ok')
+  await workspace.writeFile('prod', 'tests/cosRouter.node.test.ts', 'ok')
+  await workspace.writeFile('prod', 'tests/pressMedia.node.test.ts', 'ok')
+  await workspace.writeFile('prod', 'package.json', '{"scripts":{"test":"node --experimental-strip-types --test tests/*.test.ts"}}')
+  const runner: BuilderRunnerPort = {
+    async run(input) {
+      if (input.command === 'npm test') return { exitCode: 125, stdout: '', stderr: 'builder_repository_broad_test_blocked: select the smallest relevant test file and run it directly', timedOut: false }
+      if (input.command.includes('agentGateway')) return { exitCode: 0, stdout: 'pass 9\n', stderr: '', timedOut: false }
+      const app = input.files.find(file => file.path === 'lib/app.js')
+      return app?.content.includes('fixed')
+        ? { exitCode: 0, stdout: 'pass\n', stderr: '', timedOut: false }
+        : { exitCode: 1, stdout: '', stderr: 'AssertionError: expected fixed', timedOut: false }
+    },
+  }
+  const model = new ScriptedAi([
+    '{"type":"tool","toolId":"list_files","input":{}}',
+    '{"type":"tool","toolId":"run","input":{"command":"npm test"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"node --test tests/agentGateway.node.test.ts"}}',
+    '{"type":"tool","toolId":"write_file","input":{"path":"tests/app.test.js","content":"require(\\"node:assert\\").equal(require(\\"../lib/app.js\\"),\\"fixed\\")"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"node --test tests/app.test.js"}}',
+    '{"type":"tool","toolId":"edit_file","input":{"path":"lib/app.js","search":"broken","replace":"fixed"}}',
+    '{"type":"answer","answer":"fixed lib/app.js"}',
+  ])
+  const controlled = createRepositoryRepairProofController({ ai: model, workspace, runner, proofCommand: null })
+  const result = await new BuilderToolLoop(controlled.ai, controlled.workspace, controlled.runner).run({
+    objective: 'the app is broken, fix it', workspaceId: 'prod', maxRounds: 14,
+  })
+  assert.equal(result.ok, true, result.ok ? '' : result.error)
+  assert.equal(controlled.proofCommand, 'node --test tests/app.test.js')
+  assert.equal((await workspace.readFile('prod', 'lib/app.js'))?.content, 'module.exports = "fixed"')
+})

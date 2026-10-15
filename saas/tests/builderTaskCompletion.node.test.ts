@@ -181,27 +181,34 @@ test('repeated denied inspections stop before exhausting the entire model budget
   assert.ok(calls <= 15, `should stop repeated read requests, got ${calls}`)
 })
 
-test('repeated blocked inspections escalate repairs to mutation-only tools', async () => {
+test('repeated blocked inspections require reproduction before source edits', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   await workspace.writeFile('blocked-repair', 'index.js', 'module.exports = 0')
   let calls = 0
+  let runs = 0
   const result = await new BuilderToolLoop({
     async generate(input) {
       calls++
       if (calls === 3) {
-        assert.match(input.prompt, /mutation now/)
-        assert.match(input.prompt, /TOOLS: \["write_file","edit_file"\]/)
+        assert.match(input.prompt, /no failing verification command has reproduced the defect/)
+        assert.match(input.prompt, /run/)
+        return action('run', { command: 'node index.js' })
+      }
+      if (calls === 4) {
+        assert.match(input.prompt, /repair/i)
         return action('edit_file', { path: 'index.js', search: 'module.exports = 0', replace: 'module.exports = 1' })
       }
       return action('read_file', { path: 'index.js' })
     },
-  }, workspace, { async run() { assert.fail('no command requested') } }).run({
+  }, workspace, { async run() { runs++; return { exitCode: 1, stdout: '', stderr: 'reproduced failure', timedOut: false } } }).run({
     objective: 'Fix broken index.js implementation.',
     workspaceId: 'blocked-repair',
     maxRounds: 8,
   })
-  assert.ok(result.trace.some(item => item.toolId === 'edit_file' && item.ok),
-    JSON.stringify(result.trace.map(item => [item.toolId, item.ok, item.error])))
+  assert.ok(runs >= 1, 'a reproducing command must run before mutation')
+  const runIndex = result.trace.findIndex(item => item.toolId === 'run' && !item.ok)
+  const editIndex = result.trace.findIndex(item => item.toolId === 'edit_file' && item.ok)
+  assert.ok(runIndex >= 0 && editIndex > runIndex, JSON.stringify(result.trace.map(item => [item.toolId, item.ok, item.error])))
 })
 
 test('an unverifiable passing test run cannot replay indefinitely', async () => {

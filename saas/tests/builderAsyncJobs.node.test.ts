@@ -135,3 +135,39 @@ test('background execution is idempotently claimed and applies only validated so
   assert.match(jobRunner, /runDebugFileJob/)
   assert.match(jobRunner, /finishBuilderJob/)
 })
+
+test('repeated write_file(src/storage.js) is acknowledged as idempotent instead of trapping the agent', async () => {
+  const { InMemoryBuilderWorkspace } = await import('../lib/builder/workspace.ts')
+  const { BuilderToolLoop } = await import('../lib/builder/tool-loop.ts')
+  const workspace = new InMemoryBuilderWorkspace()
+  const source = "module.exports = { save: () => true }"
+  const workspaceId = 'user:repeat-storage-write-regression'
+  let calls = 0
+  let runs = 0
+  const ai = { async generate() {
+    calls++
+    if (calls <= 3) return JSON.stringify({
+      type: 'tool', toolId: 'write_file', input: { path: 'src/storage.js', content: source },
+    })
+    return JSON.stringify({ type: 'tool', toolId: 'run', input: { command: 'node src/storage.js' } })
+  } }
+  const runner = { async run() { runs++; return { exitCode: 0, stdout: 'ok', stderr: '', timedOut: false } } }
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({
+    objective: 'Create src/storage.js and run: node src/storage.js',
+    workspaceId, maxRounds: 8,
+  })
+  assert.equal((await workspace.readFile(workspaceId, 'src/storage.js'))?.content, source)
+  assert.ok(result.trace.some(item =>
+    item.toolId === 'write_file' && item.ok && (item.output as { alreadyPresent?: boolean } | undefined)?.alreadyPresent === true)
+    || runs > 0, 'must acknowledge identical write or proceed to verification')
+  assert.notEqual('error' in result ? result.error : '', 'builder_stalled_repeated_inspection')
+})
+
+test('anti-loop guard compares repeated writes to current content and counts repeats independently of listing', () => {
+  const source = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
+  assert.match(source, /existing\.content === proposed/)
+  assert.match(source, /alreadyPresent: true/)
+  assert.match(source, /builder_write_content_differs:/)
+  assert.match(source, /builder_repeated_write_blocked:/)
+  assert.match(source, /staleActions = \[\.\.\.trace\]\.reverse\(\)\.filter\(/)
+})

@@ -7,7 +7,7 @@ import { isOperationalLogEvidence, isPastedOperationalLog } from '@/lib/ai/cos/p
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
-import { builderPollMayResume, builderSoleResumableJob, enqueueBuilderJob, getBuilderJobForUser, readBuilderEvidenceJob } from '@/lib/builder/job-store'
+import { builderPollMayResume, builderSoleResumableJob, enqueueBuilderJob, getBuilderJobForUser, readBuilderEvidenceJob, readLatestBuilderWorkspaceJob } from '@/lib/builder/job-store'
 import { runBuilderJob, selfHealingCapacityJob } from '@/lib/builder/job-runner'
 import { hasWorkspaceSource, isOwnerRepairWithoutSource, parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
@@ -140,7 +140,13 @@ export async function GET(request: Request) {
       return noStore({ error: 'Workspace not found.' }, { status: 404 })
     }
     const files = (await workspace.listFiles(workspaceId)).map(file => file.path)
-    return noStore({ workspaceId, files })
+    const latest = await readLatestBuilderWorkspaceJob({ userId: access.userId, workspaceId })
+    const prior = latest?.metadata.platformRepair === true ? null : latest
+    return noStore({ workspaceId, files,
+      ...(prior ? { conversationId: prior.conversationId,
+        ...(prior.status === 'queued' || prior.status === 'running' || prior.status === 'paused'
+          ? { activeJobId: prior.id, activeStatus: prior.status } : {}) } : {}),
+    })
   } catch {
     return noStore({ error: 'Unable to read workspace files right now.' }, { status: 503 })
   }
@@ -241,6 +247,21 @@ export async function POST(request: Request) {
     }
     if (project.blocked) return noStore({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: 503 })
     workspaceId = project.workspaceId || workspaceId
+    // A saved workspace may be opened from another browser conversation.
+    // Its owner's active claim always wins; never start a competing job
+    // against the same files because a new tab generated a different id.
+    if (!newProjectRequested && requestedWorkspaceId) {
+      const previous = await readLatestBuilderWorkspaceJob({
+        userId: access.userId, workspaceId: requestedWorkspaceId,
+      })
+      if (previous && previous.metadata.platformRepair !== true
+        && (previous.status === 'queued' || previous.status === 'running' || previous.status === 'paused')) {
+        return noStore({
+          jobId: previous.id, workspaceId: previous.workspaceId, conversationId: previous.conversationId,
+          status: previous.status, resumable: true, reply: runningReply(previous.id),
+        }, { status: 202 })
+      }
+    }
 
     // An owner repair with no source anywhere goes to the platform repository at the deployed
     // revision instead of an empty workspace that can only answer "attach your source".

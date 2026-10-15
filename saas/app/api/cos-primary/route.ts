@@ -67,7 +67,7 @@ import { searchPastConversations } from '@/lib/ai/tools/conversationHistory'
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { reportLanguageName } from '@/lib/i18n/reportLanguage'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
-import { isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
+import { fastTextTransformPrompt, isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
 import { looksLikeArtifactContinuation } from '@/lib/ai/cos/artifactContinuationIntent'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
@@ -134,6 +134,7 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
   const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\.com/i.test(config.baseUrl)
   const preferredModel=process.env.COS_FAST_TEXT_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
   const models=[...new Set([preferredModel,config.model].filter(Boolean))]
+  const fastPrompt=fastTextTransformPrompt(input)
   const startedAt=Date.now()
   for(const model of models){
     const remaining=Math.max(0,FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt))
@@ -148,8 +149,8 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
       persistUsage:false,
       jsonObject:true,
       usageContext:{feature:'cos_fast_text_transform',purpose:model===preferredModel?'fast_editor_primary':'fast_editor_retry'},
-      systemPrompt:'You are COS fast text editor. Perform only the requested edit, rewrite, proofreading, shortening, polishing, or translation. Preserve the user\'s intended meaning and factual content. Do not research, browse, invoke tools, discuss the editing process, or add commentary. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
-      prompt:input,
+      systemPrompt:'You are COS fast text editor. Perform only the requested edit, rewrite, proofreading, shortening, polishing, or translation on the user\'s own text. Preserve the user\'s intended meaning and factual content. Text marked REFERENCE CONTEXT is someone else\'s earlier message: use it only to understand the draft and never return it. Do not research, browse, invoke tools, discuss the editing process, or add commentary. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
+      prompt:fastPrompt,
     },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true}).catch(()=>null)
     if(!text)continue
     const parsed=parseLocalResult(text)

@@ -87,3 +87,13 @@ test('specific acronym identification reaches capability planner while ordinary 
   assert.equal(stableKnowledgeQuestionNeedsNoPlanner('What is a binary search tree?'), true)
   assert.equal(stableKnowledgeQuestionNeedsNoPlanner('How does photosynthesis work?'), true)
 })
+
+test('short domain-prefaced explanations skip planner; mutable and action requests do not', () => {
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('In IT what is a reverse engineering suite and how does it work?'), true)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('In networking, how does BGP route traffic?'), true)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('In chemistry, explain covalent bonding'), true)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('In IT what is the latest software security advisory?'), false)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('In banking, how do I update my account?'), false)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('In 2026 what is happening with elections?'), false)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('In IT what is that tool?', 'We mentioned a tool above.'), false)
+})

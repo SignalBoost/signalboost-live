@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { conciergeBuilderRequest, isReplaySafeConciergeEdit, sendReplaySafeEditAfterTransportLoss } from '../lib/ai/cos/agentProgressClient.ts'
+import { conciergeBuilderRequest, isReplaySafeConciergeEdit, postWithAgentProgress, sendReplaySafeEditAfterTransportLoss } from '../lib/ai/cos/agentProgressClient.ts'
 
 test('Concierge and owner COS consume observable request progress instead of timer-only stages', () => {
   const concierge = readFileSync(new URL('../components/Concierge.tsx', import.meta.url), 'utf8')
@@ -172,5 +172,31 @@ test('non-edit requests and aborted edits never retry', async () => {
       throw new Error('disconnected')
     }, allow, abort.signal))
     assert.equal(calls, 1)
+  }
+})
+
+test('public COS browser client delivers the recovered edited reply', async () => {
+  const previousFetch = globalThis.fetch
+  const previousWindow = (globalThis as any).window
+  let sends = 0
+  ;(globalThis as any).window = { setInterval: () => 1, clearInterval: () => {} }
+  globalThis.fetch = (async () => {
+    sends += 1
+    if (sends === 1) throw new Error('network interrupted')
+    return Response.json({ reply: 'Improved wording.' })
+  }) as typeof fetch
+  try {
+    const result = await postWithAgentProgress({
+      target: 'concierge',
+      body: { messages: [{ role: 'user', content: 'edit - Make this better please.' }], context: { language: 'en' } },
+      signal: new AbortController().signal,
+      onProgress: () => {},
+    })
+    assert.equal(result.data.reply, 'Improved wording.')
+    assert.equal(result.ok, true)
+    assert.equal(sends, 2)
+  } finally {
+    globalThis.fetch = previousFetch
+    ;(globalThis as any).window = previousWindow
   }
 })

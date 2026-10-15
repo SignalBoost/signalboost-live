@@ -242,7 +242,16 @@ export default function DeveloperPage() {
 
       setFiles([])
       await loadWorkspaces()
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not reach Builder.') }
+    } catch (cause) {
+      if (cause instanceof TypeError) {
+        // A transport loss is not evidence that a POST failed. Never replay it:
+        // the server may already have persisted and queued a durable job.
+        setError('Connection to Builder was lost. The request may still have been accepted. Check Builder History or reopen the last job before submitting again. No automatic retry was sent.')
+        await loadWorkspaces()
+      } else {
+        setError(cause instanceof Error ? cause.message : 'Could not reach Builder.')
+      }
+    }
     finally { setRunning(false) }
   }
 

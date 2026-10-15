@@ -72,5 +72,9 @@ export function liveSearchQueriesForTurn(plannerQueries: readonly string[], host
   if (!planned.length) return [...hostQueries]
   const seen = new Set(planned.map(query => query.toLowerCase()))
   const extra = hostQueries.find(query => query && !seen.has(query.toLowerCase()))
-  return extra ? [...planned, extra] : planned
+  // The primary live-research lane executes at most two searches. Ensure its
+  // independent host query actually runs instead of being truncated behind
+  // multiple planner guesses. The remaining planner queries are retained for
+  // any caller that can use a wider research budget.
+  return extra ? [planned[0], extra, ...planned.slice(1)] : planned
 }

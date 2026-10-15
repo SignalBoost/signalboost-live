@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { conciergeBuilderRequest } from '../lib/ai/cos/agentProgressClient.ts'
+import { conciergeBuilderRequest, isReplaySafeConciergeEdit, sendReplaySafeEditAfterTransportLoss } from '../lib/ai/cos/agentProgressClient.ts'
 
 test('Concierge and owner COS consume observable request progress instead of timer-only stages', () => {
   const concierge = readFileSync(new URL('../components/Concierge.tsx', import.meta.url), 'utf8')
@@ -142,4 +142,35 @@ test('lost COS POST transport performs read-only History recovery before showing
   assert.match(client, /args\.target === 'cos' && conversationId && userText/)
   assert.match(client, /source: 'cos-transport-history-recovery'/)
   assert.ok(client.indexOf('recoverAssistantReplyFromHistory(userText, startedAt') < client.indexOf("source: 'assistant-transport-unconfirmed'"))
+})
+
+test('safe retry eligibility is limited to plain text rewrites without attachments', () => {
+  const body = (content: string, attachments: any[] = []) => ({ messages: [{ role: 'user', content }], attachments })
+  assert.equal(isReplaySafeConciergeEdit(body('edit - Please make this sentence clearer.')), true)
+  assert.equal(isReplaySafeConciergeEdit(body('edit - Please make this clearer.', [{name:'file.txt'}])), false)
+  assert.equal(isReplaySafeConciergeEdit(body('Deploy this app.')), false)
+})
+
+test('lost reply to plain text edit can be recovered by a bounded retry', async () => {
+  let calls = 0
+  const result = await sendReplaySafeEditAfterTransportLoss(async () => {
+    calls += 1
+    if (calls === 1) throw new Error('network interrupted')
+    return Response.json({ reply: 'Edited text.' })
+  }, true, new AbortController().signal)
+  assert.equal((await result.json()).reply, 'Edited text.')
+  assert.equal(calls, 2)
+})
+
+test('non-edit requests and aborted edits never retry', async () => {
+  for (const allow of [false, true]) {
+    const abort = new AbortController()
+    if (allow) abort.abort()
+    let calls = 0
+    await assert.rejects(sendReplaySafeEditAfterTransportLoss(async () => {
+      calls += 1
+      throw new Error('disconnected')
+    }, allow, abort.signal))
+    assert.equal(calls, 1)
+  }
 })

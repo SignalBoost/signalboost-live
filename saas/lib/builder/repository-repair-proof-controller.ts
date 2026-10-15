@@ -47,6 +47,26 @@ export function repositoryRepairProofCommand(target: Pick<SignalBoostRepositoryR
     : null
 }
 
+/** Discover a narrow proof only when a named source path maps unambiguously to a test file. */
+export function discoverRepositoryRepairProofCommand(
+  target: Pick<SignalBoostRepositoryRepairTarget, 'pathHints' | 'failedCommand'> & Partial<Pick<SignalBoostRepositoryRepairTarget, 'failureEvidence'>>,
+  availablePaths: readonly string[],
+): string | null {
+  const explicit = repositoryRepairProofCommand(target)
+  if (explicit) return explicit
+  const stems = target.pathHints
+    .filter(path => /\\.(?:[cm]?[jt]sx?)$/i.test(path) && !/\\.(?:test|spec)\\./i.test(path))
+    .map(path => path.split('/').pop()!.replace(/\\.[^.]+$/, '').toLowerCase())
+    .filter(stem => stem.length >= 5)
+  if (!stems.length) return null
+  const candidates = [...new Set(availablePaths.map(path => path.replace(/^saas\\//, '')))]
+    .filter(path => /^(?:tests|test)\\/.+\\.(?:test|spec)\\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(path))
+    .filter(path => stems.some(stem => path.split('/').pop()!.toLowerCase().includes(stem)))
+  // Ambiguous matches must not silently choose an unrelated passing suite.
+  if (candidates.length !== 1) return null
+  return `node --experimental-strip-types --test ${candidates[0]}`
+}
+
 /**
  * Repository repair verification is a controller responsibility. This adapter makes
  * the exact host-selected proof the first action on the pinned source and the first

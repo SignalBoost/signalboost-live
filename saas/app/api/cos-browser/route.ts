@@ -26,6 +26,8 @@ import { isOperationalLogRepairOffer } from '@/lib/ai/cos/pastedOperationalLog'
 import { isRepairConfirmation } from '@/lib/ai/cos/repairConfirmationIntent'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
+import { buildPriceHistoryChart, detectPriceHistoryChartRequest, fetchPriceHistory, priceHistoryUnavailableReply } from '@/lib/market/priceHistoryChart'
+import { blockedGoal, completedGoal } from '@/lib/ai/cos/goalCompletion'
 import { resolveSemanticVisualRequest, shouldResolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
 import { publicConciergeIdentityReply, publicConciergeIdentityReplyForIntent } from '@/lib/ai/cos/publicConciergeIdentity'
 import { resolveSemanticPublicIdentity, shouldResolveSemanticPublicIdentity } from '@/lib/ai/cos/publicConciergeIdentityIntent'
@@ -209,6 +211,42 @@ async function executeBrowserTurn(req: NextRequest) {
   const auditUserId = access?.userId ?? null
   const authenticatedOwner = access?.isOwner === true && Boolean(access.userId)
   const routingContext = builderRoutingContextFromBody(body)
+
+  if (browserSurface === 'concierge' && !hasAttachments) {
+    // A chart of a security's price is market data, not an illustration: plot the real daily
+    // closes and cite them, instead of image generation (which would invent the line and spend
+    // the guest visual trial) or a current-quote-only answer.
+    const priceChart = detectPriceHistoryChartRequest(prompt, userMessages.slice(0, -1).map((message: any) => String(message.content)))
+    if (priceChart) {
+      const history = await fetchPriceHistory(priceChart)
+      if (!history) {
+        return publicConciergePresentation(await withSuggestedFollowups(NextResponse.json({
+          reply: priceHistoryUnavailableReply(priceChart, language),
+          source: 'concierge-market-chart-unavailable',
+          execution_allowed: false,
+          external_action_taken: false,
+          external_ai_invoked: false,
+          local_model_invoked: false,
+          external_retrieval_used: true,
+          goal_completion: blockedGoal(['market_history_lookup_exhausted'], ['market_history'], 'wait'),
+        }), prompt, auditUserId))
+      }
+      const chart = buildPriceHistoryChart(priceChart, history, language)
+      const dataUrl = `data:image/png;base64,${chart.png.toString('base64')}`
+      return publicConciergePresentation(await withSuggestedFollowups(NextResponse.json({
+        reply: chart.reply,
+        source: 'concierge-market-chart',
+        visual: { previewUrl: dataUrl, downloadUrl: dataUrl, filename: chart.filename, alt: chart.alt },
+        execution_allowed: true,
+        external_action_taken: false,
+        external_ai_invoked: false,
+        local_model_invoked: false,
+        external_retrieval_used: true,
+        goal_completion: completedGoal(['market_history_retrieved', 'chart_rendered', 'visual_delivered_inline']),
+      }), prompt, auditUserId))
+    }
+  }
+
 
   // Self-contained writing/translation is already a complete COS objective. Do not spend the
   // interactive response budget asking unrelated public identity, Software Specialist, or visual

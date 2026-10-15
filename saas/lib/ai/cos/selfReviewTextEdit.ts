@@ -63,9 +63,34 @@ export function parseFastEditReview(text: string | null | undefined): FastEditRe
   const raw = String(text || '').trim()
   if (!raw) return null
   const start = raw.indexOf('{')
-  if (start < 0) return null
+  if (start < 0 || raw.length > 20_000) return null
+  // JSON mode is not always respected by providers: a useful completed
+  // review can be wrapped in Markdown or followed by a closing code fence.
+  // Find one balanced JSON object without mistaking braces inside strings
+  // for structural delimiters. Do not turn parse failures into approvals.
+  let depth = 0
+  let quoted = false
+  let escaped = false
+  let end = -1
+  for (let index = start; index < raw.length; index += 1) {
+    const char = raw[index]
+    if (quoted) {
+      if (escaped) escaped = false
+      else if (char === '\\') escaped = true
+      else if (char === '"') quoted = false
+    } else if (char === '"') quoted = true
+    else if (char === '{') depth += 1
+    else if (char === '}') {
+      depth -= 1
+      if (depth === 0) {
+        end = index + 1
+        break
+      }
+    }
+  }
+  if (end < 0) return null
   try {
-    const parsed: unknown = JSON.parse(raw.slice(start))
+    const parsed: unknown = JSON.parse(raw.slice(start, end))
     if (!parsed || typeof parsed !== 'object') return null
     const value = parsed as Record<string, unknown>
     if (value.verdict !== 'pass' && value.verdict !== 'repaired') return null

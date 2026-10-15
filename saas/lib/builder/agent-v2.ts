@@ -14,6 +14,32 @@ export type BuilderV2Checkpoint = Readonly<{
   lastReceipt: string
 }>
 
+/**
+ * A resumed job must never trust a checkpoint's claimed verification counters.
+ * Rebuild them from host receipts; V1 checkpoints have a different version.
+ */
+export function validateBuilderV2ReceiptHistory(checkpoint: BuilderV2Checkpoint): boolean {
+  if (!Array.isArray(checkpoint.steps) || checkpoint.steps.length > 120) return false
+  let revision = 0
+  let verifiedRevision = -1
+  let unproductive = 0
+  for (const receipt of checkpoint.steps) {
+    if (!receipt || typeof receipt !== 'object' || typeof receipt.tool !== 'string'
+      || typeof receipt.ok !== 'boolean' || typeof receipt.changed !== 'boolean') return false
+    if (receipt.changed && (!receipt.ok || (receipt.tool !== 'write_file' && receipt.tool !== 'edit_file'))) return false
+    if (receipt.changed) revision++
+    if (receipt.tool === 'run_tests' && receipt.ok) {
+      const output = receipt.output as { exitCode?: unknown; timedOut?: unknown } | undefined
+      if (!output || output.exitCode !== 0 || output.timedOut !== false) return false
+      verifiedRevision = revision
+    }
+    if (receipt.changed || receipt.tool === 'run_tests' && receipt.ok) unproductive = 0
+    else unproductive++
+  }
+  return checkpoint.revision === revision && checkpoint.verifiedRevision === verifiedRevision
+    && checkpoint.unproductive === unproductive
+}
+
 type Decision = Readonly<{ type: 'tool'; action: BuilderV2Action }> | Readonly<{ type: 'finish'; summary: string }>
 export type BuilderV2Outcome = Readonly<{
   ok: boolean
@@ -65,7 +91,7 @@ export class BuilderV2Agent {
       if (saved.workspaceDigest !== await workspaceDigest(this.workspace, options.workspaceId)) {
         return { ok: false, reason: 'builder_v2_checkpoint_workspace_changed', steps: [] }
       }
-      if (!Array.isArray(saved.steps) || saved.steps.length > 120 || [saved.revision, saved.verifiedRevision, saved.unproductive].some(n => !Number.isSafeInteger(n) || n < -1 || n > 120)) {
+      if (!validateBuilderV2ReceiptHistory(saved) || [saved.revision, saved.verifiedRevision, saved.unproductive].some(n => !Number.isSafeInteger(n) || n < -1 || n > 120)) {
         return { ok: false, reason: 'builder_v2_checkpoint_invalid', steps: [] }
       }
     }

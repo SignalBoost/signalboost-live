@@ -3,7 +3,8 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { resolveHistoricalStockChartIntent } from '../lib/ai/cos/historicalStockChartIntent.ts'
-import { historicalPricesSvg, loadHistoricalStockPrices, parseYahooHistory, parseStooqHistory } from '../lib/ai/cos/historicalStockChart.ts'
+import { historicalPricesSvg, loadHistoricalStockPrices, parseYahooHistory, parseStooqHistory, verifyHistoricalPriceCoverage } from '../lib/ai/cos/historicalStockChart.ts'
+import { orchestrateDataVisualization } from '../lib/ai/cos/dataVisualizationHarness.ts'
 
 const user = (content: string) => ({role:'user',content})
 const assistant = (content: string) => ({role:'assistant',content})
@@ -114,10 +115,13 @@ test('fallback to a second independent historical-price source when primary is u
 test('COS browser routes both turns before the image-generation paywall',()=>{
   const browser=readFileSync(join(process.cwd(),'app/api/cos-browser/route.ts'),'utf8')
   assert.ok(browser.indexOf('resolveHistoricalStockChartIntent(messages)') < browser.indexOf('const directVisual'))
-  assert.match(browser,/source: 'cos-historical-stock-chart'/)
-  assert.match(browser,/source: 'cos-historical-chart-data-unavailable'/)
-  assert.match(browser,/\/api\/market-charts\//)
-  assert.match(browser,/historical\.points\.length/)
+  assert.match(browser,/await orchestrateDataVisualization\(messages, req\.url\)/)
+  assert.match(browser,/capability_receipt: chartResult\.receipt/)
+  const harness=readFileSync(join(process.cwd(),'lib/ai/cos/dataVisualizationHarness.ts'),'utf8')
+  assert.match(harness,/source:'cos-historical-stock-chart'/)
+  assert.match(harness,/evidence_unavailable/)
+  assert.match(harness,/verifyHistoricalPriceCoverage/)
+  assert.match(harness,/\/api\/market-charts\//)
   const graphics=readFileSync(join(process.cwd(),'components/AssistantMessage.tsx'),'utf8')
   assert.match(graphics,/function isImageUrl\(/)
   assert.match(graphics,/svg/)
@@ -126,4 +130,53 @@ test('COS browser routes both turns before the image-generation paywall',()=>{
   assert.match(endpoint,/image\/svg\+xml/)
   assert.match(endpoint,/loadHistoricalStockPrices/)
   assert.doesNotMatch(endpoint,/GUEST_VISUAL_TRIAL|visualPost|image_gen/)
+})
+
+
+test('harness refuses historical chart if source observations do not span the requested period', async () => {
+  const now = new Date('2024-01-05T00:00:00Z')
+  const stock = {
+    symbol: 'VNCE',
+    range: '6mo' as const,
+    currency:'USD',
+    source: 'Yahoo Finance' as const,
+    sourceUrl:'https://finance.yahoo.com/quote/VNCE/history/',
+    fetchedAt:now.toISOString(),
+    points:[
+      {date:'2024-01-01',close:12},
+      {date:'2024-01-02',close:13},
+      {date:'2024-01-04',close:14},
+    ],
+  }
+  assert.deepEqual(verifyHistoricalPriceCoverage(stock,now), {ok:false,reason:'insufficient_history'})
+  const fakeFetch = (async ()=>new Response(JSON.stringify(yahoo()),{status:200})) as typeof fetch
+  const out=await orchestrateDataVisualization(
+    [user('Plot six months VNCE stock closing prices')],
+    'https://itmounts.com',
+    {fetchImpl:fakeFetch,now},
+  )
+  assert.equal(out?.status,'evidence_rejected')
+  assert.equal(out?.receipt.status,'evidence_rejected')
+  assert.doesNotMatch(out?.reply||'',/<svg|\/api\/market-charts\//)
+})
+
+test('harness renders its own chart backed by a sufficiently broad dated price series',async()=>{
+  const now = new Date('2024-07-15T00:00:00Z')
+  const start = new Date('2024-01-15T00:00:00Z')
+  const timestamp=Array.from({length:185},(_,index)=>Math.round((start.getTime()+index*86400_000)/1000))
+  const closes=timestamp.map((_,index)=>12+index/48)
+  const valid={
+    chart:{result:[{meta:{currency:'USD'},timestamp,indicators:{quote:[{close:closes}]}}]},
+  }
+  const fakeFetch = (async()=>new Response(JSON.stringify(valid),{status:200})) as typeof fetch
+  const out=await orchestrateDataVisualization([
+    user('Draw a chart of VNCE stock price for six months'),
+  ], 'https://itmounts.com', {fetchImpl:fakeFetch,now})
+  assert.equal(out?.status,'completed')
+  assert.equal(out?.receipt.capability,'data_visualization.historical_financial_series')
+  assert.ok((out?.receipt.observation_count||0)>100)
+  assert.match(out?.reply||'',/https:\/\/itmounts.com\/api\/market-charts\/VNCE.svg\?range=6mo/)
+  assert.match(out?.reply||'',/observed closing prices/)
+  assert.doesNotMatch(out?.reply||'',/visual trial|upgrade/i)
+  assert.equal(out?.receipt.checks.includes('range_coverage_verified'),true)
 })

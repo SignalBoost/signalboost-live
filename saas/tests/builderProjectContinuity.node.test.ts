@@ -160,3 +160,22 @@ test('the Developer surface submits conversation continuity to the server withou
   assert.match(worker, /await workspace\.listFiles\(job\.workspaceId\)/)
   assert.match(worker, /builder_existing_source_unavailable/)
 })
+
+test('durable source admission never manufactures a missing workspace', () => {
+  const storage = readFileSync(new URL('../lib/builder/workspace-supabase.ts', import.meta.url), 'utf8')
+  const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  assert.match(storage, /async hasWorkspace\(workspaceId: string\)/)
+  assert.match(route, /if \(!await workspace\.hasWorkspace\(workspaceId\)\)/)
+  assert.match(route, /exists = await workspace\.hasWorkspace\(workspaceId\)/)
+  assert.match(runner, /if \(!await workspace\.hasWorkspace\(job\.workspaceId\)\)/)
+  assert.match(runner, /if \(workspace && !unavailablePriorSource\)/)
+})
+
+test('cron retains generation-fenced stale running reconciliation and one-job admission', () => {
+  const cron = readFileSync(new URL('../app/api/cron/builder-continuations/route.ts', import.meta.url), 'utf8')
+  assert.match(cron, /requeue_stale_builder_claims/)
+  assert.match(cron, /expire_stale_builder_jobs/)
+  assert.match(cron, /blockedByActiveClaim/)
+  assert.match(cron, /const selected = blockedByActiveClaim \? null : jobs\[0\]/)
+})

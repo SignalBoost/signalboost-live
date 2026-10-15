@@ -20,8 +20,8 @@ test('the exact production prompt routes to the visual generator deterministical
   requireWiring(route, {
     file: 'saas/app/api/cos-browser/route.ts',
     purpose: 'Keep explicit visual requests on the zero-cost fast path while semantic ambiguity uses the deep conversation classifier.',
-    expect: /const directVisual = isConciergeVisualObjective\(prompt\)/,
-    insert: '    const directVisual = isConciergeVisualObjective(prompt)',
+    expect: /const directVisual = !softwareExecutionObjective && isConciergeVisualObjective\(prompt\)/,
+    insert: '    const directVisual = !softwareExecutionObjective && isConciergeVisualObjective(prompt)',
     after: '    // ambiguous — including follow-up language — is decided by the deep semantic reasoner',
     requiresImport: "import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
   })

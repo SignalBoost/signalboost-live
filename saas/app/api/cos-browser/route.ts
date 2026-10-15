@@ -375,8 +375,9 @@ async function executeBrowserTurn(req: NextRequest) {
     // ambiguous — including follow-up language — is decided by the deep semantic reasoner using
     // bounded recent user-authored conversation context. Deterministic code only validates and
     // preserves the user's exact words; it does not infer the continuation itself.
-    const directVisual = isConciergeVisualObjective(prompt)
-    const semanticVisualEligible = !directVisual
+    const softwareExecutionObjective = isCosCodingObjective(prompt, routingContext)
+    const directVisual = !softwareExecutionObjective && isConciergeVisualObjective(prompt)
+    const semanticVisualEligible = !softwareExecutionObjective && !directVisual
       && browserSurface === 'concierge'
       && shouldResolveSemanticVisualRequest(messages, prompt)
     semanticVisualInvoked = semanticVisualEligible

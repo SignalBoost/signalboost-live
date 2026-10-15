@@ -392,7 +392,15 @@ function filenameForPeople(people: readonly string[]): string {
  * and subject words tolerate one insertion, deletion, substitution, or adjacent transposition so a
  * typo such as "imaage" cannot silently send an image request to the text-only reasoning path.
  */
+/** Software execution specifications must never be mistaken for an image request. */
+export function isExecutableSoftwareBrief(prompt: string): boolean {
+  const deliverable = /(?:package\.json|node\s+index\.js|node\s+--test|npm\s+test|src\/[\w.-]+\.[jt]s|test\/[\w.-]+\.[jt]s|exit\s+code|automated\s+tests?)/i
+  const action = /\b(?:build|implement|create|develop|fix|repair|execute|run|test|verify)\b/i
+  return deliverable.test(prompt) && action.test(prompt)
+}
+
 export function isConciergeVisualObjective(prompt: string): boolean {
+  if (isExecutableSoftwareBrief(prompt)) return false
   const tokens = normalizedVisualTokens(prompt)
   if (!tokens.length || !tokens.some((token) => VISUAL_ACTION_TOKENS.has(token))) return false
   if (tokens.some((token) => SELF_SUFFICIENT_VISUAL_ACTION_TOKENS.has(token))) return true
@@ -424,6 +432,7 @@ export function detectConciergeVisualIntent(
   prompt: string,
   options?: { semanticVisual?: boolean; realPeople?: readonly string[] },
 ): ConciergeVisualIntent | null {
+  if (isExecutableSoftwareBrief(prompt)) return null
   const admitted = isConciergeVisualObjective(prompt)
     || options?.semanticVisual === true
   if (!admitted) return null

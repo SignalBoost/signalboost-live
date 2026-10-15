@@ -5,7 +5,7 @@ import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
 import { createBuilderPlaywrightCliPort } from './playwright-cli-port.ts'
-import { createRepositoryRepairProofController, repositoryRepairProofCommand } from './repository-repair-proof-controller.ts'
+import { createRepositoryRepairProofController, discoverRepositoryRepairProofCommand } from './repository-repair-proof-controller.ts'
 import { normalizeBuilderSandboxCommand } from './project-context.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { verifiedRepairLesson } from './verified-lessons.ts'
@@ -262,7 +262,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
     // feature/implementation work has no legitimate failing baseline to manufacture, so it runs
     // through the same repository workspace/runner but must still mutate source and pass fresh
     // task-specific verification before BuilderToolLoop can return success.
-    const selectedProofCommand = engineeringTask ? null : repositoryRepairProofCommand(target)
+    const selectedProofCommand = engineeringTask ? null : discoverRepositoryRepairProofCommand(target, (await durableSession.listFiles(input.workspaceId)).map(file => file.path))
     if (!engineeringTask && !selectedProofCommand) {
       // No failing test or runnable narrow proof was identified. Stop rather than letting
       // the model substitute an unrelated passing test and misreport non-reproduction.

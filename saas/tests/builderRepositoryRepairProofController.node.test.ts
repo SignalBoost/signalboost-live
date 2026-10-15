@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
-import { createRepositoryRepairProofController, repositoryRepairProofCommand } from '../lib/builder/repository-repair-proof-controller.ts'
+import { createRepositoryRepairProofController, discoverRepositoryRepairProofCommand, repositoryRepairProofCommand } from '../lib/builder/repository-repair-proof-controller.ts'
 import { formatBuilderOperatorRepairReply } from '../lib/builder/operator-narration.ts'
 import type { BuilderAiPort, BuilderBrowserCliPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
 
@@ -210,3 +210,17 @@ test('Playwright evidence cannot replace repository fail-before-edit-pass-after 
   ])
 })
 
+
+test('proof discovery chooses a unique test related to explicitly named source', () => {
+  const target = { pathHints: ['saas/lib/builder/project-continuity.ts'], failedCommand: 'npm test' }
+  assert.equal(discoverRepositoryRepairProofCommand(target, [
+    'tests/agentGateway.node.test.ts',
+    'tests/project-continuity.test.ts',
+  ]), 'node --experimental-strip-types --test tests/project-continuity.test.ts')
+  assert.equal(discoverRepositoryRepairProofCommand({ pathHints: [], failedCommand: 'npm test' }, [
+    'tests/agentGateway.node.test.ts',
+  ]), null)
+  assert.equal(discoverRepositoryRepairProofCommand(target, [
+    'tests/project-continuity.test.ts', 'tests/project-continuity.other.test.ts',
+  ]), null)
+})

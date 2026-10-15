@@ -57,11 +57,19 @@ export type BuilderV2Acceptance = Readonly<{
 export function builderV2Acceptance(objective: string, files: readonly string[], steps: readonly BuilderV2Receipt[]): BuilderV2Acceptance {
   const contract = builderTaskContract(objective)
   const lastChange = steps.findLastIndex(receipt => receipt.changed)
-  const passing = steps.slice(lastChange + 1).filter(receipt => receipt.tool === 'run_tests' && receipt.ok)
+  const runs = steps.slice(lastChange + 1).filter(receipt => receipt.tool === 'run_tests')
+  const passing = runs.filter(receipt => receipt.ok)
     .map(receipt => receipt.output as { requestedCommand?: unknown; executedCommand?: unknown; stdout?: unknown } | undefined)
+  // A more recent failed execution invalidates prior proof until verification succeeds again.
+  const latestRunPassed = runs.length > 0 && runs[runs.length - 1].ok
   const missingFiles = contract.files.filter(path => !files.includes(path))
-  const pendingCommands = contract.commands.filter(command =>
-    !passing.some(output => output?.requestedCommand === command || output?.executedCommand === command))
+  const pendingCommands = contract.commands.filter(command => {
+    const latest = runs.findLast(receipt => {
+      const output = receipt.output as { requestedCommand?: unknown; executedCommand?: unknown } | undefined
+      return output?.requestedCommand === command || output?.executedCommand === command
+    })
+    return !latest?.ok
+  })
   const testsPassed = Math.max(0, ...passing.map(output => {
     const stdout = typeof output?.stdout === 'string' ? output.stdout : ''
     const pass = /(?:^|\n)\s*(?:#|ℹ)\s+pass\s+(\d+)/.exec(stdout)
@@ -69,7 +77,7 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
     return pass && (!fail || fail[1] === '0') ? Number(pass[1]) : 0
   }))
   return {
-    satisfied: missingFiles.length === 0 && pendingCommands.length === 0 && testsPassed >= contract.minimumTests,
+    satisfied: latestRunPassed && missingFiles.length === 0 && pendingCommands.length === 0 && testsPassed >= contract.minimumTests,
     missingFiles, pendingCommands, minimumTests: contract.minimumTests, testsPassed,
   }
 }
@@ -183,7 +191,7 @@ export class BuilderV2Agent {
       const receipt = await this.dispatcher.dispatch(options.workspaceId, decision.action)
       steps.push(receipt)
       if (receipt.changed) revision++
-      if (decision.action.tool === 'run_tests' && receipt.ok) verifiedRevision = revision
+      if (decision.action.tool === 'run_tests') verifiedRevision = receipt.ok ? revision : -1
       lastReceipt = JSON.stringify(receipt).slice(0, 20_000)
       if (receipt.changed || decision.action.tool === 'run_tests' && receipt.ok) unproductive = 0
       else unproductive++

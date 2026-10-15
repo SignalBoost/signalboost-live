@@ -192,7 +192,7 @@ export default function DeveloperPage() {
   async function run() {
     const task = objective.trim()
     if (!task || running || openingWorkspace) return
-    if ((!workspaceId || !workspaceFiles.some(path => /\.(?:[cm]?js|[cm]?ts|tsx|jsx|json|py|go|rs|java|cpp|html|css)$/i.test(path))) && /\b(?:existing|current|saved)\b[\s\S]{0,90}\b(?:project|workspace|files?)\b/i.test(task)) {
+    if ((!workspaceId || !workspaceFiles.some(path => /\.(?:[cm]?js|[cm]?ts|tsx|jsx|json|py|go|rs|java|cpp|html|css)$/i.test(path))) && /^\s*(?:open|resume|continue|edit|modify|repair|debug|fix)\b[^\n]{0,120}\b(?:existing|current|saved|original)\s+(?:project|workspace|files?)\b/i.test(task)) {
       setError('The selected workspace has no source files. Open the original project and confirm its files are listed before running. No new job was created.')
       return
     }

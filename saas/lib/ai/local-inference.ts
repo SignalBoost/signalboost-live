@@ -713,6 +713,10 @@ function interactiveRunpodFirstEligible(args: LocalModelCallArgs, config: LocalI
   if (process.env.COS_INTERACTIVE_RUNPOD_FIRST?.trim().toLowerCase() === 'false') return false
   if (process.env.RUNPOD_PRIMARY_ENABLED?.trim().toLowerCase() === 'false') return false
   if (!interactiveUserResponse(args)) return false
+  // Production editing traces: owned RunPod repeatedly timed out (12s), while the
+  // configured GLM-Flash editor returned useful edits in 2.2–7.1s.
+  // Editing has its own managed model and needs no provider hedge or RunPod lease.
+  if (directTextTransformation(args)) return false
   if (providerFor(config) === 'runpod') return false
   if (config.fallbackFromOwned === true) return false
   if (protectedIndependentEvaluation(args)) return false

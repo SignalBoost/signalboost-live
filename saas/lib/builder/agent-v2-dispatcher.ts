@@ -46,7 +46,7 @@ export class BuilderV2Dispatcher {
 
   async dispatch(workspaceId: string, action: BuilderV2Action): Promise<BuilderV2Receipt> {
     if (!workspaceId.trim()) return { tool: action.tool, ok: false, changed: false, error: 'builder_workspace_required' }
-    return this.serialized(workspaceId, async () => {
+    return this.serialized<BuilderV2Receipt>(workspaceId, async () => {
       try {
         if (action.tool === 'list_files') {
           return { tool: action.tool, ok: true, changed: false, output: await this.workspace.listFiles(workspaceId) }

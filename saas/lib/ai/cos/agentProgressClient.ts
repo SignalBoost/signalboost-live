@@ -111,6 +111,35 @@ async function watchHistoryForCompletedTurn(args: {
   return null
 }
 
+/** Last-chance read-only lookup for a request whose HTTP envelope was lost or
+ * replaced by a gateway timeout. Server History may already hold the answer.
+ * Never POST from recovery: the original request may have made changes.
+ */
+async function recoverSavedTurnOnce(args: {
+  conversationId: string
+  userText: string
+  sentAtMs: number
+  signal: AbortSignal
+}): Promise<string | null> {
+  if (!args.conversationId || !args.userText || args.signal.aborted) return null
+  try {
+    const response = await fetch(`/api/assistant/chats?id=${encodeURIComponent(args.conversationId)}`, {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store',
+      signal: AbortSignal.any([args.signal, AbortSignal.timeout(COS_HISTORY_READ_DEADLINE_MS)]),
+      headers: { accept: 'application/json' },
+    })
+    if (!response.ok) return null
+    const payload = await response.json().catch(() => null)
+    return findRecoveredAssistantReply(
+      Array.isArray(payload?.messages) ? payload.messages : [],
+      args.userText,
+      args.sentAtMs,
+    )
+  } catch { return null }
+}
+
 function bodyRecord(value: unknown): Record<string, any> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : null
 }
@@ -356,6 +385,18 @@ export async function postWithAgentProgress(args: {
       const error = outcome.error
       if (args.signal.aborted) throw error
       if (boundedPublicTransport && responseSignal.aborted) {
+        // A dropped HTTP request is not proof of a failed model. The server
+        // may already have persisted the response before the gateway timed out.
+        const saved = historyWatchEligible ? await recoverSavedTurnOnce({
+          conversationId: conversationIdForTurn,
+          userText: userTextForTurn,
+          sentAtMs: startedAt,
+          signal: args.signal,
+        }) : null
+        if (saved) {
+          report('complete', 'Recovered the completed COS answer from History')
+          return { ok: true, status: 200, data: { reply: saved, source: 'cos-transport-history-recovery' } }
+        }
         report('complete', 'Concierge stopped waiting for the unavailable response')
         return {
           ok: false,
@@ -408,6 +449,27 @@ export async function postWithAgentProgress(args: {
     window.clearInterval(heartbeat)
   }
   let data: any = await response.json().catch(() => ({ error: 'assistant_response_unavailable' }))
+  // A gateway can deliver HTTP 504, a timeout envelope with status 200, or
+  // malformed JSON AFTER the model has completed and persisted the actual
+  // answer. Before displaying a transport error, check that exact saved turn.
+  // Never replace an ordinary substantive response or replay a POST.
+  const receivedReply = typeof data?.reply === 'string' ? data.reply.trim() : ''
+  const transportFailed = !response.ok
+    || (!receivedReply && !data?.turnId && !data?.jobId)
+    || receivedReply === transportFailureReply(requestBody)
+    || ['concierge-browser-deadline', 'assistant-transport-unconfirmed', 'cos-browser-turn-deadline'].includes(String(data?.source || ''))
+  if (historyWatchEligible && transportFailed && !args.signal.aborted) {
+    const saved = await recoverSavedTurnOnce({
+      conversationId: conversationIdForTurn,
+      userText: userTextForTurn,
+      sentAtMs: startedAt,
+      signal: args.signal,
+    })
+    if (saved) {
+      report('complete', 'Recovered the completed COS answer from History')
+      return { ok: true, status: 200, data: { reply: saved, source: 'cos-transport-history-recovery' } }
+    }
+  }
   const turnId = typeof data?.turnId === 'string' ? data.turnId : ''
   const conversationId = conversationIdForTurn
 

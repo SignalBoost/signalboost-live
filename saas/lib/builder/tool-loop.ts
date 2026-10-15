@@ -1320,7 +1320,7 @@ export class BuilderToolLoop {
           trace.push({ round, toolId: action.toolId, input: action.input, ok: false, output, error: `builder_command_failed: exit ${(output as ReturnType<typeof summarizeRun>).exitCode}`, ...details })
           continue
         }
-        if (action.toolId === 'write_file' || action.toolId === 'edit_file') {
+        if ((action.toolId === 'write_file' || action.toolId === 'edit_file') && (output as { alreadyPresent?: boolean } | undefined)?.alreadyPresent !== true) {
           writeCount += 1
           if (!workspacePaths.includes(toolPath(action.input))) workspacePaths.push(toolPath(action.input))
           inspectedInCurrentWorkspaceState.clear()

@@ -9,7 +9,7 @@ import {
   plannerSearchQueriesFromToolArguments,
   sanitizePlannerSearchQueries,
 } from '../lib/ai/cos/plannerSearchQueries.ts'
-import { parseCosAgentDecision } from '../lib/ai/cos/cosAgentDecision.ts'
+import { parseCosAgentDecision, stableKnowledgeQuestionNeedsNoPlanner } from '../lib/ai/cos/cosAgentDecision.ts'
 
 const decision = readFileSync(new URL('../lib/ai/cos/cosAgentDecision.ts', import.meta.url), 'utf8')
 const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
@@ -79,4 +79,11 @@ test('routing: cos-browser forwards only planner-written queries; cos-primary se
   assert.match(primary, /plannerSearchQueries=modelPlannedFreshEvidence\?decodePlannerSearchQueriesHeader\(req\.headers\.get\(PLANNER_SEARCH_QUERIES_HEADER\)\):\[\]/)
   assert.match(primary, /const queries=liveSearchQueriesForTurn\(plannerSearchQueries,freshEvidenceSearchQueries\(lookupInput\)\)/)
   assert.match(primary, /planner_search_queries:plannerSearchQueries\.length/)
+})
+
+test('specific acronym identification reaches capability planner while ordinary definitions remain fast', () => {
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('What is REA?'), false)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('What is MCP?'), false)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('What is a binary search tree?'), true)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('How does photosynthesis work?'), true)
 })

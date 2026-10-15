@@ -614,7 +614,7 @@ export class BuilderToolLoop {
       const lastTrace = trace.at(-1)
       // A model returning repeated denied actions is not productive work. This counter
       // uses the durable trace, so restarts cannot reset it and burn more GPU cycles.
-      const staleActions = [...trace].reverse().findIndex(item => item.ok || !/^(?:builder_repeated_tool_call:|builder_repair_mutation_required|builder_missing_deliverables|builder_verification_order_required)/.test(String(item.error || '')))
+      const staleActions = [...trace].reverse().filter(item => !['list_files', 'read_file', 'search_files', 'mcp_read'].includes(item.toolId) && (item.output as { alreadyPresent?: boolean } | undefined)?.alreadyPresent !== true).findIndex(item => item.ok || !/^(?:builder_repeated_tool_call:|builder_repair_mutation_required|builder_missing_deliverables|builder_verification_order_required|builder_write_content_differs:)/.test(String(item.error || '')))
       if ((staleActions < 0 ? trace.length : staleActions) >= 10) return { ok: false, error: 'builder_stalled_repeated_inspection', trace }
       const progress = builderTaskProgress(task, workspacePaths, trace)
       const pendingOrder = pendingBuilderVerificationOrder(verificationOrder, trace)
@@ -669,8 +669,10 @@ export class BuilderToolLoop {
         ? [...trace].reverse().find(item => item.toolId === 'run' && item.ok && isBuilderTestRunnerCommand(item.input.command))
         : undefined
       let consecutiveRepeatRejections = 0
-      for (let index = trace.length - 1; index >= 0
-        && String(trace[index].error || '').startsWith('builder_repeated_tool_call:'); index -= 1) consecutiveRepeatRejections += 1
+      for (const item of [...trace].reverse().filter(item => !['list_files', 'read_file', 'search_files', 'mcp_read'].includes(item.toolId))) {
+        if (!String(item.error || '').startsWith('builder_repeated_tool_call:')) break
+        consecutiveRepeatRejections += 1
+      }
       if (consecutiveRepeatRejections >= MAX_CONSECUTIVE_REPEAT_REJECTIONS) {
         return { ok: false, error: passingProofBeforeChange ? 'builder_regression_not_reproduced' : 'builder_stalled_repeated_inspection', trace }
       }

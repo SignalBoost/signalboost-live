@@ -258,18 +258,13 @@ export async function executeSignalBoostRepositoryRepair(input: {
 
     const governedAi = createGovernedBuilderAiPort(createBuilderCodingAiPort(), { deadlineAtMs: aiDeadlineAtMs })
     const engineeringTask = target.trigger === 'deployed_platform_engineering'
-    // Repairs retain the controller-owned fail-before/change/pass-after proof. Owner-authorized
+    // Repairs retain the controller-owned fail-before/change/pass-after proof. With no host-selected
+    // proof the controller pins the first failing test/typecheck/build Builder runs, so a plain-language
+    // report is investigated and reproduced instead of being refused before any command. Owner-authorized
     // feature/implementation work has no legitimate failing baseline to manufacture, so it runs
     // through the same repository workspace/runner but must still mutate source and pass fresh
     // task-specific verification before BuilderToolLoop can return success.
     const selectedProofCommand = engineeringTask ? null : discoverRepositoryRepairProofCommand(target, (await durableSession.listFiles(input.workspaceId)).map(file => file.path))
-    if (!engineeringTask && !selectedProofCommand) {
-      // No failing test or runnable narrow proof was identified. Stop rather than letting
-      // the model substitute an unrelated passing test and misreport non-reproduction.
-      const existingFiles = (await workspace.listFiles(input.workspaceId)).map(file => file.path)
-      return failedPayload({ error: 'builder_regression_evidence_required', workspaceId: input.workspaceId,
-        files: existingFiles, trace: [], baseCommitSha: target.fullCommitSha })
-    }
     const proofController = engineeringTask ? null : createRepositoryRepairProofController({
       ai: governedAi,
       workspace: durableSession,

@@ -696,7 +696,7 @@ export class BuilderToolLoop {
       }
       const broadTestNarrowCommand = blockedBroadRun && latestFailedRunIndex < 0
         ? (() => {
-            const candidates = workspacePaths.filter(path => /(?:^|\\/)(?:tests?)\\/.+\\.(?:test|spec)\\.[cm]?[jt]sx?$/i.test(path)
+            const candidates = workspacePaths.filter(path => /(?:^|\/)(?:tests?)\/.+\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(path)
               && input.objective.includes(path))
             return candidates.length === 1 ? `node --test ${candidates[0]}` : null
           })()

@@ -193,3 +193,10 @@ test('stale targeted edit recovery rereads current file with bounded retries', (
   assert.match(source, /builder_edit_target_recovery_exhausted/)
   assert.match(source, /await this\.workspace\.readFile\(input\.workspaceId, path\)/)
 })
+
+test('inspection refusal budget excludes refusals before successful source edits', () => {
+  const source = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
+  assert.match(source, /const lastSuccessfulMutation = trace\.reduce/)
+  assert.match(source, /trace\.slice\(lastSuccessfulMutation \+ 1\)\.filter/)
+  assert.match(source, /builder_repeated_inspection_blocked/)
+})

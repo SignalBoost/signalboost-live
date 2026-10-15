@@ -23,7 +23,7 @@ export const FAST_EDIT_REVIEW_INSTRUCTIONS = [
   'Check that editing is substantive when rough wording calls for it and the final text is fluent, readable, and ready to send. Mere spelling correction is not adequate when the user wants an edit.',
   'If anything is wrong, rewrite the candidate to correct it yourself. Do not simply report errors. Do not introduce claims or obligations absent from the original user-authored text.',
   'If the text is acceptable, return it as is. If the user’s requested material cannot be identified with enough confidence, return verdict "unresolved".',
-  'Return ONLY strict JSON: {"verdict":"pass"|"repaired"|"unresolved","answer":"<final edited text or empty string>"}. No explanation.',
+  'Return one strict JSON object with a verdict of "pass", "repaired", or "unresolved" and an "answer" string. Example: {"verdict":"repaired","answer":"<final edited text>"}. Use an empty answer only for unresolved. No explanation.',
 ].join('\n')
 
 export type FastEditReviewVerdict = 'pass' | 'repaired'

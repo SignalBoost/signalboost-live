@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { isFastTextTransform } from '../lib/ai/cos/fastTextTransformIntent.ts'
+import { fastTextTransformPrompt, isFastTextTransform } from '../lib/ai/cos/fastTextTransformIntent.ts'
 
 test('middleware fast edits delegate to the canonical COS editor', () => {
   const fast = readFileSync(join(process.cwd(), 'app/api/cos-fast-transform/route.ts'), 'utf8')
@@ -13,7 +13,7 @@ test('middleware fast edits delegate to the canonical COS editor', () => {
   assert.doesNotMatch(fast, /runDirectFastTextEdit/)
   assert.doesNotMatch(fast, /cos-fast-text-edit-direct/)
 
-  assert.match(primary, /if\(!fastEditAlreadyAttempted&&isFastTextTransform/)
+  assert.match(primary, /!fastEditAlreadyAttempted&&isFastTextTransform\(input/)
   assert.match(primary, /feature:'cos_fast_text_transform'/)
   assert.match(primary, /deepseek-ai\/DeepSeek-V4-Flash-0731/)
   assert.match(primary, /FAST_TEXT_TRANSFORM_ATTEMPT_MS = 9_000/)
@@ -47,4 +47,55 @@ test('edit prefix cannot swallow a factual CAP question', () => {
 test('terse edit continuation requires a real prior draft', () => {
   assert.equal(isFastTextTransform('shorten', { previousAssistant: 'This is a usable draft that can be shortened.' }), true)
   assert.equal(isFastTextTransform('edit', { previousAssistant: 'COS could not complete this text edit within the fast-path deadline.' }), false)
+})
+
+// Regression (owner report 2026-10-15): "edit - <reply>" followed by a pasted Outlook thread whose
+// quoted messages ask questions was classified as a NEW QUESTION, skipped the fast edit lane, and the
+// page stopped waiting before COS answered. Only the user's own draft decides whether it is a question.
+const QUOTED_THREAD_EDIT = [
+  'edit - Thank you Sam, since they contacted my supervisors, shall i send yo the TA and you forward to them? - as those are taxi expenses during my trip. See below.',
+  '',
+  'Sam',
+  '',
+  'From: Reviewer, Alex <alex@example.org>',
+  'Sent: Thursday, October 15, 2026 9:32 AM',
+  'To: Sam Example <sam@example.org>',
+  'Subject: FW: Transactions requiring clarification',
+  '',
+  'Hi Sam,',
+  '',
+  'Can you please check with the traveler about these transactions? It looks like a travel authorization is needed.',
+  '',
+  'From: Program Office <office@example.org>',
+  'Sent: Thursday, October 15, 2026 7:15 AM',
+  'To: Reviewer, Alex <alex@example.org>',
+  'Subject: Transactions requiring clarification',
+  '',
+  'Please let us know if you have any questions or concerns.',
+].join('\n')
+
+test('questions inside a pasted email thread do not turn an edit into a new question', () => {
+  assert.equal(isFastTextTransform(QUOTED_THREAD_EDIT), true)
+  // The user's own question is still a question even when a thread follows it.
+  assert.equal(
+    isFastTextTransform(`edit - can you explain what a travel authorization is?\n\n${QUOTED_THREAD_EDIT.split('\n').slice(4).join('\n')}`),
+    false,
+  )
+})
+
+test('the fast editor edits only the draft and receives the thread as read-only context', () => {
+  const prompt = fastTextTransformPrompt(QUOTED_THREAD_EDIT)
+  const [draft, rest] = prompt.split('REFERENCE CONTEXT')
+  assert.match(draft, /^edit - Thank you Sam/)
+  assert.doesNotMatch(draft, /From: Reviewer/)
+  assert.match(rest, /never edit, quote, summarize, or include it in the answer/)
+  assert.match(rest, /<<<CONTEXT\nFrom: Reviewer, Alex/)
+  assert.match(rest, /Please let us know if you have any questions or concerns\.\nCONTEXT$/)
+  // A draft without a quoted thread is sent unchanged.
+  assert.equal(fastTextTransformPrompt('edit - they came last week.'), 'edit - they came last week.')
+  // The primary fast lane sends the structured prompt, never the raw thread.
+  const primary = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  assert.match(primary, /const fastPrompt=fastTextTransformPrompt\(input\)/)
+  assert.match(primary, /prompt:fastPrompt,/)
+  assert.doesNotMatch(primary, /feature:'cos_fast_text_transform'[\s\S]{0,900}prompt:input,/)
 })

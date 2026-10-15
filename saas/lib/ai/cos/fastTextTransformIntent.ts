@@ -4,6 +4,12 @@
 // the whole turn is an editing task: "edit - what are CAPs?" is a factual question and belongs to
 // normal COS. The fast lane accepts an explicit supplied draft, an explicit editing instruction, or
 // a terse continuation when there is a real prior assistant draft.
+//
+// Only the user's own words can make the turn a question. A pasted email thread below the draft is
+// reference material: a question someone else asked in that thread ("Can you please check with
+// Luis about these transactions?") must not turn "edit - <reply> <quoted thread>" into a new question.
+
+import { splitQuotedEmailThread, stripQuotedEmailThread } from './quotedEmailThread.ts'
 
 export type FastTextTransformContext = {
   previousAssistant?: string | null
@@ -41,8 +47,8 @@ export function isFastTextTransform(input: string, context: FastTextTransformCon
   const priorDraft = hasUsablePriorDraft(context.previousAssistant)
   const payload = suppliedDraftAfterCommand(text, match[0].length)
 
-  // A transform-looking prefix must never swallow a factual/advisory question.
-  if (looksLikeNewQuestion(payload)) return false
+  // A transform-looking prefix must never swallow a factual/advisory question from the user.
+  if (looksLikeNewQuestion(stripQuotedEmailThread(payload))) return false
 
   // Terse continuation such as "shorter" or "polish" is safe only when there is an actual prior
   // assistant draft to transform. Transport/error copy does not count as a draft.
@@ -54,4 +60,19 @@ export function isFastTextTransform(input: string, context: FastTextTransformCon
   // Generic "edit/improve/make this..." is accepted only when it carries a real draft payload or
   // follows a real prior draft; merely starting a question with "edit" is not enough.
   return payload.length >= 8 || priorDraft
+}
+
+/**
+ * Model prompt for the fast edit lane. The user's draft is the only text to edit; a quoted email
+ * thread pasted below it is passed as read-only context so the editor understands what the draft
+ * replies to, but never rewrites or returns the other people's messages.
+ */
+export function fastTextTransformPrompt(input: string): string {
+  const { editableSource, referenceContext } = splitQuotedEmailThread(input)
+  if (!referenceContext) return String(input || '').trim()
+  return [
+    editableSource,
+    'REFERENCE CONTEXT — the email thread this draft replies to. Read only: use it to understand the draft; never edit, quote, summarize, or include it in the answer.',
+    `<<<CONTEXT\n${referenceContext.slice(0, 8_000)}\nCONTEXT`,
+  ].join('\n\n')
 }

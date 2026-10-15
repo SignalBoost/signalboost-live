@@ -273,8 +273,8 @@ export async function executeSignalBoostRepositoryRepair(input: {
       for (const term of terms) {
         const found = await durableSession.searchFiles(input.workspaceId, term)
         for (const path of found) {
-          const candidate = path.replace(/^saas\\//, '')
-          if (/^(?:tests|test)\\/.+\\.(?:test|spec)\\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(candidate)) matches.add(candidate)
+          const candidate = path.replace(/^saas\//, '')
+          if (/^(?:tests|test)\/.+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(candidate)) matches.add(candidate)
         }
       }
       if (matches.size === 1) selectedProofCommand = `node --experimental-strip-types --test ${[...matches][0]}`

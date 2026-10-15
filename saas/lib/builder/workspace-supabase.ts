@@ -42,6 +42,14 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
   private readonly userId: string
   constructor(db: SupabaseClient, userId: string) { this.db = db; this.userId = userId }
 
+  /** Check workspace ownership without creating an empty replacement. */
+  async hasWorkspace(workspaceId: string): Promise<boolean> {
+    const { data, error } = await this.db.from('builder_workspaces')
+      .select('id').eq('id', workspaceId).eq('user_id', this.userId).maybeSingle()
+    if (error) throw new Error(`builder_workspace_lookup: ${error.message}`)
+    return Boolean(data)
+  }
+
   async ensureWorkspace(workspaceId: string): Promise<void> {
     const { data, error } = await this.db.from('builder_workspaces').select('id').eq('id', workspaceId).eq('user_id', this.userId).maybeSingle()
     if (error) throw new Error(`builder_workspace_lookup: ${error.message}`)

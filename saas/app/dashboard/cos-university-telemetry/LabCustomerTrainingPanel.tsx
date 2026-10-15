@@ -10,6 +10,7 @@ import { ADD_KEY_OPTION, providerOptions, sortProviders, type ProviderOption } f
 import { cleanPastedKey, detectProviderFromKey } from '@/lib/lab/labKeyEntry'
 import { LAB_OPEN_SOURCES } from '@/lib/lab/labOpenSources'
 import { previewLabDataset } from '@/lib/lab/labDatasetPreflight'
+import LabCustomerModelPassport from './LabCustomerModelPassport'
 
 type Org = { organizationId: string; organizationName: string; experimentId: string; projectName: string; role: string }
 type CatalogEntry = { kind: string; name: string; supports: Record<string, boolean>; unsupported: Record<string, string>; keyHelp: string }
@@ -17,7 +18,7 @@ type Credential = { id: string; providerKind: string; label: string; endpoint: s
 type Run = {
   runId: string; stage: string; progressPercent: number; statusMessage: string | null; teacherProviderKind: string; teacherModel: string
   baseModel: string; hfJobUrl: string | null; artifactRepo: string | null
-  artifactRevision: string | null; failureCode: string | null; createdAt: string
+  artifactRevision: string | null; artifactHash?: string | null; failureCode: string | null; createdAt: string
   computeProviderKind?: string; tunedModelId?: string | null
 }
 type ModelOption = { id: string; label: string }
@@ -533,6 +534,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
                 {canManage && POLLED_TRAINING.has(run.computeProviderKind ?? '') && !['completed', 'failed', 'cancelled'].includes(run.stage) && <button className="underline" disabled={busy} onClick={() => cancelRun(run.runId)}>{copy.cancelTraining}</button>}
                 {run.stage === 'completed' && run.artifactRepo && <button className="underline" onClick={() => download(run.runId)}>{copy.downloadModel}</button>}
               </div>
+              <LabCustomerModelPassport run={run} language={language} />
               {files[run.runId] && (
                 <ul className="mt-2 space-y-1">
                   {files[run.runId].map(file => <li key={file.path}><a className="underline" href={fileUrl(run.runId, file.path)}>{file.path}</a> <span className="opacity-70">({(file.size / 1e6).toFixed(1)} {copy.mb})</span></li>)}

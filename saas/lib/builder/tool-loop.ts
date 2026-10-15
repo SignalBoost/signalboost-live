@@ -37,6 +37,7 @@ const MAX_REPAIR_INSPECTIONS_AFTER_FAILURE = 3
 // re-requesting unchanged work spent a model call per rejection until the time budget ran out (Production 2026-10-12:
 // 130 model calls for 1 executed command; tests/builderToolLoopPassingProofRepeat.node.test.ts).
 const MAX_CONSECUTIVE_REPEAT_REJECTIONS = 3
+const MAX_IDENTICAL_TOOL_REFUSALS = 3
 /**
  * A round must not be started that the wall clock cannot finish. Reserving one model round plus a
  * command run means the loop stops with its evidence intact instead of dying inside a generation.
@@ -51,6 +52,11 @@ const isOutputTruncation = (error: unknown): boolean =>
   error instanceof Error && error.message === MODEL_OUTPUT_TRUNCATED
 const text = (value: unknown) => typeof value === 'string' ? value : ''
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+export function repeatedWriteResolution(currentContent: string | null, requestedContent: string): 'identical' | 'different' | 'missing' {
+  if (currentContent === null) return 'missing'
+  return currentContent === requestedContent ? 'identical' : 'different'
+}
 
 function compactJsonValue(value: unknown, depth = 0): unknown {
   if (typeof value === 'string') return value.length > 8_000 ? `${value.slice(0, 8_000)}...[truncated]` : value
@@ -468,6 +474,9 @@ export class BuilderToolLoop {
     const chunks = new Map<string, string>(saved?.chunks || [])
     const inspectedInCurrentWorkspaceState = new Set<string>(saved?.inspections || [])
     const completedMutations = new Set<string>(saved?.mutations || [])
+    const repeatRefusals = new Map<string, number>()
+    const acknowledgedWrites = new Set<string>()
+    const blockedWritePaths = new Set<string>()
     const completedRunsInCurrentWorkspaceState = new Set<string>(saved?.runs || [])
     const projectContext = discoverBuilderProjectContext(files)
     const initialPaths = new Set(saved?.initialPaths || initialListing.map(file => file.path))
@@ -579,7 +588,7 @@ export class BuilderToolLoop {
       const lastTrace = trace.at(-1)
       // A model returning repeated denied actions is not productive work. This counter
       // uses the durable trace, so restarts cannot reset it and burn more GPU cycles.
-      const staleActions = [...trace].reverse().findIndex(item => item.ok || !/^(?:builder_repeated_tool_call:|builder_repair_mutation_required|builder_missing_deliverables|builder_verification_order_required)/.test(String(item.error || '')))
+      const staleActions = [...trace].reverse().findIndex(item => item.ok || item.toolId === 'list_files' || item.toolId === 'read_file' || item.toolId === 'search_files' || !/^(?:builder_repeated_tool_call:|builder_repair_mutation_required|builder_missing_deliverables|builder_verification_order_required)/.test(String(item.error || '')))
       if ((staleActions < 0 ? trace.length : staleActions) >= 10) return { ok: false, error: 'builder_stalled_repeated_inspection', trace }
       const progress = builderTaskProgress(task, workspacePaths, trace)
       const pendingOrder = pendingBuilderVerificationOrder(verificationOrder, trace)
@@ -701,7 +710,9 @@ export class BuilderToolLoop {
         : ''
       // With a passing proof there is no error to justify a source edit. Forcing one produced unsupported edits that
       // the regression gate then rejected; the justified mutation is a failing regression test, or an honest answer.
-      const currentStep = repeatedRepairStall
+      const currentStep = blockedWritePaths.size > 0 && !repairObjective
+        ? 'CURRENT STEP: A repeated write has been acknowledged or blocked. Existing source must be preserved. Run the specified verification command, or read the conflicting file and use edit_file for a justified change; do not call write_file again.'
+        : repeatedRepairStall
         ? passingProofStep || 'CURRENT STEP: The source has been read and repeated inspection or execution was refused against unchanged files. Choose ONE justified edit_file or write_file mutation now, based on the inspected source and actual errors. Do not request another read, run, or answer until a mutation is recorded. If no justified repair is possible, the host will fail transparently.'
         : coverageRepairRequired
         ? `CURRENT STEP: The commands passed, but the recorded test total does not meet the requested minimum of ${task.minimumTests}. A command exited 0 but its output did not prove ${task.minimumTests} requested tests. Complete the suite with distinct meaningful assertions. Do NOT run again against unchanged files. Use read_file on the test source if not already inspected, then edit_file or write_file to add meaningful missing assertions and explicit per-test evidence. Preserve the existing passing tests. Once the file changes, the verification run can execute again.`
@@ -757,7 +768,8 @@ export class BuilderToolLoop {
         .filter(toolId => toolId !== 'browser_cli' || browserCliActions.size > 0)
         .filter(toolId => toolId !== blockedTool)
         .filter(toolId => !blockedInspectionTools.has(toolId))
-        .filter(toolId => !(repairMutationRequired || repeatedRepairStall) || toolId === 'write_file' || toolId === 'edit_file')
+        .filter(toolId => !(repairMutationRequired || repeatedRepairStall) || toolId === 'write_file' || toolId === 'edit_file' || (blockedWritePaths.size > 0 && (toolId === 'run' || toolId === 'read_file')))
+        .filter(toolId => !blockedWritePaths.size || toolId !== 'write_file')
 
       const promptParts = [
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
@@ -915,6 +927,40 @@ export class BuilderToolLoop {
       }
 
       if (input.shouldPause?.(true)) return pause()
+      // Resolve duplicate complete writes against persisted source before reporting a
+      // rejection. Identical bytes are idempotent success, not another mutation.
+      const repeatedWrite = async (candidate: { toolId: BuilderToolId; input: Record<string, unknown> }): Promise<boolean> => {
+        if (candidate.toolId !== 'write_file' || candidate.input.mode === 'append') return false
+        const path = toolPath(candidate.input)
+        if (!path || !hasToolContent(candidate.input)) return false
+        const fingerprint = `write_file:${checkpointDigest(JSON.stringify(candidate.input))}`
+        if (!completedMutations.has(fingerprint) && !blockedWritePaths.has(path)) return false
+        const existing = await this.workspace.readFile(input.workspaceId, path)
+        const resolution = repeatedWriteResolution(existing?.content ?? null, toolContent(candidate.input))
+        if (resolution === 'identical') {
+          if (acknowledgedWrites.has(fingerprint)) {
+            blockedWritePaths.add(path)
+            trace.push({ round, toolId: 'write_file', input: { path }, ok: false,
+              error: 'builder_repeated_write_already_acknowledged',
+              remediation: 'The write is already present. Run tests or inspect another source file; another write_file call cannot make progress.' })
+            return true
+          }
+          acknowledgedWrites.add(fingerprint)
+          trace.push({ round, toolId: 'write_file', input: { path }, ok: true,
+            output: { path, unchanged: true, alreadyApplied: true } })
+          repeatRefusals.delete(fingerprint)
+          blockedWritePaths.delete(path)
+        } else {
+          const count = (repeatRefusals.get(fingerprint) || 0) + 1
+          repeatRefusals.set(fingerprint, count)
+          blockedWritePaths.add(path)
+          trace.push({ round, toolId: 'write_file', input: { path }, ok: false,
+            error: count >= MAX_IDENTICAL_TOOL_REFUSALS ? 'builder_repeated_write_blocked' : 'builder_write_content_conflict',
+            remediation: `Current ${path} differs from the requested write or does not exist. Use read_file to inspect it, then edit_file for a targeted change or run tests. Do not repeat write_file.` })
+        }
+        return true
+      }
+      if (blockedAction && await repeatedWrite(blockedAction)) continue
       if (blockedAction) {
         trace.push({
           round,
@@ -1096,12 +1142,14 @@ export class BuilderToolLoop {
         if (++gateNudges > 1) return { ok: false, error: 'builder_test_evidence_insufficient', trace }
         continue
       }
+      if (mutation && await repeatedWrite(action)) continue
       if ((mutation && completedMutations.has(fingerprint))
         || (action.toolId === 'run' && completedRunsInCurrentWorkspaceState.has(fingerprint))) {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
         continue
       }
       if (inspection) inspectedInCurrentWorkspaceState.add(fingerprint)
+      if (action.toolId === 'run' || action.toolId === 'edit_file') blockedWritePaths.clear()
       workRounds += 1
       try {
         let output: unknown

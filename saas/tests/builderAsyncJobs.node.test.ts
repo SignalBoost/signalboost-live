@@ -139,3 +139,50 @@ test('background execution is idempotently claimed and applies only validated so
   assert.match(jobRunner, /runDebugFileJob/)
   assert.match(jobRunner, /finishBuilderJob/)
 })
+
+test('repeated src/storage.js write resolves identical content and cannot force another write loop', async () => {
+  const { repeatedWriteResolution } = await import('../lib/builder/tool-loop.ts')
+  const source = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
+  const current = 'export const store = new Map()\\n'
+  assert.equal(repeatedWriteResolution(current, current), 'identical')
+  assert.equal(repeatedWriteResolution(current, 'export const store = {}\\n'), 'different')
+  assert.equal(repeatedWriteResolution(null, current), 'missing')
+  assert.ok(source.indexOf('if (blockedAction && await repeatedWrite(blockedAction))') < source.indexOf('if (blockedAction) {'))
+})
+
+test('Cursor-style Builder loop acknowledges duplicate src/storage.js write and executes verification', async () => {
+  const { BuilderToolLoop } = await import('../lib/builder/tool-loop.ts')
+  const { InMemoryBuilderWorkspace } = await import('../lib/builder/workspace.ts')
+  const workspace = new InMemoryBuilderWorkspace()
+  const content = 'export const storage = new Map()\\n'
+  const actions = [
+    { type: 'tool', toolId: 'write_file', input: { path: 'src/storage.js', content } },
+    { type: 'tool', toolId: 'write_file', input: { path: 'src/storage.js', content } },
+    { type: 'tool', toolId: 'run', input: { command: 'node --test' } },
+    { type: 'answer', answer: 'Tests passed' },
+  ]
+  let called = 0
+  let executed = 0
+  const ai = { async generate() {
+    const action = actions[Math.min(called++, actions.length - 1)]
+    return JSON.stringify(action)
+  } }
+  const runner = { async run() {
+    executed += 1
+    return { exitCode: 0, stdout: 'tests 1\\npass 1\\nfail 0\\n', stderr: '', timedOut: false }
+  } }
+  const result = await new BuilderToolLoop(ai as any, workspace, runner as any).run({
+    objective: 'Create src/storage.js and verify with node --test.',
+    workspaceId: 'w',
+    maxRounds: 12,
+    deadlineAtMs: Date.now() + 1_000_000,
+    minimumStepMs: 1,
+  })
+  const persisted = await workspace.readFile('w', 'src/storage.js')
+  assert.equal(persisted?.content, content)
+  assert.equal(result.trace.filter(item => item.toolId === 'write_file' && item.ok).length, 2,
+    'initial write and idempotent acknowledgement are both recorded')
+  assert.equal(result.trace.filter(item => item.toolId === 'write_file' && (item.output as { alreadyApplied?: boolean } | undefined)?.alreadyApplied === true).length, 1)
+  assert.ok(executed >= 1, 'verification must execute, not merely be suggested')
+  assert.ok(called <= 12, 'model calls remain bounded')
+})

@@ -157,7 +157,12 @@ function configuredReasonerLabel(): string {
 const REFERS_TO_PRIOR_TURN = /\b(?:it|its|it's|that|this|these|those|they|them|their|above|previous(?:ly)?|earlier|same|again|more|also|else|instead|then|former|latter|last one|first one|second one|you said|you mentioned|your answer|the answer)\b/
 
 export function stableKnowledgeQuestionNeedsNoPlanner(prompt: string, previousAssistant?: string | null): boolean {
-  const text = String(prompt || '').trim().toLowerCase()
+  const raw = String(prompt || '').trim()
+  // A short subject-domain preface (e.g. "In networking, what is ...?") does not
+  // turn an otherwise self-contained definition into a tool request. Keep the
+  // original prompt for the model; normalize only this planner eligibility check.
+  const domainPreface = /^in\s+[a-z][a-z\s&/-]{0,32}?,?\s+(?=(?:what|why|how|explain|define|describe|compare)\b)/i
+  const text = raw.replace(domainPreface, '').toLowerCase()
   if (!text) return false
   // A previous answer only matters when this question points back at it. Production 2026-09-30 05:32 UTC: the
   // second question of a conversation ("What is the difference between an Ingress and a Service in Kubernetes?")

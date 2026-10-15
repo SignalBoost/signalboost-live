@@ -94,6 +94,12 @@ export function builderTaskProgress(contract: BuilderTaskContract, paths: readon
     return latest?.ok === true && output?.exitCode === 0 && output?.timedOut !== true
   }
   const pendingCommands = contract.commands.filter(command => !passed(command))
+  // A successful smoke command must not conceal a later failed verification on the same source revision.
+  // Refused repeats and policy-denied calls are not executed verification failures.
+  const lastExecutedRun = recent.findLast(item => typeof item.input.command === 'string'
+    && typeof (item.output as { exitCode?: unknown } | undefined)?.exitCode === 'number')
+  const latestRunFailed = Boolean(lastExecutedRun && (lastExecutedRun.ok !== true
+    || (lastExecutedRun.output as { exitCode?: number }).exitCode !== 0))
   const hasProof = recent.some(item => typeof item.input.command === 'string' && passed(item.input.command))
   const testsSatisfied = contract.minimumTests === 0 || recent.some(item => {
     if (typeof item.input.command !== 'string' || !passed(item.input.command) || !/\b(?:--test|test)\b/.test(item.input.command)) return false
@@ -112,6 +118,6 @@ export function builderTaskProgress(contract: BuilderTaskContract, paths: readon
     pendingCommands,
     minimumTests: contract.minimumTests,
     testsSatisfied,
-    satisfied: missingFiles.length === 0 && pendingCommands.length === 0 && testsSatisfied && (!contract.requiresRun || hasProof),
+    satisfied: missingFiles.length === 0 && pendingCommands.length === 0 && testsSatisfied && !latestRunFailed && (!contract.requiresRun || hasProof),
   }
 }

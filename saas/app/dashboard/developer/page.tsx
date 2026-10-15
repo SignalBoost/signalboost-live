@@ -7,7 +7,7 @@ import { followBuilderJob } from '@/lib/builder/job-poll'
 import { uiText } from '@/lib/i18n/uiText'
 
 type WorkspaceFile = { path: string; content: string }
-type BuilderReply = { progress?: BuilderProgress; jobId?: string; workspaceId?: string; status?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string; failureClass?: string; remediation?: string; path?: string; command?: string; exitCode?: number; stdout?: string; stderr?: string; timedOut?: boolean }> }
+type BuilderReply = { conversationId?: string; activeJobId?: string; activeStatus?: string; progress?: BuilderProgress; jobId?: string; workspaceId?: string; status?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string; failureClass?: string; remediation?: string; path?: string; command?: string; exitCode?: number; stdout?: string; stderr?: string; timedOut?: boolean }> }
 type BuilderProgress = { phase?: string; lastActivityAt?: string; claimGeneration?: number; filesWritten?: number | null; workRounds?: number | null; modelTimeoutDeferrals?: number; queueReason?: string | null; lastTest?: { passed?: boolean; exitCode?: number | null; testsPassed?: number; testsFailed?: number } | null }
 type WorkspaceSummary = { id: string; objective: string; updatedAt: string; fileCount: number }
 type CertificationSummary = { earnedLevel: number; attempts: number }
@@ -16,6 +16,7 @@ const MAX_UPLOAD_BYTES = 512 * 1024
 const ALLOWED_ATTACHMENT = /\.(?:txt|log|md|mdx|yaml|yml|json|jsonl|csv|xml|js|cjs|mjs|ts|tsx|jsx|py|html|css|sql|sh|java|cpp|go|rs|php|rb)$/i
 const BUILDER_HANDOFF_FILES_KEY = 'cos-builder-handoff-files-v1'
 const BUILDER_LAST_JOB_KEY = 'cos-builder-last-job-v1'
+const BUILDER_CONVERSATION_KEY = 'cos-builder-conversation-v1'
 function filename(path: string): string { return path.split('/').pop() || 'download.txt' }
 function sleep(ms: number): Promise<void> { return new Promise(resolve => setTimeout(resolve, ms)) }
 
@@ -65,9 +66,13 @@ export default function DeveloperPage() {
   const [activeJobId, setActiveJobId] = useState('')
   const [activitySeconds, setActivitySeconds] = useState(0)
   const fileInput = useRef<HTMLInputElement>(null)
+  const conversationIdRef = useRef('')
   useEffect(() => { if (!running) return; const interval = window.setInterval(() => setActivitySeconds(value => value + 1), 1000); return () => window.clearInterval(interval) }, [running])
 
   useEffect(() => {
+    const savedConversation = sessionStorage.getItem(BUILDER_CONVERSATION_KEY) || ''
+    conversationIdRef.current = /^[0-9a-f-]{36}$/i.test(savedConversation) ? savedConversation : crypto.randomUUID()
+    sessionStorage.setItem(BUILDER_CONVERSATION_KEY, conversationIdRef.current)
     const params = new URLSearchParams(window.location.search)
     const requestedWorkspace = params.get('workspaceId')?.trim() || ''
     // Direct links work even when an older workspace is outside the latest 20.
@@ -87,8 +92,9 @@ export default function DeveloperPage() {
     } catch { sessionStorage.removeItem(BUILDER_HANDOFF_FILES_KEY) }
     void loadWorkspaces()
     try {
-      const saved = JSON.parse(localStorage.getItem(BUILDER_LAST_JOB_KEY) || 'null') as { jobId?: string; workspaceId?: string } | null
+      const saved = JSON.parse(localStorage.getItem(BUILDER_LAST_JOB_KEY) || 'null') as { jobId?: string; workspaceId?: string; conversationId?: string } | null
       if (saved?.jobId) {
+        if (saved.conversationId && /^[0-9a-f-]{36}$/i.test(saved.conversationId)) conversationIdRef.current = saved.conversationId
         if (saved.workspaceId) setWorkspaceId(saved.workspaceId)
         void restoreJob(saved.jobId)
       }
@@ -103,6 +109,10 @@ export default function DeveloperPage() {
       const terminal = await pollBuilderJob(jobId)
       if (terminal) {
         if (terminal.workspaceId) setWorkspaceId(terminal.workspaceId)
+        if (terminal.conversationId) {
+          conversationIdRef.current = terminal.conversationId
+          sessionStorage.setItem(BUILDER_CONVERSATION_KEY, terminal.conversationId)
+        }
         setWorkspaceFiles(terminal.files || [])
         setTrace(terminal.trace || [])
         setReply(terminal.reply || terminal.error || `Job ${jobId} finished.`)
@@ -139,6 +149,11 @@ export default function DeveloperPage() {
             throw new Error(data.error || 'Workspace could not be opened.')
           }
           setWorkspaceId(id); setWorkspaceFiles(Array.isArray(data.files) ? data.files : []); setFiles([]); setReply(''); setTrace([])
+          if (data.conversationId) {
+            conversationIdRef.current = data.conversationId
+            sessionStorage.setItem(BUILDER_CONVERSATION_KEY, data.conversationId)
+          }
+          if (data.activeJobId) void restoreJob(data.activeJobId)
           return
         } catch (cause) {
           lastFailure = cause
@@ -192,19 +207,19 @@ export default function DeveloperPage() {
   async function run() {
     const task = objective.trim()
     if (!task || running || openingWorkspace) return
-    if ((!workspaceId || !workspaceFiles.some(path => /\.(?:[cm]?js|[cm]?ts|tsx|jsx|json|py|go|rs|java|cpp|html|css)$/i.test(path))) && /^\s*(?:open|resume|continue|edit|modify|repair|debug|fix)\b[^\n]{0,120}\b(?:existing|current|saved|original)\s+(?:project|workspace|files?)\b/i.test(task)) {
-      setError('The selected workspace has no source files. Open the original project and confirm its files are listed before running. No new job was created.')
-      return
-    }
     setRunning(true); setError(''); setReply(''); setTrace([]); setLiveProgress(null); setActivitySeconds(0); setActiveJobId('')
     try {
       const response = await fetch('/api/builder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ objective: task, workspaceId: workspaceId || undefined, files }),
+        body: JSON.stringify({ objective: task, conversationId: conversationIdRef.current, workspaceId: workspaceId || undefined, files }),
       })
       let data = await response.json().catch(() => ({})) as BuilderReply
       if (data.workspaceId) setWorkspaceId(data.workspaceId)
+      if (data.conversationId) {
+        conversationIdRef.current = data.conversationId
+        sessionStorage.setItem(BUILDER_CONVERSATION_KEY, data.conversationId)
+      }
       setWorkspaceFiles(data.files || [])
       setTrace(data.trace || [])
       if (!response.ok) { setError(data.error || 'Builder could not complete this request.'); return }
@@ -212,7 +227,7 @@ export default function DeveloperPage() {
 
       if (response.status === 202 && data.jobId) {
         setActiveJobId(data.jobId)
-        try { localStorage.setItem(BUILDER_LAST_JOB_KEY, JSON.stringify({ jobId: data.jobId, workspaceId: data.workspaceId || workspaceId })) } catch { /* ignore */ }
+        try { localStorage.setItem(BUILDER_LAST_JOB_KEY, JSON.stringify({ jobId: data.jobId, workspaceId: data.workspaceId || workspaceId, conversationId: conversationIdRef.current })) } catch { /* ignore */ }
         const terminal = await pollBuilderJob(data.jobId)
         if (terminal) {
           data = terminal
@@ -231,7 +246,7 @@ export default function DeveloperPage() {
     finally { setRunning(false) }
   }
 
-  function reset() { setWorkspaceId(''); setFiles([]); setWorkspaceFiles([]); setReply(''); setTrace([]); setError(''); setObjective('') }
+  function reset() { conversationIdRef.current = crypto.randomUUID(); sessionStorage.setItem(BUILDER_CONVERSATION_KEY, conversationIdRef.current); setWorkspaceId(''); setFiles([]); setWorkspaceFiles([]); setReply(''); setTrace([]); setError(''); setObjective('') }
 
   return (
     <main style={{ minHeight: '100vh', background: '#020617', color: '#e2e8f0', padding: '32px clamp(18px, 5vw, 72px)', fontFamily: 'system-ui, sans-serif' }}>

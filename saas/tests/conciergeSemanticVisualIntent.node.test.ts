@@ -20,8 +20,8 @@ test('the exact production prompt routes to the visual generator deterministical
   requireWiring(route, {
     file: 'saas/app/api/cos-browser/route.ts',
     purpose: 'Keep explicit visual requests on the zero-cost fast path while semantic ambiguity uses the deep conversation classifier.',
-    expect: /const directVisual = isConciergeVisualObjective\(prompt\)/,
-    insert: '    const directVisual = isConciergeVisualObjective(prompt)',
+    expect: /const directVisual = !softwareExecutionObjective && isConciergeVisualObjective\(prompt\)/,
+    insert: '    const directVisual = !softwareExecutionObjective && isConciergeVisualObjective(prompt)',
     after: '    // ambiguous — including follow-up language — is decided by the deep semantic reasoner',
     requiresImport: "import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
   })
@@ -144,7 +144,7 @@ test('the public Concierge uses the deep semantic visual gate while owner Assist
     purpose: 'Use the deep semantic conversation verdict only for the public mouth; owner Assistant is COS and must not pay a separate visual-classifier call.',
     expect: /const semanticVisualEligible =[\s\S]*shouldResolveSemanticVisualRequest\(messages, prompt\)[\s\S]*const semanticResolution = semanticVisualEligible[\s\S]*await resolveSemanticVisualRequest\(messages, prompt\)/,
     insert: "    const semanticVisualEligible = !directVisual && browserSurface === 'concierge' && shouldResolveSemanticVisualRequest(messages, prompt)",
-    after: '    const directVisual = isConciergeVisualObjective(prompt)',
+    after: '    const directVisual = !softwareExecutionObjective && isConciergeVisualObjective(prompt)',
     requiresImport: "import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
   })
   assert.match(route, /const visualObjective = browserSurface === 'assistant'[\s\S]*\? null/)

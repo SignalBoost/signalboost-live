@@ -19,7 +19,7 @@ const THREAD_HEADER_RE = /^\s*(?:sent|enviado|enviada|wys[łl]ano|отправл
 // Those belong to the quote, not to the user's draft. Require both a contact
 // detail and a copied-mail marker so an ordinary sender's own sign-off survives.
 const CONTACT_DETAIL_RE = /^\\s*(?:teams|telephone|phone|mobile|cell|tel|email|e-mail|fax)\\s*:\\s*\\S|[\\w.+-]+@[\\w.-]+\\.[a-z]{2,}/iu
-const COPIED_MAIL_MARKER_RE = /^\\s*(?:(?:sbu|cui)\\s*[-–—]\\s*(?:privacy|pii|confidential)|(?:sbu|cui)\\s*[-–—]\\s*(?:confidential|sensitive)|image|logo|cid:[^\\s]+)\\s*$/iu
+const COPIED_MAIL_MARKER_RE = /^\\s*(?:(?:sbu|cui)\\s*[-–—]\\s*(?:privacy(?:\\s+or\\s+pii)?|pii|confidential)|(?:sbu|cui)\\s*[-–—]\\s*(?:confidential|sensitive)|image|logo|cid:[^\\s]+)\\s*$/iu
 
 function copiedSignaturePrelude(lines: string[], fromIndex: number): number {
   const lower = Math.max(0, fromIndex - 18)

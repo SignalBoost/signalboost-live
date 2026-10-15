@@ -923,8 +923,16 @@ export class BuilderToolLoop {
           ok: false,
           error: `builder_repeated_tool_call:${blockedAction.toolId}; choose a different next step`,
         })
+        // Cursor-style repair loop: a rejected inspection is not the end of a
+        // coding job. Keep the mutation-only controls in place, explain why
+        // the action was rejected, and let the reasoner choose an actual edit.
+        // The durable stale-action budget above bounds repeated refusals.
         if (repairMutationRequired || repeatedRepairStall) {
-          return { ok: false, error: passingProofBeforeChange ? 'builder_regression_not_reproduced' : 'builder_repair_mutation_not_produced', trace }
+          trace.push({ round, toolId: 'model_control', input: {}, ok: false,
+            error: 'builder_repair_mutation_required', failureClass: 'test',
+            remediation: passingProofBeforeChange
+              ? 'The existing proof passed. Add a failing regression test or report the defect as not reproduced.'
+              : 'The failure is reproduced and further inspection was rejected. Edit the relevant source file now, then rerun the exact failing command.' })
         }
         continue
       }

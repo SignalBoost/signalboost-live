@@ -1,6 +1,7 @@
 import { isConciergeBuilderObjective, structuredApplicationBuild } from './cosReasoningRolePolicy.ts'
 import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMessage } from './operator-progress.ts'
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findDurableCosTurnReply } from './assistantTransportRecovery.ts'
+import { recoverAssistantReplyFromHistory } from './assistantTransportClient.ts'
 import { planResearchTask } from './researchBudget.ts'
 
 export type AgentProgressEvent = {
@@ -280,6 +281,23 @@ export async function postWithAgentProgress(args: {
         }
       }
       if (deliberateAbort(error, args.signal)) throw error
+      // The POST may have completed on the server even when the browser lost its response.
+      // Recover the recorded answer by prompt and send time; never replay a possible action.
+      const conversationId = typeof requestRecord?.context?.conversationId === 'string'
+        ? String(requestRecord.context.conversationId)
+        : ''
+      const userText = requestRecord ? latestUserText(requestRecord) : ''
+      if (args.target === 'cos' && conversationId && userText) {
+        const recovered = await recoverAssistantReplyFromHistory(userText, startedAt, {
+          historyUrl: `/api/assistant/chats?id=${encodeURIComponent(conversationId)}`,
+          historyPollAttempts: 4,
+          historyPollDelayMs: 1200,
+        })
+        if (recovered) {
+          report('complete', 'Recovered the completed COS answer from History')
+          return { ok: true, status: 200, data: { reply: recovered, source: 'cos-transport-history-recovery' } }
+        }
+      }
       report('complete', operatorProgressMessage({ stage: 'blocked', target: progressTarget, builder: builderActive }))
       return {
         ok: false,

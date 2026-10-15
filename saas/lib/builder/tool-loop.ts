@@ -680,6 +680,20 @@ export class BuilderToolLoop {
         // Only a proving command (test, typecheck, build) can show the defect is absent; `node --version` cannot.
         ? [...trace].reverse().find(item => item.toolId === 'run' && item.ok && isBuilderTestRunnerCommand(item.input.command))
         : undefined
+      const blockedBroadRun = [...trace].reverse().find(item => item.toolId === 'run'
+        && String(item.error || '').includes('builder_repository_broad_test_blocked'))
+      if (blockedBroadRun && latestFailedRunIndex < 0 && !trace.some(item => item.ok &&
+        (item.toolId === 'write_file' || item.toolId === 'edit_file'))) {
+        const targetedPaths = workspacePaths.filter(path => /^(?:tests?|saas\/tests?)\/.+\.test\.[cm]?[jt]s$/.test(path)
+          && (objective.toLowerCase().includes(path.toLowerCase())
+            || objective.toLowerCase().includes(path.split('/').pop()!.toLowerCase())))
+        // Never choose an arbitrary passing test as the reproduction proof. If the report
+        // identifies one executable test, let the next round run that exact test.
+        if (!targetedPaths.length && trace.some(item => item.toolId === 'run' && item.ok
+          && isBuilderTestRunnerCommand(item.input.command))) {
+          return { ok: false, error: 'builder_regression_evidence_required: npm test blocked by builder_repository_broad_test_blocked; no named failing test was reproduced', trace }
+        }
+      }
       let consecutiveRepeatRejections = 0
       for (const item of [...trace].reverse().filter(item => !['list_files', 'read_file', 'search_files', 'mcp_read'].includes(item.toolId))) {
         if (!String(item.error || '').startsWith('builder_repeated_tool_call:')) break

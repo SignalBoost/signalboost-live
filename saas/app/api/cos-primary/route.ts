@@ -134,7 +134,9 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
   const config=localInferenceConfigFromEnv()
   const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\.com/i.test(config.baseUrl)
   const preferredModel=process.env.COS_FAST_TEXT_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
-  const reviewerModel=process.env.COS_FAST_TEXT_REVIEW_MODEL?.trim()
+  // Review with a separately proven managed editor by default, rather than
+  // letting the fast drafting model rubber-stamp its own mistakes.
+  const reviewerModel=process.env.COS_FAST_TEXT_REVIEW_MODEL?.trim()||process.env.COS_DIRECT_TEXT_MODEL?.trim()||(deepInfra?'zai-org/GLM-5.3-Flash':config.model)
   const models=[...new Set([preferredModel,config.model].filter(Boolean))]
   const startedAt=Date.now()
   // Give the model the complete request. It must infer which parts are the

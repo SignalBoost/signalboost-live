@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { fastTextTransformPrompt, isFastTextTransform } from '../lib/ai/cos/fastTextTransformIntent.ts'
+import { FAST_TEXT_EDITOR_SYSTEM_PROMPT, fastTextTransformPrompt, isFastTextTransform } from '../lib/ai/cos/fastTextTransformIntent.ts'
+import { splitQuotedEmailThread } from '../lib/ai/cos/quotedEmailThread.ts'
 
 test('middleware fast edits delegate to the canonical COS editor', () => {
   const fast = readFileSync(join(process.cwd(), 'app/api/cos-fast-transform/route.ts'), 'utf8')
@@ -86,7 +87,7 @@ test('questions inside a pasted email thread do not turn an edit into a new ques
 test('the fast editor edits only the draft and receives the thread as read-only context', () => {
   const prompt = fastTextTransformPrompt(QUOTED_THREAD_EDIT)
   const [draft, rest] = prompt.split('REFERENCE CONTEXT')
-  assert.match(draft, /^edit - Thank you Sam/)
+  assert.match(draft, /<<<DRAFT\nedit - Thank you Sam[\s\S]*\nDRAFT/)
   assert.doesNotMatch(draft, /From: Reviewer/)
   assert.match(rest, /never edit, quote, summarize, or include it in the answer/)
   assert.match(rest, /<<<CONTEXT\nFrom: Reviewer, Alex/)
@@ -98,4 +99,39 @@ test('the fast editor edits only the draft and receives the thread as read-only 
   assert.match(primary, /const fastPrompt=fastTextTransformPrompt\(input\)/)
   assert.match(primary, /prompt:fastPrompt,/)
   assert.doesNotMatch(primary, /feature:'cos_fast_text_transform'[\s\S]{0,900}prompt:input,/)
+})
+
+// Owner report 2026-10-15 ("it did a terrible editing"): the edit returned the replied-to person's
+// message, signature and the SBU banner as if the owner had written them.
+test('a handling banner above a quoted header belongs to the thread, not the draft', () => {
+  const pasted = [
+    'edit - thanks, i will send it today - as discussed. See below. Please send the form.',
+    '',
+    'Sam',
+    'Sam Example',
+    'Office Chief',
+    '',
+    'SBU - PRIVACY OR PII',
+    'From: Reviewer, Alex <alex@example.org>',
+    'Sent: Thursday, October 15, 2026 9:32 AM',
+    'To: Sam Example <sam@example.org>',
+    'Subject: Form',
+    '',
+    'Hi Sam, please send the form.',
+  ].join('\n')
+  const split = splitQuotedEmailThread(pasted)
+  assert.doesNotMatch(split.editableSource, /SBU - PRIVACY OR PII/)
+  assert.match(String(split.referenceContext), /^SBU - PRIVACY OR PII\nFrom: Reviewer, Alex/)
+  // A user's own sentence is never mistaken for a banner when no quoted header follows it.
+  assert.equal(splitQuotedEmailThread('edit - Confidential matters aside, thanks.').referenceContext, null)
+})
+
+test('the fast editor edits only the user draft and returns none of the replied-to message', () => {
+  assert.match(FAST_TEXT_EDITOR_SYSTEM_PROMPT, /FIND THE USER'S OWN DRAFT/)
+  assert.match(FAST_TEXT_EDITOR_SYSTEM_PROMPT, /may begin in the middle of a line/)
+  assert.match(FAST_TEXT_EDITOR_SYSTEM_PROMPT, /signature block/)
+  assert.match(FAST_TEXT_EDITOR_SYSTEM_PROMPT, /RETURN ONLY THE EDITED DRAFT/)
+  assert.match(FAST_TEXT_EDITOR_SYSTEM_PROMPT, /Never add facts, promises/)
+  const primary = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  assert.match(primary, /systemPrompt:FAST_TEXT_EDITOR_SYSTEM_PROMPT,/)
 })

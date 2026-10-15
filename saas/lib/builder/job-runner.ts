@@ -672,7 +672,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     const suiteUnverified = contract.commands.some(command =>
       /(?:npm test|node --test|pnpm test|yarn test)/.test(command)) &&
       (!latestSuite || latestSuite.ok !== true || (latestSuite.output as { exitCode?: number } | undefined)?.exitCode !== 0)
-    if (verification.pendingCommands.length > 0 || suiteUnverified || !verification.testsSatisfied) {
+    if (!verification.satisfied || suiteUnverified) {
       const reply = historyReply('Builder has not passed the required full verification after the latest changes. Saved workspace and diagnostics remain available.', job.workspaceId, files)
       await finishBuilderJob({
         jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,

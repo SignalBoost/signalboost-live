@@ -338,6 +338,7 @@ async function executeExam(agentId: string, row: ExamRunRow, target: CosUniversi
       language: target.kind === 'language' ? target.language : 'en',
       privileged: true,
       disableCache: true,
+      inferenceLane: 'university_exam',
     })
   } catch (error) {
     flushCapturedEvidenceSourceUse()
@@ -370,6 +371,7 @@ async function executeExam(agentId: string, row: ExamRunRow, target: CosUniversi
         language: target.kind === 'language' ? target.language : 'en',
         privileged: true,
         disableCache: true,
+      inferenceLane: 'university_exam',
       })
       const revisedReply = revised.handled ? revised.reply : ('bestEffortReply' in revised ? revised.bestEffortReply ?? '' : '')
       // The rewrite must come from the same local reasoning path as the draft, and must actually be

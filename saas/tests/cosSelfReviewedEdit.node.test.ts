@@ -7,6 +7,7 @@ import {
   FAST_EDIT_REVIEW_INSTRUCTIONS,
   parseFastEditReview,
   runSelfReviewedEdit,
+  formatIndependentEditReviewPrompt,
 } from '../lib/ai/cos/selfReviewTextEdit.ts'
 
 const contexts = [
@@ -73,13 +74,13 @@ test('valid approved edits are retained, while a missing first draft never start
 test('generic semantic and editorial quality contract is model-led, not tied to one email or sender', () => {
   assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /Interpret the entire user request/)
   assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /Edit ONLY the material the user is asking to edit/)
-  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /evaluate and if necessary REPAIR/)
-  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /substantive/)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /strongest faithful final rewrite/)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /Proofreading alone is insufficient/)
   // Owner report 2026-10-15: the edit kept the replied-to person's sentence that followed the draft on
   // the same line and invented a sign-off. Authorship is decided by who writes to whom.
   assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /can end in the middle of a line/)
   assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /Add no greeting, sign-off, name or signature/)
-  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /text addressed to the user that followed their draft on the same line/)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /same line as the end of that draft/)
   const source = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
   const fast = source.slice(source.indexOf('async function runFastTextTransform('), source.indexOf('export const FAST_AUTHORING_TIMEOUT_MS'))
   assert.match(fast, /runSelfReviewedEdit\(/)

@@ -283,11 +283,16 @@ export function builderPollMayResume(job: Pick<BuilderJobRecord, 'status' | 'job
   return job.status === 'paused' && job.jobKind === 'standard' && job.checkpoint !== null && job.claimGeneration < MAX_WORK_SLICES
 }
 
-/** The scheduler's admission rule: one RunPod-bound job at a time. Unknown counts fail closed. */
-export async function builderNoRunningClaim(): Promise<boolean> {
+/**
+ * Admission for a poll resume: no Builder claim is running and no other paused checkpoint is waiting. Two polls can then
+ * only ever target the same job, and the generation-fenced claim starts it once, so polls never add a second job to the
+ * single model slot (Codex review of #4392). Otherwise the scheduler decides. Unknown counts fail closed.
+ */
+export async function builderSoleResumableJob(jobId: string): Promise<boolean> {
   const db = serviceClient()
   if (!db) return false
-  const { count, error } = await db.from('builder_jobs').select('id', { count: 'exact', head: true }).eq('status', 'running')
+  const { count, error } = await db.from('builder_jobs').select('id', { count: 'exact', head: true })
+    .or('status.eq.running,and(status.eq.paused,job_kind.eq.standard,checkpoint.not.is.null)').neq('id', jobId)
   return !error && count === 0
 }
 

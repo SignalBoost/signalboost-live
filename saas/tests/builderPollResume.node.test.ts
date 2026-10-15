@@ -2,8 +2,8 @@
 //
 // Production 2026-10-14 (OrderFlow job 4eb4a2e5): between work slices the paused job sat idle 112-148s waiting for the
 // once-a-minute scheduler, while the owner's page polled its status every 2 seconds. The poll now resumes the caller's
-// own paused checkpoint immediately, under the scheduler's admission rule (no other running claim) and the existing
-// generation-fenced claim, so concurrent polls cannot start it twice and nothing is replayed.
+// own paused checkpoint immediately, only when nothing is running and no other checkpoint waits, through the existing
+// generation-fenced claim: concurrent polls can never start two jobs on the single model slot, and nothing is replayed.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -25,12 +25,13 @@ test('only a resumable paused checkpoint is resumed by a poll — the same set t
   assert.match(scheduler, /\.eq\('status', 'paused'\)\.eq\('job_kind', 'standard'\)\.not\('checkpoint', 'is', null\)\s*\.lt\('claim_generation', MAX_WORK_SLICES\)/)
 })
 
-test('a poll uses the scheduler admission rule and fails closed', () => {
+test('a poll resumes only when nothing runs and no other checkpoint waits, so two polls can never start two jobs (Codex P1)', () => {
   const store = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
-  const admission = store.slice(store.indexOf('export async function builderNoRunningClaim'))
-  assert.match(admission, /\.from\('builder_jobs'\)\.select\('id', \{ count: 'exact', head: true \}\)\.eq\('status', 'running'\)/)
+  const admission = store.slice(store.indexOf('export async function builderSoleResumableJob'))
+  assert.match(admission, /\.select\('id', \{ count: 'exact', head: true \}\)\s*\.or\('status\.eq\.running,and\(status\.eq\.paused,job_kind\.eq\.standard,checkpoint\.not\.is\.null\)'\)\.neq\('id', jobId\)/)
   assert.match(admission, /return !error && count === 0/)
   assert.match(admission, /if \(!db\) return false/)
+  assert.doesNotMatch(store, /builderNoRunningClaim/)
 })
 
 test('the poll resumes only the caller\'s own job, never Self-Healing work, through the fenced runner', () => {

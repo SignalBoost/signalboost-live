@@ -278,6 +278,17 @@ export async function POST(request: Request) {
       return noStore({ error: 'Builder storage is unavailable.', reply }, { status: 503 })
     }
 
+    // An explicitly selected saved project must contain editable source. New builds use a
+    // fresh workspace and must not be blocked merely because it starts empty.
+    if (!newProjectRequested && (project.workspaceId || requestedWorkspaceId) && files.length === 0) {
+      let existingFiles
+      try { existingFiles = await workspace.listFiles(workspaceId) }
+      catch { return noStore({ error: 'Unable to verify selected workspace source files. No job was created.', execution_allowed: false }, { status: 503 }) }
+      if (!hasWorkspaceSource(existingFiles.map(file => file.path)) && !repositoryTarget) {
+        return noStore({ error: 'Selected workspace is empty. Choose the original project or connect/import the repository.', execution_allowed: false }, { status: 422 })
+      }
+    }
+
     await workspace.ensureWorkspace(workspaceId)
     await workspace.setObjective(workspaceId, objective)
     if (repositoryTarget) {

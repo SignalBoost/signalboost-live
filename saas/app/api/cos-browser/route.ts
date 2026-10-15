@@ -32,8 +32,7 @@ import { resolveSemanticPublicIdentity, shouldResolveSemanticPublicIdentity } fr
 import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
-import { resolveHistoricalStockChartIntent } from '@/lib/ai/cos/historicalStockChartIntent'
-import { loadHistoricalStockPrices } from '@/lib/ai/cos/historicalStockChart'
+import { orchestrateDataVisualization } from '@/lib/ai/cos/dataVisualizationHarness'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { decideCosAgentTurn, stableKnowledgeQuestionNeedsNoPlanner, type CosAgentDecision } from '@/lib/ai/cos/cosAgentDecision'
 import { encodePlannerSearchQueriesHeader, PLANNER_SEARCH_QUERIES_HEADER } from '@/lib/ai/cos/plannerSearchQueries'
@@ -191,45 +190,15 @@ async function executeBrowserTurn(req: NextRequest) {
   // both semantic image routing (and its trial paywall) and free-form live web
   // synthesis. Financial history requires dated source data, not a screenshot
   // or a current quote interpreted as months of prices.
-  const stockChartIntent = !hasAttachments ? resolveHistoricalStockChartIntent(messages) : null
-  if (stockChartIntent) {
-    const historical = await loadHistoricalStockPrices(stockChartIntent.symbol, stockChartIntent.range)
-    const title = stockChartIntent.symbol + ' — historical closing prices (' + stockChartIntent.range + ')'
-    if (!historical) {
-      const reply = 'I could not retrieve a verified historical price series for ' + stockChartIntent.symbol +
-        '. A current quote is not enough to draw an accurate historical chart. Historical data can also be viewed at ' +
-        'https://finance.yahoo.com/quote/' + encodeURIComponent(stockChartIntent.symbol) + '/history/'
-      const unavailable = NextResponse.json({
-        ok: false, reply, source: 'cos-historical-chart-data-unavailable',
-        execution_allowed: false, external_action_taken: false,
-      }, {status: 200})
-      return browserSurface === 'concierge' ? publicConciergePresentation(unavailable) : unavailable
-    }
-    const first = historical.points[0]
-    const last = historical.points[historical.points.length - 1]
-    const change = (last.close / first.close - 1) * 100
-    const imageUrl = new URL('/api/market-charts/' + encodeURIComponent(historical.symbol) +
-      '.svg?range=' + encodeURIComponent(historical.range), req.url).toString()
-    const reply = [
-      '**' + title + '**',
-      imageUrl,
-      'From ' + first.date + ' to ' + last.date + ': ' + historical.currency + ' ' +
-        first.close.toFixed(2) + ' → ' + last.close.toFixed(2) +
-        ' (' + (change >= 0 ? '+' : '') + change.toFixed(2) + '%). ' +
-        historical.points.length + ' verified closing-price observations.',
-      'Historical data source: [' + historical.source + '](' + historical.sourceUrl + '). ' +
-        'This chart plots observed closing prices, not a forecast or invented data.',
-    ].join('\n\n')
+  const chartResult = !hasAttachments ? await orchestrateDataVisualization(messages, req.url) : null
+  if (chartResult) {
     const chartResponse = NextResponse.json({
-      ok: true, reply, source: 'cos-historical-stock-chart',
-      historical_chart: {
-        symbol: historical.symbol, range: historical.range,
-        from: first.date, to: last.date, observations: historical.points.length,
-        source: historical.source, source_url: historical.sourceUrl,
-      },
+      ok: chartResult.status === 'completed',
+      reply: chartResult.reply,
+      source: chartResult.source,
+      capability_receipt: chartResult.receipt,
       execution_allowed: false, external_action_taken: false,
       external_ai_invoked: false, local_model_invoked: false,
-      live_external_evidence: {used: true, sources: [{title: historical.source, url: historical.sourceUrl}]},
     }, {headers: {'Cache-Control': 'no-store'}})
     return browserSurface === 'concierge' ? publicConciergePresentation(chartResponse) : chartResponse
   }

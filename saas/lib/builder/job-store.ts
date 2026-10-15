@@ -265,14 +265,27 @@ export async function finishBuilderJob(input: {
 }
 
 /** Only server-owned paused checkpoints are eligible; running/uncertain work is never replayed. */
+/**
+ * Work a person is waiting for goes before background Self-Healing work. Production 2026-10-14 (OrderFlow job
+ * 57f9bd7b): with eight Self-Healing repairs queued and one in the capacity queue, the owner's build sat idle 319s
+ * while the one-job-per-tick scheduler took jobs in age order. Every Self-Healing job carries selfHealing* metadata.
+ */
+export function builderPersonStarted(metadata: unknown): boolean {
+  return !Object.keys(metadata && typeof metadata === 'object' ? metadata : {}).some(key => key.startsWith('selfHealing'))
+}
+
+export function personStartedFirst<T extends { metadata?: unknown }>(rows: readonly T[]): T[] {
+  return [...rows.filter(row => builderPersonStarted(row.metadata)), ...rows.filter(row => !builderPersonStarted(row.metadata))]
+}
+
 export async function listBuilderContinuations(): Promise<Array<{ id: string; userId: string }>> {
   const db = serviceClient()
   if (!db) throw new Error('builder_job_storage_unavailable')
-  const { data, error } = await db.from('builder_jobs').select('id,user_id')
+  const { data, error } = await db.from('builder_jobs').select('id,user_id,metadata')
     .eq('status', 'paused').eq('job_kind', 'standard').not('checkpoint', 'is', null)
-    .lt('claim_generation', MAX_WORK_SLICES).order('updated_at', { ascending: true }).limit(3)
+    .lt('claim_generation', MAX_WORK_SLICES).order('updated_at', { ascending: true }).limit(30)
   if (error) throw new Error('builder_continuations_read_failed')
-  return (data || []).map(row => ({ id: row.id, userId: row.user_id }))
+  return personStartedFirst(data || []).slice(0, 3).map(row => ({ id: row.id, userId: row.user_id }))
 }
 
 /**

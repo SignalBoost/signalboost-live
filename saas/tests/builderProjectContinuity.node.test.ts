@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { selectBuilderProject } from '../lib/builder/project-continuity.ts'
+import { inspectBuilderContinuationSource } from '../lib/builder/continuation-source.ts'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 
@@ -168,7 +169,7 @@ test('durable source admission never manufactures a missing workspace', () => {
   assert.match(storage, /async hasWorkspace\(workspaceId: string\)/)
   assert.match(route, /if \(!await workspace\.hasWorkspace\(workspaceId\)\)/)
   assert.match(route, /exists = await workspace\.hasWorkspace\(workspaceId\)/)
-  assert.match(runner, /if \(!await workspace\.hasWorkspace\(job\.workspaceId\)\)/)
+  assert.match(runner, /inspectBuilderContinuationSource\(/)
   assert.match(runner, /if \(workspace && !unavailablePriorSource\)/)
 })
 
@@ -190,4 +191,35 @@ test('saved workspace selection retrieves same-owner active job without a second
   assert.match(route, /previous\.status === 'paused'/)
   assert.match(route, /resumable: true, reply: runningReply\(previous\.id\)/)
   assert.match(page, /if \(data\.activeJobId\) void restoreJob\(data\.activeJobId\)/)
+})
+
+test('source admission retries a transient empty listing using read-only inspection', async () => {
+  let reads = 0
+  const delays: number[] = []
+  const result = await inspectBuilderContinuationSource({
+    hasWorkspace: async () => true,
+    listPaths: async () => (++reads === 1 ? [] : ['src/index.ts']),
+    wait: async duration => { delays.push(duration) },
+  })
+  assert.deepEqual(result, { status: 'ready', paths: ['src/index.ts'] })
+  assert.equal(reads, 2)
+  assert.deepEqual(delays, [350])
+})
+
+test('source admission refuses missing workspace without listing or writing files', async () => {
+  let listed = false
+  const missing = await inspectBuilderContinuationSource({
+    hasWorkspace: async () => false,
+    listPaths: async () => { listed = true; return ['src/index.ts'] },
+  })
+  assert.deepEqual(missing, { status: 'workspace_missing', paths: [] })
+  assert.equal(listed, false)
+  let reads = 0
+  const empty = await inspectBuilderContinuationSource({
+    hasWorkspace: async () => true,
+    listPaths: async () => { reads++; return [] },
+    wait: async () => {},
+  })
+  assert.deepEqual(empty, { status: 'source_missing', paths: [] })
+  assert.equal(reads, 3)
 })

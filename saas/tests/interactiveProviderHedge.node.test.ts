@@ -81,3 +81,12 @@ test('production provider race emits per-attempt timing without changing hedge p
   assert.match(lane, /firstUsefulWithHedge/)
   assert.match(lane, /8_000 : interactiveManagedBackupAfterMs\(\)/)
 })
+
+test('default interactive chat hedge starts earlier, while the owner override stays in force', () => {
+  const source = readFileSync(new URL('../lib/ai/local-inference.ts', import.meta.url), 'utf8')
+  const fn = source.slice(source.indexOf('function interactiveManagedBackupAfterMs():'), source.indexOf('// OWNED REASONER WINDOW'))
+  assert.match(fn, /process\.env\.COS_INTERACTIVE_MANAGED_BACKUP_AFTER_MS \|\| '8000'/)
+  assert.match(fn, /Math\.max\(1000, Math\.min\(60000, value\)\) : 8000/)
+  const turn = source.slice(source.indexOf('async function runpodFirstInteractiveTurn('), source.indexOf('export async function callLocalModelTurn('))
+  assert.match(turn, /interactiveManagedBackupAfterMs\(\)/)
+})

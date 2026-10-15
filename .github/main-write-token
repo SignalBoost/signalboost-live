@@ -1,2 +1,2 @@
-base_sha=5129c9abb170b98b3b4628e3af059dd4a905b6c5
-branch=test/lab-observability-acceptance-rebased-20261015
+base_sha=9e9bdd4e0e8daf3ee6226d1c87677a6624db6b60
+branch=fix/builder-workspace-filecount-preflight-20261015

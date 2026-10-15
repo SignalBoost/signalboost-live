@@ -169,5 +169,5 @@ test('anti-loop guard compares repeated writes to current content and counts rep
   assert.match(source, /alreadyPresent: true/)
   assert.match(source, /builder_write_content_differs:/)
   assert.match(source, /builder_repeated_write_blocked:/)
-  assert.match(source, /staleActions = \[\.\.\.trace\]\.reverse\(\)\.filter\(/)
+  assert.match(source, /meaningfulActions = \[\.\.\.trace\]\.reverse\(\)\.filter\(/)
 })

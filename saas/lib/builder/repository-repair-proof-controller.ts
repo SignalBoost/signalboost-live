@@ -55,12 +55,12 @@ export function discoverRepositoryRepairProofCommand(
   const explicit = repositoryRepairProofCommand(target)
   if (explicit) return explicit
   const stems = target.pathHints
-    .filter(path => /\\.(?:[cm]?[jt]sx?)$/i.test(path) && !/\\.(?:test|spec)\\./i.test(path))
-    .map(path => path.split('/').pop()!.replace(/\\.[^.]+$/, '').toLowerCase())
+    .filter(path => /\.(?:[cm]?[jt]sx?)$/i.test(path) && !/\.(?:test|spec)\./i.test(path))
+    .map(path => path.split('/').pop()!.replace(/\.[^.]+$/, '').toLowerCase())
     .filter(stem => stem.length >= 5)
   if (!stems.length) return null
-  const candidates = [...new Set(availablePaths.map(path => path.replace(/^saas\\//, '')))]
-    .filter(path => /^(?:tests|test)\\/.+\\.(?:test|spec)\\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(path))
+  const candidates = [...new Set(availablePaths.map(path => path.replace(/^saas\//, '')))]
+    .filter(path => /^(?:tests|test)\/.+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(path))
     .filter(path => stems.some(stem => path.split('/').pop()!.toLowerCase().includes(stem)))
   // Ambiguous matches must not silently choose an unrelated passing suite.
   if (candidates.length !== 1) return null

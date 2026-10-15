@@ -1,2 +1,2 @@
-base_sha=56835e28e1a107cd5368578aae527dc4fea53e79
-branch=fix/builder-cursor-rejection-budget-20261014
+base_sha=4351ddbf1beef61ce0c3140341cf17ae6d78787c
+branch=feat/builder-poll-resume-20261014

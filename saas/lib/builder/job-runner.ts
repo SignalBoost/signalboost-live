@@ -41,7 +41,7 @@ const SELF_HEALING_REPOSITORY_BUDGET_MS = 285_000
 const MAX_SELF_HEALING_EXECUTION_TIMEOUT_DEFERRALS = 3
 const MAX_STANDARD_CAPACITY_DEFERRALS = 3
 
-function selfHealingCapacityJob(job: BuilderJobRecord): boolean {
+export function selfHealingCapacityJob(job: BuilderJobRecord): boolean {
   return job.ownerAuthorized && (
     job.metadata.selfHealingUniversityDistillation === true
     || job.metadata.selfHealingOwnedSite === true

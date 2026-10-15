@@ -1,2 +1,2 @@
-base_sha=fcdb39fae9fe05e51d91694ad6a2e7465a7aaafa
-branch=fix/cos-assistant-recover-long-turns-20261015
+base_sha=86a2ce0a5f2d0e0229ee17ae37b558852e86e7e5
+branch=fix/builder-empty-workspace-current-main-20261015

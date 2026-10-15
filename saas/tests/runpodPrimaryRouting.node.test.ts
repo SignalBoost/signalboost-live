@@ -90,7 +90,7 @@ test('interactive COS answers and authoring bypass RunPod primary and use bounde
   assert.doesNotMatch(inference, /COS_INTERACTIVE_AUTHORING_MODEL/)
   assert.match(firstAnswer, /function interactiveReasonerFeature/)
   assert.match(firstAnswer, /'cos_interactive_authoring'/)
-  assert.match(firstAnswer, /purpose:'user_facing_response'/)
+  assert.match(firstAnswer, /purpose:input\.inferenceLane === 'university_exam' \? 'independent_exam_response' : 'user_facing_response'/)
   assert.match(firstAnswer, /COS_INTERACTIVE_REASONER_MAX_TOKENS/)
   assert.match(firstAnswer, /COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS \|\| '900'/)
 })

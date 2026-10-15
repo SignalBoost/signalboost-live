@@ -174,7 +174,7 @@ test('editing guidelines preserve user intent and do not convert background-only
   assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /For proofread-only requests, make restrained changes/i)
   assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /meaning-and-evidence audit/i)
   assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /Remove unsupported specifics and certainty borrowed from background material/i)
-  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /not an acceptable edit; awkward phrasing/i)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /not automatically an acceptable edit; awkward phrasing/i)
   assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /rhetorical questions/i)
 })
 

@@ -9,6 +9,7 @@ import { fmt, type LabCustomerTrainingCopy } from '@/lib/i18n/labCustomerTrainin
 import { ADD_KEY_OPTION, providerOptions, sortProviders, type ProviderOption } from '@/lib/lab/labProviderOptions'
 import { cleanPastedKey, detectProviderFromKey } from '@/lib/lab/labKeyEntry'
 import { LAB_OPEN_SOURCES } from '@/lib/lab/labOpenSources'
+import { previewLabDataset } from '@/lib/lab/labDatasetPreflight'
 
 type Org = { organizationId: string; organizationName: string; experimentId: string; projectName: string; role: string }
 type CatalogEntry = { kind: string; name: string; supports: Record<string, boolean>; unsupported: Record<string, string>; keyHelp: string }
@@ -27,6 +28,19 @@ const LAB_UI_VERSION = 'LAB UI v2026.10.12.10'
 const POLLED_TRAINING = new Set(['together', 'fireworks'])
 // Training providers whose base-model list is public, so it shows before a key is saved.
 const PUBLIC_MODEL_DIRECTORY = new Set(['huggingface'])
+const DATASET_PREFLIGHT_LABELS: Record<string, string[]> = {
+  en: ["Dataset preflight (local, no provider calls)","Unique prompts","Invalid rows","Exact duplicates","Conflicting answers","Overlong fields","Beyond 128-item limit","Ready for review","Fix issues before training","Review source licenses and personal data before training."],
+  es: ["Revisión previa de datos (local, sin llamadas externas)","Preguntas únicas","Filas inválidas","Duplicados exactos","Respuestas contradictorias","Campos demasiado largos","Más del límite de 128","Listo para revisar","Corrija los problemas antes de entrenar","Revise licencias y datos personales."],
+  pt: ["Pré-verificação dos dados (local, sem chamadas externas)","Perguntas únicas","Linhas inválidas","Duplicatas exatas","Respostas conflitantes","Campos longos demais","Acima do limite de 128","Pronto para revisão","Corrija os problemas antes do treino","Verifique licenças e dados pessoais."],
+  pl: ["Wstępna kontrola danych (lokalna, bez połączeń)","Unikalne pytania","Błędne wiersze","Identyczne duplikaty","Sprzeczne odpowiedzi","Zbyt długie pola","Powyżej limitu 128","Gotowe do przeglądu","Popraw dane przed treningiem","Sprawdź licencje i dane osobowe."],
+  ru: ["Предпроверка данных (локально, без запросов)","Уникальные запросы","Ошибочные строки","Точные дубликаты","Противоречивые ответы","Длинные поля","Сверх лимита 128","Готово к проверке","Исправьте ошибки до обучения","Проверьте лицензии и персональные данные."],
+  de: ["Datensatzprüfung (lokal, ohne Anbieteraufrufe)","Eindeutige Fragen","Ungültige Zeilen","Exakte Duplikate","Widersprüchliche Antworten","Zu lange Felder","Über dem Limit von 128","Bereit zur Prüfung","Vor dem Training korrigieren","Lizenzen und personenbezogene Daten prüfen."],
+  fr: ["Précontrôle des données (local, sans appel externe)","Questions uniques","Lignes invalides","Doublons exacts","Réponses contradictoires","Champs trop longs","Au-delà de la limite de 128","Prêt à vérifier","Corriger avant l'entraînement","Vérifiez licences et données personnelles."],
+  it: ["Controllo dati (locale, senza chiamate esterne)","Domande uniche","Righe non valide","Duplicati esatti","Risposte in conflitto","Campi troppo lunghi","Oltre il limite di 128","Pronto per la verifica","Correggi prima dell'addestramento","Verifica licenze e dati personali."],
+  ja: ["データ事前確認（ローカル・外部呼び出しなし）","固有の質問","無効な行","完全な重複","矛盾する回答","長すぎる項目","128件の上限超過","確認できます","学習前に修正してください","ライセンスと個人情報を確認してください。"],
+  ko: ["데이터 사전 검사(로컬, 외부 호출 없음)","고유 질문","잘못된 행","완전 중복","상충하는 답변","너무 긴 필드","128개 제한 초과","검토 준비 완료","학습 전에 수정하세요","라이선스와 개인정보를 확인하세요."],
+  ar: ["فحص البيانات المسبق (محلي، دون اتصال خارجي)","أسئلة فريدة","صفوف غير صالحة","تكرارات متطابقة","إجابات متعارضة","حقول طويلة جدًا","تجاوز حد 128","جاهز للمراجعة","صحح المشاكل قبل التدريب","راجع التراخيص والبيانات الشخصية."],
+}
 const BASE_MODEL_ID: Record<string, RegExp> = {
   huggingface: /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, together: /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/,
   fireworks: /^accounts\/[a-z0-9-]+\/models\/[A-Za-z0-9_.-]+$/,
@@ -122,7 +136,9 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const selectedTeacherCredentials = teacherCredentials.filter(item => item.providerKind === teacherProviderKind)
   const promptCount = useMemo(() => new Set(prompts.split('\n').map(line => line.trim()).filter(Boolean)).size, [prompts])
   const exampleCount = useMemo(() => examples.split('\n').filter(line => { try { const o = JSON.parse(line); return o?.prompt && o?.response } catch { return false } }).length, [examples])
-  const itemCount = source === 'teacher' ? promptCount : exampleCount
+  const preflight = useMemo(() => previewLabDataset(examples), [examples])
+  const preflightLabels = DATASET_PREFLIGHT_LABELS[language] ?? DATASET_PREFLIGHT_LABELS.en
+  const itemCount = source === 'teacher' ? promptCount : preflight.uniquePrompts
 
   useEffect(() => {
     void (async () => {
@@ -483,11 +499,18 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             ) : (
               <label className="text-sm sm:col-span-2">{fmt(copy.examples, { n: exampleCount })}
                 <textarea className="mt-1 h-40 w-full rounded border px-2 py-1 font-mono text-xs" value={examples} onChange={event => { setExamples(event.target.value); setBillingConfirmed(false) }} />
+                {examples.trim() && <div aria-live="polite" className="mt-2 rounded border border-white/20 p-3 text-xs text-slate-200">
+                  <p className="font-semibold">{preflightLabels[0]}</p>
+                  <p className="mt-1">{preflightLabels[1]}: {preflight.uniquePrompts} · {preflightLabels[2]}: {preflight.invalidLines} · {preflightLabels[3]}: {preflight.duplicateRows}</p>
+                  <p>{preflightLabels[4]}: {preflight.conflictingPrompts} · {preflightLabels[5]}: {preflight.truncatedFields} · {preflightLabels[6]}: {preflight.extraRows}</p>
+                  <p className={preflight.ready ? 'text-emerald-300' : 'text-amber-200'}>{preflight.ready ? preflightLabels[7] : preflightLabels[8]}</p>
+                  <p className="opacity-70">{preflightLabels[9]}</p>
+                </div>}
               </label>
             )}
           </div>
           <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={billingConfirmed} onChange={event => setBillingConfirmed(event.target.checked)} /> {copy.billingConfirmation}</label>
-          <button className="rounded border px-3 py-1" disabled={busy || !billingConfirmed || !computeProviderKind || !computeId || !baseModelValid || itemCount < 20 || itemCount > 128 || (source === 'teacher' && (!teacherProviderKind || !teacherId || !teacherModel))} onClick={startRun}>{copy.start}</button>
+          <button className="rounded border px-3 py-1" disabled={busy || !billingConfirmed || !computeProviderKind || !computeId || !baseModelValid || itemCount < 20 || itemCount > 128 || (source !== 'teacher' && !preflight.ready) || (source === 'teacher' && (!teacherProviderKind || !teacherId || !teacherModel))} onClick={startRun}>{copy.start}</button>
         </div>
       )}
 

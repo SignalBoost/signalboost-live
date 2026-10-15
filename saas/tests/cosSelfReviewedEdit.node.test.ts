@@ -155,3 +155,45 @@ test('editorial model independently reviews whole user request with actual line 
   const source = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
   assert.match(source, /prompt:formatIndependentEditReviewPrompt\(userRequest,candidate\)/)
 })
+
+test('provider-wrapped editorial JSON is parsed without losing a completed review', () => {
+  const final = { verdict: 'repaired', answer: 'Thank you. I have a question about {the dates} and would appreciate your clarification.' }
+  assert.deepEqual(parseFastEditReview('Some explanation:\n' + JSON.stringify(final) + '\nDone.'), final)
+  assert.deepEqual(parseFastEditReview(JSON.stringify(final) + '\nDone.'), final)
+  const fence = String.fromCharCode(96).repeat(3)
+  assert.deepEqual(parseFastEditReview(fence + 'json\n' + JSON.stringify(final) + '\n' + fence), final)
+  assert.equal(parseFastEditReview('{"verdict":"pass","answer":"Partial"'), null)
+  assert.equal(parseFastEditReview('{"verdict":"unresolved","answer":"A draft"}'), null)
+  assert.equal(parseFastEditReview('{"verdict":"pass","answer":"Invalid\\q"}'), null)
+})
+
+test('editing guidelines preserve user intent and do not convert background-only facts into new commitments', () => {
+  assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /never invent a new fact, schedule, commitment, or certainty/i)
+  assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /surrounding material supplies context, not permission to add details/i)
+  assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /contextual sources disagree, do not silently choose between them/i)
+  assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /For proofread-only requests, make restrained changes/i)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /meaning-and-evidence audit/i)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /Remove unsupported specifics and certainty borrowed from background material/i)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /not an acceptable edit; awkward phrasing/i)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /rhetorical questions/i)
+})
+
+test('model review can repair ambiguous timeline wording without inserting the quoted time', async () => {
+  const source = [
+    'edit my reply - Thanks for arranging transportation. Could you tell me why pickup is so early?',
+    '',
+    'Earlier message from colleague: Pickup 07:30; schedule says 08:30.',
+  ].join('\n')
+  const first = 'Thank you for arranging transportation. Why is pickup at 07:30?'
+  const improved = 'Thank you for arranging transportation. Could you clarify why the pickup is scheduled so early?'
+  const result = await runSelfReviewedEdit({
+    userRequest: source,
+    draft: async () => first,
+    review: async ({userRequest, candidate}) => {
+      assert.equal(userRequest, source)
+      assert.equal(candidate, first)
+      return JSON.stringify({verdict:'repaired', answer:improved}) + '\nDone.'
+    },
+  })
+  assert.deepEqual(result, {verdict:'repaired', answer:improved})
+})

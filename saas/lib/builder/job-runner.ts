@@ -26,7 +26,7 @@ import { createBuilderPlaywrightCliPort } from './playwright-cli-port.ts'
 import { VercelSandboxBuilderRunner } from './vercel-sandbox-runner.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { executeSignalBoostRepositoryRepair } from './repository-repair.ts'
-import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from './repository-repair-target.ts'
+import { hasWorkspaceSource, parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from './repository-repair-target.ts'
 import { builderAutoMergeSnapshotPort } from './repository-repair-snapshot-host.ts'
 import { retrieveValidatedCognitiveSkills, type CognitiveSkillContextResult } from '@/lib/ai/cos/cognitiveSkillContext'
 import { recordVerifiedCognitiveProductionOutcome } from '@/lib/ai/cos/cognitiveProductionOutcome'
@@ -493,6 +493,21 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     if (!workspace) {
       await terminalFailure(job, 'builder_job_storage_unavailable')
       return
+    }
+    // Conversation continuations may be admitted when their initial file list
+    // was transiently empty. The claimed worker must read source again before
+    // doing any work: never invent a replacement project from an empty listing.
+    if (job.metadata.requiresExistingSource === true) {
+      let paths: string[]
+      try { paths = (await workspace.listFiles(job.workspaceId)).map(file => file.path) }
+      catch {
+        await terminalFailure(job, 'builder_existing_source_read_unavailable')
+        return
+      }
+      if (!hasWorkspaceSource(paths)) {
+        await terminalFailure(job, 'builder_existing_source_unavailable')
+        return
+      }
     }
 
     const cognitive = await retrieveValidatedCognitiveSkills(job.objective, { specialistFamily: 'software' }).catch(error => {

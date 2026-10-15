@@ -58,11 +58,11 @@ test('new projects, uploads, imports and ordinary questions cannot silently reus
     { ...input, objective: 'Build a complete working order management application from scratch in a new isolated workspace; fix failing tests and verify the app.' },
     { ...input, objective: 'Create a fresh isolated project with total.js and tests' },
     { ...input, objective: 'Update a different app' },
-    { ...input, objective: 'Explain total.js' },
     { ...input, hasNewSource: true }, { ...input, repositoryImport: true },
     { ...input, conversationId: null }, { ...input, userId: null },
   ]) assert.deepEqual(await selectBuilderProject(request, async () => { assert.fail('must not read history'); return null }), {})
-  assert.deepEqual(await selectBuilderProject({ ...input, objective: 'Add a calendar event' }, async () => job), {})
+  assert.equal((await selectBuilderProject({ ...input, objective: 'Explain total.js' }, async () => job)).workspaceId, workspaceId)
+  assert.equal((await selectBuilderProject({ ...input, objective: 'Add a calendar event' }, async () => job)).workspaceId, workspaceId)
 })
 
 test('complete and verify existing tests reuses the prior workspace instead of creating an empty one', async () => {
@@ -86,7 +86,9 @@ test('history cannot cross owners, conversations or the platform repository boun
 
 test('active jobs and history failures cannot fork an empty replacement project', async () => {
   for (const status of ['queued', 'running', 'paused']) {
-    assert.deepEqual(await selectBuilderProject(input, async () => ({ ...job, status })), { blocked: 'busy' })
+    assert.deepEqual(await selectBuilderProject(input, async () => ({ ...job, status })), {
+      workspaceId, blocked: 'busy', activeJobId: job.id, activeStatus: status,
+    })
   }
   assert.deepEqual(await selectBuilderProject(input, async () => { throw new Error('db unavailable') }), { blocked: 'unavailable' })
   assert.equal((await selectBuilderProject(input, async () => ({ ...job, status: 'failed' }))).workspaceId, workspaceId)
@@ -130,4 +132,31 @@ test('new isolated builds ignore an explicitly retained old workspace ID', async
   assert.match(route, /const newProjectRequested = isNewBuilderProjectObjective\(objective\)/)
   assert.match(route, /let workspaceId = newProjectRequested \? crypto\.randomUUID\(\) : requestedWorkspaceId \|\| crypto\.randomUUID\(\)/)
   assert.match(route, /requestedWorkspaceId: newProjectRequested \? undefined : requestedWorkspaceId/)
+})
+
+test('same-conversation continuity is server-resolved without requiring a canned follow-up phrase', async () => {
+  const selected = await selectBuilderProject({ ...input, objective: 'Please make the latest implementation reliable.' }, async target => {
+    assert.deepEqual(target, { userId, conversationId })
+    return job
+  })
+  assert.equal(selected.workspaceId, workspaceId)
+  assert.equal(selected.context?.previousJobId, job.id)
+  const explicitlySelected = await selectBuilderProject({ ...input, requestedWorkspaceId: workspaceId }, async target => {
+    assert.deepEqual(target, { userId, conversationId, workspaceId })
+    return job
+  })
+  assert.equal(explicitlySelected.workspaceId, workspaceId)
+})
+
+test('the Developer surface submits conversation continuity to the server without local source gate', () => {
+  const page = readFileSync(new URL('../app/dashboard/developer/page.tsx', import.meta.url), 'utf8')
+  const api = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
+  const worker = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  assert.match(page, /conversationId: conversationIdRef\.current/)
+  assert.doesNotMatch(page, /The selected workspace has no source files\. Open the original project/)
+  assert.match(api, /resumable: true, reply: runningReply/)
+  assert.match(api, /requiresExistingSource: true/)
+  assert.match(worker, /if \(job\.metadata\.requiresExistingSource === true\)/)
+  assert.match(worker, /await workspace\.listFiles\(job\.workspaceId\)/)
+  assert.match(worker, /builder_existing_source_unavailable/)
 })

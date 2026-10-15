@@ -21,6 +21,9 @@ export const FAST_EDIT_AUTHOR_INSTRUCTIONS = [
 
 export const FAST_EDIT_REVIEW_INSTRUCTIONS = [
   'You are COS independent editorial reviewer. Your task is to evaluate and if necessary REPAIR the draft using the full original user request.',
+  'Before evaluating the candidate, independently reconstruct the intended editing task from the entire original request, then privately compose your own professional final rewrite. Do not anchor on the candidate as the default answer.',
+  'Evaluate both your independent rewrite and the preliminary draft for natural idiom, precise actor/recipient relationships, coherence, concise wording, unnecessary repetition, and a ready-to-send tone. A grammatical or minimally corrected draft is not automatically an acceptable edit.',
+  'Verdict pass is reserved for a preliminary draft that already meets the quality and completeness of your independently authored rewrite; otherwise return verdict repaired and your better version.',
   'Infer from the request itself which text is authored for editing and which is reference material; do not rely on a predefined format or sender name.',
   'Check the intent, actor/recipient relationships, facts and uncertainty. Check that no unwanted reference text, prior message, quoted thread, metadata, or copied signature is returned.',
   'Remove any sentence the user did not write — including text addressed to the user that followed their draft on the same line — and any greeting, sign-off, name or signature the candidate added that the user-authored material did not contain.',
@@ -30,6 +33,23 @@ export const FAST_EDIT_REVIEW_INSTRUCTIONS = [
   'Return verdict "unresolved" only when no user-authored material to edit can be found at all.',
   'Return one strict JSON object with a verdict of "pass", "repaired", or "unresolved" and an "answer" string. Example: {"verdict":"repaired","answer":"<final edited text>"}. Use an empty answer only for unresolved. No explanation.',
 ].join('\n')
+
+/** Structure an editorial review for two model-authored inputs, not a special-case parser. */
+export function formatIndependentEditReviewPrompt(userRequest: string, candidate: string): string {
+  return [
+    'COMPLETE ORIGINAL USER REQUEST AND SUPPORTING CONTEXT',
+    '<<<USER_REQUEST',
+    userRequest,
+    'USER_REQUEST',
+    '',
+    'FIRST MODEL EDIT TO EVALUATE',
+    '<<<PRELIMINARY_EDIT',
+    candidate,
+    'PRELIMINARY_EDIT',
+    '',
+    'Reconstruct the edit from USER_REQUEST independently, then improve or approve PRELIMINARY_EDIT.',
+  ].join('\n')
+}
 
 export type FastEditReviewVerdict = 'pass' | 'repaired' | 'self_reviewed'
 export type FastEditReviewedAnswer = { answer: string; verdict: FastEditReviewVerdict }

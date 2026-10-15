@@ -1,0 +1,34 @@
+name: LAB public observability smoke (zero spend)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'saas/scripts/lab-observability-smoke.mjs'
+      - '.github/workflows/lab-public-observability-smoke.yml'
+permissions:
+  contents: read
+jobs:
+  public-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify anonymous LAB endpoints on public production origin
+        env:
+          LAB_ACCEPTANCE_BASE_URL: https://itmounts.com
+        working-directory: saas
+        run: |
+          set -o pipefail
+          node scripts/lab-observability-smoke.mjs | tee lab-anonymous-smoke.jsonl
+      - name: Preserve no-credential result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-public-anonymous-smoke-${{ github.sha }}
+          path: saas/lab-anonymous-smoke.jsonl
+          if-no-files-found: warn
+          retention-days: 30

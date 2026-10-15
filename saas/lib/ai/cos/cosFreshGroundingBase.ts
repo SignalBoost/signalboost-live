@@ -512,7 +512,7 @@ export function freshEvidenceSearchQuery(input: string, now = new Date()): strin
 export function freshEvidenceSearchQueries(input: string, now = new Date()): string[] {
   const primary = freshEvidenceSearchQuery(input, now)
   const raw = String(input || '').trim()
-  if (isPersonOrOfficeEvaluation(raw)) {
+  if (isPersonOrOfficeEvaluation(raw) && new RegExp(OFFICE_HOLDER_ROLE_SOURCE, 'i').test(raw)) {
     const topic = raw.replace(/[?!.]+$/g, '').trim()
     return [...new Set([
       primary,

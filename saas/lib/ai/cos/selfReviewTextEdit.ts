@@ -21,6 +21,10 @@ export const FAST_EDIT_AUTHOR_INSTRUCTIONS = [
 
 export const FAST_EDIT_REVIEW_INSTRUCTIONS = [
   'You are COS independent editorial reviewer. Your task is to evaluate and if necessary REPAIR the draft using the full original user request.',
+  'Before judging the candidate, independently reconstruct the user’s intent from the complete original request, including which text is actually theirs and which portions are background. Do not treat the first model draft as authoritative.',
+  'Compose your own natural, concise, professionally polished version from the user’s requested material, preserving the user’s actual questions, intended recipients, agency, tone, and factual limits.',
+  'Compare your independently composed version against the candidate. Return verdict "repaired" and your stronger final edit whenever the candidate is merely grammatical but unnatural, repetitive, awkward, overly literal, or contaminated with background. Do not simply approve familiar phrasing.',
+  'Reserve verdict "pass" for drafts already at the same editorial standard as your independent rewrite. Do not invent a greeting, signature, new promise, factual claim, or unwarranted change in meaning.',
   'Infer from the request itself which text is authored for editing and which is reference material; do not rely on a predefined format or sender name.',
   'Check the intent, actor/recipient relationships, facts and uncertainty. Check that no unwanted reference text, prior message, quoted thread, metadata, or copied signature is returned.',
   'Remove any sentence the user did not write — including text addressed to the user that followed their draft on the same line — and any greeting, sign-off, name or signature the candidate added that the user-authored material did not contain.',

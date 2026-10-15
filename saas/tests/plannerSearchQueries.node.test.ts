@@ -46,7 +46,7 @@ test('planner queries lead the turn; the host template stays as one extra search
   const host = ['whose is more likely to be the next Brazilian president 2026-10-10']
   assert.deepEqual(
     liveSearchQueriesForTurn(['Brazil 2026 presidential election polls', 'Brazil 2026 presidential candidates'], host),
-    ['Brazil 2026 presidential election polls', 'Brazil 2026 presidential candidates', host[0]],
+    ['Brazil 2026 presidential election polls', host[0], 'Brazil 2026 presidential candidates'],
   )
   assert.deepEqual(liveSearchQueriesForTurn([], host), host)
   assert.deepEqual(liveSearchQueriesForTurn(['same query'], ['Same Query']), ['same query'])

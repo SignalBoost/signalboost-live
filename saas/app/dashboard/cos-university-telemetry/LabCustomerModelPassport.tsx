@@ -1,7 +1,7 @@
 'use client'
 
 // Displays only tenant-scoped fields already returned by the authenticated run list.
-// A completed provider job is NOT an independently evaluated or certified model.
+// A completed provider job is NOT independently evaluated.
 type PassportRun = {
   runId: string; stage: string; createdAt: string; teacherProviderKind: string; teacherModel: string;
   computeProviderKind?: string; baseModel: string; artifactRepo: string | null;

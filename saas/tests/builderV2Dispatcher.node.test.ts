@@ -44,3 +44,35 @@ test('host verification failure is preserved and can be repaired', async () => {
   assert.equal((await dispatcher.dispatch('test', { tool: 'run_tests', command: 'node --test' })).ok, true)
   assert.equal(count, 2)
 })
+
+test('V2 agent creates source, runs verification, and only then completes', async () => {
+  const { BuilderV2Agent } = await import('../lib/builder/agent-v2.ts')
+  const workspace = new InMemoryBuilderWorkspace()
+  const actions = [
+    { type: 'tool', action: { tool: 'write_file', path: 'src/storage.js', content: 'export default {}' } },
+    { type: 'tool', action: { tool: 'write_file', path: 'src/storage.js', content: 'export default {}' } },
+    { type: 'tool', action: { tool: 'run_tests', command: 'node --test' } },
+    { type: 'finish', summary: 'Built and tested' },
+  ]
+  let index = 0
+  let runs = 0
+  const ai = { async generate() { return JSON.stringify(actions[Math.min(index++, actions.length - 1)]) } }
+  const dispatcher = new BuilderV2Dispatcher(workspace, { async run() {
+    runs++; return { exitCode: 0, stdout: 'pass', stderr: '', timedOut: false }
+  } })
+  const outcome = await new BuilderV2Agent(ai, dispatcher).run({ workspaceId: 'w', objective: 'Build storage', maxSteps: 12 })
+  assert.equal(outcome.ok, true)
+  assert.equal(runs, 1)
+  assert.equal(outcome.steps.filter(x => x.tool === 'write_file').length, 2)
+})
+
+test('V2 agent does not accept unverified success from the model', async () => {
+  const { BuilderV2Agent } = await import('../lib/builder/agent-v2.ts')
+  const ai = { async generate() { return JSON.stringify({ type: 'finish', summary: 'All tests passed' }) } }
+  const dispatcher = new BuilderV2Dispatcher(new InMemoryBuilderWorkspace(), { async run() {
+    throw Error('should not run')
+  } })
+  const outcome = await new BuilderV2Agent(ai, dispatcher).run({ workspaceId: 'w', objective: 'Build an app' })
+  assert.equal(outcome.ok, false)
+  assert.equal(outcome.reason, 'builder_v2_unverified_completion')
+})

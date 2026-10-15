@@ -297,7 +297,7 @@ export async function postWithAgentProgress(args: {
       // external side effect and must not strand the visitor with transport copy.
       response = await sendReplaySafeEditAfterTransportLoss(
         sendOnce,
-        args.target === 'concierge' && !builderRequest && isReplaySafeConciergeEdit(requestBody),
+        !builderRequest && isReplaySafeConciergeEdit(requestBody),
         responseSignal,
         () => report('running', 'Recovering an interrupted text edit'),
       )

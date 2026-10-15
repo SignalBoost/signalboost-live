@@ -63,8 +63,13 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
   // A more recent failed execution invalidates prior proof until verification succeeds again.
   const latestRunPassed = runs.length > 0 && runs[runs.length - 1].ok
   const missingFiles = contract.files.filter(path => !files.includes(path))
-  const pendingCommands = contract.commands.filter(command =>
-    !passing.some(output => output?.requestedCommand === command || output?.executedCommand === command))
+  const pendingCommands = contract.commands.filter(command => {
+    const latest = runs.findLast(receipt => {
+      const output = receipt.output as { requestedCommand?: unknown; executedCommand?: unknown } | undefined
+      return output?.requestedCommand === command || output?.executedCommand === command
+    })
+    return !latest?.ok
+  })
   const testsPassed = Math.max(0, ...passing.map(output => {
     const stdout = typeof output?.stdout === 'string' ? output.stdout : ''
     const pass = /(?:^|\n)\s*(?:#|ℹ)\s+pass\s+(\d+)/.exec(stdout)

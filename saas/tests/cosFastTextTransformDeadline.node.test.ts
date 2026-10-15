@@ -10,8 +10,12 @@ test('canonical COS edits never run unbounded model or QA fallback cascades', as
   assert.match(source, /FAST_TEXT_TRANSFORM_TIMEOUT_MS\s*=\s*15_000/)
   assert.match(source, /FAST_TEXT_TRANSFORM_ATTEMPT_MS\s*=\s*7_000/)
   assert.match(fast, /const models=\[\.\.\.new Set\(\[editorModel,alternateModel\]/)
-  assert.match(fast, /const remaining=FAST_TEXT_TRANSFORM_TIMEOUT_MS-/)
-  assert.match(fast, /index===0\?FAST_TEXT_TRANSFORM_ATTEMPT_MS:5_500/)
+  // The primary editor gets the attempt budget; the alternate is a hedge started after
+  // FAST_TEXT_HEDGE_MS (or at once if the primary fails), with its own 5.5 s bound.
+  assert.match(source, /FAST_TEXT_HEDGE_MS = 3_000/)
+  assert.match(fast, /draftWith\(models\[0\],FAST_TEXT_TRANSFORM_ATTEMPT_MS,'fast_editor_primary'\)/)
+  assert.match(fast, /draftWith\(models\[1\],5_500,'fast_editor_hedge'\)/)
+  assert.match(fast, /const timeLeft=FAST_TEXT_TRANSFORM_TIMEOUT_MS-/)
   assert.match(fast, /selfReviewedDraft:true/)
   assert.match(fast, /timeoutMs:attemptMs/)
   assert.match(fast, /disableThinking:true/)

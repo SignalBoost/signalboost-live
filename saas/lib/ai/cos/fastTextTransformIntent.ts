@@ -33,10 +33,24 @@ function suppliedDraftAfterCommand(input: string, commandEnd: number): string {
   return remainder.replace(/^\s*(?:[-—–:]\s*|(?:this|the following)(?:\s+(?:text|message|paragraph|email|draft))?\s*[:—–-]?\s*)/i, '').trim()
 }
 
+// A draft written to someone else: it greets a recipient, signs off, or the command names it as
+// the user's own reply/email/message. Questions inside such a draft are questions to its recipient,
+// not to COS. Production 2026-10-15: "edit my reply - Hi Andrea, … What time is the embassy work
+// hours? …" was routed as a new question and took 15-25 s through the general pipeline.
+const DRAFT_GREETING = /^\s*(?:hi|hello|hey|dear|good\s+(?:morning|afternoon|evening)|hola|ol[aá]|bonjour|hallo|ciao|cze[sś][ćc]|dzie[nń]\s+dobry|привет|здравствуйте)\b[^\n]{0,60}[,!:\n]/iu
+const DRAFT_SIGN_OFF = /(?:^|\n|[.!?]\s+)(?:thank\s+you|thanks|regards|best(?:\s+regards)?|sincerely|cheers|kind\s+regards|respectfully|gracias|obrigad[oa]|dzi[eę]kuj[eę]|спасибо)\b[^\n]{0,40}$/imu
+const NAMED_OWN_DRAFT = /^\s*(?:my|this|the\s+following)\s+(?:reply|response|email|e-mail|message|note|text|draft|answer|letter)\b/i
+
+function looksLikeDraftToRecipient(payload: string): boolean {
+  const value = String(payload || '').trim()
+  return NAMED_OWN_DRAFT.test(value) || DRAFT_GREETING.test(value) || DRAFT_SIGN_OFF.test(value)
+}
+
 function looksLikeNewQuestion(text: string): boolean {
   const value = String(text || '').trim()
   if (!value) return false
-  return QUESTION_START.test(value) || QUESTION_ANYWHERE.test(value)
+  if (QUESTION_START.test(value)) return true
+  return QUESTION_ANYWHERE.test(value) && !looksLikeDraftToRecipient(value)
 }
 
 export function isFastTextTransform(input: string, context: FastTextTransformContext = {}): boolean {

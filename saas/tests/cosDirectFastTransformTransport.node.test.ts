@@ -122,3 +122,16 @@ test('the fast editor drafts and is independently reviewed against the whole req
   assert.match(primary, /systemPrompt:FAST_EDIT_REVIEW_INSTRUCTIONS,/)
   assert.match(primary, /runSelfReviewedEdit\(/)
 })
+
+// Production 2026-10-15: "edit my reply - Hi Andrea, … What time is the embassy work hours? …" was
+// routed as a new question (15-25 s through the general pipeline). Questions inside a draft written
+// to a recipient are the recipient's questions, not questions to COS.
+test('a draft to a recipient may contain questions and still takes the edit lane', () => {
+  assert.equal(isFastTextTransform('edit my reply - Hi Sam, thank you for your email. Yes, you can submit the request. What time are the office hours? Why is the pickup at 6:20 am?\n\nRegards,\nAlex'), true)
+  assert.equal(isFastTextTransform('edit - Hi Sam, should I send you the form? Thank you.'), true)
+  assert.equal(isFastTextTransform('edit - the report is late. Could you check it before Friday? Thanks'), true)
+  // Questions addressed to COS still leave the edit lane.
+  assert.equal(isFastTextTransform('edit - can you explain what CAPs are and who is allowed to open them?'), false)
+  assert.equal(isFastTextTransform('edit - what are CAPs?'), false)
+  assert.equal(isFastTextTransform('edit - I think they are called CAPs. Is that the right term?'), false)
+})

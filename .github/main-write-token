@@ -1,2 +1,2 @@
-base_sha=e4b69ebbb5e64352819bff42b1aad44d9eecc004
-branch=fix/builder-reproduce-without-host-proof-20261015
+base_sha=ad77e07cf38e68ebbb3703b07514ba6c287218b2
+branch=fix/builder-proof-search-current-main-20261015

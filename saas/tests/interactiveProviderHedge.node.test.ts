@@ -90,3 +90,11 @@ test('default interactive chat hedge starts earlier, while the owner override st
   const turn = source.slice(source.indexOf('async function runpodFirstInteractiveTurn('), source.indexOf('export async function callLocalModelTurn('))
   assert.match(turn, /interactiveManagedBackupAfterMs\(\)/)
 })
+
+test('customer text transformations bypass slow RunPod-first hedge', () => {
+  const source = readFileSync(new URL('../lib/ai/local-inference.ts', import.meta.url), 'utf8')
+  const eligible = source.slice(source.indexOf('function interactiveRunpodFirstEligible('), source.indexOf('function interactiveManagedBackupAfterMs('))
+  assert.match(eligible, /if \(directTextTransformation\(args\)\) return false/)
+  assert.match(source, /if \(interactiveRunpodFirstEligible\(args, effectiveConfig\)\) return runpodFirstInteractiveTurn/)
+  assert.match(source, /return callConfiguredModelTurn\(args, effectiveConfig\)/)
+})

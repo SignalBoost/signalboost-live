@@ -20,15 +20,37 @@ export const FAST_EDIT_AUTHOR_INSTRUCTIONS = [
 ].join('\n')
 
 export const FAST_EDIT_REVIEW_INSTRUCTIONS = [
-  'You are COS independent editorial reviewer. Your task is to evaluate and if necessary REPAIR the draft using the full original user request.',
-  'Infer from the request itself which text is authored for editing and which is reference material; do not rely on a predefined format or sender name.',
-  'Check the intent, actor/recipient relationships, facts and uncertainty. Check that no unwanted reference text, prior message, quoted thread, metadata, or copied signature is returned.',
-  'Remove any sentence the user did not write — including text addressed to the user that followed their draft on the same line — and any greeting, sign-off, name or signature the candidate added that the user-authored material did not contain.',
-  'Check that editing is substantive when rough wording calls for it and the final text is fluent, readable, and ready to send. Mere spelling correction is not adequate when the user wants an edit.',
-  'If anything is wrong, rewrite the candidate to correct it yourself. Do not simply report errors. Do not introduce claims or obligations absent from the original user-authored text.',
-  'If the text is acceptable, return it as is. If the user’s requested material cannot be identified with enough confidence, return verdict "unresolved".',
+  'You are COS independent professional editor. Produce the strongest faithful final rewrite, not an approval stamp for the first model.',
+  'FIRST, independently interpret the COMPLETE original user request as though the candidate draft did not exist. Identify the user-authored material to edit, intended audience, communicative act, and which surrounding material is background only. Do not rely on fixed separators, email patterns, or a sender name.',
+  'SECOND, privately compose your own polished edit based on that interpretation. Keep the user’s voice, level of formality, intended actor and recipient, questions versus statements, uncertainty, and all supported facts. Do not insert information or commitments not present in the user-authored material.',
+  'THIRD, compare your independently composed edit with the candidate. Reject leakage of third-party wording, quoted discussions, headers, names and signatures that are not part of the user-authored draft, including when those words occur on the same line as the end of that draft.',
+  'Apply a demanding editorial standard. Correct grammar and spelling, then improve natural idiom, rhythm, concision, parallelism, coherence, punctuation, and paragraph structure. Remove redundancy and repetitious phrasing. Proofreading alone is insufficient when the instruction requests an edit and the original wording is awkward.',
+  'Treat a sentence as professionally ready only when an experienced human editor could send it without further substantive revision. Preserve intentional rhetoric, opinions, and tone without misrepresenting them as verified facts.',
+  'Return verdict "repaired" and YOUR better final text whenever the candidate falls short on any of these dimensions. Verdict "pass" is reserved for a candidate already matching the quality of your independent rewrite; do not use it merely because a candidate is grammatical or mostly correct.',
+  'If you cannot confidently identify the material the user wants edited, return verdict "unresolved". Never ask the customer to narrow an otherwise clear editing instruction.',
   'Return one strict JSON object with a verdict of "pass", "repaired", or "unresolved" and an "answer" string. Example: {"verdict":"repaired","answer":"<final edited text>"}. Use an empty answer only for unresolved. No explanation.',
 ].join('\n')
+
+/**
+ * Clear, unambiguous input channels for the independent editorial model.
+ * Keep both the complete request and the preliminary answer; the reviewer
+ * must infer authorship and scope, not a hand-written email parser.
+ */
+export function formatIndependentEditReviewPrompt(userRequest: string, candidate: string): string {
+  return [
+    'ORIGINAL USER INSTRUCTION AND ALL CONTEXT:',
+    '<<<ORIGINAL_USER_REQUEST',
+    userRequest,
+    'ORIGINAL_USER_REQUEST',
+    '',
+    'PRELIMINARY EDIT TO CRITIQUE (NOT AUTHORITATIVE):',
+    '<<<PRELIMINARY_EDIT',
+    candidate,
+    'PRELIMINARY_EDIT',
+    '',
+    'Independently reconstruct the intended edit from ORIGINAL_USER_REQUEST, compare it with PRELIMINARY_EDIT, and provide your best final text.',
+  ].join('\n')
+}
 
 export type FastEditReviewVerdict = 'pass' | 'repaired' | 'self_reviewed'
 export type FastEditReviewedAnswer = { answer: string; verdict: FastEditReviewVerdict }

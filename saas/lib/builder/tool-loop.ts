@@ -685,8 +685,8 @@ export class BuilderToolLoop {
       if (blockedBroadRun && latestFailedRunIndex < 0 && !trace.some(item => item.ok &&
         (item.toolId === 'write_file' || item.toolId === 'edit_file'))) {
         const targetedPaths = workspacePaths.filter(path => /^(?:tests?|saas\/tests?)\/.+\.test\.[cm]?[jt]s$/.test(path)
-          && (objective.toLowerCase().includes(path.toLowerCase())
-            || objective.toLowerCase().includes(path.split('/').pop()!.toLowerCase())))
+          && (input.objective.toLowerCase().includes(path.toLowerCase())
+            || input.objective.toLowerCase().includes(path.split('/').pop()!.toLowerCase())))
         // Never choose an arbitrary passing test as the reproduction proof. If the report
         // identifies one executable test, let the next round run that exact test.
         if (!targetedPaths.length && trace.some(item => item.toolId === 'run' && item.ok

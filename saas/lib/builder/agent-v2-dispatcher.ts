@@ -92,7 +92,7 @@ export class BuilderV2Dispatcher {
         const result = await this.runner.run({ workspaceId, command: action.command, files })
         return {
           tool: action.tool, ok: result.exitCode === 0 && !result.timedOut, changed: false,
-          output: { exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr, timedOut: result.timedOut, executedCommand: result.executedCommand ?? action.command },
+          output: { exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr, timedOut: result.timedOut, executedCommand: result.executedCommand ?? action.command, requestedCommand: action.command },
           ...((result.exitCode !== 0 || result.timedOut) ? {
             error: result.timedOut ? 'builder_test_timeout' : 'builder_tests_failed',
             next: ['read_file', 'edit_file', 'run_tests'] as const,

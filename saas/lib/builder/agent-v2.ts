@@ -1,6 +1,7 @@
 import type { BuilderAiPort, BuilderWorkspacePort } from './contracts.ts'
 import { checkpointDigest, workspaceDigest } from './checkpoint.ts'
 import { BuilderV2Dispatcher, type BuilderV2Action, type BuilderV2Receipt } from './agent-v2-dispatcher.ts'
+import { builderTaskContract } from './task-contract.ts'
 
 export type BuilderV2Checkpoint = Readonly<{
   version: 2
@@ -38,6 +39,39 @@ export function validateBuilderV2ReceiptHistory(checkpoint: BuilderV2Checkpoint)
   }
   return checkpoint.revision === revision && checkpoint.verifiedRevision === verifiedRevision
     && checkpoint.unproductive === unproductive
+}
+
+export type BuilderV2Acceptance = Readonly<{
+  satisfied: boolean
+  missingFiles: readonly string[]
+  pendingCommands: readonly string[]
+  minimumTests: number
+  testsPassed: number
+}>
+
+/**
+ * The objective's own checklist decides completion, from host receipts only: every required file exists, every
+ * required command passed after the last change, and a passing test run reports at least the requested test count.
+ * A passing run alone is not completion — production OrderFlow runs passed tests with 8 of 15 files written.
+ */
+export function builderV2Acceptance(objective: string, files: readonly string[], steps: readonly BuilderV2Receipt[]): BuilderV2Acceptance {
+  const contract = builderTaskContract(objective)
+  const lastChange = steps.findLastIndex(receipt => receipt.changed)
+  const passing = steps.slice(lastChange + 1).filter(receipt => receipt.tool === 'run_tests' && receipt.ok)
+    .map(receipt => receipt.output as { requestedCommand?: unknown; executedCommand?: unknown; stdout?: unknown } | undefined)
+  const missingFiles = contract.files.filter(path => !files.includes(path))
+  const pendingCommands = contract.commands.filter(command =>
+    !passing.some(output => output?.requestedCommand === command || output?.executedCommand === command))
+  const testsPassed = Math.max(0, ...passing.map(output => {
+    const stdout = typeof output?.stdout === 'string' ? output.stdout : ''
+    const pass = /(?:^|\n)\s*(?:#|ℹ)\s+pass\s+(\d+)/.exec(stdout)
+    const fail = /(?:^|\n)\s*(?:#|ℹ)\s+fail\s+(\d+)/.exec(stdout)
+    return pass && (!fail || fail[1] === '0') ? Number(pass[1]) : 0
+  }))
+  return {
+    satisfied: missingFiles.length === 0 && pendingCommands.length === 0 && testsPassed >= contract.minimumTests,
+    missingFiles, pendingCommands, minimumTests: contract.minimumTests, testsPassed,
+  }
 }
 
 type Decision = Readonly<{ type: 'tool'; action: BuilderV2Action }> | Readonly<{ type: 'finish'; summary: string }>
@@ -107,6 +141,8 @@ export class BuilderV2Agent {
       workspaceDigest: await workspaceDigest(this.workspace, options.workspaceId),
       steps: [...steps], revision, verifiedRevision, unproductive, lastReceipt,
     } : undefined
+    const checklist = builderTaskContract(options.objective)
+    let checklistRejections = 0
     for (let i = steps.length; i < maxSteps; i++) {
       if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
       let raw: string | null
@@ -115,6 +151,8 @@ export class BuilderV2Agent {
           systemPrompt: 'You are an autonomous software engineering agent. Choose one tool operation at a time. Inspect, write or edit, run tests, diagnose failures and repair. Never claim verification without a real passing run_tests receipt. Output JSON only: {"type":"tool","action":{"tool":"list_files"}} or {"type":"finish","summary":"..."}; tools: list_files, read_file, search_files, write_file, edit_file, run_tests.',
           prompt: JSON.stringify({
             objective: options.objective,
+            ...(checklist.files.length || checklist.commands.length || checklist.minimumTests
+              ? { checklist: { files: checklist.files, commands: checklist.commands, minimumTests: checklist.minimumTests } } : {}),
             workspaceId: options.workspaceId,
             lastReceipt,
             tail: steps.slice(-8),
@@ -130,9 +168,17 @@ export class BuilderV2Agent {
       const decision = parseDecision(raw)
       if (!decision) return { ok: false, reason: 'builder_v2_invalid_model_action', steps }
       if (decision.type === 'finish') {
-        return verifiedRevision === revision && verifiedRevision >= 0
-          ? { ok: true, reason: 'verified', steps, summary: decision.summary }
-          : { ok: false, reason: 'builder_v2_unverified_completion', steps }
+        if (!(verifiedRevision === revision && verifiedRevision >= 0)) return { ok: false, reason: 'builder_v2_unverified_completion', steps }
+        const listed = await this.dispatcher.dispatch(options.workspaceId, { tool: 'list_files' })
+        const files = Array.isArray(listed.output) ? listed.output.map(file => String((file as { path?: unknown }).path)) : []
+        const acceptance = builderV2Acceptance(options.objective, files, steps)
+        if (acceptance.satisfied) return { ok: true, reason: 'verified', steps, summary: decision.summary }
+        // Not a receipt: the counters rebuilt from receipts on resume stay valid. Bounded so a model that keeps
+        // claiming completion ends with the exact unmet checklist instead of looping.
+        if (++checklistRejections >= 3) return { ok: false, reason: 'builder_v2_checklist_incomplete', steps, checkpoint: await snapshot() }
+        lastReceipt = JSON.stringify({ tool: 'finish', ok: false, error: 'builder_v2_checklist_incomplete', ...acceptance,
+          next: acceptance.missingFiles.length ? ['write_file'] : ['run_tests', 'edit_file'] }).slice(0, 20_000)
+        continue
       }
       const receipt = await this.dispatcher.dispatch(options.workspaceId, decision.action)
       steps.push(receipt)

@@ -1,2 +1,2 @@
-base_sha=1575c7dd42a86d8bd82f9f6ca231c0de7907a157
-branch=fix/builder-execution-idempotent-write-20261015
+base_sha=65a4de31338fc11c425027f8c0ee71b097ef7ed3
+branch=feat/builder-v2-checklist-acceptance-20261015

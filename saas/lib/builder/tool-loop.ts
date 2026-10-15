@@ -579,7 +579,7 @@ export class BuilderToolLoop {
       const lastTrace = trace.at(-1)
       // A model returning repeated denied actions is not productive work. This counter
       // uses the durable trace, so restarts cannot reset it and burn more GPU cycles.
-      const staleActions = [...trace].reverse().findIndex(item => item.ok || !/^(?:builder_repeated_tool_call:|builder_missing_deliverables|builder_verification_order_required)/.test(String(item.error || '')))
+      const staleActions = [...trace].reverse().findIndex(item => item.ok || !/^(?:builder_repeated_tool_call:|builder_repair_mutation_required|builder_missing_deliverables|builder_verification_order_required)/.test(String(item.error || '')))
       if ((staleActions < 0 ? trace.length : staleActions) >= 10) return { ok: false, error: 'builder_stalled_repeated_inspection', trace }
       const progress = builderTaskProgress(task, workspacePaths, trace)
       const pendingOrder = pendingBuilderVerificationOrder(verificationOrder, trace)

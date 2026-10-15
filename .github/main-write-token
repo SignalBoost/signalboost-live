@@ -1,2 +1,2 @@
-base_sha=9e018e7aff1ec1eccbfeedb8db10923a5146ef8d
-branch=fix/builder-cursor-repair-control-retry-20261014
+base_sha=56835e28e1a107cd5368578aae527dc4fea53e79
+branch=fix/builder-cursor-rejection-budget-20261014

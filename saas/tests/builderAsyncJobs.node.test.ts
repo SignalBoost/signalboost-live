@@ -193,3 +193,10 @@ test('stale targeted edit recovery rereads current file with bounded retries', (
   assert.match(source, /builder_edit_target_recovery_exhausted/)
   assert.match(source, /await this\.workspace\.readFile\(input\.workspaceId, path\)/)
 })
+
+test('inspection refusals cannot terminate a job before its repair and verification controls run', () => {
+  const source = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /if \(deniedInspections >= 4\) return/)
+  assert.match(source, /const repairMutationRequired =/)
+  assert.match(source, /builder_stalled_repeated_inspection/)
+})

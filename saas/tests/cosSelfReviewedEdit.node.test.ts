@@ -75,6 +75,11 @@ test('generic semantic and editorial quality contract is model-led, not tied to 
   assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /Edit ONLY the material the user is asking to edit/)
   assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /evaluate and if necessary REPAIR/)
   assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /substantive/)
+  // Owner report 2026-10-15: the edit kept the replied-to person's sentence that followed the draft on
+  // the same line and invented a sign-off. Authorship is decided by who writes to whom.
+  assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /can end in the middle of a line/)
+  assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /Add no greeting, sign-off, name or signature/)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /text addressed to the user that followed their draft on the same line/)
   const source = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
   const fast = source.slice(source.indexOf('async function runFastTextTransform('), source.indexOf('export const FAST_AUTHORING_TIMEOUT_MS'))
   assert.match(fast, /runSelfReviewedEdit\(/)

@@ -69,6 +69,7 @@ import { reportLanguageName } from '@/lib/i18n/reportLanguage'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
 import { FAST_EDIT_AUTHOR_INSTRUCTIONS, FAST_EDIT_REVIEW_INSTRUCTIONS, formatIndependentEditReviewPrompt, runSelfReviewedEdit } from '@/lib/ai/cos/selfReviewTextEdit'
+import { EDIT_DETAIL_REPAIR_INSTRUCTIONS, formatEditDetailRepairPrompt, stripUnrequestedSubjectLine, unsupportedEditDetails, userAuthoredText } from '@/lib/ai/cos/editFactGuard'
 import { looksLikeArtifactContinuation } from '@/lib/ai/cos/artifactContinuationIntent'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
@@ -130,6 +131,25 @@ export function isFastTextTransform(input:string, context:{previousAssistant?:st
   return classifyFastTextTransform(input, context)
 }
 
+// LATENCY (2026-10-15): the alternate editor no longer waits for the primary to fail. If the
+// primary has not produced a draft within FAST_TEXT_HEDGE_MS, the alternate starts in parallel and
+// the first usable draft wins; when the primary answers first the alternate is never started.
+export const FAST_TEXT_HEDGE_MS = 3_000
+
+function firstUsable<T>(attempts:Promise<T|null>[]):Promise<T|null>{
+  return new Promise(resolve=>{
+    let pending=attempts.length
+    if(!pending)return resolve(null)
+    for(const attempt of attempts){
+      attempt.then(value=>{
+        if(value)return resolve(value)
+        pending-=1
+        if(!pending)resolve(null)
+      },()=>{pending-=1;if(!pending)resolve(null)})
+    }
+  })
+}
+
 async function runFastTextTransform(input:string):Promise<{reply:string;reasonerLabel:string;reviewVerdict:string}|null>{
   const config=localInferenceConfigFromEnv()
   const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\.com/i.test(config.baseUrl)
@@ -142,60 +162,99 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
   const reviewModel=process.env.COS_FAST_TEXT_REVIEW_MODEL?.trim()||alternateModel
   const models=[...new Set([editorModel,alternateModel].filter(Boolean))]
   const startedAt=Date.now()
-  for(const [index,model] of models.entries()){
-    const remaining=FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt)
-    if(remaining<1_200)break
-    const attemptMs=Math.min(index===0?FAST_TEXT_TRANSFORM_ATTEMPT_MS:5_500,remaining-500)
-    const drafted=await runSelfReviewedEdit({
-      userRequest:input,
-      selfReviewedDraft:true,
-      draft:async()=>{
-        const raw=await callLocalModel({
-          temperature:.12,
-          maxTokens:850,
-          disableThinking:true,
-          timeoutMs:attemptMs,
-          allowConfiguredFallback:false,
-          persistUsage:false,
-          jsonObject:true,
-          usageContext:{feature:'cos_fast_text_transform',purpose:index===0?'fast_editor_primary':'fast_editor_retry'},
-          systemPrompt:FAST_EDIT_AUTHOR_INSTRUCTIONS,
-          prompt:input,
-        },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true}).catch(()=>null)
-        return raw?parseLocalResult(raw)?.answer?.trim()||null:null
-      },
-      review:async({userRequest,candidate})=>{
-        const timeLeft=FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt)
-        if(timeLeft<1_400)return null
-        const reviewMs=Math.min(3_500,timeLeft-500)
-        return await callLocalModel({
-          temperature:.08,
-          maxTokens:850,
-          disableThinking:true,
-          timeoutMs:reviewMs,
-          allowConfiguredFallback:false,
-          persistUsage:false,
-          jsonObject:true,
-          usageContext:{feature:'cos_fast_text_transform',purpose:'fast_editor_quality_review'},
-          systemPrompt:FAST_EDIT_REVIEW_INSTRUCTIONS,
-          prompt:formatIndependentEditReviewPrompt(userRequest,candidate),
-        },{...config,model:reviewModel,timeoutMs:reviewMs,fallbackFromOwned:true}).catch(()=>null)
-      },
-    })
-    if(drafted){
-      const reasoner= drafted.verdict==='self_reviewed'?model:reviewModel
-      console.info('[cos-fast-edit-quality]',{
-        verdict:drafted.verdict,model,reviewerModel:reviewModel,latencyMs:Date.now()-startedAt,
+  const draftWith=(model:string,attemptMs:number,purpose:string)=>callLocalModel({
+    temperature:.12,
+    maxTokens:850,
+    disableThinking:true,
+    timeoutMs:attemptMs,
+    allowConfiguredFallback:false,
+    persistUsage:false,
+    jsonObject:true,
+    usageContext:{feature:'cos_fast_text_transform',purpose},
+    systemPrompt:FAST_EDIT_AUTHOR_INSTRUCTIONS,
+    prompt:input,
+  },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true})
+    .then(raw=>{const answer=raw?parseLocalResult(raw)?.answer?.trim()||'':'';return answer?{answer,model}:null})
+    .catch(()=>null)
+  let draftedBy=models[0]
+  const drafted=await runSelfReviewedEdit({
+    userRequest:input,
+    selfReviewedDraft:true,
+    draft:async()=>{
+      const primary=draftWith(models[0],FAST_TEXT_TRANSFORM_ATTEMPT_MS,'fast_editor_primary')
+      if(models.length<2){const only=await primary;return only?.answer||null}
+      let hedgeTimer:ReturnType<typeof setTimeout>|null=null
+      let startHedge=()=>{}
+      const hedge=new Promise<{answer:string;model:string}|null>(resolve=>{
+        startHedge=()=>{
+          if(!hedgeTimer)return
+          clearTimeout(hedgeTimer)
+          hedgeTimer=null
+          resolve(draftWith(models[1],5_500,'fast_editor_hedge'))
+        }
+        hedgeTimer=setTimeout(()=>startHedge(),FAST_TEXT_HEDGE_MS)
       })
-      const provider=String(config.provider||'').trim()
-      const reasonerLabel=provider&&provider!=='self_hosted'
-        ? `managed-open-model:${provider}:${reasoner}`
-        : `independent-local:${reasoner}`
-      return{reply:drafted.answer,reasonerLabel,reviewVerdict:drafted.verdict}
-    }
+      // A primary that fails early starts the alternate at once instead of waiting for the timer.
+      primary.then(value=>{if(!value)startHedge()})
+      const first=await firstUsable([primary,hedge])
+      if(hedgeTimer)clearTimeout(hedgeTimer)
+      if(first)draftedBy=first.model
+      return first?.answer||null
+    },
+    review:async({userRequest,candidate})=>{
+      const timeLeft=FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt)
+      if(timeLeft<1_400)return null
+      const reviewMs=Math.min(3_500,timeLeft-500)
+      return await callLocalModel({
+        temperature:.08,
+        maxTokens:850,
+        disableThinking:true,
+        timeoutMs:reviewMs,
+        allowConfiguredFallback:false,
+        persistUsage:false,
+        jsonObject:true,
+        usageContext:{feature:'cos_fast_text_transform',purpose:'fast_editor_quality_review'},
+        systemPrompt:FAST_EDIT_REVIEW_INSTRUCTIONS,
+        prompt:formatIndependentEditReviewPrompt(userRequest,candidate),
+      },{...config,model:reviewModel,timeoutMs:reviewMs,fallbackFromOwned:true}).catch(()=>null)
+    },
+  })
+  if(!drafted){
+    console.warn('[cos-fast-edit-quality]',{reviewed:false,reason:'editing_models_unavailable',latencyMs:Date.now()-startedAt})
+    return null
   }
-  console.warn('[cos-fast-edit-quality]',{reviewed:false,reason:'editing_models_unavailable',latencyMs:Date.now()-startedAt})
-  return null
+  // NO ADDED DETAILS (2026-10-15): the edit may not state a number (time, date, amount, phone) the
+  // user's own text does not contain, and may not add a Subject line the user did not write.
+  let reply=stripUnrequestedSubjectLine(drafted.answer,input)
+  const unsupported=unsupportedEditDetails(reply,input)
+  if(unsupported.length){
+    const repairMs=Math.max(1_500,Math.min(5_000,FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt)))
+    const repaired=await callLocalModel({
+      temperature:0,
+      maxTokens:850,
+      disableThinking:true,
+      timeoutMs:repairMs,
+      allowConfiguredFallback:false,
+      persistUsage:false,
+      jsonObject:true,
+      usageContext:{feature:'cos_fast_text_transform',purpose:'fast_editor_detail_repair'},
+      systemPrompt:EDIT_DETAIL_REPAIR_INSTRUCTIONS,
+      prompt:formatEditDetailRepairPrompt(userAuthoredText(input),reply,unsupported),
+    },{...config,model:editorModel,timeoutMs:repairMs,fallbackFromOwned:true}).catch(()=>null)
+    const repairedAnswer=repaired?parseLocalResult(repaired)?.answer?.trim()||'':''
+    const remaining=repairedAnswer?unsupportedEditDetails(repairedAnswer,input):unsupported
+    console.info('[cos-fast-edit-details]',{unsupported,repaired:Boolean(repairedAnswer),remaining})
+    if(repairedAnswer&&remaining.length<unsupported.length)reply=stripUnrequestedSubjectLine(repairedAnswer,input)
+  }
+  const reasoner=drafted.verdict==='self_reviewed'?draftedBy:reviewModel
+  console.info('[cos-fast-edit-quality]',{
+    verdict:drafted.verdict,model:draftedBy,reviewerModel:reviewModel,latencyMs:Date.now()-startedAt,
+  })
+  const provider=String(config.provider||'').trim()
+  const reasonerLabel=provider&&provider!=='self_hosted'
+    ? `managed-open-model:${provider}:${reasoner}`
+    : `independent-local:${reasoner}`
+  return{reply,reasonerLabel,reviewVerdict:drafted.verdict}
 }
 
 

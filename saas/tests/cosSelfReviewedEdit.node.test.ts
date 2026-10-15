@@ -136,7 +136,8 @@ test('editing model route prefers dedicated editor, limits cascades, and refuses
 test('a failed edit pass is retried once in the same turn, and the reviewer gets real line breaks', () => {
   const primary = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
   assert.match(primary, /const fast=await runFastTextTransform\(input\)\?\?await runFastTextTransform\(input\)/)
-  assert.match(primary, /prompt:`FULL USER REQUEST:\\n\$\{userRequest\}\\n\\nEDITED DRAFT TO EVALUATE AND REPAIR:\\n\$\{candidate\}`/)
+  // The review prompt is built by formatIndependentEditReviewPrompt, which joins real lines.
+  assert.match(primary, /prompt:formatIndependentEditReviewPrompt\(userRequest,candidate\)/)
   assert.doesNotMatch(primary, /FULL USER REQUEST:\\\\n/)
   assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /do not give up: keep only the sentences that are clearly written by the user/)
   assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /"unresolved" only when no user-authored material to edit can be found at all/)

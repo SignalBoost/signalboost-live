@@ -177,7 +177,7 @@ test('repeated denied inspections stop before exhausting the entire model budget
     maxRounds: 96,
   })
   assert.equal(result.ok, false)
-  if (!result.ok) assert.equal(result.error, 'builder_stalled_repeated_inspection')
+  if (!result.ok) assert.match(result.error, /^builder_repeated_inspection_blocked:/)
   assert.ok(calls <= 15, `should stop repeated read requests, got ${calls}`)
 })
 

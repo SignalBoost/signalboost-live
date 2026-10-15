@@ -503,14 +503,23 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     // was transiently empty. The claimed worker must read source again before
     // doing any work: never invent a replacement project from an empty listing.
     if (job.metadata.requiresExistingSource === true) {
-      let paths: string[]
-      try {
-        if (!await workspace.hasWorkspace(job.workspaceId)) {
-          await terminalFailure(job, 'builder_existing_workspace_missing')
-          return
+      let paths: string[] | null = null
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          if (!await workspace.hasWorkspace(job.workspaceId)) {
+            await terminalFailure(job, 'builder_existing_workspace_missing')
+            return
+          }
+          paths = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
+          if (hasWorkspaceSource(paths)) break
+        } catch {
+          paths = null
         }
-        paths = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
-      } catch {
+        // A transiently empty workspace listing is not authorization to
+        // invent source files. Retry the read only, then report a real blocker.
+        if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 350 * (attempt + 1)))
+      }
+      if (!paths) {
         await terminalFailure(job, 'builder_existing_source_read_unavailable')
         return
       }

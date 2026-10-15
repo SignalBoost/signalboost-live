@@ -7,7 +7,7 @@ import { followBuilderJob } from '@/lib/builder/job-poll'
 import { uiText } from '@/lib/i18n/uiText'
 
 type WorkspaceFile = { path: string; content: string }
-type BuilderReply = { conversationId?: string; progress?: BuilderProgress; jobId?: string; workspaceId?: string; status?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string; failureClass?: string; remediation?: string; path?: string; command?: string; exitCode?: number; stdout?: string; stderr?: string; timedOut?: boolean }> }
+type BuilderReply = { conversationId?: string; activeJobId?: string; activeStatus?: string; progress?: BuilderProgress; jobId?: string; workspaceId?: string; status?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string; failureClass?: string; remediation?: string; path?: string; command?: string; exitCode?: number; stdout?: string; stderr?: string; timedOut?: boolean }> }
 type BuilderProgress = { phase?: string; lastActivityAt?: string; claimGeneration?: number; filesWritten?: number | null; workRounds?: number | null; modelTimeoutDeferrals?: number; queueReason?: string | null; lastTest?: { passed?: boolean; exitCode?: number | null; testsPassed?: number; testsFailed?: number } | null }
 type WorkspaceSummary = { id: string; objective: string; updatedAt: string; fileCount: number }
 type CertificationSummary = { earnedLevel: number; attempts: number }
@@ -149,6 +149,11 @@ export default function DeveloperPage() {
             throw new Error(data.error || 'Workspace could not be opened.')
           }
           setWorkspaceId(id); setWorkspaceFiles(Array.isArray(data.files) ? data.files : []); setFiles([]); setReply(''); setTrace([])
+          if (data.conversationId) {
+            conversationIdRef.current = data.conversationId
+            sessionStorage.setItem(BUILDER_CONVERSATION_KEY, data.conversationId)
+          }
+          if (data.activeJobId) void restoreJob(data.activeJobId)
           return
         } catch (cause) {
           lastFailure = cause

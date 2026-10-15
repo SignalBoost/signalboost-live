@@ -77,7 +77,9 @@ function emptyStage() {
 }
 
 function isLatencySensitiveShortEdit(instruction: string, source: string, referenceContext: string | null): boolean {
-  if (referenceContext) return false
+  // Quoted email threads are reference material, not another writing assignment.
+  // Their presence must not route a short edit through the expensive multi-model pipeline.
+  void referenceContext
   if (source.length > 2_500) return false
   const mode = String(instruction || '').trim().toLowerCase()
   return /^(?:edit|proofread|polish|correct|fix(?:\s+(?:grammar|spelling|wording|english))?)\b/.test(mode)
@@ -262,6 +264,7 @@ export async function tryDirectTextTransformation(input: {
       prompt: [
         `USER INSTRUCTION:\n${request.instruction}`,
         `EDITABLE SOURCE TEXT:\n<<<SOURCE\n${editableSource}\nSOURCE`,
+        ...(referenceContext ? [`REFERENCE CONTEXT (read only; never rewrite or include in the answer):\n${referenceContext.slice(0, 3500)}`] : []),
         'Return the finished edited text now.',
       ].join('\n\n'),
     }).catch(() => null)

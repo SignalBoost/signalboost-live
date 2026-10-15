@@ -66,8 +66,8 @@ test('browser direct edits delegate to canonical COS instead of running a compet
 })
 
 test('canonical edit lane shares the same bounded interactive budget', () => {
-  assert.match(primary, /FAST_TEXT_TRANSFORM_TIMEOUT_MS = 18_000/)
-  assert.match(primary, /FAST_TEXT_TRANSFORM_ATTEMPT_MS = 9_000/)
+  assert.match(primary, /FAST_TEXT_TRANSFORM_TIMEOUT_MS = 15_000/)
+  assert.match(primary, /FAST_TEXT_TRANSFORM_ATTEMPT_MS = 7_000/)
   assert.match(primary, /usageContext:\{feature:'cos_fast_text_transform'/)
 })
 

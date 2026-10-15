@@ -17,6 +17,10 @@ import { isRepairObjective } from './regression-gate.ts'
 import { formatBuilderExecutionEvidence } from './execution-evidence.ts'
 import { explainInitialBuilderRepair } from './explain-evidence.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
+import { BuilderV2Agent } from './agent-v2.ts'
+import { BuilderV2Dispatcher } from './agent-v2-dispatcher.ts'
+import { runBuilderV2JobCycle } from './agent-v2-job-cycle.ts'
+import { createBuilderV2SupabaseLeaseStore } from './agent-v2-supabase-store.ts'
 import { createBuilderMcpReadPort } from './mcp-read-port.ts'
 import { createBuilderPlaywrightCliPort } from './playwright-cli-port.ts'
 import { VercelSandboxBuilderRunner } from './vercel-sandbox-runner.ts'
@@ -358,6 +362,46 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     if (job.claimGeneration === 1 && typeof job.metadata.approvedProposalFingerprint === 'string'
       && await readBuilderWorkspaceFingerprint(job.userId, job.workspaceId) !== job.metadata.approvedProposalFingerprint) {
       await terminalFailure(job, 'builder_proposal_source_changed')
+      return
+    }
+
+    // V2 canary is an explicit owner-only opt-in. Never reinterpret a V1
+    // checkpoint or send an ordinary customer job through an unverified engine.
+    if (job.ownerAuthorized === true && job.jobKind === 'standard'
+      && job.metadata.builderEngine === 'v2') {
+      const workspace = createSupabaseBuilderWorkspace(job.userId)
+      if (!workspace) { await terminalFailure(job, 'builder_v2_workspace_unavailable'); return }
+      const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort({ yieldToChat: true }), {
+        deadlineAtMs: Date.now() + 210_000,
+      })
+      const v2 = new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, new VercelSandboxBuilderRunner()), workspace)
+      const cycle = await withBuilderSliceDeadline(() => runBuilderV2JobCycle({
+        jobId: job.id, claimGeneration: job.claimGeneration,
+        store: createBuilderV2SupabaseLeaseStore(db, job.userId),
+        agent: v2, maxSteps: 24,
+      }), BUILDER_SLICE_HARD_DEADLINE_MS)
+      if (cycle.status === 'lost_lease') return
+      const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
+      if (cycle.status === 'paused' && cycle.result?.checkpoint) {
+        const reply = historyReply('Builder V2 saved its progress and will continue automatically. Verification is not complete.', job.workspaceId, files)
+        const { data, error } = await db.rpc('pause_builder_job_slice', {
+          p_job_id: job.id, p_user_id: job.userId, p_generation: job.claimGeneration,
+          p_checkpoint: cycle.result.checkpoint, p_reply: reply,
+          p_result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, engine: 'v2' },
+        })
+        if (error || data !== true) throw new Error('builder_v2_checkpoint_persist_failed')
+        return
+      }
+      const success = cycle.status === 'verified'
+      const reply = historyReply(success
+        ? `Builder V2 verified the workspace with recorded host test execution. ${cycle.result?.summary || ''}`
+        : `Builder V2 could not complete verification: ${cycle.reason}`, job.workspaceId, files)
+      await finishBuilderJob({
+        jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
+        status: success ? 'succeeded' : 'failed', reply, error: success ? null : cycle.reason,
+        result: { jobId: job.id, workspaceId: job.workspaceId, status: success ? 'succeeded' : 'failed',
+          reply, files, engine: 'v2', receipts: cycle.result?.steps ?? [] },
+      })
       return
     }
 

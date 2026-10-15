@@ -9,7 +9,7 @@ import {
   plannerSearchQueriesFromToolArguments,
   sanitizePlannerSearchQueries,
 } from '../lib/ai/cos/plannerSearchQueries.ts'
-import { parseCosAgentDecision } from '../lib/ai/cos/cosAgentDecision.ts'
+import { parseCosAgentDecision, stableKnowledgeQuestionNeedsNoPlanner } from '../lib/ai/cos/cosAgentDecision.ts'
 
 const decision = readFileSync(new URL('../lib/ai/cos/cosAgentDecision.ts', import.meta.url), 'utf8')
 const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
@@ -46,7 +46,7 @@ test('planner queries lead the turn; the host template stays as one extra search
   const host = ['whose is more likely to be the next Brazilian president 2026-10-10']
   assert.deepEqual(
     liveSearchQueriesForTurn(['Brazil 2026 presidential election polls', 'Brazil 2026 presidential candidates'], host),
-    ['Brazil 2026 presidential election polls', 'Brazil 2026 presidential candidates', host[0]],
+    ['Brazil 2026 presidential election polls', host[0], 'Brazil 2026 presidential candidates'],
   )
   assert.deepEqual(liveSearchQueriesForTurn([], host), host)
   assert.deepEqual(liveSearchQueriesForTurn(['same query'], ['Same Query']), ['same query'])
@@ -79,4 +79,11 @@ test('routing: cos-browser forwards only planner-written queries; cos-primary se
   assert.match(primary, /plannerSearchQueries=modelPlannedFreshEvidence\?decodePlannerSearchQueriesHeader\(req\.headers\.get\(PLANNER_SEARCH_QUERIES_HEADER\)\):\[\]/)
   assert.match(primary, /const queries=liveSearchQueriesForTurn\(plannerSearchQueries,freshEvidenceSearchQueries\(lookupInput\)\)/)
   assert.match(primary, /planner_search_queries:plannerSearchQueries\.length/)
+})
+
+test('specific acronym identification reaches capability planner while ordinary definitions remain fast', () => {
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('What is REA?'), false)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('What is MCP?'), false)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('What is a binary search tree?'), true)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('How does photosynthesis work?'), true)
 })

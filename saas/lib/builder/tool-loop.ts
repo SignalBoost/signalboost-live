@@ -579,7 +579,7 @@ export class BuilderToolLoop {
       const lastTrace = trace.at(-1)
       // A model returning repeated denied actions is not productive work. This counter
       // uses the durable trace, so restarts cannot reset it and burn more GPU cycles.
-      const staleActions = [...trace].reverse().findIndex(item => item.ok || !/^(?:builder_repeated_tool_call:|builder_repair_mutation_required|builder_missing_deliverables|builder_verification_order_required)/.test(String(item.error || '')))
+      const staleActions = [...trace].reverse().findIndex(item => (item.ok && item.toolId !== 'list_files' && item.toolId !== 'read_file' && item.toolId !== 'search_files') || !/^(?:builder_repeated_tool_call:|builder_write_conflict:|builder_repair_mutation_required|builder_missing_deliverables|builder_verification_order_required)/.test(String(item.error || '')))
       if ((staleActions < 0 ? trace.length : staleActions) >= 10) return { ok: false, error: 'builder_stalled_repeated_inspection', trace }
       const progress = builderTaskProgress(task, workspacePaths, trace)
       const pendingOrder = pendingBuilderVerificationOrder(verificationOrder, trace)
@@ -916,23 +916,43 @@ export class BuilderToolLoop {
 
       if (input.shouldPause?.(true)) return pause()
       if (blockedAction) {
-        trace.push({
-          round,
-          toolId: blockedAction.toolId,
-          input: blockedAction.input,
-          ok: false,
-          error: `builder_repeated_tool_call:${blockedAction.toolId}; choose a different next step`,
-        })
-        // Cursor-style repair loop: a rejected inspection is not the end of a
-        // coding job. Keep the mutation-only controls in place, explain why
-        // the action was rejected, and let the reasoner choose an actual edit.
-        // The durable stale-action budget above bounds repeated refusals.
+        const blockedPath = toolPath(blockedAction.input)
+        // A repeated write is idempotent when its requested bytes are already on disk.
+        // Acknowledge the actual file state instead of burning model rounds on a
+        // no-op write. No file mutation or fabricated runner evidence is created.
+        if (blockedAction.toolId === 'write_file' && blockedPath && typeof blockedAction.input.content === 'string') {
+          const current = await this.workspace.readFile(input.workspaceId, blockedPath).catch(() => null)
+          if (current && current.content === blockedAction.input.content) {
+            workingFiles.set(blockedPath, current)
+            trace.push({ round, toolId: 'write_file', input: { path: blockedPath }, ok: true,
+              output: { unchanged: true, alreadyPresent: true, path: blockedPath } })
+            continue
+          }
+          const previousDifferences = trace.filter(item =>
+            item.toolId === 'write_file' && !item.ok &&
+            String(item.error || '').startsWith('builder_write_conflict:') &&
+            toolPath(item.input) === blockedPath).length
+          if (previousDifferences >= 2) {
+            return { ok: false, error: 'builder_write_conflict_repeated', trace }
+          }
+          trace.push({ round, toolId: 'write_file', input: { path: blockedPath }, ok: false,
+            error: 'builder_write_conflict:existing_content_differs; use read_file then edit_file or choose another file' })
+          // The next action can inspect or surgically edit; do not reoffer a
+          // whole-file write for this unchanged workspace generation.
+          continue
+        }
+        const repeatsForTool = trace.filter(item => !item.ok &&
+          item.toolId === blockedAction.toolId &&
+          String(item.error || '').startsWith('builder_repeated_tool_call:')).length
+        if (repeatsForTool >= MAX_CONSECUTIVE_REPEAT_REJECTIONS) {
+          return { ok: false, error: `builder_repeated_${blockedAction.toolId}_limit`, trace }
+        }
+        trace.push({ round, toolId: blockedAction.toolId, input: blockedAction.input,
+          ok: false, error: `builder_repeated_tool_call:${blockedAction.toolId}; choose a different next step` })
         if (repairMutationRequired || repeatedRepairStall) {
           trace.push({ round, toolId: 'model_control', input: {}, ok: false,
             error: 'builder_repair_mutation_required', failureClass: 'test',
-            remediation: passingProofBeforeChange
-              ? 'The existing proof passed. Add a failing regression test or report the defect as not reproduced.'
-              : 'The failure is reproduced and further inspection was rejected. Edit the relevant source file now, then rerun the exact failing command.' })
+            remediation: 'The inspected source has not changed. Use read_file for a different path or edit_file for a targeted change; do not repeat a rejected tool call.' })
         }
         continue
       }

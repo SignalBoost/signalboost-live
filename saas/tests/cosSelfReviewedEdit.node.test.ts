@@ -140,3 +140,16 @@ test('a failed edit pass is retried once in the same turn, and the reviewer gets
   assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /do not give up: keep only the sentences that are clearly written by the user/)
   assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /"unresolved" only when no user-authored material to edit can be found at all/)
 })
+
+test('editorial review independently rewrites low-quality but grammatical drafts', () => {
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /independently reconstruct the user’s intent/)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /Compose your own natural, concise, professionally polished version/)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /merely grammatical but unnatural, repetitive, awkward/)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /Reserve verdict "pass" for drafts already at the same editorial standard/)
+  // Keep the previous release's no-clarification-on-ambiguous-draft and
+  // genuine linebreak improvements when rebasing this quality correction.
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /do not give up: keep only the sentences/)
+  const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  assert.match(route, /const fast=await runFastTextTransform\(input\)\?\?await runFastTextTransform\(input\)/)
+  assert.doesNotMatch(route, /FULL USER REQUEST:\\\\n/)
+})

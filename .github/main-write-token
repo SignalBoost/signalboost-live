@@ -1,2 +1,2 @@
-base_sha=5d927e22ac5be1d99207f4c6c396387ec22cbf63
-branch=fix/cos-edit-drafts-with-questions-20261015
+base_sha=a4c053e6270cb18dea274535297efd13e3941f1d
+branch=fix/cos-http-timeout-history-20261015

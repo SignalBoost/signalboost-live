@@ -1,2 +1,2 @@
-base_sha=4351ddbf1beef61ce0c3140341cf17ae6d78787c
-branch=feat/builder-poll-resume-20261014
+base_sha=1575c7dd42a86d8bd82f9f6ca231c0de7907a157
+branch=fix/builder-execution-idempotent-write-20261015

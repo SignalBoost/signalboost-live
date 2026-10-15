@@ -1241,12 +1241,25 @@ export class BuilderToolLoop {
             }
             action.input = { path, content: assembled }
           }
-          const file = action.toolId === 'write_file'
-            ? await this.workspace.writeFile(input.workspaceId, toolPath(action.input), toolContent(action.input))
-            : await this.workspace.editFile(input.workspaceId, toolPath(action.input), text(action.input.search), text(action.input.replace))
-          chunks.delete(file.path)
-          workingFiles.set(file.path, file)
-          output = summarize(file)
+          const filePath = toolPath(action.input)
+          const proposedContent = toolContent(action.input)
+          // Compare every complete write, not only writes rejected at the tool-control
+          // boundary. The model may keep selecting write_file while it remains allowed.
+          // A byte-identical retry must not mutate source or inflate completed writes.
+          const existingFile = action.toolId === 'write_file'
+            ? await this.workspace.readFile(input.workspaceId, filePath)
+            : null
+          if (action.toolId === 'write_file' && existingFile && existingFile.content === proposedContent) {
+            workingFiles.set(filePath, existingFile)
+            output = { path: filePath, alreadyPresent: true, bytes: Buffer.byteLength(existingFile.content) }
+          } else {
+            const file = action.toolId === 'write_file'
+              ? await this.workspace.writeFile(input.workspaceId, filePath, proposedContent)
+              : await this.workspace.editFile(input.workspaceId, filePath, text(action.input.search), text(action.input.replace))
+            chunks.delete(file.path)
+            workingFiles.set(file.path, file)
+            output = summarize(file)
+          }
         }
         if (action.toolId === 'run') {
           if (chunks.size) throw new Error('builder_file_assembly_incomplete')
@@ -1307,7 +1320,7 @@ export class BuilderToolLoop {
           trace.push({ round, toolId: action.toolId, input: action.input, ok: false, output, error: `builder_command_failed: exit ${(output as ReturnType<typeof summarizeRun>).exitCode}`, ...details })
           continue
         }
-        if (action.toolId === 'write_file' || action.toolId === 'edit_file') {
+        if ((action.toolId === 'write_file' || action.toolId === 'edit_file') && (output as { alreadyPresent?: boolean } | undefined)?.alreadyPresent !== true) {
           writeCount += 1
           if (!workspacePaths.includes(toolPath(action.input))) workspacePaths.push(toolPath(action.input))
           inspectedInCurrentWorkspaceState.clear()

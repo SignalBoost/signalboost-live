@@ -175,3 +175,11 @@ test('anti-loop guard compares repeated writes to current content and counts rep
   assert.match(source, /builder_repeated_write_blocked:/)
   assert.match(source, /meaningfulActions = \[\.\.\.trace\]\.reverse\(\)\.filter\(/)
 })
+
+test('allowed identical writes do not consume the mutation budget or reset verification', () => {
+  const source = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
+  assert.match(source, /existingFile\.content === proposedContent/)
+  assert.match(source, /alreadyPresent: true/)
+  assert.match(source, /writeCount \+= 1/)
+  assert.match(source, /alreadyPresent !== true/)
+})

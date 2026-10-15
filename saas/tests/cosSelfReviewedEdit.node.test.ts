@@ -159,6 +159,8 @@ test('provider-wrapped editorial JSON is parsed without losing a completed revie
   const final = { verdict: 'repaired', answer: 'Thank you. I have a question about {the dates} and would appreciate your clarification.' }
   assert.deepEqual(parseFastEditReview('Some explanation:\n' + JSON.stringify(final) + '\nDone.'), final)
   assert.deepEqual(parseFastEditReview(JSON.stringify(final) + '\nDone.'), final)
+  const fence = String.fromCharCode(96).repeat(3)
+  assert.deepEqual(parseFastEditReview(fence + 'json\n' + JSON.stringify(final) + '\n' + fence), final)
   assert.equal(parseFastEditReview('{"verdict":"pass","answer":"Partial"'), null)
   assert.equal(parseFastEditReview('{"verdict":"unresolved","answer":"A draft"}'), null)
   assert.equal(parseFastEditReview('{"verdict":"pass","answer":"Invalid\\q"}'), null)

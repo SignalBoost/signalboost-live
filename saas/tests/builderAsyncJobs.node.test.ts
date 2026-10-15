@@ -162,8 +162,11 @@ test('repeated write_file(src/storage.js) is acknowledged as idempotent instead 
   })
   assert.equal((await workspace.readFile(workspaceId, 'src/storage.js'))?.content, source)
   assert.ok(result.trace.some(item =>
-    item.toolId === 'write_file' && item.ok && (item.output as { alreadyPresent?: boolean } | undefined)?.alreadyPresent === true)
-    || runs > 0, 'must acknowledge identical write or proceed to verification')
+    item.toolId === 'write_file' && item.ok && (item.output as { alreadyPresent?: boolean } | undefined)?.alreadyPresent === true),
+    'identical writes must be acknowledged without mutating the workspace')
+  assert.equal(runs, 1, 'the Builder must execute host verification after repeated identical writes')
+  assert.ok(result.trace.some(item => item.toolId === 'run' && item.ok),
+    'verification must be recorded in the durable trace')
   assert.notEqual('error' in result ? result.error : '', 'builder_stalled_repeated_inspection')
 })
 

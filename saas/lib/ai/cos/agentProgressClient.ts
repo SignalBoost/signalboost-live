@@ -90,6 +90,8 @@ async function watchHistoryForCompletedTurn(args: {
         signal: AbortSignal.any([args.signal, AbortSignal.timeout(readBudgetMs)]),
         headers: { accept: 'application/json' },
       })
+      // No History for this visitor (signed out): stop watching instead of polling for minutes.
+      if (history.status === 401 || history.status === 403) return null
       if (history.ok) {
         const payload = await history.json().catch(() => null)
         const reply = findRecoveredAssistantReply(
@@ -311,7 +313,10 @@ export async function postWithAgentProgress(args: {
   // exists — whether the response arrives, stalls, or the connection is dropped (tab backgrounded,
   // network change, proxy idle cut). Production 2026-10-15: COS answered and saved the edit, but the
   // page lost the response and showed the timeout copy.
-  const historyWatchEligible = args.target === 'cos' && !builderRequest && Boolean(conversationIdForTurn) && Boolean(userTextForTurn)
+  // Both surfaces: production 2026-10-15 the owner, signed in on the homepage Concierge, saw the
+  // timeout copy twice although the server answered each edit in seconds and saved it to History.
+  // For a visitor without History the first read is refused and the watch stops.
+  const historyWatchEligible = !builderRequest && Boolean(conversationIdForTurn) && Boolean(userTextForTurn)
   const fetchAbort = new AbortController()
   const watchAbort = new AbortController()
   type TransportOutcome =

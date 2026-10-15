@@ -128,3 +128,37 @@ test('when History shows the answer first, a live response that lands in the gra
     assert.deepEqual(result.data.diagnostics, { lane: 'fast' })
   } finally { restore() }
 })
+
+// Production 2026-10-15: on the homepage Concierge (signed in) the owner saw the timeout copy twice
+// for a short edit that the server had answered in seconds and saved in History.
+test('the homepage Concierge also takes the saved History answer when its response stalls', async () => {
+  const sentAt = Date.now()
+  let posts = 0
+  const restore = installBrowser((_url, init) => {
+    if (init?.method === 'POST') {
+      posts += 1
+      return new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))))
+    }
+    return Promise.resolve(new Response(JSON.stringify(storedHistory(sentAt)), { status: 200 }))
+  })
+  try {
+    const result = await postWithAgentProgress({ target: 'concierge', body: body(), signal: new AbortController().signal, onProgress: () => undefined })
+    assert.equal(result.ok, true)
+    assert.equal(result.data.source, 'cos-transport-history-recovery')
+    assert.equal(posts, 1)
+  } finally { restore() }
+})
+
+test('a visitor without History stops watching after the first refused read', async () => {
+  let historyReads = 0
+  const restore = installBrowser((_url, init) => {
+    if (init?.method === 'POST') return new Promise(resolve => setTimeout(() => resolve(new Response(JSON.stringify({ ok: true, reply: 'Edited.' }), { status: 200 })), 12_000))
+    historyReads += 1
+    return Promise.resolve(new Response('{"error":"unauthorized"}', { status: 401 }))
+  })
+  try {
+    const result = await postWithAgentProgress({ target: 'concierge', body: body(), signal: new AbortController().signal, onProgress: () => undefined })
+    assert.equal(result.data.reply, 'Edited.')
+    assert.equal(historyReads, 1)
+  } finally { restore() }
+})

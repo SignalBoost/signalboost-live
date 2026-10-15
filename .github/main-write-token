@@ -1,2 +1,2 @@
-base_sha=56835e28e1a107cd5368578aae527dc4fea53e79
-branch=fix/builder-cursor-rejection-budget-20261014
+base_sha=ea728169e15dd78f9c80e11a7007d2e9b5362c65
+branch=fix/builder-checkpoint-verify-before-repeat-20261014

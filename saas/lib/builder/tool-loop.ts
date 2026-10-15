@@ -689,7 +689,7 @@ export class BuilderToolLoop {
       const requiredTestFilesReady = task.files.filter(path => /(?:^|\/)(?:test|tests)\/|(?:\.test\.|\.spec\.)/i.test(path)).every(path => workspacePaths.includes(path))
       const partialTestProofReady = requiredImplementationReady && stagedTestsExist && requiredTestFilesReady
         && task.commands.some(command => /\b(?:--test|npm test)\b/.test(command))
-      const verificationCommand = chunks.size === 0 && !repairObjective && writeCount > 0 && task.files.length > 0
+      const verificationCommand = chunks.size === 0 && !repairObjective && (writeCount > 0 || trace.some(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))) && task.files.length > 0
         && (progress.missingFiles.length === 0 || partialTestProofReady)
         ? progress.pendingCommands.find(command => !trace.slice(lastWorkspaceChange + 1)
           .some(item => item.toolId === 'run' && (item.input.command === command || item.input.requestedCommand === command)))

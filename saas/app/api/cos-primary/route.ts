@@ -123,41 +123,42 @@ async function assessSelfHealingSupervisor(request:string):Promise<string|null>{
 }
 // Foreground transforms must complete the user's task, not merely fail quickly. The owned runtime
 // remains first choice, but one stalled worker must not turn an edit into a dead-end response.
-export const FAST_TEXT_TRANSFORM_TIMEOUT_MS = 18_000
-export const FAST_TEXT_TRANSFORM_ATTEMPT_MS = 9_000
+export const FAST_TEXT_TRANSFORM_TIMEOUT_MS = 15_000
+export const FAST_TEXT_TRANSFORM_ATTEMPT_MS = 7_000
 
 export function isFastTextTransform(input:string, context:{previousAssistant?:string|null}={}):boolean{
   return classifyFastTextTransform(input, context)
 }
 
-async function runFastTextTransform(input:string):Promise<{reply:string;reasonerLabel:string}|null>{
+async function runFastTextTransform(input:string):Promise<{reply:string;reasonerLabel:string;reviewVerdict:string}|null>{
   const config=localInferenceConfigFromEnv()
-  const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\.com/i.test(config.baseUrl)
-  const preferredModel=process.env.COS_FAST_TEXT_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
-  // Review with a separately proven managed editor by default, rather than
-  // letting the fast drafting model rubber-stamp its own mistakes.
-  const reviewerModel=process.env.COS_FAST_TEXT_REVIEW_MODEL?.trim()||process.env.COS_DIRECT_TEXT_MODEL?.trim()||(deepInfra?'zai-org/GLM-5.3-Flash':config.model)
-  const models=[...new Set([preferredModel,config.model].filter(Boolean))]
+  const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\\.com/i.test(config.baseUrl)
+  // Production 2026-10-15: the dedicated GLM editor returned substantive
+  // edits in 2-5s. DeepSeek/Qwen-first repeatedly exhausted 9s provider
+  // deadlines, then the general COS fallback took another 20-30 seconds.
+  // Prefer the known editing capability; permit just ONE alternate model.
+  const editorModel=process.env.COS_DIRECT_TEXT_MODEL?.trim()||(deepInfra?'zai-org/GLM-5.3-Flash':config.model)
+  const alternateModel=process.env.COS_FAST_TEXT_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
+  const reviewModel=process.env.COS_FAST_TEXT_REVIEW_MODEL?.trim()||alternateModel
+  const models=[...new Set([editorModel,alternateModel].filter(Boolean))]
   const startedAt=Date.now()
-  // Give the model the complete request. It must infer which parts are the
-  // user's draft and which parts are merely supporting context; regex-based
-  // email segmentation is not authorized to decide the scope of the edit.
-  for(const model of models){
-    const remaining=Math.max(0,FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt))
-    if(remaining<3_000)break
+  for(const [index,model] of models.entries()){
+    const remaining=FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt)
+    if(remaining<1_200)break
+    const attemptMs=Math.min(index===0?FAST_TEXT_TRANSFORM_ATTEMPT_MS:5_500,remaining-500)
     const drafted=await runSelfReviewedEdit({
       userRequest:input,
+      selfReviewedDraft:true,
       draft:async()=>{
-        const attemptMs=Math.min(FAST_TEXT_TRANSFORM_ATTEMPT_MS,Math.max(1_000,FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt)-2_000))
         const raw=await callLocalModel({
-          temperature:.15,
-          maxTokens:950,
+          temperature:.12,
+          maxTokens:850,
           disableThinking:true,
           timeoutMs:attemptMs,
           allowConfiguredFallback:false,
           persistUsage:false,
           jsonObject:true,
-          usageContext:{feature:'cos_fast_text_transform',purpose:'fast_editor_primary'},
+          usageContext:{feature:'cos_fast_text_transform',purpose:index===0?'fast_editor_primary':'fast_editor_retry'},
           systemPrompt:FAST_EDIT_AUTHOR_INSTRUCTIONS,
           prompt:input,
         },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true}).catch(()=>null)
@@ -165,11 +166,11 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
       },
       review:async({userRequest,candidate})=>{
         const timeLeft=FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt)
-        if(timeLeft<1_000)return null
-        const reviewMs=Math.min(7_000,timeLeft)
+        if(timeLeft<1_400)return null
+        const reviewMs=Math.min(3_500,timeLeft-500)
         return await callLocalModel({
           temperature:.08,
-          maxTokens:1050,
+          maxTokens:850,
           disableThinking:true,
           timeoutMs:reviewMs,
           allowConfiguredFallback:false,
@@ -178,21 +179,22 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
           usageContext:{feature:'cos_fast_text_transform',purpose:'fast_editor_quality_review'},
           systemPrompt:FAST_EDIT_REVIEW_INSTRUCTIONS,
           prompt:`FULL USER REQUEST:\\n${userRequest}\\n\\nEDITED DRAFT TO EVALUATE AND REPAIR:\\n${candidate}`,
-        },{...config,model:reviewerModel||model,timeoutMs:reviewMs,fallbackFromOwned:true}).catch(()=>null)
+        },{...config,model:reviewModel,timeoutMs:reviewMs,fallbackFromOwned:true}).catch(()=>null)
       },
     })
     if(drafted){
-      console.info('[cos-fast-edit-quality]',{verdict:drafted.verdict,reviewed:true,model,reviewerModel:reviewerModel||model,latencyMs:Date.now()-startedAt})
+      const reasoner= drafted.verdict==='self_reviewed'?model:reviewModel
+      console.info('[cos-fast-edit-quality]',{
+        verdict:drafted.verdict,model,reviewerModel:reviewModel,latencyMs:Date.now()-startedAt,
+      })
       const provider=String(config.provider||'').trim()
       const reasonerLabel=provider&&provider!=='self_hosted'
-        ? `managed-open-model:${provider}:${reviewerModel||model}`
-        : `independent-local:${reviewerModel||model}`
-      return{reply:drafted.answer,reasonerLabel}
+        ? `managed-open-model:${provider}:${reasoner}`
+        : `independent-local:${reasoner}`
+      return{reply:drafted.answer,reasonerLabel,reviewVerdict:drafted.verdict}
     }
   }
-  // An unreviewed draft must never be passed to the visitor as a success.
-  // The canonical COS editor can make another attempt with its own guards.
-  console.warn('[cos-fast-edit-quality]',{reviewed:false,reason:'no_reviewed_answer',latencyMs:Date.now()-startedAt})
+  console.warn('[cos-fast-edit-quality]',{reviewed:false,reason:'editing_models_unavailable',latencyMs:Date.now()-startedAt})
   return null
 }
 
@@ -555,11 +557,20 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     const fast=await runFastTextTransform(input)
     if(fast){
       const executionProvenance=authoritativeProvenance(null,{invoked:false})
-      ;(executionProvenance as any).local_reasoning={invoked:true,model:fast.reasonerLabel,confidence:1}
+      ;(executionProvenance as any).local_reasoning={invoked:true,model:fast.reasonerLabel,confidence:fast.reviewVerdict==='self_reviewed'?0.75:0.95}
       ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,provider:null,model:fast.reasonerLabel,from_cache:false}
       const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:fast.reply,source:'local_cos_reasoning',confidence:1,provenance:executionProvenance,externalAiInvoked:false})
-      return NextResponse.json({ok:true,reply:fast.reply,source:'cos-fast-text-transform',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+      return NextResponse.json({ok:true,reply:fast.reply,source:'cos-fast-text-transform',confidence_score:fast.reviewVerdict==='self_reviewed'?0.75:0.95,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
+    // Explicit edits are fully specified. Never send these into the general
+    // question-answering harness or claim that the customer needs to clarify.
+    return NextResponse.json({
+      ok:false,
+      reply:'COS understood your editing request, but its editing models did not respond in time. Please retry the edit.',
+      source:'cos-fast-text-transform-unavailable',
+      execution_allowed:false,
+      external_action_taken:false,
+    },{status:503})
   }
 
   const hasAttachments=Array.isArray(body?.attachments)&&body.attachments.length>0

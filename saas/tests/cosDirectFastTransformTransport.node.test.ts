@@ -3,6 +3,8 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fastTextTransformPrompt, isFastTextTransform } from '../lib/ai/cos/fastTextTransformIntent.ts'
+import { splitQuotedEmailThread } from '../lib/ai/cos/quotedEmailThread.ts'
+import { fastTextEditReplyIsClean } from '../lib/ai/cos/fastTextEditQuality.ts'
 
 test('middleware fast edits delegate to the canonical COS editor', () => {
   const fast = readFileSync(join(process.cwd(), 'app/api/cos-fast-transform/route.ts'), 'utf8')
@@ -98,4 +100,74 @@ test('the fast editor edits only the draft and receives the thread as read-only 
   assert.match(primary, /const fastPrompt=fastTextTransformPrompt\(input\)/)
   assert.match(primary, /prompt:fastPrompt,/)
   assert.doesNotMatch(primary, /feature:'cos_fast_text_transform'[\s\S]{0,900}prompt:input,/)
+})
+
+const COPIED_SIGNATURE_EDIT = [
+  'edit - Thank you Morgan, because the office contacted my supervisors, can I send you the authorization for forwarding? The costs were taxis during my assignment. Please see the correspondence below.',
+  '',
+  '',
+  'Morgan',
+  '',
+  'Morgan A. Example',
+  'Regional Technology Lead',
+  'Operations/Regional Center',
+  'Teams: +1 202 555 0101',
+  'image',
+  '',
+  'SBU - PRIVACY OR PII',
+  'From: Reviewer, Taylor <reviewer@example.org>',
+  'Sent: Thursday, October 15, 2026 9:32 AM',
+  'To: Morgan <morgan@example.org>',
+  'Subject: FW: Clarification needed',
+  '',
+  'Hello Morgan,',
+  '',
+  'Can you please follow up about these expenses?',
+].join('\\n')
+
+test('copied sender signature and confidentiality footer are read-only, not editable source', () => {
+  const split = splitQuotedEmailThread(COPIED_SIGNATURE_EDIT)
+  assert.match(split.editableSource, /Thank you Morgan/)
+  assert.match(split.editableSource, /taxis during my assignment/)
+  assert.doesNotMatch(split.editableSource, /Morgan A\\. Example|Teams:|PRIVACY OR PII|From:/)
+  assert.match(split.referenceContext || '', /^Morgan\\s*\\n/)
+  assert.match(split.referenceContext || '', /Morgan A\\. Example/)
+  assert.match(split.referenceContext || '', /From: Reviewer/)
+  const fast = fastTextTransformPrompt(COPIED_SIGNATURE_EDIT)
+  assert.doesNotMatch(fast.split('REFERENCE CONTEXT')[0], /Regional Technology Lead|Teams:/)
+  assert.match(fast, /REFERENCE CONTEXT/)
+  assert.equal(isFastTextTransform(COPIED_SIGNATURE_EDIT), true)
+})
+
+test('ordinary user-authored sign-off remains editable even when quoting a thread', () => {
+  const source = [
+    'edit - Hi Morgan, please find the attached draft.',
+    '',
+    'Best regards,',
+    'Jordan',
+    '',
+    'From: Reviewer, Taylor <reviewer@example.org>',
+    'Sent: October 15, 2026',
+    'To: Jordan <jordan@example.org>',
+    'Subject: Attached draft',
+  ].join('\\n')
+  const split = splitQuotedEmailThread(source)
+  assert.match(split.editableSource, /Best regards,\\nJordan$/)
+  assert.doesNotMatch(split.editableSource, /From: Reviewer/)
+})
+
+test('COS fast answer rejects copied headers and prior sender signature, accepts clean rewrite', () => {
+  const clean = 'Hi Morgan,\\n\\nSince the office contacted my supervisors, may I send you the travel authorization to forward? The taxi expenses were incurred during my assignment.'
+  const contaminated = 'Thank you Morgan. Morgan A. Example Regional Technology Lead Teams: +1 202 555 0101 SBU - PRIVACY OR PII'
+  assert.equal(fastTextEditReplyIsClean({originalPrompt:COPIED_SIGNATURE_EDIT,reply:clean}),true)
+  assert.equal(fastTextEditReplyIsClean({originalPrompt:COPIED_SIGNATURE_EDIT,reply:contaminated}),false)
+  assert.equal(fastTextEditReplyIsClean({originalPrompt:COPIED_SIGNATURE_EDIT,reply:'From: Taylor\\nSent: 2026-10-15'}),false)
+  assert.equal(fastTextEditReplyIsClean({originalPrompt:COPIED_SIGNATURE_EDIT,reply:'Edited message. Morgan A. Example'}),false)
+})
+
+test('fast editor requires substantive business prose and validates model output before release', () => {
+  const primary = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'),'utf8')
+  assert.match(primary, /skilled professional editor, not a transcription or minimal-spelling-correction service/)
+  assert.match(primary, /fastTextEditReplyIsClean\\(\\{originalPrompt:input,reply\\}\\)/)
+  assert.match(primary, /restoreCorrespondenceLayout\\(reply,reply\\)/)
 })

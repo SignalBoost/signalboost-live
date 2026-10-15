@@ -1,2 +1,2 @@
-base_sha=7469bf12d48d34fab5c1db131112b8128fea1f25
-branch=fix/builder-person-jobs-before-self-healing-20261015
+base_sha=5ec6ed5270b3a0120377e43aadf464bac7ff1865
+branch=fix/builder-verification-failure-fence-20261014

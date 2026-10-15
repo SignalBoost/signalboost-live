@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { MAX_BUILDER_RAW_OBJECTIVE_CHARS } from '@/lib/builder/request-contract'
+import { isNewBuilderProjectObjective } from '@/lib/builder/project-continuity'
 import { followBuilderJob } from '@/lib/builder/job-poll'
 import { uiText } from '@/lib/i18n/uiText'
 
@@ -192,7 +193,7 @@ export default function DeveloperPage() {
   async function run() {
     const task = objective.trim()
     if (!task || running || openingWorkspace) return
-    if ((!workspaceId || !workspaceFiles.some(path => /\.(?:[cm]?js|[cm]?ts|tsx|jsx|json|py|go|rs|java|cpp|html|css)$/i.test(path))) && /^\s*(?:open|resume|continue|edit|modify|repair|debug|fix)\b[^\n]{0,120}\b(?:existing|current|saved|original)\s+(?:project|workspace|files?)\b/i.test(task)) {
+    if (!isNewBuilderProjectObjective(task) && (!workspaceId || !workspaceFiles.some(path => /\.(?:[cm]?js|[cm]?ts|tsx|jsx|json|py|go|rs|java|cpp|html|css)$/i.test(path))) && /^\s*(?:open|resume|continue|edit|modify|repair|debug|fix)\b[^\n]{0,120}\b(?:existing|current|saved|original)\s+(?:project|workspace|files?)\b/i.test(task)) {
       setError('The selected workspace has no source files. Open the original project and confirm its files are listed before running. No new job was created.')
       return
     }
@@ -201,7 +202,7 @@ export default function DeveloperPage() {
       const response = await fetch('/api/builder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ objective: task, workspaceId: workspaceId || undefined, files }),
+        body: JSON.stringify({ objective: task, workspaceId: isNewBuilderProjectObjective(task) ? undefined : workspaceId || undefined, files }),
       })
       let data = await response.json().catch(() => ({})) as BuilderReply
       if (data.workspaceId) setWorkspaceId(data.workspaceId)

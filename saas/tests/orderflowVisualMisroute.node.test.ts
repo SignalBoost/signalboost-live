@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import { detectConciergeVisualIntent, isConciergeVisualObjective, isExecutableSoftwareBrief } from '../lib/visuals/intent.ts'
 
 const orderflow = `# OrderFlow — End-to-End Builder Acceptance Test
@@ -26,4 +27,11 @@ test('actual visual creation is still available', () => {
 
 test('ordinary programming discussion does not require executable artifact markers', () => {
   assert.equal(isExecutableSoftwareBrief('Explain JavaScript promises'), false)
+})
+
+test('COS browser excludes coding objectives from deterministic and semantic visual routes', () => {
+  const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+  assert.match(browser, /softwareExecutionObjective = isCosCodingObjective\\(prompt, routingContext\\)/)
+  assert.match(browser, /directVisual = !softwareExecutionObjective && isConciergeVisualObjective\\(prompt\\)/)
+  assert.match(browser, /semanticVisualEligible = !softwareExecutionObjective && !directVisual/)
 })

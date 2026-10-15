@@ -9,7 +9,7 @@ test('foreground fast transforms use a bounded fast-model cascade off the satura
   assert.match(primary, /deepseek-ai\/DeepSeek-V4-Flash/)
   assert.match(primary, /FAST_TEXT_TRANSFORM_ATTEMPT_MS = 7_000/)
   assert.match(primary, /FAST_TEXT_TRANSFORM_TIMEOUT_MS = 15_000/)
-  assert.match(primary, /for\(const model of models\)/)
+  assert.match(primary, /for\\(const \\[index,model\\] of models\\.entries\\(\\)\\)/)
 })
 
 test('Supabase access cannot hold a request for the full Vercel runtime', () => {

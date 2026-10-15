@@ -68,7 +68,7 @@ import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { reportLanguageName } from '@/lib/i18n/reportLanguage'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
-import { FAST_EDIT_AUTHOR_INSTRUCTIONS, FAST_EDIT_REVIEW_INSTRUCTIONS, runSelfReviewedEdit } from '@/lib/ai/cos/selfReviewTextEdit'
+import { FAST_EDIT_AUTHOR_INSTRUCTIONS, FAST_EDIT_REVIEW_INSTRUCTIONS, formatIndependentEditReviewPrompt, runSelfReviewedEdit } from '@/lib/ai/cos/selfReviewTextEdit'
 import { looksLikeArtifactContinuation } from '@/lib/ai/cos/artifactContinuationIntent'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
@@ -178,7 +178,7 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
           jsonObject:true,
           usageContext:{feature:'cos_fast_text_transform',purpose:'fast_editor_quality_review'},
           systemPrompt:FAST_EDIT_REVIEW_INSTRUCTIONS,
-          prompt:`FULL USER REQUEST:\n${userRequest}\n\nEDITED DRAFT TO EVALUATE AND REPAIR:\n${candidate}`,
+          prompt:formatIndependentEditReviewPrompt(userRequest,candidate),
         },{...config,model:reviewModel,timeoutMs:reviewMs,fallbackFromOwned:true}).catch(()=>null)
       },
     })

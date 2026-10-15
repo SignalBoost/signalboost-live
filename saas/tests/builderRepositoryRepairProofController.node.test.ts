@@ -114,6 +114,8 @@ test('repository proof selection preserves the exact build and narrows explicit 
     failedCommand: 'npm test',
   }), 'node --experimental-strip-types --test tests/builderToolLoop.node.test.ts')
 
+  assert.equal(repositoryRepairProofCommand({ pathHints: [], failedCommand: 'npm test' }), null)
+  assert.equal(repositoryRepairProofCommand({ pathHints: ['saas/tests/builderV2NewProjectHandoff.node.test.ts'], failedCommand: 'npm test' }), 'node --experimental-strip-types --test tests/builderV2NewProjectHandoff.node.test.ts')
   assert.equal(repositoryRepairProofCommand({ pathHints: [], failedCommand: 'git log --oneline -15' }), null)
 })
 

@@ -39,6 +39,9 @@ export function repositoryRepairProofCommand(target: Pick<SignalBoostRepositoryR
 
   const failedCommand = normalizedProofCommand(target.failedCommand)
   if (!failedCommand) return null
+  // Repository-wide suites are blocked by the sandbox. Without a named failing test,
+  // replaying them cannot establish a baseline; guessing a nearby test is not proof.
+  if (/^(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test\s*$/i.test(failedCommand)) return null
   return /vercel-cos-gates|npm run prebuild|next build|check-cos-blueprint|(?:^|\s)(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|typecheck|lint|build)(?:\s|$)|(?:^|\s)(?:node|python\d*)\b[^\n]*(?:--test|pytest|unittest)|(?:^|\s)(?:tsc|eslint|vitest|jest|playwright)(?:\s|$)/i.test(failedCommand)
     ? failedCommand
     : null

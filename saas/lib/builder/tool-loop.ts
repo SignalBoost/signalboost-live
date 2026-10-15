@@ -475,6 +475,7 @@ export class BuilderToolLoop {
     const inspectedInCurrentWorkspaceState = new Set<string>(saved?.inspections || [])
     const completedMutations = new Set<string>(saved?.mutations || [])
     const repeatRefusals = new Map<string, number>()
+    const acknowledgedWrites = new Set<string>()
     const blockedWritePaths = new Set<string>()
     const completedRunsInCurrentWorkspaceState = new Set<string>(saved?.runs || [])
     const projectContext = discoverBuilderProjectContext(files)
@@ -709,7 +710,9 @@ export class BuilderToolLoop {
         : ''
       // With a passing proof there is no error to justify a source edit. Forcing one produced unsupported edits that
       // the regression gate then rejected; the justified mutation is a failing regression test, or an honest answer.
-      const currentStep = repeatedRepairStall
+      const currentStep = blockedWritePaths.size > 0 && !repairObjective
+        ? 'CURRENT STEP: A repeated write has been acknowledged or blocked. Existing source must be preserved. Run the specified verification command, or read the conflicting file and use edit_file for a justified change; do not call write_file again.'
+        : repeatedRepairStall
         ? passingProofStep || 'CURRENT STEP: The source has been read and repeated inspection or execution was refused against unchanged files. Choose ONE justified edit_file or write_file mutation now, based on the inspected source and actual errors. Do not request another read, run, or answer until a mutation is recorded. If no justified repair is possible, the host will fail transparently.'
         : coverageRepairRequired
         ? `CURRENT STEP: The commands passed, but the recorded test total does not meet the requested minimum of ${task.minimumTests}. A command exited 0 but its output did not prove ${task.minimumTests} requested tests. Complete the suite with distinct meaningful assertions. Do NOT run again against unchanged files. Use read_file on the test source if not already inspected, then edit_file or write_file to add meaningful missing assertions and explicit per-test evidence. Preserve the existing passing tests. Once the file changes, the verification run can execute again.`
@@ -935,6 +938,14 @@ export class BuilderToolLoop {
         const existing = await this.workspace.readFile(input.workspaceId, path)
         const resolution = repeatedWriteResolution(existing?.content ?? null, toolContent(candidate.input))
         if (resolution === 'identical') {
+          if (acknowledgedWrites.has(fingerprint)) {
+            blockedWritePaths.add(path)
+            trace.push({ round, toolId: 'write_file', input: { path }, ok: false,
+              error: 'builder_repeated_write_already_acknowledged',
+              remediation: 'The write is already present. Run tests or inspect another source file; another write_file call cannot make progress.' })
+            return true
+          }
+          acknowledgedWrites.add(fingerprint)
           trace.push({ round, toolId: 'write_file', input: { path }, ok: true,
             output: { path, unchanged: true, alreadyApplied: true } })
           repeatRefusals.delete(fingerprint)
@@ -1138,7 +1149,7 @@ export class BuilderToolLoop {
         continue
       }
       if (inspection) inspectedInCurrentWorkspaceState.add(fingerprint)
-      if (action.toolId === 'run' || action.toolId === 'read_file') blockedWritePaths.clear()
+      if (action.toolId === 'run' || action.toolId === 'edit_file') blockedWritePaths.clear()
       workRounds += 1
       try {
         let output: unknown

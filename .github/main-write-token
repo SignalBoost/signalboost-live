@@ -1,2 +1,2 @@
-base_sha=ee94c9e6314c1955f62780c1c40a3589ebadd1a3
-branch=fix/builder-continuity-current-main-20261015
+base_sha=37267328a9bb1294b4f5f46897a02daf90c4401a
+branch=fix/builder-empty-selected-workspace-api-20261015

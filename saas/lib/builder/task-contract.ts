@@ -43,12 +43,20 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
   const commands = new Set<string>()
   let fileList = false
   let runList = false
+  let fence = false
   for (const raw of objective.split(/\r?\n/)) {
     const line = raw.trim()
     // Markdown acceptance specifications place deliverable lists inside fenced
     // blocks. The fence is a delimiter, not a missing file or command.
     if (/^```/.test(line)) {
-      if (line === '```') { fileList = false; runList = false }
+      fence = !fence
+      continue
+    }
+    // Only a fenced block under an explicit deliverable/verification heading is a checklist.
+    if (fence && !fileList && !runList) continue
+    if (!fence && /^#{1,6}\\s/.test(line)) {
+      fileList = /(?:required files|project structure|deliverables)/i.test(line)
+      runList = /(?:required execution|verification commands)/i.test(line)
       continue
     }
     if (/^run(?:\s+(?:these|the following)\s+commands)?(?:\s+against\s+the\s+actual\s+generated\s+files)?\s*:\s*$/i.test(line) || /^execute\s+(?:these|the following)\s+commands(?:\s+in\s+the\s+builder\s+workspace)?\s*:\s*$/i.test(line)) {
@@ -71,7 +79,7 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
     for (const command of inlineCommands(line)) commands.add(command)
     const command = line.replace(/^\$\s+/, '').replace(/^`|`$/g, '')
     if (runList && /^(?:node|python3?|npm|pnpm|yarn|bun)\s+\S/.test(command) && command.length <= 2_000) commands.add(command)
-    else if (line && !/^```/.test(line)) runList = false
+    else if (line && !fence) runList = false
   }
   const explicitCount = /\b(?:at least|minimum(?: of)?|all|verify|confirm)\s+(\d+)\s+(?:(?:independent|meaningful|automated|unit|integration|regression)\s+)*tests?\b/i.exec(objective)
   const wordCount = /\b(?:all|verify|confirm)\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+tests?\b/i.exec(objective)

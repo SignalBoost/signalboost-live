@@ -135,3 +135,17 @@ test('background execution is idempotently claimed and applies only validated so
   assert.match(jobRunner, /runDebugFileJob/)
   assert.match(jobRunner, /finishBuilderJob/)
 })
+
+test('repeated src/storage.js write resolves identical content and cannot force another write loop', async () => {
+  const { repeatedWriteResolution } = await import('../lib/builder/tool-loop.ts')
+  const source = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
+  const current = 'export const store = new Map()\\n'
+  assert.equal(repeatedWriteResolution(current, current), 'identical')
+  assert.equal(repeatedWriteResolution(current, 'export const store = {}\\n'), 'different')
+  assert.equal(repeatedWriteResolution(null, current), 'missing')
+  assert.match(source, /await this\\.workspace\\.readFile\\(input\\.workspaceId, path\\)/)
+  assert.match(source, /alreadyApplied: true/)
+  assert.match(source, /builder_write_content_conflict/)
+  assert.match(source, /blockedWritePaths\\.size > 0 && \\(toolId === 'run' \\|\\| toolId === 'read_file'\\)/)
+  assert.ok(source.indexOf('if (blockedAction && await repeatedWrite(blockedAction))') < source.indexOf('if (blockedAction) {'))
+})

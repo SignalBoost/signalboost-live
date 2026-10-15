@@ -330,8 +330,18 @@ export async function POST(request: Request) {
       if (!exists) {
         return noStore({ error: 'Selected workspace does not exist. No job was created.', execution_allowed: false }, { status: 404 })
       }
-      try { await workspace.listFiles(workspaceId) }
-      catch { console.warn('[builder_continuation_source_list_deferred]', { workspaceId }) }
+      try {
+        const listed = await workspace.listFiles(workspaceId)
+        if (!project.context && !hasWorkspaceSource(listed.map(file => file.path))) {
+          return noStore({
+            error: 'Selected workspace is empty. Choose the original project or connect/import the repository. No job was created.',
+            execution_allowed: false,
+          }, { status: 400 })
+        }
+      } catch {
+        // Do not misclassify a transient storage failure as an empty workspace.
+        return noStore({ error: 'Unable to verify selected workspace source files. No job was created.', execution_allowed: false }, { status: 503 })
+      }
       // Claimed worker re-reads the existing workspace before making any edits.
     }
 

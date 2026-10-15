@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { historicalPricesSvg, loadHistoricalStockPrices } from '@/lib/ai/cos/historicalStockChart'
+import { historicalPricesSvg, loadHistoricalStockPrices, verifyHistoricalPriceCoverage } from '@/lib/ai/cos/historicalStockChart'
 import type { StockChartRange } from '@/lib/ai/cos/historicalStockChartIntent'
 
 export const runtime = 'nodejs'
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ file: strin
     return NextResponse.json({ error: 'invalid_stock_chart_request' }, { status: 400 })
   }
   const prices = await loadHistoricalStockPrices(symbol, range as StockChartRange)
-  if (!prices) {
+  if (!prices || !verifyHistoricalPriceCoverage(prices).ok) {
     return NextResponse.json({
       error: 'historical_prices_unavailable',
       message: 'A stock chart requires independently retrieved dated historical closes. No points were fabricated.',

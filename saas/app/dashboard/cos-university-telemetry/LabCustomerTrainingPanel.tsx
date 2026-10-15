@@ -11,6 +11,7 @@ import { cleanPastedKey, detectProviderFromKey } from '@/lib/lab/labKeyEntry'
 import { LAB_OPEN_SOURCES } from '@/lib/lab/labOpenSources'
 import { previewLabDataset } from '@/lib/lab/labDatasetPreflight'
 import LabCustomerModelPassport from './LabCustomerModelPassport.tsx'
+import LabCustomerResponseComparison from './LabCustomerResponseComparison.tsx'
 
 type Org = { organizationId: string; organizationName: string; experimentId: string; projectName: string; role: string }
 type CatalogEntry = { kind: string; name: string; supports: Record<string, boolean>; unsupported: Record<string, string>; keyHelp: string }
@@ -535,6 +536,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
                 {run.stage === 'completed' && run.artifactRepo && <button className="underline" onClick={() => download(run.runId)}>{copy.downloadModel}</button>}
               </div>
               <LabCustomerModelPassport run={run} language={language} />
+              {run.stage === 'completed' && (run.tunedModelId || run.artifactRevision) && <LabCustomerResponseComparison key={run.runId} language={language} baseModel={run.baseModel} trainedModel={run.tunedModelId || run.artifactRepo || run.artifactRevision || '—'} />}
               {files[run.runId] && (
                 <ul className="mt-2 space-y-1">
                   {files[run.runId].map(file => <li key={file.path}><a className="underline" href={fileUrl(run.runId, file.path)}>{file.path}</a> <span className="opacity-70">({(file.size / 1e6).toFixed(1)} {copy.mb})</span></li>)}

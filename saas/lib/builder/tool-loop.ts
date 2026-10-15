@@ -683,6 +683,19 @@ export class BuilderToolLoop {
       // A blocked broad suite plus an unrelated passing test is not a reason to stop: the defect has not been
       // reproduced yet, so the repair continues toward a failing proof (the repository proof controller refuses
       // source edits until one fails and ends an unreproduced answer as builder_regression_not_reproduced).
+      const broadTestNarrowCommand = blockedBroadRun && latestFailedRunIndex < 0
+        ? (() => {
+            const candidates = workspacePaths.filter(path => /(?:^|\/)(?:tests?)\/.+\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(path)
+              && input.objective.includes(path))
+            return candidates.length === 1 ? `node --test ${candidates[0]}` : null
+          })()
+        : null
+      if (blockedBroadRun && !broadTestNarrowCommand
+        && trace.some(item => String(item.error || '').startsWith('builder_repeated_tool_call:list_files'))) {
+        return { ok: false,
+          error: 'builder_regression_evidence_required: npm test blocked by builder_repository_broad_test_blocked; no unique named failing test; repeated list_files cannot recover',
+          trace }
+      }
       let consecutiveRepeatRejections = 0
       for (const item of [...trace].reverse().filter(item => !['list_files', 'read_file', 'search_files', 'mcp_read'].includes(item.toolId))) {
         if (!String(item.error || '').startsWith('builder_repeated_tool_call:')) break
@@ -884,7 +897,10 @@ export class BuilderToolLoop {
         'When done: {"type":"answer","answer":"what changed and what ran"}',
       ].filter(Boolean)
 
-      let action: Action | null = verificationCommand
+      let action: Action | null = broadTestNarrowCommand
+        && !trace.some(item => item.toolId === 'run' && item.input.command === broadTestNarrowCommand)
+        ? { type: 'tool', toolId: 'run', input: { command: broadTestNarrowCommand } }
+        : verificationCommand
         ? { type: 'tool', toolId: 'run', input: { command: verificationCommand } }
         : forcedRepairInspectionPath
           ? { type: 'tool', toolId: 'read_file', input: { path: forcedRepairInspectionPath } }

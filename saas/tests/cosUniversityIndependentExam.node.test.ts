@@ -266,3 +266,13 @@ test('ready exam queue recovers one no-valid-execution error and scans past bloc
   assert.match(runner, /if \(executionSlots >= maxExams\) break/)
   assert.match(runner, /run\.status === 'error'\) executionSlots \+= 1/)
 })
+
+test('independent University exams use background inference rather than interactive chat hedge', () => {
+  const runner = file('../lib/ai/cos/cosUniversityIndependentExamRunner.ts')
+  const firstAnswer = file('../lib/ai/cos/cosFirstAnswerEnterprise.ts')
+  const local = file('../lib/ai/local-inference.ts')
+  assert.equal((runner.match(/inferenceLane: 'university_exam'/g) || []).length, 2)
+  assert.match(firstAnswer, /feature:input\.inferenceLane === 'university_exam' \? 'university_exam'/)
+  assert.match(firstAnswer, /purpose:input\.inferenceLane === 'university_exam' \? 'independent_exam_response'/)
+  assert.match(local, /if \(!interactiveUserResponse\(args\)\) return false/)
+})

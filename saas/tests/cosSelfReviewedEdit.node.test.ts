@@ -88,3 +88,43 @@ test('generic semantic and editorial quality contract is model-led, not tied to 
   assert.doesNotMatch(fast, /return\\{reply:parsed\\.answer|const fastPrompt=fastTextTransformPrompt/)
   assert.match(fast, /return null/)
 })
+
+test('completed, self-reviewed COS edit survives optional independent reviewer timeout', async () => {
+  const fullRequest = 'edit - please make this short note professional while keeping its meaning'
+  let reviews = 0
+  const result = await runSelfReviewedEdit({
+    userRequest: fullRequest,
+    selfReviewedDraft: true,
+    draft: async () => 'Would you please review the attached note?',
+    review: async ({userRequest,candidate}) => {
+      assert.equal(userRequest, fullRequest)
+      assert.equal(candidate, 'Would you please review the attached note?')
+      reviews += 1
+      return null
+    },
+  })
+  assert.equal(reviews, 1)
+  assert.deepEqual(result, {answer:'Would you please review the attached note?',verdict:'self_reviewed'})
+})
+
+test('reviewer rejection still blocks release of candidate even with self-review', async () => {
+  const result = await runSelfReviewedEdit({
+    userRequest: 'edit - please correct this.',
+    selfReviewedDraft: true,
+    draft: async () => 'Some draft.',
+    review: async () => '{"verdict":"unresolved","answer":""}',
+  })
+  assert.equal(result, null)
+})
+
+test('editing model route prefers dedicated editor, limits cascades, and refuses generic clarification fallback', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'),'utf8')
+  const fast = route.slice(route.indexOf('async function runFastTextTransform('),route.indexOf('export const FAST_AUTHORING_TIMEOUT_MS'))
+  const early = route.slice(route.indexOf('if(!artifactContinuation&&!fastEditAlreadyAttempted&&isFastTextTransform('),route.indexOf('const hasAttachments='))
+  assert.match(fast, /const models=\[\.\.\.new Set\(\[editorModel,alternateModel\]/)
+  assert.match(fast, /selfReviewedDraft:true/)
+  assert.match(fast, /const editorModel=process\.env\.COS_DIRECT_TEXT_MODEL/)
+  assert.match(fast, /FAST_TEXT_TRANSFORM_TIMEOUT_MS/)
+  assert.match(early, /source:'cos-fast-text-transform-unavailable'/)
+  assert.doesNotMatch(early, /buildHonestRefusalReply|tryCOSFirstAnswer/)
+})

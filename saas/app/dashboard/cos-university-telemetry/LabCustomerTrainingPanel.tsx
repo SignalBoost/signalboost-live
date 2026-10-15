@@ -14,6 +14,7 @@ import LabCustomerModelPassport from './LabCustomerModelPassport.tsx'
 import LabCustomerResponseComparison from './LabCustomerResponseComparison.tsx'
 import LabCustomerTrainingAdvisor from './LabCustomerTrainingAdvisor.tsx'
 import LabCustomerRunTimeline from './LabCustomerRunTimeline.tsx'
+import LabCustomerFailureGuidance from './LabCustomerFailureGuidance.tsx'
 import LabCustomerHoldoutEvaluation from './LabCustomerHoldoutEvaluation.tsx'
 
 type Org = { organizationId: string; organizationName: string; experimentId: string; projectName: string; role: string }
@@ -531,7 +532,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
                 <span className="opacity-70">{run.teacherModel} → {run.baseModel} · {new Date(run.createdAt).toLocaleString(language)}</span>
               </div>
               <div className="my-2 h-2 w-full rounded bg-muted"><div className="h-2 rounded bg-primary" style={{ width: `${run.progressPercent}%` }} /></div>
-              {run.failureCode ? <p>{explain(run.failureCode)}</p> : run.statusMessage && <p>{run.statusMessage}</p>}
+              {run.failureCode ? <><p>{explain(run.failureCode)}</p><LabCustomerFailureGuidance code={run.failureCode} language={language} /></> : run.statusMessage && <p>{run.statusMessage}</p>}
               {run.tunedModelId && <p>{fmt(copy.tunedModelLine, { id: run.tunedModelId })}</p>}
               <div className="mt-2 flex flex-wrap gap-3">
                 {run.hfJobUrl && <a className="underline" href={run.hfJobUrl} target="_blank" rel="noreferrer">{copy.openJob}</a>}

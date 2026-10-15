@@ -1,2 +1,2 @@
 base_sha=9e018e7aff1ec1eccbfeedb8db10923a5146ef8d
-branch=fix/concierge-orderflow-fixture-ci-20261014
+branch=fix/builder-cursor-repair-control-retry-20261014

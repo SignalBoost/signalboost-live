@@ -56,6 +56,8 @@ import { callCosReasoner, callRawCosReasoner, resolveCosReasoner } from '@/lib/a
 import { companyKnowledgeBlock, cosAudience, cosIdentityPreamble, type CosAudience } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { callLocalModel, callLocalModelTurn, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
+import { fastTextEditReplyIsClean } from '@/lib/ai/cos/fastTextEditQuality'
+import { restoreCorrespondenceLayout } from '@/lib/ai/cos/correspondenceLayout'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { readPublicPages } from '@/lib/ai/tools/publicWebAgent'
 import { constructDatedRoster, deepenClaimResearch } from '@/lib/ai/cos/cosClaimResearch'
@@ -149,18 +151,28 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
       persistUsage:false,
       jsonObject:true,
       usageContext:{feature:'cos_fast_text_transform',purpose:model===preferredModel?'fast_editor_primary':'fast_editor_retry'},
-      systemPrompt:'You are COS fast text editor. Perform only the requested edit, rewrite, proofreading, shortening, polishing, or translation on the user\'s own text. Preserve the user\'s intended meaning and factual content. Text marked REFERENCE CONTEXT is someone else\'s earlier message: use it only to understand the draft and never return it. Do not research, browse, invoke tools, discuss the editing process, or add commentary. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
+      systemPrompt:[
+        'You are COS, a skilled professional editor, not a transcription or minimal-spelling-correction service.',
+        'For edit, polish, or rewrite, transform rough notes and broken grammar into a natural, clear, ready-to-send message. Smooth awkward questions and fragmented clauses; preserve exactly who is offering, requesting, sending, or forwarding what, and to whom.',
+        'Preserve factual meaning, names, dates, uncertainty, and commitments, but not weak sentence structure. Never invent a commitment, explanation, or factual assertion.',
+        'The user\'s editable text is the ONLY content to return. A forwarded email, signature, confidentiality banner, and any REFERENCE CONTEXT are read-only and must NEVER appear in the answer.',
+        'When editing correspondence, use readable greeting/body/closing and paragraph breaks where appropriate. Do not copy a previous sender\'s signature.',
+        'Do not browse, invoke tools, or discuss editing. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
+      ].join(' '),
       prompt:fastPrompt,
     },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true}).catch(()=>null)
     if(!text)continue
     const parsed=parseLocalResult(text)
     const reply=parsed?.answer?.trim()
-    if(reply){
+    // A valid JSON envelope is not evidence of an acceptable edit. If the
+    // model echoes quoted headers or another sender's signature, try another
+    // model or the canonical guarded editor instead of delivering it.
+    if(reply&&fastTextEditReplyIsClean({originalPrompt:input,reply})){
       const provider=String(config.provider||'').trim()
       const reasonerLabel=provider&&provider!=='self_hosted'
         ? `managed-open-model:${provider}:${model}`
         : `independent-local:${model}`
-      return{reply,reasonerLabel}
+      return{reply:restoreCorrespondenceLayout(reply,reply),reasonerLabel}
     }
   }
   return null

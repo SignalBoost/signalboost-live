@@ -1,7 +1,7 @@
 import type { EvidenceJob, EvidenceLookup } from './execution-evidence.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const NEW_PROJECT = /\b(?:new|another|separate|different)\s+(?:(?:isolated|fresh|clean|empty|independent)\s+)?(?:project|workspace|app|application|website|repository)\b|\bstart\s+(?:over|fresh)\b|\bfrom\s+scratch\b/i
+const NEW_PROJECT = /\b(?:new|another|separate|different|fresh|clean)\s+(?:(?:isolated|fresh|clean|empty|independent)\s+)?(?:project|workspace|app|application|website|repository)\b|\bstart\s+(?:over|fresh)\b|\bfrom\s+scratch\b/i
 
 export function isNewBuilderProjectObjective(objective: string): boolean {
   return NEW_PROJECT.test(objective)

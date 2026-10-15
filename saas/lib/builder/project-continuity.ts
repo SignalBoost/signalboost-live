@@ -19,6 +19,8 @@ export type BuilderProjectSelection = {
   workspaceId?: string
   context?: BuilderProjectContext
   blocked?: 'busy' | 'unavailable'
+  activeJobId?: string
+  activeStatus?: string
 }
 
 /** Only persisted same-user/conversation jobs select an implicit project; chat text grants no access. */
@@ -30,21 +32,28 @@ export async function selectBuilderProject(input: {
   hasNewSource: boolean
   repositoryImport: boolean
 }, lookup: (target: EvidenceLookup) => Promise<EvidenceJob & { objective?: string } | null>): Promise<BuilderProjectSelection> {
-  // An explicit fresh-build request must not inherit a stale selected workspace.
-  // This also covers the case where a client keeps sending its prior workspaceId.
+  // Explicit fresh builds and source imports must not borrow another project's history.
   if (NEW_PROJECT.test(input.objective)) return {}
-  if (input.requestedWorkspaceId && UUID.test(input.requestedWorkspaceId)) return { workspaceId: input.requestedWorkspaceId }
-  if (input.hasNewSource || input.repositoryImport || !ACTION.test(input.objective)) return {}
-  if (!input.userId || !UUID.test(input.userId) || !input.conversationId || !UUID.test(input.conversationId)) return {}
+  const selected = input.requestedWorkspaceId && UUID.test(input.requestedWorkspaceId)
+    ? input.requestedWorkspaceId : undefined
+  if (input.hasNewSource || input.repositoryImport) return selected ? { workspaceId: selected } : {}
+  if (!input.userId || !UUID.test(input.userId) || !input.conversationId || !UUID.test(input.conversationId)) {
+    return selected ? { workspaceId: selected } : {}
+  }
+  // The conversation is the durable project reference. Do not require a narrow
+  // verb or pronoun in every follow-up before looking up the actual stored job.
   let job
-  try { job = await lookup({ userId: input.userId, conversationId: input.conversationId }) }
-  catch { return { blocked: 'unavailable' } }
+  try {
+    job = await lookup({ userId: input.userId, conversationId: input.conversationId,
+      ...(selected ? { workspaceId: selected } : {}) })
+  } catch { return { blocked: 'unavailable' } }
   if (!job || job.userId !== input.userId || job.conversationId !== input.conversationId
-    || !UUID.test(job.workspaceId) || job.metadata.platformRepair === true) return {}
-  const paths = Array.isArray(job.result?.files) ? job.result.files.filter((path): path is string => typeof path === 'string') : []
-  const namedExistingFile = paths.some(path => input.objective.includes(path))
-  if (!namedExistingFile && !REFERENCE.test(input.objective) && !/^\s*(?:please\s+)?continue\b/i.test(input.objective)) return {}
-  if (['queued', 'running', 'paused'].includes(job.status)) return { blocked: 'busy' }
+    || !UUID.test(job.workspaceId) || job.metadata.platformRepair === true) {
+    return selected ? { workspaceId: selected } : {}
+  }
+  if (['queued', 'running', 'paused'].includes(job.status)) {
+    return { workspaceId: job.workspaceId, blocked: 'busy', activeJobId: job.id, activeStatus: job.status }
+  }
   const trace = Array.isArray(job.result?.trace) ? job.result.trace : []
   return { workspaceId: job.workspaceId, context: {
     previousJobId: job.id,

@@ -1,7 +1,6 @@
 import { isConciergeBuilderObjective, structuredApplicationBuild } from './cosReasoningRolePolicy.ts'
 import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMessage } from './operator-progress.ts'
-import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findDurableCosTurnReply } from './assistantTransportRecovery.ts'
-import { recoverAssistantReplyFromHistory } from './assistantTransportClient.ts'
+import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findDurableCosTurnReply, findRecoveredAssistantReply } from './assistantTransportRecovery.ts'
 import { planResearchTask } from './researchBudget.ts'
 
 export type AgentProgressEvent = {
@@ -17,6 +16,15 @@ const COS_TURN_POLL_DELAY_MS = 1_500
 const COS_TURN_FOREGROUND_WAIT_MS = 180_000
 const COS_HISTORY_READ_DEADLINE_MS = 2_000
 const PUBLIC_CONCIERGE_TRANSPORT_DEADLINE_MS = 195_000
+// History watch for an open COS turn: first read after 5 s, then every 3 s, until 240 s after send.
+// 240 s covers the server's 172 s whole-turn watchdog plus the History write, and stays inside the
+// Assistant page's 290 s deadline.
+const COS_HISTORY_WATCH_START_MS = 5_000
+const COS_HISTORY_WATCH_INTERVAL_MS = 3_000
+const COS_HISTORY_WATCH_DEADLINE_MS = 240_000
+// The server saves the turn just before it responds. When History shows the answer first, give the
+// live response this long to land so its extra fields (diagnostics, Builder files) are not lost.
+const COS_HISTORY_RESPONSE_GRACE_MS = 4_000
 const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
 const MAX_CLIENT_FILE_BYTES = 512 * 1024
 const FENCED_SOURCE = /```([A-Za-z0-9_+#.-]*)\s*\n?([\s\S]*?)```/m
@@ -57,6 +65,48 @@ function wait(ms: number, signal: AbortSignal): Promise<void> {
     }, ms)
     signal.addEventListener('abort', onAbort, { once: true })
   })
+}
+
+/**
+ * Read-only History watch for one sent COS turn. Returns the saved assistant reply for this exact
+ * send (matched by prompt and send time, see findRecoveredAssistantReply) or null at the deadline.
+ * It never POSTs, so it can never replay an action.
+ */
+async function watchHistoryForCompletedTurn(args: {
+  conversationId: string
+  userText: string
+  sentAtMs: number
+  signal: AbortSignal
+}): Promise<string | null> {
+  const deadlineMs = args.sentAtMs + COS_HISTORY_WATCH_DEADLINE_MS
+  await wait(COS_HISTORY_WATCH_START_MS, args.signal)
+  while (Date.now() < deadlineMs) {
+    const readBudgetMs = Math.max(1, Math.min(COS_HISTORY_READ_DEADLINE_MS, deadlineMs - Date.now()))
+    try {
+      const history = await fetch(`/api/assistant/chats?id=${encodeURIComponent(args.conversationId)}`, {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+        signal: AbortSignal.any([args.signal, AbortSignal.timeout(readBudgetMs)]),
+        headers: { accept: 'application/json' },
+      })
+      if (history.ok) {
+        const payload = await history.json().catch(() => null)
+        const reply = findRecoveredAssistantReply(
+          Array.isArray(payload?.messages) ? payload.messages : [],
+          args.userText,
+          args.sentAtMs,
+        )
+        if (reply) return reply
+      }
+    } catch (error) {
+      if (args.signal.aborted) throw error
+    }
+    const remainingMs = deadlineMs - Date.now()
+    if (remainingMs <= 0) break
+    await wait(Math.min(COS_HISTORY_WATCH_INTERVAL_MS, remainingMs), args.signal)
+  }
+  return null
 }
 
 function bodyRecord(value: unknown): Record<string, any> | null {
@@ -251,21 +301,54 @@ export async function postWithAgentProgress(args: {
   // a signed-in owner using the public homepage Concierge from inheriting private owner authority;
   // only the owner Assistant surface may enter the privileged lane after server-side authentication.
   const endpoint = builderRequest?.endpoint ?? '/api/cos-browser'
+  const conversationIdForTurn = typeof requestRecord?.context?.conversationId === 'string'
+    ? String(requestRecord.context.conversationId)
+    : ''
+  const userTextForTurn = requestRecord ? latestUserText(requestRecord) : ''
+  // RESUMABLE TURN (2026-10-15). The answer must not depend on one long HTTP response surviving.
+  // The server saves every completed owner turn in History before it responds, so while the POST is
+  // open the page also watches History (read-only GETs) and shows the saved answer as soon as it
+  // exists — whether the response arrives, stalls, or the connection is dropped (tab backgrounded,
+  // network change, proxy idle cut). Production 2026-10-15: COS answered and saved the edit, but the
+  // page lost the response and showed the timeout copy.
+  const historyWatchEligible = args.target === 'cos' && !builderRequest && Boolean(conversationIdForTurn) && Boolean(userTextForTurn)
+  const fetchAbort = new AbortController()
+  const watchAbort = new AbortController()
+  type TransportOutcome =
+    | { kind: 'response'; response: Response }
+    | { kind: 'error'; error: unknown }
+    | { kind: 'history'; reply: string }
+  const posted: Promise<TransportOutcome> = fetch(endpoint, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json',
+      'x-signalboost-surface': args.target,
+    },
+    body: JSON.stringify(requestBody),
+    signal: AbortSignal.any([responseSignal, fetchAbort.signal]),
+  }).then(
+    (value): TransportOutcome => ({ kind: 'response', response: value }),
+    (error): TransportOutcome => ({ kind: 'error', error }),
+  )
+  const watched: Promise<string | null> = historyWatchEligible
+    ? watchHistoryForCompletedTurn({
+        conversationId: conversationIdForTurn,
+        userText: userTextForTurn,
+        sentAtMs: startedAt,
+        signal: AbortSignal.any([args.signal, watchAbort.signal]),
+      }).catch(() => null)
+    : Promise.resolve(null)
+  const historyFound: Promise<TransportOutcome> = watched.then(reply => reply
+    ? { kind: 'history', reply }
+    : new Promise<TransportOutcome>(() => undefined))
+
   let response: Response
   try {
-    try {
-      response = await fetch(endpoint, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'content-type': 'application/json',
-          accept: 'application/json',
-          'x-signalboost-surface': args.target,
-        },
-        body: JSON.stringify(requestBody),
-        signal: responseSignal,
-      })
-    } catch (error) {
+    let outcome = await Promise.race([posted, historyFound])
+    if (outcome.kind === 'error') {
+      const error = outcome.error
       if (args.signal.aborted) throw error
       if (boundedPublicTransport && responseSignal.aborted) {
         report('complete', 'Concierge stopped waiting for the unavailable response')
@@ -281,23 +364,27 @@ export async function postWithAgentProgress(args: {
         }
       }
       if (deliberateAbort(error, args.signal)) throw error
-      // The POST may have completed on the server even when the browser lost its response.
-      // Recover the recorded answer by prompt and send time; never replay a possible action.
-      const conversationId = typeof requestRecord?.context?.conversationId === 'string'
-        ? String(requestRecord.context.conversationId)
-        : ''
-      const userText = requestRecord ? latestUserText(requestRecord) : ''
-      if (args.target === 'cos' && conversationId && userText) {
-        const recovered = await recoverAssistantReplyFromHistory(userText, startedAt, {
-          historyUrl: `/api/assistant/chats?id=${encodeURIComponent(conversationId)}`,
-          historyPollAttempts: 4,
-          historyPollDelayMs: 1200,
-        })
-        if (recovered) {
-          report('complete', 'Recovered the completed COS answer from History')
-          return { ok: true, status: 200, data: { reply: recovered, source: 'cos-transport-history-recovery' } }
-        }
+      // The POST may have completed on the server even though the browser lost its response.
+      // Keep reading History until the turn's deadline; never replay a possible action.
+      if (historyWatchEligible) {
+        report('running', 'The connection to COS was interrupted — waiting for the saved answer in History (the request is not replayed)')
+        const reply = await watched
+        if (reply) outcome = { kind: 'history', reply }
       }
+    }
+    if (outcome.kind === 'history') {
+      const late = await Promise.race([
+        posted,
+        new Promise<null>(resolve => window.setTimeout(() => resolve(null), COS_HISTORY_RESPONSE_GRACE_MS)),
+      ])
+      if (late?.kind === 'response') outcome = late
+    }
+    if (outcome.kind === 'history') {
+      fetchAbort.abort()
+      report('complete', 'Recovered the completed COS answer from History')
+      return { ok: true, status: 200, data: { reply: outcome.reply, source: 'cos-transport-history-recovery' } }
+    }
+    if (outcome.kind === 'error') {
       report('complete', operatorProgressMessage({ stage: 'blocked', target: progressTarget, builder: builderActive }))
       return {
         ok: false,
@@ -310,14 +397,14 @@ export async function postWithAgentProgress(args: {
         },
       }
     }
+    response = outcome.response
   } finally {
+    watchAbort.abort()
     window.clearInterval(heartbeat)
   }
   let data: any = await response.json().catch(() => ({ error: 'assistant_response_unavailable' }))
   const turnId = typeof data?.turnId === 'string' ? data.turnId : ''
-  const conversationId = typeof requestRecord?.context?.conversationId === 'string'
-    ? String(requestRecord.context.conversationId)
-    : ''
+  const conversationId = conversationIdForTurn
 
   if (turnId && data?.status === 'running' && conversationId) {
     const durablePollDeadlineMs = startedAt + COS_TURN_FOREGROUND_WAIT_MS

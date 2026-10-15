@@ -138,7 +138,7 @@ test('owner Assistant polls a single accepted Builder job for eight minutes with
 
 test('lost COS POST transport performs read-only History recovery before showing failure', () => {
   const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
-  assert.match(client, /const historyWatchEligible = args\.target === 'cos' && !builderRequest && Boolean\(conversationIdForTurn\) && Boolean\(userTextForTurn\)/)
+  assert.match(client, /const historyWatchEligible = !builderRequest && Boolean\(conversationIdForTurn\) && Boolean\(userTextForTurn\)/)
   assert.match(client, /Promise\.race\(\[posted, historyFound\]\)/)
   assert.match(client, /const reply = await watched/)
   assert.match(client, /source: 'cos-transport-history-recovery'/)

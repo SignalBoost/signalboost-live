@@ -304,3 +304,11 @@ test('official government roster prose answers a compound current-plus-history r
   assert.match(resolved?.reply || '', /Example Alpha — 2005–2009/)
   assert.match(resolved?.reply || '', /Example Zeta — 2025–present/)
 })
+
+test('technology platform rankings never include economic administration queries', () => {
+  const q = freshEvidenceSearchQueries('What are the 10 best AI platforms for developers?')
+  assert.equal(q.length, 1)
+  assert.doesNotMatch(q.join(' '), /unemployment|CPI inflation|GDP growth/i)
+  const office = freshEvidenceSearchQueries('Who was the best US president?')
+  assert.ok(office.some(query => /unemployment rate by administration/i.test(query)))
+})

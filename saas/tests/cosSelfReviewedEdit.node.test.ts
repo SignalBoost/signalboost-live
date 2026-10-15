@@ -129,3 +129,15 @@ test('editing model route prefers dedicated editor, limits cascades, and refuses
   assert.match(early, /source:'cos-fast-text-transform-unavailable'/)
   assert.doesNotMatch(early, /buildHonestRefusalReply|tryCOSFirstAnswer/)
 })
+
+test('independent COS reviewer sees the full original and candidate with actual line breaks', () => {
+  const original = ['edit - Please make this more professional.', '', 'Prior message:', 'Would you send the document?'].join('\n')
+  const candidate = 'Please send the document.'
+  const result = formatIndependentEditReviewPrompt(original, candidate)
+  assert.ok(result.includes('<<<ORIGINAL_USER_REQUEST\n' + original + '\nORIGINAL_USER_REQUEST'))
+  assert.ok(result.includes('<<<PRELIMINARY_EDIT\n' + candidate + '\nPRELIMINARY_EDIT'))
+  assert.equal(result.includes('\\n'), false)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /privately compose your own polished edit/)
+  const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  assert.match(route, /prompt:formatIndependentEditReviewPrompt\(userRequest,candidate\)/)
+})

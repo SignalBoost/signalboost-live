@@ -136,10 +136,13 @@ export async function GET(request: Request) {
   }
   if (!UUID.test(workspaceId)) return noStore({ error: 'Invalid workspace id.' }, { status: 400 })
   try {
+    if (!await workspace.hasWorkspace(workspaceId)) {
+      return noStore({ error: 'Workspace not found.' }, { status: 404 })
+    }
     const files = (await workspace.listFiles(workspaceId)).map(file => file.path)
     return noStore({ workspaceId, files })
   } catch {
-    return noStore({ error: 'Workspace not found.' }, { status: 404 })
+    return noStore({ error: 'Unable to read workspace files right now.' }, { status: 503 })
   }
 }
 
@@ -296,17 +299,19 @@ export async function POST(request: Request) {
     const continuationWorkspace = !newProjectRequested && !repositoryTarget && files.length === 0
       && Boolean(project.workspaceId || requestedWorkspaceId)
     if (continuationWorkspace) {
-      let sourceVisible = false
-      let listingFailed = false
-      try {
-        sourceVisible = hasWorkspaceSource((await workspace.listFiles(workspaceId)).map(file => file.path))
-      } catch { listingFailed = true }
-      if (!project.context && !sourceVisible) {
-        const reply = listingFailed
-          ? 'Unable to verify the selected workspace right now. The existing workspace has not been changed.'
-          : 'Selected workspace has no editable source. Import the repository or supply source files before requesting changes.'
-        return noStore({ error: reply, execution_allowed: false }, { status: listingFailed ? 503 : 422 })
+      // Verify the workspace is owned by this user without creating one.
+      // A blank or failed file listing is not proof that the project was deleted.
+      let exists: boolean
+      try { exists = await workspace.hasWorkspace(workspaceId) }
+      catch {
+        return noStore({ error: 'Unable to verify selected workspace ownership right now.', execution_allowed: false }, { status: 503 })
       }
+      if (!exists) {
+        return noStore({ error: 'Selected workspace does not exist. No job was created.', execution_allowed: false }, { status: 404 })
+      }
+      try { await workspace.listFiles(workspaceId) }
+      catch { console.warn('[builder_continuation_source_list_deferred]', { workspaceId }) }
+      // Claimed worker re-reads the existing workspace before making any edits.
     }
 
     await workspace.ensureWorkspace(workspaceId)

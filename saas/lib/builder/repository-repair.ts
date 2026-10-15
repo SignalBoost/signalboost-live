@@ -267,7 +267,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
       // The reported failure may name a symbol or diagnostic but not its test path.
       // Search actual repository contents; do not pick an arbitrary passing suite.
       const terms = [...target.symbolHints, ...target.failureEvidence.flatMap(line =>
-        [...line.matchAll(/\\b(?:builder|cos|workspace|repository)_[a-z][a-z0-9_]{5,100}\\b/g)].map(match => match[0]))]
+        [...line.matchAll(/\b(?:builder|cos|workspace|repository)_[a-z][a-z0-9_]{5,100}\b/g)].map(match => match[0]))]
         .filter(term => term.length >= 8).slice(0, 4)
       const matches = new Set<string>()
       for (const term of terms) {

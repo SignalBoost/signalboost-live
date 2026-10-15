@@ -992,7 +992,7 @@ export function companyKnowledgeBlock(prompt:string):string {
   ].filter(Boolean).join('\n\n') + '\n\n'
 }
 
-export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:string|null;userId?:string|null;language?:string;privileged?:boolean;disableCache?:boolean}):Promise<COSFirstAnswerResult> {
+export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:string|null;userId?:string|null;language?:string;privileged?:boolean;disableCache?:boolean; inferenceLane?:'university_exam'}):Promise<COSFirstAnswerResult> {
   const startedAt = Date.now()
   const audience = cosAudience(input.privileged === true)
   const context = await retrieveInternalContext(input.prompt, input.userId, Boolean(input.privileged), audience)
@@ -1084,7 +1084,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   let reasonerFailureMessage: string | null = null
   const reasonerStartedAt = Date.now()
   const reasoned = await callCosReasoner({
-    usageContext:{ feature:interactiveReasonerFeature(input.prompt), purpose:'user_facing_response' },
+    usageContext:{ feature:input.inferenceLane === 'university_exam' ? 'university_exam' : interactiveReasonerFeature(input.prompt), purpose:input.inferenceLane === 'university_exam' ? 'independent_exam_response' : 'user_facing_response' },
     // INTERACTIVE SPEED (2026-09-27). This call runs under the 20s interactive model timeout
     // (COS_INTERACTIVE_MODEL_TIMEOUT_MS). With hidden thinking on, every owner question in Production
     // failed at ~22-28s with "Independent COS inference did not return an answer" and fell through to the

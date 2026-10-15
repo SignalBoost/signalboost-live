@@ -135,3 +135,27 @@ test('background execution is idempotently claimed and applies only validated so
   assert.match(jobRunner, /runDebugFileJob/)
   assert.match(jobRunner, /finishBuilderJob/)
 })
+
+test('repeated write_file(src/storage.js) acknowledges already-present bytes or advances to verification', async () => {
+  const { BuilderToolLoop } = await import('../lib/builder/tool-loop.ts')
+  const { InMemoryBuilderWorkspace } = await import('../lib/builder/workspace.ts')
+  const workspace = new InMemoryBuilderWorkspace()
+  const workspaceId = 'idempotent-write'
+  const content = 'module.exports = { save: () => true }\\n'
+  await workspace.writeFile(workspaceId, 'src/storage.js', content)
+  let calls = 0
+  const actions = [
+    JSON.stringify({ type: 'tool', toolId: 'write_file', input: { path: 'src/storage.js', content } }),
+    JSON.stringify({ type: 'tool', toolId: 'write_file', input: { path: 'src/storage.js', content } }),
+    JSON.stringify({ type: 'answer', answer: 'Source is present.' }),
+  ]
+  const result = await new BuilderToolLoop({
+    async generate() { return actions[calls++] || actions[2] },
+  }, workspace, { async run() { return { exitCode: 0, stdout: '# pass 1\\n# fail 0', stderr: '', timedOut: false } } }).run({
+    workspaceId, objective: 'Inspect src/storage.js and ensure the storage implementation is present.',
+    maxRounds: 7,
+  })
+  assert.ok(calls <= 7)
+  assert.ok(result.trace.some(item => item.toolId === 'write_file' && item.ok))
+  assert.ok(!result.trace.some(item => String(item.error || '').startsWith('builder_write_conflict:')))
+})

@@ -135,3 +135,11 @@ test('owner Assistant polls a single accepted Builder job for eight minutes with
   assert.match(transport, /const BUILDER_JOB_POLL_DELAY_MS = 2_000/)
   assert.match(transport, /\/api\/builder\?jobId=/)
 })
+
+test('lost COS POST transport performs read-only History recovery before showing failure', () => {
+  const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
+  assert.match(client, /recoverAssistantReplyFromHistory\(userText, startedAt/)
+  assert.match(client, /args\.target === 'cos' && conversationId && userText/)
+  assert.match(client, /source: 'cos-transport-history-recovery'/)
+  assert.ok(client.indexOf('recoverAssistantReplyFromHistory(userText, startedAt') < client.indexOf("source: 'assistant-transport-unconfirmed'"))
+})

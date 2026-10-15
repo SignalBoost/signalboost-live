@@ -481,7 +481,6 @@ export function freshEvidenceSearchQuery(input: string, now = new Date()): strin
   // Preserve their proper names and avoid appending election/news-style freshness terms, which
   // can swamp the subject and return generic results instead of primary documentation.
   const isDefinitionLookup = /^(?:what(?:'s| is| are)|explain|define|how does|how do|tell me about|describe)\b/i.test(raw)
-    && /\b(?:tool|project|platform|framework|library|software|package|api|sdk|app|application|system|technology|works?|used for|mean|refers to|what is|how does)\b/i.test(raw)
     && !/\b(?:today|latest|currently|current|recent|newest|released|version|price|cost|election|president|ceo|weather|stock)\b/i.test(raw)
   if (isDefinitionLookup) return raw.replace(/\s+/g, ' ').slice(0, 180)
   // Short lookups pass through intact — the phrasing IS the query ("who is the president of X").

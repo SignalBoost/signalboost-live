@@ -182,7 +182,7 @@ test('Cursor-style Builder loop acknowledges duplicate src/storage.js write and 
   assert.equal(persisted?.content, content)
   assert.equal(result.trace.filter(item => item.toolId === 'write_file' && item.ok).length, 2,
     'initial write and idempotent acknowledgement are both recorded')
-  assert.equal(result.trace.filter(item => item.toolId === 'write_file' && item.output && 'alreadyApplied' in item.output).length, 1)
+  assert.equal(result.trace.filter(item => item.toolId === 'write_file' && (item.output as { alreadyApplied?: boolean } | undefined)?.alreadyApplied === true).length, 1)
   assert.ok(executed >= 1, 'verification must execute, not merely be suggested')
   assert.ok(called <= 12, 'model calls remain bounded')
 })

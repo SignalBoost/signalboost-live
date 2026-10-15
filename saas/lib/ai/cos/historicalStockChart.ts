@@ -75,13 +75,34 @@ export function parseStooqHistory(raw: unknown): StockPricePoint[] | null {
   return points.length >= 3 ? points : null
 }
 
-function stooqWindow(range: StockChartRange) {
-  const today = new Date()
+function stooqWindow(range: StockChartRange, now = new Date()) {
+  const today = new Date(now)
   const from = new Date(today)
   const months = range === '1mo' ? 1 : range === '3mo' ? 3 : range === '6mo' ? 6 : range === '1y' ? 12 : 60
   from.setUTCMonth(from.getUTCMonth() - months)
   const stamp = (date: Date) => date.toISOString().slice(0,10).replace(/-/g,'')
   return { from: stamp(from), to: stamp(today) }
+}
+
+const RANGE_DAYS: Record<StockChartRange, number> = { '1mo': 30, '3mo': 91, '6mo': 183, '1y': 365, '5y': 1826 }
+
+/** Dated evidence must represent the requested horizon, not a small cluster
+ * of current observations wrongly described as months of stock history.
+ * Account for weekends/holidays; fail safely for delisted/thin series.
+ */
+export function verifyHistoricalPriceCoverage(series: HistoricalPrices, now = new Date()): {
+  ok: boolean
+  reason: 'ok' | 'insufficient_history' | 'stale_data' | 'future_data' | 'insufficient_observations'
+} {
+  if (series.points.length < 3) return {ok:false,reason:'insufficient_observations'}
+  const first = Date.parse(series.points[0].date+'T00:00:00Z')
+  const last = Date.parse(series.points[series.points.length-1].date+'T00:00:00Z')
+  const today = now.getTime()
+  const day = 86400_000
+  if (!Number.isFinite(first) || !Number.isFinite(last) || first > last || last > today + day) return {ok:false,reason:'future_data'}
+  if ((today-last)/day > 10) return {ok:false,reason:'stale_data'}
+  if ((last-first)/day < RANGE_DAYS[series.range]*0.67) return {ok:false,reason:'insufficient_history'}
+  return {ok:true,reason:'ok'}
 }
 
 /**
@@ -93,6 +114,7 @@ export async function loadHistoricalStockPrices(
   symbol: string,
   range: StockChartRange,
   fetchImpl: Fetcher = fetch,
+  now = new Date(),
 ): Promise<HistoricalPrices | null> {
   const ticker = String(symbol || '').toUpperCase()
   if (!ALLOWED_SYMBOL.test(ticker) || !ALLOWED_RANGES.has(range)) return null
@@ -107,7 +129,7 @@ export async function loadHistoricalStockPrices(
       fetchedAt: new Date().toISOString(),
     }
   }
-  const bounds = stooqWindow(range)
+  const bounds = stooqWindow(range, now)
   const stooq = new URL('https://stooq.com/q/d/l/')
   stooq.searchParams.set('s', ticker.toLowerCase() + '.us')
   stooq.searchParams.set('i', 'd')

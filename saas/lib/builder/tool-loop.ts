@@ -617,9 +617,10 @@ export class BuilderToolLoop {
       const meaningfulActions = [...trace].reverse().filter(item => !['list_files', 'read_file', 'search_files', 'mcp_read'].includes(item.toolId) && (item.output as { alreadyPresent?: boolean } | undefined)?.alreadyPresent !== true)
       const staleActions = meaningfulActions.findIndex(item => item.ok || !/^(?:builder_repeated_tool_call:|builder_repair_mutation_required|builder_missing_deliverables|builder_verification_order_required|builder_write_content_differs:)/.test(String(item.error || '')))
       if ((staleActions < 0 ? meaningfulActions.length : staleActions) >= 10) return { ok: false, error: 'builder_stalled_repeated_inspection', trace }
-      const deniedInspections = trace.filter(item => ['list_files', 'read_file', 'search_files', 'mcp_read'].includes(item.toolId)
-        && String(item.error || '').startsWith('builder_repeated_tool_call:')).length
-      if (deniedInspections >= 4) return { ok: false, error: 'builder_repeated_inspection_blocked: inspect a different file or run verification', trace }
+      // Do not terminally fail on inspection refusals accumulated across earlier
+      // workspace revisions. The repair-phase mutation restriction and the durable
+      // nonproductive-action budget below enforce progress without discarding a
+      // previously executed failing test or preventing its correction.
       const progress = builderTaskProgress(task, workspacePaths, trace)
       const pendingOrder = pendingBuilderVerificationOrder(verificationOrder, trace)
       // Explicit multi-test creation jobs are complete when the actual, post-write

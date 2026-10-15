@@ -162,3 +162,83 @@ test('a visitor without History stops watching after the first refused read', as
     assert.equal(historyReads, 1)
   } finally { restore() }
 })
+
+
+test('homepage recovers a completed edit from History after an HTTP 504 gateway response', async () => {
+  const sentAt = Date.now()
+  const calls: string[] = []
+  const restore = installBrowser((url, init) => {
+    calls.push((init?.method || 'GET') + ' ' + url)
+    if (init?.method === 'POST') return Promise.resolve(new Response(
+      JSON.stringify({ reply: 'The page stopped waiting before it received the COS response.', source: 'concierge-browser-deadline' }),
+      { status: 504 },
+    ))
+    return Promise.resolve(new Response(JSON.stringify(storedHistory(sentAt, 'Professionally edited answer.')), { status: 200 }))
+  })
+  try {
+    const response = await postWithAgentProgress({ target: 'concierge', body: body(), signal: new AbortController().signal, onProgress: () => undefined })
+    assert.equal(response.ok, true)
+    assert.equal(response.data.source, 'cos-transport-history-recovery')
+    assert.equal(response.data.reply, 'Professionally edited answer.')
+    assert.equal(calls.filter(call => call.startsWith('POST ')).length, 1)
+    assert.equal(calls.filter(call => call.startsWith('GET ')).length, 1)
+  } finally { restore() }
+})
+
+test('timeout error envelope with HTTP 200 cannot hide the saved answer', async () => {
+  const sentAt = Date.now()
+  const restore = installBrowser((_url, init) => {
+    if (init?.method === 'POST') return Promise.resolve(new Response(JSON.stringify({
+      ok: false,
+      reply: 'The page stopped waiting before it received the COS response. It could not confirm whether the server completed the request. Check History before retrying an action to avoid duplicates.',
+      source: 'assistant-transport-unconfirmed',
+    }), { status: 200 }))
+    return Promise.resolve(new Response(JSON.stringify(storedHistory(sentAt, 'The saved edit.')), { status: 200 }))
+  })
+  try {
+    const response = await postWithAgentProgress({ target: 'cos', body: body(), signal: new AbortController().signal, onProgress: () => undefined })
+    assert.equal(response.ok, true)
+    assert.equal(response.data.reply, 'The saved edit.')
+    assert.equal(response.data.source, 'cos-transport-history-recovery')
+  } finally { restore() }
+})
+
+test('no unauthorized History means a lost response stays truthful and is never replayed', async () => {
+  let posts = 0
+  let reads = 0
+  const restore = installBrowser((_url, init) => {
+    if (init?.method === 'POST') {
+      posts += 1
+      return Promise.resolve(new Response(JSON.stringify({ error: 'gateway_timeout' }), { status: 504 }))
+    }
+    reads += 1
+    return Promise.resolve(new Response(JSON.stringify({ error: 'Not authenticated' }), { status: 401 }))
+  })
+  try {
+    const response = await postWithAgentProgress({ target: 'concierge', body: body(), signal: new AbortController().signal, onProgress: () => undefined })
+    assert.equal(response.ok, false)
+    assert.equal(response.status, 504)
+    assert.equal(posts, 1)
+    assert.equal(reads, 1)
+  } finally { restore() }
+})
+
+test('a successful model response is shown without waiting for History or a second POST', async () => {
+  let posts = 0
+  let reads = 0
+  const restore = installBrowser((_url, init) => {
+    if (init?.method === 'POST') {
+      posts += 1
+      return Promise.resolve(new Response(JSON.stringify({ ok:true, reply:'Finished edit.' }), { status: 200 }))
+    }
+    reads += 1
+    return Promise.resolve(new Response(JSON.stringify({messages:[]}), { status: 200 }))
+  })
+  try {
+    const response = await postWithAgentProgress({ target: 'concierge', body: body(), signal: new AbortController().signal, onProgress: () => undefined })
+    assert.equal(response.ok, true)
+    assert.equal(response.data.reply, 'Finished edit.')
+    assert.equal(posts, 1)
+    assert.equal(reads, 0)
+  } finally { restore() }
+})

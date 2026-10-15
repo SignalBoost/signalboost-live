@@ -15,6 +15,7 @@ import LabCustomerResponseComparison from './LabCustomerResponseComparison.tsx'
 import LabCustomerTrainingAdvisor from './LabCustomerTrainingAdvisor.tsx'
 import LabCustomerRunTimeline from './LabCustomerRunTimeline.tsx'
 import LabCustomerFailureGuidance from './LabCustomerFailureGuidance.tsx'
+import LabOrganizationDiagnostics from './LabOrganizationDiagnostics.tsx'
 import LabCustomerHoldoutEvaluation from './LabCustomerHoldoutEvaluation.tsx'
 
 type Org = { organizationId: string; organizationName: string; experimentId: string; projectName: string; role: string }
@@ -384,6 +385,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
         ) : <span aria-label={copy.workspaceSelectorLabel} className="rounded border border-white/20 px-3 py-2 text-sm text-slate-300">{copy.workspaceSelectorLabel}: {org?.organizationName === copy.title ? copy.defaultWorkspaceName : (org?.organizationName || copy.defaultWorkspaceName)}</span>}
       </header>
       {message && <p role={message.kind} className="text-sm">{message.text}</p>}
+      {canManage && org && <LabOrganizationDiagnostics key={org.organizationId} organizationId={org.organizationId} language={language} />}
 
       <div className="space-y-2">
         <h3 className="font-medium">{copy.keysHeading}</h3>

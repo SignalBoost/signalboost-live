@@ -326,6 +326,7 @@ const tests = [
   'tests/builderModelTimeoutVerification.node.test.ts',
   'tests/builderRunpodSharedHealth.node.test.ts',
   'tests/builderPollResume.node.test.ts',
+  'tests/builderPersonJobsFirst.node.test.ts',
   'tests/builderWorkBudget.node.test.ts',
   'tests/builderStandardCapacityRecovery.node.test.ts',
   'tests/builderCapacityStatusContract.node.test.ts',

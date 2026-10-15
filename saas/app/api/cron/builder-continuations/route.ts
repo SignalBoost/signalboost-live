@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { BUILDER_JOB_STALE_AFTER_MS, listBuilderContinuations } from '@/lib/builder/job-store'
+import { BUILDER_JOB_STALE_AFTER_MS, listBuilderContinuations, personStartedFirst } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { retryFailedOwnedAuditEngineRepair } from '@/self-healing-host/owned-audit-self-healing'
@@ -58,7 +58,8 @@ async function queuedCapacityRecovery(): Promise<{ id: string; userId: string } 
     return null
   }
   const now = Date.now()
-  const due = (data || []).find(job => {
+  // A person's build goes before background Self-Healing work in the same cooled-down queue.
+  const due = personStartedFirst(data || []).find(job => {
     const deferredAt = Date.parse(String(job.updated_at || ''))
     const attempts = Number(job.metadata?.builderCapacityDeferrals || 1)
     return Number.isFinite(deferredAt) && now - deferredAt >= builderCapacityRetryDelayMs(attempts)

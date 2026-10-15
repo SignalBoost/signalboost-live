@@ -1060,7 +1060,9 @@ export class BuilderToolLoop {
           const files = (await Promise.all(listed.map(file => this.workspace.readFile(input.workspaceId, file.path))))
             .filter((file): file is BuilderFile => file !== null)
           const proofFile = files.find(file => /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(file.path))
-          const observedFailedCommand = trace.find(item => isExecutedBuilderRun(item) && !item.ok)?.input.command
+          // A failed diagnostic (git log on a missing path, ls) is not the reproduction; prefer the failed proving command.
+          const observedFailedCommand = trace.find(item => isExecutedBuilderRun(item) && !item.ok && isBuilderTestRunnerCommand(item.input.command))?.input.command
+            ?? trace.find(item => isExecutedBuilderRun(item) && !item.ok)?.input.command
           const proofCommand = (typeof observedFailedCommand === 'string' ? observedFailedCommand : '')
             || (projectContext.manifestPath ? projectContext.recommendedTestCommand : '')
             || (proofFile ? `node --experimental-strip-types --test ${proofFile.path}` : '')

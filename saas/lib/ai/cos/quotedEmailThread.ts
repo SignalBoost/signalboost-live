@@ -38,6 +38,46 @@ function quotedThreadBoundary(lines: string[]): number | null {
   return null
 }
 
+// Production 2026-10-15: "edit - Thank you Tim, … in Managua. See below. It looks like you need to
+// send them a TA.\n\nTim\nTimothy Hinman\n…" — the user pasted his reply, then the message he is
+// replying to (Tim's note, on the same line), then Tim's signature, then the older thread. Tim's
+// note was edited as if the user wrote it. When the draft addresses a person by name and that
+// person's signature block (first name, then a full name beginning with it) appears below, the
+// addressee's note and signature are reference context. The note starts at a forwarding opener
+// ("See below", "FYI", …) when one precedes the signature; otherwise only the signature moves.
+const SIGNATURE_FIRST_NAME_RE = /^\p{Lu}\p{Ll}{1,19}$/u
+const SIGNATURE_FULL_NAME_RE = /^\p{Lu}\p{Ll}+(?:\s+\p{Lu}[\p{L}'.-]*){1,3}$/u
+const FORWARDING_OPENER_RE = /(?:^|[.!?]\s+|\n\s*)((?:please\s+)?see\s+(?:below|(?:the\s+)?(?:e-?mail|message|note|thread)\s+below|attached)|fyi\b|forwarding\b)/giu
+const ADDRESS_WINDOW_CHARS = 80
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function addresseeReplyStart(text: string): number | null {
+  const lines = text.split('\n')
+  let offset = 0
+  for (let index = 0; index < lines.length; offset += lines[index].length + 1, index += 1) {
+    const name = lines[index].trim()
+    if (index === 0 || !SIGNATURE_FIRST_NAME_RE.test(name)) continue
+    const following = lines.slice(index + 1, index + 5).map(line => line.trim()).filter(Boolean)
+    const fullName = following[0] || ''
+    if (!SIGNATURE_FULL_NAME_RE.test(fullName) || !fullName.split(/\s+/)[0].startsWith(name)) continue
+    // Only the signature of the person the draft is written to; the user's own signature stays.
+    const opening = text.slice(0, Math.min(offset, ADDRESS_WINDOW_CHARS))
+    if (!new RegExp(`(?:^|[^\\p{L}])${escapeRegExp(name)}(?:[^\\p{L}]|$)`, 'u').test(opening)) continue
+
+    const before = text.slice(0, offset)
+    let start = offset
+    for (const match of before.matchAll(FORWARDING_OPENER_RE)) {
+      const openerIndex = (match.index ?? 0) + match[0].indexOf(match[1])
+      if (before.slice(0, openerIndex).trim()) start = openerIndex
+    }
+    return start
+  }
+  return null
+}
+
 /**
  * Separate the user's draft from quoted/forwarded mail. The draft is the only text that may be
  * rewritten. The quoted thread is retained as read-only reference context so the editor can
@@ -50,10 +90,15 @@ export function splitQuotedEmailThread(sourceText: string): TextTransformationSo
 
   const lines = source.split('\n')
   const boundary = quotedThreadBoundary(lines)
-  if (boundary === null) return { editableSource: source, referenceContext: null }
+  let editableSource = boundary === null ? source : lines.slice(0, boundary).join('\n').trim()
+  let referenceContext = boundary === null ? '' : lines.slice(boundary).join('\n').trim()
 
-  const editableSource = lines.slice(0, boundary).join('\n').trim()
-  const referenceContext = lines.slice(boundary).join('\n').trim()
+  const replyStart = addresseeReplyStart(editableSource)
+  if (replyStart !== null) {
+    const addresseeReply = editableSource.slice(replyStart).trim()
+    editableSource = editableSource.slice(0, replyStart).trim()
+    referenceContext = [addresseeReply, referenceContext].filter(Boolean).join('\n\n')
+  }
   return {
     editableSource,
     referenceContext: referenceContext || null,

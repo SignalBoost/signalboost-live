@@ -135,3 +135,35 @@ test('a draft to a recipient may contain questions and still takes the edit lane
   assert.equal(isFastTextTransform('edit - what are CAPs?'), false)
   assert.equal(isFastTextTransform('edit - I think they are called CAPs. Is that the right term?'), false)
 })
+
+// Production 2026-10-15: "edit - Thank you Tim, … in Managua. See below. It looks like you need to
+// send them a TA.\n\nTim\nTimothy Hinman …" — Tim's note (same line as the draft) and his signature
+// were edited as the user's own words. The addressee's note and signature are reference context.
+test('the addressee note and signature below the draft are reference, not the user draft', () => {
+  const pasted = [
+    'edit - Thank you Sam, shall I send you the form and you forward it to them? - as those are my costs. See below. It looks like you need to send them a form.',
+    '',
+    'Sam',
+    '',
+    'Samuel Example',
+    'Office Chief',
+    'Teams: +1 555-010-0000',
+    '',
+    'SBU - PRIVACY OR PII',
+    'From: Reviewer, Alex <alex@example.org>',
+    'Sent: Thursday, October 15, 2026 9:32 AM',
+    'To: Sam Example <sam@example.org>',
+    'Subject: Form',
+  ].join('\n')
+  const split = splitQuotedEmailThread(pasted)
+  assert.equal(split.editableSource, 'edit - Thank you Sam, shall I send you the form and you forward it to them? - as those are my costs.')
+  assert.match(String(split.referenceContext), /^See below\. It looks like you need to send them a form\.\n+Sam\n+Samuel Example[\s\S]*From: Reviewer, Alex/)
+  // The user's own signature is never moved: it is not the addressee's.
+  assert.equal(splitQuotedEmailThread('edit - Hi Sam, see you soon.\n\nThanks,\nLuis\nLuis Example').referenceContext, null)
+})
+
+// Codex review on #4495: a closing courtesy must not turn a request for an explanation into an edit.
+test('a sign-off alone does not protect a request for an explanation', () => {
+  assert.equal(isFastTextTransform('edit - I received a CAP notice. Can you explain what it means? Thanks'), false)
+  assert.equal(isFastTextTransform('edit - Hi Sam, can you explain what the notice means? Thanks'), true)
+})

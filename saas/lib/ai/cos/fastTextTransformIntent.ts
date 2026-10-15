@@ -41,9 +41,15 @@ const DRAFT_GREETING = /^\s*(?:hi|hello|hey|dear|good\s+(?:morning|afternoon|eve
 const DRAFT_SIGN_OFF = /(?:^|\n|[.!?]\s+)(?:thank\s+you|thanks|regards|best(?:\s+regards)?|sincerely|cheers|kind\s+regards|respectfully|gracias|obrigad[oa]|dzi[eę]kuj[eę]|спасибо)\b[^\n]{0,40}$/imu
 const NAMED_OWN_DRAFT = /^\s*(?:my|this|the\s+following)\s+(?:reply|response|email|e-mail|message|note|text|draft|answer|letter)\b/i
 
+// A closing courtesy alone is weak evidence: "I received a CAP notice. Can you explain what it
+// means? Thanks" asks COS for an explanation. Without a greeting or a named draft, a sign-off
+// protects only questions that ask the recipient to act, never a request for an explanation.
+const INFORMATION_REQUEST = /\b(?:explain|tell\s+me|what\s+(?:it|this|that)\s+means|what\s+(?:does|do)\b[^\n?]{0,60}\bmean|meaning\s+of)\b/i
+
 function looksLikeDraftToRecipient(payload: string): boolean {
   const value = String(payload || '').trim()
-  return NAMED_OWN_DRAFT.test(value) || DRAFT_GREETING.test(value) || DRAFT_SIGN_OFF.test(value)
+  if (NAMED_OWN_DRAFT.test(value) || DRAFT_GREETING.test(value)) return true
+  return DRAFT_SIGN_OFF.test(value) && !INFORMATION_REQUEST.test(value)
 }
 
 function looksLikeNewQuestion(text: string): boolean {

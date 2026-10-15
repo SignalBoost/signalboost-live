@@ -1350,6 +1350,17 @@ export class BuilderToolLoop {
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'builder_tool_failed'
+        if (action.toolId === 'edit_file' && message === 'builder_edit_target_not_found') {
+          const path = toolPath(action.input)
+          const recent = trace.filter(item => item.toolId === 'edit_file'
+            && toolPath(item.input) === path && item.error === message)
+          if (recent.length >= 2) return { ok: false, error: 'builder_edit_target_recovery_exhausted', trace }
+          const current = await this.workspace.readFile(input.workspaceId, path)
+          if (current) {
+            workingFiles.set(path, current)
+            trace.push({ round, toolId: 'read_file', input: { path }, ok: true, output: summarize(current) })
+          }
+        }
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: message, ...diagnose(message, workspacePaths) })
       }
     }

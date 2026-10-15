@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { conciergeBuilderRequest } from '../lib/ai/cos/agentProgressClient.ts'
+import { conciergeBuilderRequest, isReplaySafeConciergeEdit, postWithAgentProgress, sendReplaySafeEditAfterTransportLoss } from '../lib/ai/cos/agentProgressClient.ts'
 
 test('Concierge and owner COS consume observable request progress instead of timer-only stages', () => {
   const concierge = readFileSync(new URL('../components/Concierge.tsx', import.meta.url), 'utf8')
@@ -142,4 +142,68 @@ test('lost COS POST transport performs read-only History recovery before showing
   assert.match(client, /args\.target === 'cos' && conversationId && userText/)
   assert.match(client, /source: 'cos-transport-history-recovery'/)
   assert.ok(client.indexOf('recoverAssistantReplyFromHistory(userText, startedAt') < client.indexOf("source: 'assistant-transport-unconfirmed'"))
+})
+
+test('safe retry eligibility is limited to plain text rewrites without attachments', () => {
+  const body = (content: string, attachments: any[] = []) => ({ messages: [{ role: 'user', content }], attachments })
+  assert.equal(isReplaySafeConciergeEdit(body('edit - Please make this sentence clearer.')), true)
+  assert.equal(isReplaySafeConciergeEdit(body('edit - Please make this clearer.', [{name:'file.txt'}])), false)
+  assert.equal(isReplaySafeConciergeEdit(body('Deploy this app.')), false)
+})
+
+test('lost reply to plain text edit can be recovered by a bounded retry', async () => {
+  let calls = 0
+  const result = await sendReplaySafeEditAfterTransportLoss(async () => {
+    calls += 1
+    if (calls === 1) throw new Error('network interrupted')
+    return Response.json({ reply: 'Edited text.' })
+  }, true, new AbortController().signal)
+  assert.equal((await result.json()).reply, 'Edited text.')
+  assert.equal(calls, 2)
+})
+
+test('non-edit requests and aborted edits never retry', async () => {
+  for (const allow of [false, true]) {
+    const abort = new AbortController()
+    if (allow) abort.abort()
+    let calls = 0
+    await assert.rejects(sendReplaySafeEditAfterTransportLoss(async () => {
+      calls += 1
+      throw new Error('disconnected')
+    }, allow, abort.signal))
+    assert.equal(calls, 1)
+  }
+})
+
+test('public COS browser client delivers the recovered edited reply', async () => {
+  const previousFetch = globalThis.fetch
+  const previousWindow = (globalThis as any).window
+  let sends = 0
+  ;(globalThis as any).window = { setInterval: () => 1, clearInterval: () => {} }
+  globalThis.fetch = (async () => {
+    sends += 1
+    if (sends === 1) throw new Error('network interrupted')
+    return Response.json({ reply: 'Improved wording.' })
+  }) as typeof fetch
+  try {
+    const result = await postWithAgentProgress({
+      target: 'concierge',
+      body: { messages: [{ role: 'user', content: 'edit - Make this better please.' }], context: { language: 'en' } },
+      signal: new AbortController().signal,
+      onProgress: () => {},
+    })
+    assert.equal(result.data.reply, 'Improved wording.')
+    assert.equal(result.ok, true)
+    assert.equal(sends, 2)
+  } finally {
+    globalThis.fetch = previousFetch
+    ;(globalThis as any).window = previousWindow
+  }
+})
+
+test('both COS and Concierge use text-only recovery while Builder never does', () => {
+  const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
+  assert.match(client, /!builderRequest && isReplaySafeConciergeEdit\(requestBody\)/)
+  assert.match(client, /sendReplaySafeEditAfterTransportLoss/)
+  assert.match(client, /if \(deliberateAbort\(error, args\.signal\)\) throw error/)
 })

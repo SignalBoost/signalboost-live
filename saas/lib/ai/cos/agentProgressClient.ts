@@ -72,6 +72,33 @@ function latestUserText(body: Record<string, any>): string {
   return ''
 }
 
+/**
+ * Retry only explicit, standalone text rewrites that carry no attachments or action.
+ * These are pure content transformations; Builder, tooling and general requests must
+ * never be POSTed twice after transport loss.
+ */
+export function isReplaySafeConciergeEdit(body: unknown): boolean {
+  const record = bodyRecord(body)
+  if (!record || (Array.isArray(record.attachments) && record.attachments.length > 0)) return false
+  const prompt = latestUserText(record)
+  return /^(?:(?:please|could you|can you)\s+)?(?:edit|proofread|polish|rewrite|rephrase|correct\s+grammar|fix\s+grammar)\s*[-:–—]\s*[\s\S]{8,}$/i.test(prompt)
+}
+
+export async function sendReplaySafeEditAfterTransportLoss(
+  send: () => Promise<Response>,
+  canRetry: boolean,
+  signal: AbortSignal,
+  onRetry: () => void = () => {},
+): Promise<Response> {
+  try {
+    return await send()
+  } catch (error) {
+    if (!canRetry || signal.aborted) throw error
+    onRetry()
+    return send()
+  }
+}
+
 function transportFailureReply(body: unknown): string {
   const record = bodyRecord(body)
   const locale = String(record?.context?.language || 'en').toLowerCase() as keyof typeof ASSISTANT_TRANSPORT_TIMEOUT_COPY
@@ -254,7 +281,7 @@ export async function postWithAgentProgress(args: {
   let response: Response
   try {
     try {
-      response = await fetch(endpoint, {
+      const sendOnce = () => fetch(endpoint, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -265,6 +292,15 @@ export async function postWithAgentProgress(args: {
         body: JSON.stringify(requestBody),
         signal: responseSignal,
       })
+      // If the server finished but the browser lost the POST response, never replay
+      // a possible action. A text-only edit is the sole exception: it has no
+      // external side effect and must not strand the visitor with transport copy.
+      response = await sendReplaySafeEditAfterTransportLoss(
+        sendOnce,
+        !builderRequest && isReplaySafeConciergeEdit(requestBody),
+        responseSignal,
+        () => report('running', 'Recovering an interrupted text edit'),
+      )
     } catch (error) {
       if (args.signal.aborted) throw error
       if (boundedPublicTransport && responseSignal.aborted) {

@@ -76,3 +76,52 @@ test('V2 agent does not accept unverified success from the model', async () => {
   assert.equal(outcome.ok, false)
   assert.equal(outcome.reason, 'builder_v2_unverified_completion')
 })
+
+test('V2 resumes from a verified workspace checkpoint without replaying source writes', async () => {
+  const { BuilderV2Agent } = await import('../lib/builder/agent-v2.ts')
+  const workspace = new InMemoryBuilderWorkspace()
+  let tests = 0
+  const runner = { async run() { tests++; return { exitCode: 0, stdout: 'pass', stderr: '', timedOut: false } } }
+  const dispatcher = new BuilderV2Dispatcher(workspace, runner)
+  const actions = [
+    { type: 'tool', action: { tool: 'write_file', path: 'src/storage.js', content: 'saved' } },
+    { type: 'tool', action: { tool: 'run_tests', command: 'node --test' } },
+    { type: 'finish', summary: 'verified after resume' },
+  ]
+  let cursor = 0
+  const ai = { async generate() { return JSON.stringify(actions[cursor++]) } }
+  let checkpoint: import('../lib/builder/agent-v2.ts').BuilderV2Checkpoint | undefined
+  const first = await new BuilderV2Agent(ai, dispatcher, workspace).run({
+    workspaceId: 'w', objective: 'Implement storage', maxSteps: 2,
+    onCheckpoint: async value => { checkpoint = value },
+  })
+  assert.equal(first.reason, 'builder_v2_step_budget')
+  assert.ok(checkpoint)
+  const resumed = await new BuilderV2Agent(ai, dispatcher, workspace).run({
+    workspaceId: 'w', objective: 'Implement storage', maxSteps: 3, checkpoint,
+  })
+  assert.equal(resumed.ok, true)
+  assert.equal(tests, 1)
+  assert.equal(resumed.steps.length, 2)
+})
+
+test('V2 refuses to resume after workspace changed outside the agent', async () => {
+  const { BuilderV2Agent } = await import('../lib/builder/agent-v2.ts')
+  const workspace = new InMemoryBuilderWorkspace()
+  const dispatcher = new BuilderV2Dispatcher(workspace, { async run() {
+    return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+  } })
+  let checkpoint: import('../lib/builder/agent-v2.ts').BuilderV2Checkpoint | undefined
+  const ai = { async generate() {
+    return JSON.stringify({ type: 'tool', action: { tool: 'write_file', path: 'a.js', content: 'first' } })
+  } }
+  await new BuilderV2Agent(ai, dispatcher, workspace).run({
+    workspaceId: 'w', objective: 'Build example', maxSteps: 1,
+    onCheckpoint: async value => { checkpoint = value },
+  })
+  await workspace.writeFile('w', 'a.js', 'changed')
+  const result = await new BuilderV2Agent(ai, dispatcher, workspace).run({
+    workspaceId: 'w', objective: 'Build example', checkpoint,
+  })
+  assert.equal(result.reason, 'builder_v2_checkpoint_workspace_changed')
+})

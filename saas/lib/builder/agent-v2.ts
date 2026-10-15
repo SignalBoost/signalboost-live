@@ -1,5 +1,18 @@
-import type { BuilderAiPort } from './contracts.ts'
+import type { BuilderAiPort, BuilderWorkspacePort } from './contracts.ts'
+import { checkpointDigest, workspaceDigest } from './checkpoint.ts'
 import { BuilderV2Dispatcher, type BuilderV2Action, type BuilderV2Receipt } from './agent-v2-dispatcher.ts'
+
+export type BuilderV2Checkpoint = Readonly<{
+  version: 2
+  workspaceId: string
+  objectiveDigest: string
+  workspaceDigest: string
+  steps: readonly BuilderV2Receipt[]
+  revision: number
+  verifiedRevision: number
+  unproductive: number
+  lastReceipt: string
+}>
 
 type Decision = Readonly<{ type: 'tool'; action: BuilderV2Action }> | Readonly<{ type: 'finish'; summary: string }>
 export type BuilderV2Outcome = Readonly<{
@@ -7,6 +20,7 @@ export type BuilderV2Outcome = Readonly<{
   reason: string
   steps: readonly BuilderV2Receipt[]
   summary?: string
+  checkpoint?: BuilderV2Checkpoint
 }>
 
 function parseDecision(value: string | null): Decision | null {
@@ -33,22 +47,42 @@ function parseDecision(value: string | null): Decision | null {
  * allows completion. A no-op write cannot mint progress indefinitely.
  */
 export class BuilderV2Agent {
-  constructor(private readonly ai: BuilderAiPort, private readonly dispatcher: BuilderV2Dispatcher) {}
+  constructor(private readonly ai: BuilderAiPort, private readonly dispatcher: BuilderV2Dispatcher, private readonly workspace?: BuilderWorkspacePort) {}
 
   async run(options: {
     workspaceId: string
     objective: string
     maxSteps?: number
     signal?: AbortSignal
+    checkpoint?: BuilderV2Checkpoint
+    onCheckpoint?: (checkpoint: BuilderV2Checkpoint) => Promise<void>
   }): Promise<BuilderV2Outcome> {
-    const steps: BuilderV2Receipt[] = []
+    const saved = options.checkpoint
+    if (saved) {
+      if (!this.workspace || saved.version !== 2 || saved.workspaceId !== options.workspaceId || saved.objectiveDigest !== checkpointDigest(options.objective)) {
+        return { ok: false, reason: 'builder_v2_checkpoint_scope_mismatch', steps: [] }
+      }
+      if (saved.workspaceDigest !== await workspaceDigest(this.workspace, options.workspaceId)) {
+        return { ok: false, reason: 'builder_v2_checkpoint_workspace_changed', steps: [] }
+      }
+      if (!Array.isArray(saved.steps) || saved.steps.length > 120 || [saved.revision, saved.verifiedRevision, saved.unproductive].some(n => !Number.isSafeInteger(n) || n < -1 || n > 120)) {
+        return { ok: false, reason: 'builder_v2_checkpoint_invalid', steps: [] }
+      }
+    }
+    const steps: BuilderV2Receipt[] = [...(saved?.steps || [])]
     const maxSteps = Math.max(1, Math.min(options.maxSteps ?? 60, 120))
-    let revision = 0
-    let verifiedRevision = -1
-    let unproductive = 0
-    let lastReceipt = ''
-    for (let i = 0; i < maxSteps; i++) {
-      if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps }
+    let revision = saved?.revision ?? 0
+    let verifiedRevision = saved?.verifiedRevision ?? -1
+    let unproductive = saved?.unproductive ?? 0
+    let lastReceipt = saved?.lastReceipt ?? ''
+    const snapshot = async (): Promise<BuilderV2Checkpoint | undefined> => this.workspace ? {
+      version: 2, workspaceId: options.workspaceId,
+      objectiveDigest: checkpointDigest(options.objective),
+      workspaceDigest: await workspaceDigest(this.workspace, options.workspaceId),
+      steps: [...steps], revision, verifiedRevision, unproductive, lastReceipt,
+    } : undefined
+    for (let i = steps.length; i < maxSteps; i++) {
+      if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
       let raw: string | null
       try {
         raw = await this.ai.generate({
@@ -81,8 +115,12 @@ export class BuilderV2Agent {
       lastReceipt = JSON.stringify(receipt).slice(0, 20_000)
       if (receipt.changed || decision.action.tool === 'run_tests' && receipt.ok) unproductive = 0
       else unproductive++
-      if (unproductive >= 6) return { ok: false, reason: 'builder_v2_no_progress', steps }
+      if (options.onCheckpoint) {
+        const checkpoint = await snapshot()
+        if (checkpoint) await options.onCheckpoint(checkpoint)
+      }
+      if (unproductive >= 6) return { ok: false, reason: 'builder_v2_no_progress', steps, checkpoint: await snapshot() }
     }
-    return { ok: false, reason: 'builder_v2_step_budget', steps }
+    return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
   }
 }

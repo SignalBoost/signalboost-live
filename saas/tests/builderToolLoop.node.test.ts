@@ -195,7 +195,7 @@ test('Builder recovers when the model replays a completed tool call', async () =
   ])
   const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Create hello.js and run it.', workspaceId: 'user:replay' })
   assert.equal(result.ok, true)
-  assert.equal(result.trace.some(item => String(item.error || '').startsWith('builder_repeated_tool_call:write_file')), true)
+  assert.equal(result.trace.some(item => item.toolId === 'write_file' && item.ok && (item.output as { alreadyPresent?: boolean } | undefined)?.alreadyPresent === true), true)
   assert.equal(result.trace.some(item => item.toolId === 'run' && item.ok), true)
 })
 

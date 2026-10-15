@@ -124,8 +124,8 @@ test('continuation retains cumulative round limits and refuses repeated writes',
   const resumed = await new BuilderToolLoop({ async generate() { return write } }, workspace, runner)
     .run({ objective: 'Create first.js and verify it.', workspaceId: 'budget', maxRounds: 2, checkpoint: first.checkpoint })
   assert.equal(resumed.ok, false)
-  assert.equal(resumed.trace.filter(item => item.toolId === 'write_file' && item.ok).length, 1)
-  assert.ok(resumed.trace.some(item => item.error?.startsWith('builder_repeated_tool_call:')))
+  assert.equal(resumed.trace.filter(item => item.toolId === 'write_file' && item.ok && (item.output as { alreadyPresent?: boolean } | undefined)?.alreadyPresent !== true).length, 1)
+  assert.ok(resumed.trace.some(item => item.toolId === 'write_file' && item.ok && (item.output as { alreadyPresent?: boolean } | undefined)?.alreadyPresent === true))
 })
 
 test('scheduler accepts only its secret and resumes only server-owned paused jobs', () => {

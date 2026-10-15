@@ -500,6 +500,41 @@ export class BuilderToolLoop {
     let browserCliStepCount = 0
     const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 64, 96))
     let workRounds = saved?.workRounds || 0
+    // Per-tool repeat budgets are independent of inspections. A file listing never
+    // resets a duplicate-write streak or turns a useful diagnostic into a loop.
+    const repeatedWriteLimit = 3
+    const reconcileRepeatedWrite = async (action: ToolAction, round: number): Promise<string | null> => {
+      if (action.toolId !== 'write_file') return null
+      const path = toolPath(action.input)
+      const existing = await this.workspace.readFile(input.workspaceId, path)
+      const proposed = action.input.content
+      const previous = trace.filter(item => item.toolId === 'write_file' && toolPath(item.input) === path
+        && (String(item.error || '').startsWith('builder_repeated_tool_call:') ||
+          String(item.error || '').startsWith('builder_write_content_differs:') ||
+          (item.output as { alreadyPresent?: boolean } | undefined)?.alreadyPresent === true))
+      if (previous.length >= repeatedWriteLimit) {
+        return 'builder_repeated_write_blocked:' + path + ': no new file change; use read_file, edit_file, or run'
+      }
+      // Complete writes can be acknowledged idempotently. Append chunks are
+      // not complete file contents and must never be compared as such.
+      if (existing && typeof proposed === 'string' && action.input.mode !== 'append' && existing.content === proposed) {
+        trace.push({ round, toolId: 'write_file', input: { path }, ok: true,
+          output: { path, alreadyPresent: true, bytes: Buffer.byteLength(existing.content) } })
+        return 'already_present'
+      }
+      if (existing && typeof proposed === 'string' && action.input.mode !== 'append') {
+        let offset = 0
+        while (offset < existing.content.length && offset < proposed.length
+          && existing.content[offset] === proposed[offset]) offset++
+        const error = 'builder_write_content_differs:' + path
+          + ':first_diff_offset=' + offset + ':existing_length=' + existing.content.length
+          + ':proposed_length=' + proposed.length
+        trace.push({ round, toolId: 'write_file', input: { path }, ok: false, error,
+          remediation: 'Read the current file or use edit_file for a targeted modification; do not repeat write_file. Run the requested tests if all deliverables are present.' })
+        return 'different'
+      }
+      return null
+    }
     let attempt = saved?.attempt || 0
     const pause = async (): Promise<BuilderLoopResult> => {
       const checkpoint: BuilderLoopCheckpoint = {
@@ -579,8 +614,12 @@ export class BuilderToolLoop {
       const lastTrace = trace.at(-1)
       // A model returning repeated denied actions is not productive work. This counter
       // uses the durable trace, so restarts cannot reset it and burn more GPU cycles.
-      const staleActions = [...trace].reverse().findIndex(item => item.ok || !/^(?:builder_repeated_tool_call:|builder_repair_mutation_required|builder_missing_deliverables|builder_verification_order_required)/.test(String(item.error || '')))
-      if ((staleActions < 0 ? trace.length : staleActions) >= 10) return { ok: false, error: 'builder_stalled_repeated_inspection', trace }
+      const meaningfulActions = [...trace].reverse().filter(item => !['list_files', 'read_file', 'search_files', 'mcp_read'].includes(item.toolId) && (item.output as { alreadyPresent?: boolean } | undefined)?.alreadyPresent !== true)
+      const staleActions = meaningfulActions.findIndex(item => item.ok || !/^(?:builder_repeated_tool_call:|builder_repair_mutation_required|builder_missing_deliverables|builder_verification_order_required|builder_write_content_differs:)/.test(String(item.error || '')))
+      if ((staleActions < 0 ? meaningfulActions.length : staleActions) >= 10) return { ok: false, error: 'builder_stalled_repeated_inspection', trace }
+      const deniedInspections = trace.filter(item => ['list_files', 'read_file', 'search_files', 'mcp_read'].includes(item.toolId)
+        && String(item.error || '').startsWith('builder_repeated_tool_call:')).length
+      if (deniedInspections >= 4) return { ok: false, error: 'builder_repeated_inspection_blocked: inspect a different file or run verification', trace }
       const progress = builderTaskProgress(task, workspacePaths, trace)
       const pendingOrder = pendingBuilderVerificationOrder(verificationOrder, trace)
       // Explicit multi-test creation jobs are complete when the actual, post-write
@@ -634,8 +673,10 @@ export class BuilderToolLoop {
         ? [...trace].reverse().find(item => item.toolId === 'run' && item.ok && isBuilderTestRunnerCommand(item.input.command))
         : undefined
       let consecutiveRepeatRejections = 0
-      for (let index = trace.length - 1; index >= 0
-        && String(trace[index].error || '').startsWith('builder_repeated_tool_call:'); index -= 1) consecutiveRepeatRejections += 1
+      for (const item of [...trace].reverse().filter(item => !['list_files', 'read_file', 'search_files', 'mcp_read'].includes(item.toolId))) {
+        if (!String(item.error || '').startsWith('builder_repeated_tool_call:')) break
+        consecutiveRepeatRejections += 1
+      }
       if (consecutiveRepeatRejections >= MAX_CONSECUTIVE_REPEAT_REJECTIONS) {
         return { ok: false, error: passingProofBeforeChange ? 'builder_regression_not_reproduced' : 'builder_stalled_repeated_inspection', trace }
       }
@@ -916,6 +957,9 @@ export class BuilderToolLoop {
 
       if (input.shouldPause?.(true)) return pause()
       if (blockedAction) {
+        const repeatedWrite = await reconcileRepeatedWrite(blockedAction, round)
+        if (repeatedWrite === 'already_present' || repeatedWrite === 'different') continue
+        if (repeatedWrite) return { ok: false, error: repeatedWrite, trace }
         trace.push({
           round,
           toolId: blockedAction.toolId,
@@ -1098,6 +1142,11 @@ export class BuilderToolLoop {
       }
       if ((mutation && completedMutations.has(fingerprint))
         || (action.toolId === 'run' && completedRunsInCurrentWorkspaceState.has(fingerprint))) {
+        if (action.toolId === 'write_file') {
+          const repeatedWrite = await reconcileRepeatedWrite(action, round)
+          if (repeatedWrite === 'already_present' || repeatedWrite === 'different') continue
+          if (repeatedWrite) return { ok: false, error: repeatedWrite, trace }
+        }
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
         continue
       }

@@ -132,7 +132,7 @@ export function isFastTextTransform(input:string, context:{previousAssistant?:st
 
 async function runFastTextTransform(input:string):Promise<{reply:string;reasonerLabel:string;reviewVerdict:string}|null>{
   const config=localInferenceConfigFromEnv()
-  const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\\.com/i.test(config.baseUrl)
+  const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\.com/i.test(config.baseUrl)
   // Production 2026-10-15: the dedicated GLM editor returned substantive
   // edits in 2-5s. DeepSeek/Qwen-first repeatedly exhausted 9s provider
   // deadlines, then the general COS fallback took another 20-30 seconds.

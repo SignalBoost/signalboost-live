@@ -1,2 +1,2 @@
-base_sha=b5c2b2ef7ce507b9df683508de2e087aa3d3b355
-branch=fix/builder-repair-durable-edits-20261015
+base_sha=6ff9e40e2114e3a575da27ace5e9b0d68ae5420b
+branch=feat/lab-holdout-leakage-20261015

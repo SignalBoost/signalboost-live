@@ -17,10 +17,21 @@ export async function observeLabRequest<T extends Response>(
   const started = Date.now()
   let status = 500
   let outcome: 'response' | 'exception' = 'exception'
+  let failureCode: string | null = null
   try {
     const response = await handler()
     status = response.status
     outcome = 'response'
+    // Capture only a strictly constrained machine-readable error code from the response.
+    // Never log provider bodies, error messages, tenant identifiers, or request content.
+    if (status >= 400) {
+      try {
+        const payload: unknown = await response.clone().json()
+        const code = payload && typeof payload === 'object' && !Array.isArray(payload)
+          ? (payload as Record<string, unknown>).error : null
+        if (typeof code === 'string' && /^lab_[a-z0-9_]{1,80}$/.test(code)) failureCode = code
+      } catch { /* Non-JSON errors are deliberately bucketed by status only. */ }
+    }
     // Response headers contain a correlation handle for a customer support report,
     // without exposing customer identifiers or sensitive request data.
     try { response.headers.set('x-lab-observation-id', observationId) } catch { /* immutable header */ }
@@ -37,6 +48,7 @@ export async function observeLabRequest<T extends Response>(
       outcome,
       durationMs,
       severity,
+      failureCode,
       environment: process.env.VERCEL_ENV === 'production' ? 'production' : 'nonproduction',
     }
     // Explicit structured console output is collected by Vercel Runtime Logs.

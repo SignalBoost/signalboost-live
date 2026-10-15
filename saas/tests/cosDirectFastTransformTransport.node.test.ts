@@ -94,11 +94,12 @@ test('the fast editor edits only the draft and receives the thread as read-only 
   assert.match(rest, /Please let us know if you have any questions or concerns\.\nCONTEXT$/)
   // A draft without a quoted thread is sent unchanged.
   assert.equal(fastTextTransformPrompt('edit - they came last week.'), 'edit - they came last week.')
-  // The primary fast lane sends the structured prompt, never the raw thread.
+  // Full-context editing is performed by COS, without rule-based draft extraction.
   const primary = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
-  assert.match(primary, /const fastPrompt=fastTextTransformPrompt\(input\)/)
-  assert.match(primary, /prompt:fastPrompt,/)
-  assert.doesNotMatch(primary, /feature:'cos_fast_text_transform'[\s\S]{0,900}prompt:input,/)
+  assert.match(primary, /userRequest:input/)
+  assert.match(primary, /prompt:input,/)
+  assert.doesNotMatch(primary, /const fastPrompt=fastTextTransformPrompt/)
+
 })
 
 // Owner report 2026-10-15 ("it did a terrible editing"): the edit returned the replied-to person's
@@ -133,5 +134,7 @@ test('the fast editor edits only the user draft and returns none of the replied-
   assert.match(FAST_TEXT_EDITOR_SYSTEM_PROMPT, /RETURN ONLY THE EDITED DRAFT/)
   assert.match(FAST_TEXT_EDITOR_SYSTEM_PROMPT, /Never add facts, promises/)
   const primary = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
-  assert.match(primary, /systemPrompt:FAST_TEXT_EDITOR_SYSTEM_PROMPT,/)
+  assert.match(primary, /systemPrompt:FAST_EDIT_AUTHOR_INSTRUCTIONS,/)
+  assert.match(primary, /systemPrompt:FAST_EDIT_REVIEW_INSTRUCTIONS,/)
+  assert.match(primary, /runSelfReviewedEdit\(/)
 })

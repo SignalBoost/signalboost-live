@@ -67,7 +67,8 @@ import { searchPastConversations } from '@/lib/ai/tools/conversationHistory'
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { reportLanguageName } from '@/lib/i18n/reportLanguage'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
-import { FAST_TEXT_EDITOR_SYSTEM_PROMPT, fastTextTransformPrompt, isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
+import { isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
+import { FAST_EDIT_AUTHOR_INSTRUCTIONS, FAST_EDIT_REVIEW_INSTRUCTIONS, runSelfReviewedEdit } from '@/lib/ai/cos/selfReviewTextEdit'
 import { looksLikeArtifactContinuation } from '@/lib/ai/cos/artifactContinuationIntent'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
@@ -133,36 +134,65 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
   const config=localInferenceConfigFromEnv()
   const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\.com/i.test(config.baseUrl)
   const preferredModel=process.env.COS_FAST_TEXT_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
+  // Review with a separately proven managed editor by default, rather than
+  // letting the fast drafting model rubber-stamp its own mistakes.
+  const reviewerModel=process.env.COS_FAST_TEXT_REVIEW_MODEL?.trim()||process.env.COS_DIRECT_TEXT_MODEL?.trim()||(deepInfra?'zai-org/GLM-5.3-Flash':config.model)
   const models=[...new Set([preferredModel,config.model].filter(Boolean))]
-  const fastPrompt=fastTextTransformPrompt(input)
   const startedAt=Date.now()
+  // Give the model the complete request. It must infer which parts are the
+  // user's draft and which parts are merely supporting context; regex-based
+  // email segmentation is not authorized to decide the scope of the edit.
   for(const model of models){
     const remaining=Math.max(0,FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt))
-    if(remaining<1_000)break
-    const attemptMs=Math.min(FAST_TEXT_TRANSFORM_ATTEMPT_MS,remaining)
-    const text=await callLocalModel({
-      temperature:.1,
-      maxTokens:768,
-      disableThinking:true,
-      timeoutMs:attemptMs,
-      allowConfiguredFallback:false,
-      persistUsage:false,
-      jsonObject:true,
-      usageContext:{feature:'cos_fast_text_transform',purpose:model===preferredModel?'fast_editor_primary':'fast_editor_retry'},
-      systemPrompt:FAST_TEXT_EDITOR_SYSTEM_PROMPT,
-      prompt:fastPrompt,
-    },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true}).catch(()=>null)
-    if(!text)continue
-    const parsed=parseLocalResult(text)
-    const reply=parsed?.answer?.trim()
-    if(reply){
+    if(remaining<3_000)break
+    const drafted=await runSelfReviewedEdit({
+      userRequest:input,
+      draft:async()=>{
+        const attemptMs=Math.min(FAST_TEXT_TRANSFORM_ATTEMPT_MS,Math.max(1_000,FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt)-2_000))
+        const raw=await callLocalModel({
+          temperature:.15,
+          maxTokens:950,
+          disableThinking:true,
+          timeoutMs:attemptMs,
+          allowConfiguredFallback:false,
+          persistUsage:false,
+          jsonObject:true,
+          usageContext:{feature:'cos_fast_text_transform',purpose:'fast_editor_primary'},
+          systemPrompt:FAST_EDIT_AUTHOR_INSTRUCTIONS,
+          prompt:input,
+        },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true}).catch(()=>null)
+        return raw?parseLocalResult(raw)?.answer?.trim()||null:null
+      },
+      review:async({userRequest,candidate})=>{
+        const timeLeft=FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt)
+        if(timeLeft<1_000)return null
+        const reviewMs=Math.min(7_000,timeLeft)
+        return await callLocalModel({
+          temperature:.08,
+          maxTokens:1050,
+          disableThinking:true,
+          timeoutMs:reviewMs,
+          allowConfiguredFallback:false,
+          persistUsage:false,
+          jsonObject:true,
+          usageContext:{feature:'cos_fast_text_transform',purpose:'fast_editor_quality_review'},
+          systemPrompt:FAST_EDIT_REVIEW_INSTRUCTIONS,
+          prompt:`FULL USER REQUEST:\\n${userRequest}\\n\\nEDITED DRAFT TO EVALUATE AND REPAIR:\\n${candidate}`,
+        },{...config,model:reviewerModel||model,timeoutMs:reviewMs,fallbackFromOwned:true}).catch(()=>null)
+      },
+    })
+    if(drafted){
+      console.info('[cos-fast-edit-quality]',{verdict:drafted.verdict,reviewed:true,model,reviewerModel:reviewerModel||model,latencyMs:Date.now()-startedAt})
       const provider=String(config.provider||'').trim()
       const reasonerLabel=provider&&provider!=='self_hosted'
-        ? `managed-open-model:${provider}:${model}`
-        : `independent-local:${model}`
-      return{reply,reasonerLabel}
+        ? `managed-open-model:${provider}:${reviewerModel||model}`
+        : `independent-local:${reviewerModel||model}`
+      return{reply:drafted.answer,reasonerLabel}
     }
   }
+  // An unreviewed draft must never be passed to the visitor as a success.
+  // The canonical COS editor can make another attempt with its own guards.
+  console.warn('[cos-fast-edit-quality]',{reviewed:false,reason:'no_reviewed_answer',latencyMs:Date.now()-startedAt})
   return null
 }
 

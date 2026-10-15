@@ -7,8 +7,8 @@ import { isOperationalLogEvidence, isPastedOperationalLog } from '@/lib/ai/cos/p
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
-import { enqueueBuilderJob, getBuilderJobForUser, readBuilderEvidenceJob } from '@/lib/builder/job-store'
-import { runBuilderJob } from '@/lib/builder/job-runner'
+import { builderNoRunningClaim, builderPollMayResume, enqueueBuilderJob, getBuilderJobForUser, readBuilderEvidenceJob } from '@/lib/builder/job-store'
+import { runBuilderJob, selfHealingCapacityJob } from '@/lib/builder/job-runner'
 import { hasWorkspaceSource, isOwnerRepairWithoutSource, parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
 import {
@@ -80,6 +80,11 @@ export async function GET(request: Request) {
       const job = await getBuilderJobForUser(jobId, access.userId)
       if (!job) return noStore({ error: 'Builder job not found.' }, { status: 404 })
       if (job.status === 'queued' || job.status === 'running' || job.status === 'paused') {
+        // The person watching resumes their paused checkpoint now instead of waiting for the next scheduler tick.
+        // Same admission as the scheduler (no other running claim); the generation-fenced claim lets only one start.
+        if (builderPollMayResume(job) && !selfHealingCapacityJob(job) && await builderNoRunningClaim()) {
+          after(async () => { await runBuilderJob(job.id, access.userId) })
+        }
         return noStore({
           jobId: job.id,
           workspaceId: job.workspaceId,

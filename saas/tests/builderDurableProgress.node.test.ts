@@ -11,5 +11,9 @@ test('polling exposes saved progress, without replaying jobs or leaking raw test
   assert.match(get, /modelTimeoutDeferrals:/)
   assert.match(get, /testsPassed:/)
   assert.match(get, /testsFailed:/)
-  assert.doesNotMatch(get, /after\(async/)
+  // GET never replays POST work. Its only background action is resuming the caller's own paused checkpoint through
+  // the scheduler's admission rule and the generation-fenced claim (tests/builderPollResume.node.test.ts).
+  assert.doesNotMatch(get, /enqueueBuilderJob|enqueueSignalBoostRepositoryRepairJob/)
+  assert.equal(get.split('after(async').length - 1, 1)
+  assert.match(get, /if \(builderPollMayResume\(job\) && !selfHealingCapacityJob\(job\) && await builderNoRunningClaim\(\)\) \{\s*after\(async \(\) => \{ await runBuilderJob\(job\.id, access\.userId\) \}\)/)
 })

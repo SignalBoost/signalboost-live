@@ -70,7 +70,11 @@ test('GET polling is user-scoped and never executes the job', () => {
   const getStart = route.indexOf('export async function GET')
   const postStart = route.indexOf('export async function POST')
   const getBody = route.slice(getStart, postStart)
-  assert.doesNotMatch(getBody, /runBuilderJob|BuilderToolLoop|runner\.run/)
+  assert.doesNotMatch(getBody, /BuilderToolLoop|runner\.run|enqueueBuilderJob/)
+  // The one exception: the caller's own paused checkpoint resumes through the fenced runner under the scheduler's
+  // admission rule (tests/builderPollResume.node.test.ts). Nothing new is created or replayed.
+  assert.equal(getBody.split('runBuilderJob(').length - 1, 1)
+  assert.match(getBody, /builderPollMayResume\(job\) && !selfHealingCapacityJob\(job\) && await builderNoRunningClaim\(\)[\s\S]{0,80}runBuilderJob\(job\.id, access\.userId\)/)
 })
 
 test('the browser sends Builder POST once and polls read-only status', () => {

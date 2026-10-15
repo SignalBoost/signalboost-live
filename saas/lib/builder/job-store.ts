@@ -275,6 +275,22 @@ export async function listBuilderContinuations(): Promise<Array<{ id: string; us
   return (data || []).map(row => ({ id: row.id, userId: row.user_id }))
 }
 
+/**
+ * The same paused checkpoint the scheduler would pick next. Production 2026-10-14 (OrderFlow job 4eb4a2e5): a paused
+ * job sat idle 112-148s between slices waiting for the once-a-minute scheduler while its owner's page polled every 2s.
+ */
+export function builderPollMayResume(job: Pick<BuilderJobRecord, 'status' | 'jobKind' | 'checkpoint' | 'claimGeneration'>): boolean {
+  return job.status === 'paused' && job.jobKind === 'standard' && job.checkpoint !== null && job.claimGeneration < MAX_WORK_SLICES
+}
+
+/** The scheduler's admission rule: one RunPod-bound job at a time. Unknown counts fail closed. */
+export async function builderNoRunningClaim(): Promise<boolean> {
+  const db = serviceClient()
+  if (!db) return false
+  const { count, error } = await db.from('builder_jobs').select('id', { count: 'exact', head: true }).eq('status', 'running')
+  return !error && count === 0
+}
+
 /** A bounded new claim cycle on the same durable job; never recreates workspace files. */
 export async function requeueBuilderContinuationCycle(input: {
   job: BuilderJobRecord; checkpoint: BuilderLoopCheckpoint; reply: string; result: Record<string, unknown>

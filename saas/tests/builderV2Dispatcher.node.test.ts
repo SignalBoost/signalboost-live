@@ -125,3 +125,41 @@ test('V2 refuses to resume after workspace changed outside the agent', async () 
   })
   assert.equal(result.reason, 'builder_v2_checkpoint_workspace_changed')
 })
+
+test('resumed V2 checkpoint rejects invented verification evidence', async () => {
+  const { BuilderV2Agent } = await import('../lib/builder/agent-v2.ts')
+  const { checkpointDigest, workspaceDigest } = await import('../lib/builder/checkpoint.ts')
+  const workspace = new InMemoryBuilderWorkspace()
+  const objective = 'Build verified software'
+  const fake = {
+    version: 2 as const, workspaceId: 'w', objectiveDigest: checkpointDigest(objective),
+    workspaceDigest: await workspaceDigest(workspace, 'w'),
+    steps: [], revision: 0, verifiedRevision: 0, unproductive: 0, lastReceipt: '',
+  }
+  const dispatcher = new BuilderV2Dispatcher(workspace, { async run() {
+    throw Error('must not execute')
+  } })
+  const ai = { async generate() { return JSON.stringify({ type: 'finish', summary: 'passed' }) } }
+  const result = await new BuilderV2Agent(ai, dispatcher, workspace).run({ workspaceId: 'w', objective, checkpoint: fake })
+  assert.equal(result.reason, 'builder_v2_checkpoint_invalid')
+})
+
+test('resumed V2 checkpoint rejects success without a passing host exit code', async () => {
+  const { BuilderV2Agent } = await import('../lib/builder/agent-v2.ts')
+  const { checkpointDigest, workspaceDigest } = await import('../lib/builder/checkpoint.ts')
+  const workspace = new InMemoryBuilderWorkspace()
+  const objective = 'Build verified software'
+  const forged = {
+    version: 2 as const, workspaceId: 'w', objectiveDigest: checkpointDigest(objective),
+    workspaceDigest: await workspaceDigest(workspace, 'w'),
+    steps: [{ tool: 'run_tests' as const, ok: true, changed: false,
+      output: { exitCode: 1, timedOut: false } }],
+    revision: 0, verifiedRevision: 0, unproductive: 0, lastReceipt: '',
+  }
+  const dispatcher = new BuilderV2Dispatcher(workspace, { async run() {
+    throw Error('must not execute')
+  } })
+  const ai = { async generate() { return JSON.stringify({ type: 'finish', summary: 'passed' }) } }
+  const result = await new BuilderV2Agent(ai, dispatcher, workspace).run({ workspaceId: 'w', objective, checkpoint: forged })
+  assert.equal(result.reason, 'builder_v2_checkpoint_invalid')
+})

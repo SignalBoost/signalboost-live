@@ -128,3 +128,15 @@ test('editing model route prefers dedicated editor, limits cascades, and refuses
   assert.match(early, /source:'cos-fast-text-transform-unavailable'/)
   assert.doesNotMatch(early, /buildHonestRefusalReply|tryCOSFirstAnswer/)
 })
+
+// Production 2026-10-15: one edit answered "editing models did not respond in time"; the owner's
+// manual retry of the same text then succeeded, and the reviewer had been receiving the two characters
+// "\n" instead of line breaks.
+test('a failed edit pass is retried once in the same turn, and the reviewer gets real line breaks', () => {
+  const primary = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  assert.match(primary, /const fast=await runFastTextTransform\(input\)\?\?await runFastTextTransform\(input\)/)
+  assert.match(primary, /prompt:`FULL USER REQUEST:\\n\$\{userRequest\}\\n\\nEDITED DRAFT TO EVALUATE AND REPAIR:\\n\$\{candidate\}`/)
+  assert.doesNotMatch(primary, /FULL USER REQUEST:\\\\n/)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /do not give up: keep only the sentences that are clearly written by the user/)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /"unresolved" only when no user-authored material to edit can be found at all/)
+})

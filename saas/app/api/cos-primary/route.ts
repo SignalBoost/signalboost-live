@@ -178,7 +178,7 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
           jsonObject:true,
           usageContext:{feature:'cos_fast_text_transform',purpose:'fast_editor_quality_review'},
           systemPrompt:FAST_EDIT_REVIEW_INSTRUCTIONS,
-          prompt:`FULL USER REQUEST:\\n${userRequest}\\n\\nEDITED DRAFT TO EVALUATE AND REPAIR:\\n${candidate}`,
+          prompt:`FULL USER REQUEST:\n${userRequest}\n\nEDITED DRAFT TO EVALUATE AND REPAIR:\n${candidate}`,
         },{...config,model:reviewModel,timeoutMs:reviewMs,fallbackFromOwned:true}).catch(()=>null)
       },
     })
@@ -554,7 +554,10 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // Fast text transforms remain the FIRST executable branch, but only for a verified edit intent.
 // A miss is not terminal: the request falls through to the normal COS chain under the same turn.
   if(!artifactContinuation&&!fastEditAlreadyAttempted&&isFastTextTransform(input,{previousAssistant:precedingAssistant})){
-    const fast=await runFastTextTransform(input)
+    // Production 2026-10-15: an edit answered "editing models did not respond in time" and the
+    // owner's immediate manual retry of the same text succeeded. Make that retry here, once, inside
+    // the same turn, instead of asking the person to resend.
+    const fast=await runFastTextTransform(input)??await runFastTextTransform(input)
     if(fast){
       const executionProvenance=authoritativeProvenance(null,{invoked:false})
       ;(executionProvenance as any).local_reasoning={invoked:true,model:fast.reasonerLabel,confidence:fast.reviewVerdict==='self_reviewed'?0.75:0.95}

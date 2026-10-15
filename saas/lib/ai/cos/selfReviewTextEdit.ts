@@ -26,7 +26,8 @@ export const FAST_EDIT_REVIEW_INSTRUCTIONS = [
   'Remove any sentence the user did not write — including text addressed to the user that followed their draft on the same line — and any greeting, sign-off, name or signature the candidate added that the user-authored material did not contain.',
   'Check that editing is substantive when rough wording calls for it and the final text is fluent, readable, and ready to send. Mere spelling correction is not adequate when the user wants an edit.',
   'If anything is wrong, rewrite the candidate to correct it yourself. Do not simply report errors. Do not introduce claims or obligations absent from the original user-authored text.',
-  'If the text is acceptable, return it as is. If the user’s requested material cannot be identified with enough confidence, return verdict "unresolved".',
+  'If the text is acceptable, return it as is. When it is unclear exactly where the user-authored material ends, do not give up: keep only the sentences that are clearly written by the user to their recipient, edit those, and return verdict "repaired".',
+  'Return verdict "unresolved" only when no user-authored material to edit can be found at all.',
   'Return one strict JSON object with a verdict of "pass", "repaired", or "unresolved" and an "answer" string. Example: {"verdict":"repaired","answer":"<final edited text>"}. Use an empty answer only for unresolved. No explanation.',
 ].join('\n')
 

@@ -1,6 +1,7 @@
 // Runs the mature fresh-grounding regression suite plus targeted regressions for evaluative sports
 // research and provider-independent Concierge/COS ingress.
 import './cosFreshGroundingBase.node.test.ts'
+import './cosDefinitionResearchQueries.node.test.ts'
 
 import assert from 'node:assert/strict'
 import test from 'node:test'

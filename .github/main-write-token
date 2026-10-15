@@ -1,2 +1,2 @@
-base_sha=d18f33550e6384165fb90b34e0f97d54f995f5d2
-branch=feat/lab-holdout-eval-20261015-v2
+base_sha=b5c2b2ef7ce507b9df683508de2e087aa3d3b355
+branch=fix/builder-repair-durable-edits-20261015

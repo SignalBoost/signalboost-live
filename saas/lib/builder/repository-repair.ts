@@ -237,6 +237,25 @@ export async function executeSignalBoostRepositoryRepair(input: {
       },
     }
 
+    // The repository sandbox is ephemeral. Persist every successful model-issued edit before
+    // returning the tool receipt; timeout paths intentionally cannot collect a full git diff.
+    // Keep the underlying session's methods bound to preserve its private state.
+    const durableSession = new Proxy(session, {
+      get(target, key, receiver) {
+        if (key === 'writeFile' || key === 'editFile') {
+          return async (...args: string[]) => {
+            const result = key === 'writeFile'
+              ? await target.writeFile(args[0], args[1], args[2])
+              : await target.editFile(args[0], args[1], args[2], args[3])
+            await workspace.writeFile(input.workspaceId, `repository/${result.path}`, result.content)
+            return result
+          }
+        }
+        const value = Reflect.get(target, key, receiver)
+        return typeof value === 'function' ? value.bind(target) : value
+      },
+    })
+
     const governedAi = createGovernedBuilderAiPort(createBuilderCodingAiPort(), { deadlineAtMs: aiDeadlineAtMs })
     const engineeringTask = target.trigger === 'deployed_platform_engineering'
     // Repairs retain the controller-owned fail-before/change/pass-after proof. Owner-authorized
@@ -245,14 +264,14 @@ export async function executeSignalBoostRepositoryRepair(input: {
     // task-specific verification before BuilderToolLoop can return success.
     const proofController = engineeringTask ? null : createRepositoryRepairProofController({
       ai: governedAi,
-      workspace: session,
+      workspace: durableSession,
       runner: repositoryRunner,
       proofCommand: repositoryRepairProofCommand(target),
     })
 
     const result = await new BuilderToolLoop(
       proofController?.ai ?? governedAi,
-      proofController?.workspace ?? session,
+      proofController?.workspace ?? durableSession,
       proofController?.runner ?? repositoryRunner,
       undefined,
       browserCli,

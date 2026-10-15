@@ -686,7 +686,8 @@ export class BuilderToolLoop {
       const stagedTestsExist = workspacePaths.some(path => /(?:^|\/)(?:test|tests)\/.*\.(?:test|spec)\.[cm]?js$/i.test(path))
       // Start host testing as soon as all mandatory implementation files and one test exist.
       // Remaining suites and documentation stay mandatory for the final acceptance gate.
-      const partialTestProofReady = requiredImplementationReady && stagedTestsExist
+      const requiredTestFilesReady = task.files.filter(path => /(?:^|\/)(?:test|tests)\/|(?:\.test\.|\.spec\.)/i.test(path)).every(path => workspacePaths.includes(path))
+      const partialTestProofReady = requiredImplementationReady && stagedTestsExist && requiredTestFilesReady
         && task.commands.some(command => /\b(?:--test|npm test)\b/.test(command))
       const verificationCommand = chunks.size === 0 && !repairObjective && writeCount > 0 && task.files.length > 0
         && (progress.missingFiles.length === 0 || partialTestProofReady)

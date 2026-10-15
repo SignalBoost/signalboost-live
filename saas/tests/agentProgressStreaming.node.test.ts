@@ -138,8 +138,13 @@ test('owner Assistant polls a single accepted Builder job for eight minutes with
 
 test('lost COS POST transport performs read-only History recovery before showing failure', () => {
   const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
-  assert.match(client, /recoverAssistantReplyFromHistory\(userText, startedAt/)
-  assert.match(client, /args\.target === 'cos' && conversationId && userText/)
+  assert.match(client, /const historyWatchEligible = args\.target === 'cos' && !builderRequest && Boolean\(conversationIdForTurn\) && Boolean\(userTextForTurn\)/)
+  assert.match(client, /Promise\.race\(\[posted, historyFound\]\)/)
+  assert.match(client, /const reply = await watched/)
   assert.match(client, /source: 'cos-transport-history-recovery'/)
-  assert.ok(client.indexOf('recoverAssistantReplyFromHistory(userText, startedAt') < client.indexOf("source: 'assistant-transport-unconfirmed'"))
+  assert.ok(client.indexOf('const reply = await watched') < client.indexOf("source: 'assistant-transport-unconfirmed'"))
+  // The watch is read-only: it GETs History and never re-sends the POST.
+  const watch = client.slice(client.indexOf('async function watchHistoryForCompletedTurn'), client.indexOf('function bodyRecord'))
+  assert.match(watch, /method: 'GET'/)
+  assert.doesNotMatch(watch, /method: 'POST'/)
 })

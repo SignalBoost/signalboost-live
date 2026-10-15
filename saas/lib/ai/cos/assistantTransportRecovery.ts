@@ -23,6 +23,21 @@ function normalize(value: unknown): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim()
 }
 
+// History stores each message cut to this many characters (MAX_STORED_CONTENT in
+// lib/ai/tools/conversationHistory.ts). A prompt longer than that — an email with its pasted
+// thread — is stored as a prefix, so exact equality can never recover it. Production 2026-10-15:
+// COS answered and saved the reply, but the page could not match the 4,616-character prompt to
+// its 4,000-character stored copy and showed the transport-timeout copy instead.
+export const HISTORY_STORED_MESSAGE_CHARS = 4_000
+
+function sameStoredPrompt(stored: unknown, expected: string): boolean {
+  const raw = String(stored ?? '')
+  const value = normalize(raw)
+  if (!value) return false
+  if (value === expected) return true
+  return raw.length >= HISTORY_STORED_MESSAGE_CHARS && expected.startsWith(value)
+}
+
 /**
  * Return the assistant reply belonging to this exact client send when the POST response
  * was lost after the server persisted the turn. Repeated identical prompts are common in
@@ -41,7 +56,7 @@ export function findRecoveredAssistantReply(
 
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const current = messages[i]
-    if (current?.role !== 'user' || normalize(current.content) !== expected) continue
+    if (current?.role !== 'user' || !sameStoredPrompt(current.content, expected)) continue
 
     const createdAt = Date.parse(String(current.created_at ?? ''))
     if (!Number.isFinite(createdAt) || createdAt < earliestAllowed) continue

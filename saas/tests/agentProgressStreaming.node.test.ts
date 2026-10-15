@@ -200,3 +200,10 @@ test('public COS browser client delivers the recovered edited reply', async () =
     ;(globalThis as any).window = previousWindow
   }
 })
+
+test('both COS and Concierge use text-only recovery while Builder never does', () => {
+  const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
+  assert.match(client, /!builderRequest && isReplaySafeConciergeEdit\(requestBody\)/)
+  assert.match(client, /sendReplaySafeEditAfterTransportLoss/)
+  assert.match(client, /if \(deliberateAbort\(error, args\.signal\)\) throw error/)
+})

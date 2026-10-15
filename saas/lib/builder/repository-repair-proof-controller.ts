@@ -1,5 +1,6 @@
 import type { BuilderAiPort, BuilderRunnerPort, BuilderWorkspacePort } from './contracts.ts'
 import type { SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
+import { isBuilderTestRunnerCommand } from './regression-gate.ts'
 
 export type RepositoryRepairProofController = Readonly<{
   ai: BuilderAiPort
@@ -67,12 +68,24 @@ export function discoverRepositoryRepairProofCommand(
   return `node --experimental-strip-types --test ${candidates[0]}`
 }
 
+// Before a defect is reproduced only reproduction may be written: a regression test, or the lock file
+// a dependency install generates. Source stays untouched until a proof has failed on it.
+const REPRODUCTION_PATH = /^(?:saas\/)?(?:tests?\/.+|.+\.(?:test|spec)\.[cm]?[jt]sx?|package-lock\.json)$/i
+const ANSWER_CONTROL = /"(?:type|action)"\s*:\s*"answer"/i
+
 /**
  * Repository repair verification is a controller responsibility. This adapter makes
  * the exact host-selected proof the first action on the pinned source and the first
  * action after every successful mutation. The model therefore cannot skip the
  * fail-before/change/pass-after cycle by returning prose, diagnostics, or another
  * command. A passing baseline aborts before the model can edit a non-reproducing bug.
+ *
+ * When the host has no proof (a plain-language owner report that names no failing test,
+ * build, or unambiguous source/test pair), the model must reproduce the defect itself:
+ * the first test, typecheck, or build it runs that actually fails becomes the pinned
+ * proof, and the same controller cycle applies from then on. Until then source edits
+ * are refused and an answer ends as not reproduced, so no unrelated passing test can
+ * stand in for a reproduction and no repair can be claimed without one.
  */
 export function createRepositoryRepairProofController(input: {
   ai: BuilderAiPort
@@ -80,12 +93,17 @@ export function createRepositoryRepairProofController(input: {
   runner: BuilderRunnerPort
   proofCommand: string | null
 }): RepositoryRepairProofController {
-  const proofCommand = normalizedProofCommand(input.proofCommand)
-  if (!proofCommand) return Object.freeze({ ai: input.ai, workspace: input.workspace, runner: input.runner, proofCommand: null })
+  let proofCommand = normalizedProofCommand(input.proofCommand)
+  const hostSelected = proofCommand !== null
 
   let workspaceGeneration = 0
   let provedGeneration = -1
   let baselineState: 'pending' | 'failed' | 'passed' | 'invalid' = 'pending'
+
+  function assertReproductionWrite(path: string) {
+    if (proofCommand || REPRODUCTION_PATH.test(String(path || ''))) return
+    throw new Error('builder_regression_proof_required_before_source_edit: run the narrowest test, typecheck, or build that fails on the reported defect first (a new regression test under tests/ may be written to reproduce it); source is edited only after that proof fails')
+  }
 
   const workspace: BuilderWorkspacePort = {
     listFiles: (workspaceId) => input.workspace.listFiles(workspaceId),
@@ -94,11 +112,13 @@ export function createRepositoryRepairProofController(input: {
       ? { searchFiles: (workspaceId: string, query: string) => input.workspace.searchFiles!(workspaceId, query) }
       : {}),
     async writeFile(workspaceId, path, content) {
+      assertReproductionWrite(path)
       const file = await input.workspace.writeFile(workspaceId, path, content)
       workspaceGeneration += 1
       return file
     },
     async editFile(workspaceId, path, search, replace) {
+      assertReproductionWrite(path)
       const file = await input.workspace.editFile(workspaceId, path, search, replace)
       workspaceGeneration += 1
       return file
@@ -107,12 +127,26 @@ export function createRepositoryRepairProofController(input: {
 
   const runner: BuilderRunnerPort = {
     async run(runInput) {
+      if (!proofCommand) {
+        const result = await input.runner.run(runInput)
+        const command = String(result.executedCommand || runInput.command || '').trim()
+        const policyDenied = result.exitCode === 125
+          && String(result.stderr || '').includes('builder_repository_broad_test_blocked')
+        // Only an executed test runner, typecheck, or build that fails pins the proof.
+        // Diagnostics (git log, ls, node --version) and passing tests are inspection.
+        if (result.exitCode !== 0 && !result.timedOut && !policyDenied && isBuilderTestRunnerCommand(command)) {
+          proofCommand = command
+          provedGeneration = workspaceGeneration
+          baselineState = 'failed'
+        }
+        return result
+      }
       const proofRequired = provedGeneration !== workspaceGeneration
       const command = proofRequired ? proofCommand : runInput.command
       const result = await input.runner.run({ ...runInput, command })
       if (proofRequired) {
         provedGeneration = workspaceGeneration
-        if (workspaceGeneration === 0) {
+        if (hostSelected && workspaceGeneration === 0) {
           // A host policy refusal (exit 125) never executed the requested proof.
           // It must not authorize a source mutation as though tests failed.
           const policyDenied = result.exitCode === 125
@@ -128,12 +162,19 @@ export function createRepositoryRepairProofController(input: {
     async generate(request) {
       if (baselineState === 'passed' && workspaceGeneration === 0) throw new Error('builder_regression_not_reproduced')
       if (baselineState === 'invalid' && workspaceGeneration === 0) throw new Error('builder_regression_evidence_required')
-      if (provedGeneration !== workspaceGeneration) {
+      if (proofCommand && provedGeneration !== workspaceGeneration) {
         return JSON.stringify({ type: 'tool', toolId: 'run', input: { command: proofCommand } })
       }
-      return input.ai.generate(request)
+      const response = await input.ai.generate(request)
+      if (!proofCommand && ANSWER_CONTROL.test(String(response || ''))) throw new Error('builder_regression_not_reproduced')
+      return response
     },
   }
 
-  return Object.freeze({ ai, workspace, runner, proofCommand })
+  return Object.freeze({
+    ai,
+    workspace,
+    runner,
+    get proofCommand() { return proofCommand },
+  })
 }

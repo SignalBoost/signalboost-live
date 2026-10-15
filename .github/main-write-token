@@ -1,2 +1,2 @@
-base_sha=46d0d5edc4058c7220ad4c770df5839d274913aa
-branch=fix/cos-editor-revision-current-main-20261015
+base_sha=ad77e07cf38e68ebbb3703b07514ba6c287218b2
+branch=fix/builder-reproduce-without-host-proof-20261015

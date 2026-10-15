@@ -224,3 +224,80 @@ test('proof discovery chooses a unique test related to explicitly named source',
     'tests/project-continuity.test.ts', 'tests/project-continuity.other.test.ts',
   ]), null)
 })
+
+test('without a host proof Builder reproduces with its own failing regression test, then fail edit pass', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('discover', 'lib/app.js', 'module.exports = "broken"')
+  const commands: string[] = []
+  const runner: BuilderRunnerPort = {
+    async run(input) {
+      commands.push(input.command)
+      if (input.command.startsWith('git ')) return { exitCode: 128, stdout: '', stderr: 'fatal: bad revision', timedOut: false }
+      const app = input.files.find(file => file.path === 'lib/app.js')
+      return app?.content.includes('fixed')
+        ? { exitCode: 0, stdout: 'pass\n', stderr: '', timedOut: false }
+        : { exitCode: 1, stdout: '', stderr: 'AssertionError: expected fixed', timedOut: false }
+    },
+  }
+  const model = new ScriptedAi([
+    '{"type":"tool","toolId":"run","input":{"command":"git log --oneline -3 -- lib/app.js"}}',
+    '{"type":"tool","toolId":"edit_file","input":{"path":"lib/app.js","search":"broken","replace":"guess"}}',
+    '{"type":"tool","toolId":"write_file","input":{"path":"tests/app.test.js","content":"require(\\"node:assert\\").equal(require(\\"../lib/app.js\\"),\\"fixed\\")"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"node --test tests/app.test.js"}}',
+    '{"type":"tool","toolId":"edit_file","input":{"path":"lib/app.js","search":"broken","replace":"fixed"}}',
+    '{"type":"answer","answer":"fixed lib/app.js"}',
+  ])
+  const controlled = createRepositoryRepairProofController({ ai: model, workspace, runner, proofCommand: null })
+  const result = await new BuilderToolLoop(controlled.ai, controlled.workspace, controlled.runner).run({
+    objective: 'the app is broken, fix it', workspaceId: 'discover', maxRounds: 12,
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(controlled.proofCommand, 'node --test tests/app.test.js')
+  const guess = result.trace.find(item => item.toolId === 'edit_file' && item.input.replace === 'guess')
+  assert.equal(guess?.ok, false)
+  assert.match(String(guess?.error), /builder_regression_proof_required_before_source_edit/)
+  assert.equal(commands[0], 'git log --oneline -3 -- lib/app.js')
+  assert.deepEqual(commands.slice(-2), ['node --test tests/app.test.js', 'node --test tests/app.test.js'])
+  assert.equal((await workspace.readFile('discover', 'lib/app.js'))?.content, 'module.exports = "fixed"')
+})
+
+test('without a host proof a passing test never stands in for reproduction and an answer ends not reproduced', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('green', 'lib/app.js', 'module.exports = "fixed"')
+  await workspace.writeFile('green', 'tests/other.test.js', 'ok')
+  const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: 'pass\n', stderr: '', timedOut: false } } }
+  const model = new ScriptedAi([
+    '{"type":"tool","toolId":"run","input":{"command":"node --test tests/other.test.js"}}',
+    '{"type":"answer","answer":"all good, fixed"}',
+  ])
+  const controlled = createRepositoryRepairProofController({ ai: model, workspace, runner, proofCommand: null })
+  const result = await new BuilderToolLoop(controlled.ai, controlled.workspace, controlled.runner).run({
+    objective: 'the app is broken, fix it', workspaceId: 'green', maxRounds: 6,
+  })
+  assert.equal(result.ok, false)
+  if (!result.ok) assert.equal(result.error, 'builder_regression_not_reproduced')
+  assert.equal(controlled.proofCommand, null)
+  assert.ok(result.trace.some(item => item.toolId === 'run' && item.ok))
+  assert.equal((await workspace.readFile('green', 'lib/app.js'))?.content, 'module.exports = "fixed"')
+})
+
+test('without a host proof a policy-blocked broad suite does not pin a proof or unlock source edits', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('broad', 'lib/app.js', 'module.exports = "unchanged"')
+  const runner: BuilderRunnerPort = { async run() {
+    return { exitCode: 125, stdout: '', stderr: 'builder_repository_broad_test_blocked: use targeted test', timedOut: false }
+  } }
+  const model = new ScriptedAi([
+    '{"type":"tool","toolId":"run","input":{"command":"npm test"}}',
+    '{"type":"tool","toolId":"edit_file","input":{"path":"lib/app.js","search":"unchanged","replace":"changed"}}',
+  ])
+  const controlled = createRepositoryRepairProofController({ ai: model, workspace, runner, proofCommand: null })
+  const result = await new BuilderToolLoop(controlled.ai, controlled.workspace, controlled.runner).run({
+    objective: 'Fix the broken app', workspaceId: 'broad', maxRounds: 4,
+  })
+  assert.equal(result.ok, false)
+  assert.equal(controlled.proofCommand, null)
+  assert.equal(result.trace.some(item => item.ok && item.toolId === 'edit_file'), false)
+  assert.equal((await workspace.readFile('broad', 'lib/app.js'))?.content, 'module.exports = "unchanged"')
+})

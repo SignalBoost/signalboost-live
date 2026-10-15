@@ -751,7 +751,7 @@ export class BuilderToolLoop {
       // With a passing proof there is no error to justify a source edit. Forcing one produced unsupported edits that
       // the regression gate then rejected; the justified mutation is a failing regression test, or an honest answer.
       const currentStep = repeatedRepairStall
-        ? passingProofStep || 'CURRENT STEP: The source has been read and repeated inspection or execution was refused against unchanged files. Choose ONE justified edit_file or write_file mutation now, based on the inspected source and actual errors. Do not request another read, run, or answer until a mutation is recorded. If no justified repair is possible, the host will fail transparently.'
+        ? passingProofStep || 'CURRENT STEP: The source was already inspected, but no failing verification command has reproduced the defect. Do not read the same source again and do not guess an edit. Run a targeted reproducing test or verification command against the current source. If the reported defect is not reproducible, report that without modifying source.'
         : coverageRepairRequired
         ? `CURRENT STEP: The commands passed, but the recorded test total does not meet the requested minimum of ${task.minimumTests}. A command exited 0 but its output did not prove ${task.minimumTests} requested tests. Complete the suite with distinct meaningful assertions. Do NOT run again against unchanged files. Use read_file on the test source if not already inspected, then edit_file or write_file to add meaningful missing assertions and explicit per-test evidence. Preserve the existing passing tests. Once the file changes, the verification run can execute again.`
         : repairMutationRequired
@@ -806,7 +806,7 @@ export class BuilderToolLoop {
         .filter(toolId => toolId !== 'browser_cli' || browserCliActions.size > 0)
         .filter(toolId => toolId !== blockedTool)
         .filter(toolId => !blockedInspectionTools.has(toolId))
-        .filter(toolId => !(repairMutationRequired || repeatedRepairStall) || toolId === 'write_file' || toolId === 'edit_file')
+        .filter(toolId => !repairMutationRequired || toolId === 'write_file' || toolId === 'edit_file')
 
       const promptParts = [
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
@@ -979,7 +979,7 @@ export class BuilderToolLoop {
         // coding job. Keep the mutation-only controls in place, explain why
         // the action was rejected, and let the reasoner choose an actual edit.
         // The durable stale-action budget above bounds repeated refusals.
-        if (repairMutationRequired || repeatedRepairStall) {
+        if (repairMutationRequired) {
           trace.push({ round, toolId: 'model_control', input: {}, ok: false,
             error: 'builder_repair_mutation_required', failureClass: 'test',
             remediation: passingProofBeforeChange
@@ -1005,7 +1005,7 @@ export class BuilderToolLoop {
 
       if (action.type === 'answer') {
         // A not-reproduced answer after a passing proof is honest; the answer path below records it as such.
-        if (repairMutationRequired || (repeatedRepairStall && !passingProofBeforeChange)) {
+        if (repairMutationRequired) {
           trace.push({ round, toolId: 'model_control', input: {}, ok: false,
             error: 'builder_repair_mutation_required',
             failureClass: 'test',

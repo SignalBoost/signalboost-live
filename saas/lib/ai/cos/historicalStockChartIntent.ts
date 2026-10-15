@@ -28,7 +28,14 @@ function rangeOf(text: string): StockChartRange {
 function tickerOf(text: string): string | null {
   const named = text.match(/\b(?:ticker|symbol)\s*[:#]?\s*([A-Z][A-Z0-9.-]{0,9})\b/i)
   if (named && SYMBOL.test(named[1].toUpperCase())) return named[1].toUpperCase()
-  const upper = text.match(/\b[A-Z][A-Z0-9.-]{1,9}\b/g) || []
+  // Accept natural lower-case ticker mentions next to a financial noun, but
+  // never turn an arbitrary word in a narrative into an unverified symbol.
+  const adjacent = text.match(/\b([A-Za-z][A-Za-z0-9.-]{0,9})\s+(?:stock|shares?|ticker)\b/i)
+  if (adjacent) {
+    const value = adjacent[1].toUpperCase()
+    if (SYMBOL.test(value) && !TICKER_STOP.has(value)) return value
+  }
+    const upper = text.match(/\b[A-Z][A-Z0-9.-]{1,9}\b/g) || []
   return upper.find(value => SYMBOL.test(value) && !TICKER_STOP.has(value)) || null
 }
 

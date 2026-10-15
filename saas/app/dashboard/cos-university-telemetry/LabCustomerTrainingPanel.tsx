@@ -12,6 +12,7 @@ import { LAB_OPEN_SOURCES } from '@/lib/lab/labOpenSources'
 import { previewLabDataset } from '@/lib/lab/labDatasetPreflight'
 import LabCustomerModelPassport from './LabCustomerModelPassport.tsx'
 import LabCustomerResponseComparison from './LabCustomerResponseComparison.tsx'
+import LabCustomerTrainingAdvisor from './LabCustomerTrainingAdvisor.tsx'
 
 type Org = { organizationId: string; organizationName: string; experimentId: string; projectName: string; role: string }
 type CatalogEntry = { kind: string; name: string; supports: Record<string, boolean>; unsupported: Record<string, string>; keyHelp: string }
@@ -413,6 +414,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
       {canManage && (
         <div className="space-y-2">
           <h3 className="font-medium">{copy.chooseHeading}</h3>
+          <LabCustomerTrainingAdvisor language={language} catalog={catalog} connectedKinds={connectedKinds} selectedKind={computeProviderKind} ready={source === 'teacher' ? promptCount >= 20 && promptCount <= 128 : preflight.ready} />
           <div className="flex gap-4 text-sm">
             <label><input type="radio" checked={source === 'examples'} onChange={() => { setSource('examples'); setBillingConfirmed(false) }} /> {copy.useExamples}</label>
             <label><input type="radio" checked={source === 'teacher'} onChange={() => { setSource('teacher'); setBillingConfirmed(false) }} /> {copy.askTeacher}</label>

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { listBuilderContinuations } from '@/lib/builder/job-store'
+import { BUILDER_JOB_STALE_AFTER_MS, listBuilderContinuations } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { retryFailedOwnedAuditEngineRepair } from '@/self-healing-host/owned-audit-self-healing'
@@ -110,9 +110,34 @@ export async function GET(request: Request) {
   // replay POST or allow a delayed worker to commit under its expired generation.
   const db = getAdminSupabase()
   const { error: staleRecoveryError } = await db.rpc('requeue_stale_builder_claims', {
-    p_cutoff: new Date(Date.now() - 6 * 60_000).toISOString(),
+    p_cutoff: new Date(Date.now() - BUILDER_JOB_STALE_AFTER_MS).toISOString(),
   })
-  if (staleRecoveryError) console.warn('[builder_stale_claim_requeue_failed]', { message: staleRecoveryError.message })
+  if (staleRecoveryError) {
+    console.error('[builder_stale_claim_requeue_failed]', { code: staleRecoveryError.code })
+    return NextResponse.json({ ok: false, error: 'builder_stale_claim_recovery_unavailable' }, { status: 503 })
+  }
+  // Recover non-checkpointed/exhausted claims too: the checkpoint RPC above can only
+  // pause safe, resumable jobs. The existing scoped RPC terminally fences the rest.
+  // A live heartbeat prevents declaring an actively executing tool round stale.
+  const cutoff = new Date(Date.now() - BUILDER_JOB_STALE_AFTER_MS).toISOString()
+  const { data: stranded, error: strandedError } = await db.from('builder_jobs')
+    .select('id,user_id,last_heartbeat_at,updated_at')
+    .eq('status', 'running').lt('updated_at', cutoff).limit(100)
+  if (strandedError) {
+    console.error('[builder_stale_claim_scan_failed]', { code: strandedError.code })
+    return NextResponse.json({ ok: false, error: 'builder_stale_claim_scan_unavailable' }, { status: 503 })
+  }
+  for (const stuck of stranded || []) {
+    if (stuck.last_heartbeat_at && Date.parse(stuck.last_heartbeat_at) > Date.parse(cutoff)) continue
+    const { error } = await db.rpc('expire_stale_builder_jobs', {
+      p_user_id: stuck.user_id, p_job_id: stuck.id,
+      p_conversation_id: null, p_cutoff: cutoff,
+    })
+    if (error) {
+      console.error('[builder_stale_claim_expire_failed]', { jobId: stuck.id, code: error.code })
+      return NextResponse.json({ ok: false, error: 'builder_stale_claim_expire_unavailable' }, { status: 503 })
+    }
+  }
   const continuations = await listBuilderContinuations()
   // Reconciliation visibility: the scheduler deliberately executes only one job per
   // tick. Report the remaining durable backlog rather than implying a quiet tick

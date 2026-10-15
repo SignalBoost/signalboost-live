@@ -36,6 +36,7 @@ import { getAdminSupabase } from '@/utils/supabase/server'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
+const BUILDER_SLICE_HARD_DEADLINE_MS = 240_000
 const SELF_HEALING_REPOSITORY_BUDGET_MS = 285_000
 const MAX_SELF_HEALING_EXECUTION_TIMEOUT_DEFERRALS = 3
 const MAX_STANDARD_CAPACITY_DEFERRALS = 3
@@ -306,6 +307,20 @@ async function runBuilderPlaywrightCliCanary(job: BuilderJobRecord): Promise<voi
   }
 }
 
+async function withBuilderSliceDeadline<T>(operation: () => Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      operation(),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error('builder_model_round_timeout')), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 /**
  * Execute one already-enqueued Builder job. The atomic claim makes duplicate invocations harmless;
  * the browser never replays POST and polling GET has no execution authority.
@@ -478,8 +493,8 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       console.warn('[builder_project_lesson_read_failed]', { jobId })
       return []
     })
-    const result = plan
-      ? await runDebugFileJob({
+    const result = await withBuilderSliceDeadline(() => plan
+      ? runDebugFileJob({
           objective: job.objective,
           workspaceId: job.workspaceId,
           plan,
@@ -489,7 +504,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           cognitiveSkills: cognitive.items,
           workingKnowledge: combinedWorkingKnowledge,
         })
-      : await new BuilderToolLoop(ai, workspace, runner, mcp, browserCli).run({
+      : new BuilderToolLoop(ai, workspace, runner, mcp, browserCli).run({
           objective: job.objective,
           workspaceId: job.workspaceId,
           priorLessons,
@@ -499,11 +514,15 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           checkpoint: job.checkpoint,
           documentationPaths,
           // Leave room for a slow model round, then a bounded sandbox command and persistence.
-          shouldPause: (beforeTool = false) => Date.now() - sliceStartedAtMs >= (beforeTool ? 150_000 : 100_000),
+          shouldPause: (beforeTool = false) => {
+            // Each tool boundary refreshes the generation-fenced watchdog timestamp.
+            void heartbeat().catch(() => undefined)
+            return Date.now() - sliceStartedAtMs >= (beforeTool ? 150_000 : 100_000)
+          },
           maxRounds: 96,
           deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
           modelRoundTimeoutMs: 55_000,
-        })
+        }), BUILDER_SLICE_HARD_DEADLINE_MS)
     await browserCli.close().catch(error => {
       console.warn('[builder_browser_cli_close_failed]', { message: error instanceof Error ? error.message : 'unknown' })
     })

@@ -89,6 +89,7 @@ export async function GET(request: Request) {
         return noStore({
           jobId: job.id,
           workspaceId: job.workspaceId,
+          conversationId: job.conversationId,
           status: job.status,
           progress: {
             phase: job.checkpoint?.verificationPending === true ? 'verification'
@@ -113,6 +114,7 @@ export async function GET(request: Request) {
         ...(job.result || {}),
         jobId: job.id,
         workspaceId: job.workspaceId,
+        conversationId: job.conversationId,
         status: job.status,
         ...(job.error ? { error: job.error } : {}),
       })
@@ -225,12 +227,21 @@ export async function POST(request: Request) {
       requestedWorkspaceId: newProjectRequested ? undefined : requestedWorkspaceId,
       hasNewSource: files.length > 0, repositoryImport: Boolean(repositoryTarget),
     }, readBuilderEvidenceJob)
-    if (project.blocked) return noStore({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: project.blocked === 'busy' ? 409 : 503 })
+    if (project.blocked === 'busy' && project.activeJobId && project.workspaceId) {
+      // One conversation keeps its existing durable job; a follow-up must not
+      // fork a new workspace or ask the customer to submit the same task again.
+      return noStore({
+        jobId: project.activeJobId, workspaceId: project.workspaceId, conversationId,
+        status: project.activeStatus || 'running',
+        resumable: true, reply: runningReply(project.activeJobId),
+      }, { status: 202 })
+    }
+    if (project.blocked) return noStore({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: 503 })
     workspaceId = project.workspaceId || workspaceId
 
     // An owner repair with no source anywhere goes to the platform repository at the deployed
     // revision instead of an empty workspace that can only answer "attach your source".
-    if (access.isOwner && files.length === 0 && !repositoryTarget && !project.context) {
+    if (access.isOwner && files.length === 0 && !repositoryTarget && !project.context && !(project.workspaceId || requestedWorkspaceId)) {
       const selectedWorkspaceId = project.workspaceId || requestedWorkspaceId
       const sourceWorkspace = selectedWorkspaceId ? createSupabaseBuilderWorkspace(access.userId) : null
       // A storage failure counts as "has files": never reroute a workspace whose contents are unknown.
@@ -278,14 +289,23 @@ export async function POST(request: Request) {
       return noStore({ error: 'Builder storage is unavailable.', reply }, { status: 503 })
     }
 
-    // An explicitly selected saved project must contain editable source. New builds use a
-    // fresh workspace and must not be blocked merely because it starts empty.
-    if (!newProjectRequested && (project.workspaceId || requestedWorkspaceId) && files.length === 0) {
-      let existingFiles
-      try { existingFiles = await workspace.listFiles(workspaceId) }
-      catch { return noStore({ error: 'Unable to verify selected workspace source files. No job was created.', execution_allowed: false }, { status: 503 }) }
-      if (!hasWorkspaceSource(existingFiles.map(file => file.path)) && !repositoryTarget) {
-        return noStore({ error: 'Selected workspace is empty. Choose the original project or connect/import the repository.', execution_allowed: false }, { status: 422 })
+    // A workspace's current file listing is not the whole source of truth:
+    // prior jobs in this same authenticated conversation prove continuity.
+    // Defer a transient empty listing to the claimed worker, where actual
+    // source availability is rechecked before any coding tool can run.
+    const continuationWorkspace = !newProjectRequested && !repositoryTarget && files.length === 0
+      && Boolean(project.workspaceId || requestedWorkspaceId)
+    if (continuationWorkspace) {
+      let sourceVisible = false
+      let listingFailed = false
+      try {
+        sourceVisible = hasWorkspaceSource((await workspace.listFiles(workspaceId)).map(file => file.path))
+      } catch { listingFailed = true }
+      if (!project.context && !sourceVisible) {
+        const reply = listingFailed
+          ? 'Unable to verify the selected workspace right now. The existing workspace has not been changed.'
+          : 'Selected workspace has no editable source. Import the repository or supply source files before requesting changes.'
+        return noStore({ error: reply, execution_allowed: false }, { status: listingFailed ? 503 : 422 })
       }
     }
 
@@ -325,8 +345,10 @@ export async function POST(request: Request) {
               logEvidence: true,
               passiveLogEvidence,
               repositoryAuthority: false,
+              ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
             }
-          : { ...(project.context ? { projectContext: project.context } : {}) },
+          : { ...(project.context ? { projectContext: project.context } : {}),
+              ...(continuationWorkspace ? { requiresExistingSource: true } : {}) },
       ownerAuthorized: access.isOwner === true,
       runningReply: reply,
     })
@@ -338,6 +360,7 @@ export async function POST(request: Request) {
     return noStore({
       jobId,
       workspaceId,
+      conversationId,
       status: 'queued',
       reply,
     }, { status: 202 })

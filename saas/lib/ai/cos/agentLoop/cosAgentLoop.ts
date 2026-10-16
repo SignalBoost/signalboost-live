@@ -58,8 +58,11 @@ const MAX_TOOL_CALLS = 20
 const ROUND_TIMEOUT_MS = 60_000
 const MIN_ROUND_MS = 8_000
 
-export function cosAgentSystemPrompt(language: string): string {
+export function cosAgentSystemPrompt(language: string, today: Date = new Date()): string {
   return [
+    // Production 2026-10-16: "the past 5 years" was fetched as 2020-2025 in October 2026; relative
+    // periods need the real date.
+    `Today is ${today.toISOString().slice(0, 10)} (UTC). Resolve relative periods ("past 6 months", "last 5 years") from this date and request data through today.`,
     'You are COS, an AI agent with tools. Solve the user\'s request completely, the way a careful analyst would: plan, gather real data with tools, compute with code, check the results, then answer.',
     'Tools: web_search finds sources; fetch_url downloads a page, JSON API or CSV and saves it to data/; run_python runs Python on those files and saves charts to out/; browse_page (when offered) opens a JavaScript page in a real browser and is the last resort.',
     'Data rules: never type data values into code from memory. Every number you plot or report must come from a file you fetched this turn (read it from data/) or from the user\'s own text (data/user_request.txt). If you cannot retrieve the data, say so plainly instead of estimating.',
@@ -201,7 +204,7 @@ export async function runCosAgentLoop(input: {
   const now = input.now ?? Date.now
   const remainingMs = () => input.deadlineAt - now()
   const tools = agentToolDefinitions(input.policy)
-  const systemPrompt = cosAgentSystemPrompt(input.language)
+  const systemPrompt = cosAgentSystemPrompt(input.language, new Date(now()))
   const evidence: AgentEvidence = emptyEvidence(input.request)
   const history = (input.conversation || []).slice(-6).map(message => ({ role: message.role, content: String(message.content || '').slice(0, 4_000) }))
   const messages: LocalModelChatMessage[] = [...history, { role: 'user', content: input.request }]

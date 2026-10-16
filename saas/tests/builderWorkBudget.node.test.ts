@@ -74,7 +74,8 @@ test('waiting for the model never spends the free slices or ends a job (producti
   assert.equal(builderMayContinue({ claimGeneration: 9, checkpoint: previous, metadata: requeued3 }, waited, false), false)
   assert.equal(builderMayContinue({ claimGeneration: MAX_WORK_SLICES, checkpoint: previous, metadata: requeued3 }, waited, true), false)
   const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
-  assert.match(runner, /builderMayContinue\(job, result\.checkpoint,\s*result\.error === 'builder_runpod_primary_busy' \|\| result\.error === 'builder_model_round_timeout'\)/)
+  // #4568: a turn timeout is model capacity too, so it is also not a verdict on the job.
+  assert.match(runner, /builderMayContinue\(job, result\.checkpoint,\s*result\.error === 'builder_runpod_primary_busy' \|\| result\.error === 'builder_model_round_timeout' \|\| result\.error === BUILDER_TURN_TIMEOUT_ERROR\)/)
 })
 
 test('a stop reports how many required files exist and which are missing', () => {

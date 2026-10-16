@@ -1,2 +1,2 @@
-base_sha=db0cd477b062cff7659924676faaceb7bee57242
-branch=fix/home-history-delete-20261016
+base_sha=06cbec486baab683b7a84c31d4b552ecd36d3dd1
+branch=fix/cos-agent-loop-plot-in-same-run-20261016

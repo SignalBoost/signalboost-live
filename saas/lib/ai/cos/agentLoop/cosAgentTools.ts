@@ -243,7 +243,7 @@ export async function executeAgentTool(input: {
         result.stdout ? `stdout:\n${result.stdout}` : 'stdout: (empty)',
         result.stderr ? `stderr:\n${result.stderr}` : '',
         !result.images.length
-          ? 'images saved: none'
+          ? 'images saved: none (if the user asked for a chart, your next run must save it to out/)'
           : accepted
             ? `images saved: ${result.images.map(image => `out/${image.name}`).join(', ')} (they will be shown to the user with your answer)`
             : 'images REJECTED by the harness: the program did not open any data/ file. Plot only data loaded from data/.',

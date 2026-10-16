@@ -376,7 +376,9 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     if (job.jobKind === 'standard' && job.metadata.builderEngine === 'v2') {
       const workspace = createSupabaseBuilderWorkspace(job.userId)
       if (!workspace) { await terminalFailure(job, 'builder_v2_workspace_unavailable'); return }
-      const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort({ yieldToChat: true }), {
+      // Same priority rule as V1: only background self-healing work yields the model to chat. Production
+      // 2026-10-16: V2 always yielded, so an owner's own chat refused every model call of the build it started.
+      const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort({ yieldToChat: selfHealingCapacityJob(job) }), {
         deadlineAtMs: Date.now() + 210_000,
       })
       const v2 = new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, new VercelSandboxBuilderRunner()), workspace)

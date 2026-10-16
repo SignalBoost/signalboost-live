@@ -53,8 +53,15 @@ export async function runBuilderV2JobCycle(input: {
     status: 'lost_lease', result, reason: 'builder_v2_claim_stale',
   }
   if (result.ok) return { status: 'verified', result, reason: 'verified' }
-  // Slice budget, cancellation (slice deadline) and a model timeout/outage all pause with the checkpoint; the
-  // job's slice cap still bounds how often it resumes.
+  // A model failure pauses only after the slice recorded new work, the progress rule V1 continuations use. A slice
+  // whose model call fails before any step fails with the model's error: production 2026-10-16, an always-refused
+  // model paused every slice instantly and spent all 24 slices with only package.json written.
+  const priorSteps = job.checkpoint?.steps.length ?? 0
+  if (result.reason === 'builder_v2_model_unavailable' && (result.checkpoint?.steps.length ?? 0) <= priorSteps) {
+    return { status: 'failed', result, reason: `builder_v2_model_unavailable: ${result.summary || 'builder_v2_model_error'}` }
+  }
+  // Slice budget, cancellation (slice deadline) and a model timeout/outage after progress all pause with the
+  // checkpoint; the job's slice cap still bounds how often it resumes.
   if (result.reason === 'builder_v2_step_budget' || result.reason === 'builder_v2_cancelled' || result.reason === 'builder_v2_model_unavailable') {
     if (result.checkpoint && result.checkpoint !== persisted
       && !await input.store.save(input.jobId, input.claimGeneration, result.checkpoint)) {

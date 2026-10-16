@@ -1,2 +1,2 @@
-base_sha=d878b2f235cd7cadb6d6083ed6dec94625aa9c19
-branch=fix/builder-v2-tolerant-control-and-early-finish-20261016
+base_sha=bd211d1fab6a515221c2e084c3974fede4d0eb23
+branch=fix/builder-v2-pause-checkpoint-db-20261016

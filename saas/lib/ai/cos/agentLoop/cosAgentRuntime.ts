@@ -19,7 +19,7 @@ const FETCH_HEADERS = Object.freeze({
 
 /** Code execution is open to every surface with per-turn caps; the real browser stays owner-only. */
 export function cosAgentToolPolicy(input: { ownerAuthenticated: boolean; signedIn: boolean }): AgentToolPolicy {
-  return Object.freeze({ maxPythonRuns: input.signedIn || input.ownerAuthenticated ? 4 : 2, browserAllowed: input.ownerAuthenticated })
+  return Object.freeze({ maxPythonRuns: input.signedIn || input.ownerAuthenticated ? 5 : 3, browserAllowed: input.ownerAuthenticated })
 }
 
 async function browseWithPlaywright(url: string, budgetMs: number): Promise<AgentBrowseResult> {

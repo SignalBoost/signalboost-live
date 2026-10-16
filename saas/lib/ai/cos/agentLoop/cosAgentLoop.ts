@@ -49,10 +49,12 @@ export function newAgentLoopTrace(): AgentLoopTrace {
   return { outcome: 'running', rounds: 0, model: '', steps: [], unsupportedNumbers: [], modelError: '', roundMs: [] }
 }
 
-const MAX_ROUNDS = 8
+// Rounds are fast on the round models (1-7 s each in production); the time budget, not the round
+// count, is the real limit. 8 rounds ended a turn that had data and a fixable code error.
+const MAX_ROUNDS = 14
 // Host-owned tool budget: a model that emits many parallel calls cannot fan out past these.
 const MAX_CALLS_PER_ROUND = 4
-const MAX_TOOL_CALLS = 12
+const MAX_TOOL_CALLS = 20
 const ROUND_TIMEOUT_MS = 60_000
 const MIN_ROUND_MS = 8_000
 

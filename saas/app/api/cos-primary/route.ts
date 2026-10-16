@@ -74,6 +74,12 @@ import { looksLikeArtifactContinuation } from '@/lib/ai/cos/artifactContinuation
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
+import { runCosAgentLoop } from '@/lib/ai/cos/agentLoop/cosAgentLoop'
+import { cosAgentToolPolicy, createCosAgentPorts } from '@/lib/ai/cos/agentLoop/cosAgentRuntime'
+import { requiresAgentTools } from '@/lib/ai/cos/agentLoop/agentToolIntent'
+import { runCosAgentToolTurn } from '@/lib/ai/cos/cosAgentDecision'
+import { turnDeadlineRemainingMs } from '@/lib/ai/cos/cosTurnBudget'
+import { buildPriceHistoryChart, detectPriceHistoryChartRequest, fetchPriceHistory } from '@/lib/market/priceHistoryChart'
 import { retrieveCreativeMemory, formatCreativeMemoryForReasoner } from '@/lib/ai/cos/creativeMemory'
 import {
   isProvenanceIntrospection,
@@ -311,6 +317,70 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
     }
   }
   return null
+}
+
+// The agent loop's share of an interactive turn: tool rounds, sandbox and verification together.
+// Longer than a one-pass answer by nature; the browser's History watch covers turns past the
+// response window, and the loop stops launching tools as soon as its deadline is spent.
+const AGENT_LOOP_BUDGET_MS=90_000
+
+type AgentComputeTurn={startedAt:number;input:string;language:string;body:any;userId:string|null;ownerAuthenticated:boolean;precedingAssistant:string|null}
+
+function agentChartJson(startedAt:number,input:string,payload:{reply:string;source:string;png?:Buffer;filename?:string;sources:string[];reasonerLabel:string|null;modelInvoked:boolean;loop?:unknown}){
+  const executionProvenance=authoritativeProvenance(null,{invoked:false})
+  if(payload.reasonerLabel){
+    ;(executionProvenance as any).local_reasoning={invoked:true,model:payload.reasonerLabel,confidence:1}
+    ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,provider:null,model:payload.reasonerLabel,from_cache:false}
+  }
+  ;(executionProvenance as any).agent_tool_loop=payload.loop??null
+  const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:payload.reply,source:payload.modelInvoked?'local_cos_reasoning':'deterministic',confidence:1,provenance:executionProvenance,externalAiInvoked:false})
+  const dataUrl=payload.png?`data:image/png;base64,${payload.png.toString('base64')}`:''
+  return{executionProvenance,response:NextResponse.json({ok:true,reply:payload.reply,source:payload.source,confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:payload.modelInvoked,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,live_evidence_retrieved_this_turn:payload.sources.length>0,live_evidence_sources:payload.sources,...(dataUrl?{visual:{previewUrl:dataUrl,downloadUrl:dataUrl,filename:payload.filename||'chart.png',alt:input.slice(0,200)}}:{}),agent_tool_loop:payload.loop??undefined,execution_allowed:false,external_action_taken:false})}
+}
+
+/**
+ * COS capability "compute": the general agent tool loop (search, fetch, sandboxed Python, governed
+ * browser) runs here, behind the canonical COS ingress, so provenance, telemetry and public scope
+ * apply as for every other answer. A chart request is released only with a verified chart; when the
+ * loop cannot deliver one, a security price history still has a deterministic renderer, and
+ * anything else continues through the ordinary COS pipeline.
+ */
+async function agentComputeResponse(turn:AgentComputeTurn):Promise<NextResponse|null>{
+  const loopStartedAt=Date.now()
+  const remaining=turnDeadlineRemainingMs()
+  const policy=cosAgentToolPolicy({ownerAuthenticated:turn.ownerAuthenticated,signedIn:Boolean(turn.userId)})
+  const history=(Array.isArray(turn.body?.messages)?turn.body.messages:[])
+    .filter((message:any)=>(message?.role==='user'||message?.role==='assistant')&&typeof message?.content==='string')
+    .slice(0,-1)
+    .map((message:any)=>({role:message.role as 'user'|'assistant',content:String(message.content)}))
+  const result=await runCosAgentLoop({
+    request:turn.input,
+    conversation:history,
+    language:turn.language,
+    model:runCosAgentToolTurn,
+    ports:createCosAgentPorts(policy),
+    policy,
+    deadlineAt:loopStartedAt+Math.min(AGENT_LOOP_BUDGET_MS,remaining===null?AGENT_LOOP_BUDGET_MS:Math.max(0,remaining-10_000)),
+  }).catch(error=>{console.warn('[cos-agent-loop] failed',error instanceof Error?error.message:String(error));return null})
+  const chartRequested=requiresAgentTools(turn.input,turn.precedingAssistant)
+  console.info('[cos-agent-loop]',JSON.stringify({at:new Date().toISOString(),ok:Boolean(result),chartRequested,ms:Date.now()-loopStartedAt,rounds:result?.rounds??null,toolCalls:result?.toolCalls??[],pythonRuns:result?.pythonRuns??0,images:result?.images.length??0,verification:result?.verification??null,model:result?.model??null}))
+  recordCosLatencyStage('primary:agent_loop',Date.now()-loopStartedAt)
+  const loop=result?{rounds:result.rounds,tool_calls:result.toolCalls,python_runs:result.pythonRuns,verification:result.verification,model:result.model}:null
+  if(result&&(!chartRequested||result.images.length)){
+    const image=result.images[0]
+    const built=agentChartJson(turn.startedAt,turn.input,{reply:result.reply,source:'cos-agent-tool-loop',png:image?.png,filename:image?.name.replace(/[^a-z0-9._-]+/gi,'-'),sources:result.sources,reasonerLabel:result.model?`managed-open-model:${result.model}`:null,modelInvoked:true,loop})
+    await writeCosPrimaryProvenance(turn.userId,result.reply,built.executionProvenance,'cos-agent-tool-loop',{prompt:turn.input,answered:true,confidence:1,branch:'agent_tool_loop'})
+    return built.response
+  }
+  if(!chartRequested)return null
+  const earlierUserTurns=history.filter((message:{role:string})=>message.role==='user').map((message:{content:string})=>message.content)
+  const priceChart=detectPriceHistoryChartRequest(turn.input,earlierUserTurns)
+  const priceHistory=priceChart?await fetchPriceHistory(priceChart):null
+  if(!priceChart||!priceHistory)return null
+  const chart=buildPriceHistoryChart(priceChart,priceHistory,turn.language)
+  const built=agentChartJson(turn.startedAt,turn.input,{reply:chart.reply,source:'cos-market-chart',png:chart.png,filename:chart.filename,sources:[priceHistory.source.url],reasonerLabel:null,modelInvoked:false,loop})
+  await writeCosPrimaryProvenance(turn.userId,chart.reply,built.executionProvenance,'cos-market-chart',{prompt:turn.input,answered:true,confidence:1,branch:'market_chart'})
+  return built.response
 }
 
 function fastAuthoringResponse(startedAt:number,input:string,fast:{reply:string;reasonerLabel:string;cognitiveMode:FastAuthoringCognitiveMode},source='cos-fast-authoring'){
@@ -719,6 +789,10 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       .map(value=>value.trim())
       .filter(Boolean),
   )
+  if(agentCapabilities.has('compute')){
+    const computed=await agentComputeResponse({startedAt,input,language,body,userId,ownerAuthenticated:access?.isOwner===true&&Boolean(userId),precedingAssistant:precedingAssistant||null})
+    if(computed)return computed
+  }
   const modelPlannedFreshEvidence=agentCapabilities.has('live_web')
   // Searches the planner wrote for live_web (cos-browser strips any client-supplied value before routing).
   const plannerSearchQueries=modelPlannedFreshEvidence?decodePlannerSearchQueriesHeader(req.headers.get(PLANNER_SEARCH_QUERIES_HEADER)):[]

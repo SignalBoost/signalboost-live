@@ -81,10 +81,10 @@ test('the chart is a real PNG with cited figures from the data', () => {
   assert.match(buildPriceHistoryChart(request, history, 'ar').reply, /آخر إغلاق/)
 })
 
-test('the Concierge plots price charts before image generation', () => {
-  const route = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
-  const chartAt = route.indexOf('detectPriceHistoryChartRequest(prompt')
-  assert.ok(chartAt > 0 && chartAt < route.indexOf('isConciergeVisualObjective(prompt)'))
-  assert.match(route, /source: 'concierge-market-chart'/)
-  assert.match(route, /previewUrl: dataUrl/)
+test('a price chart the agent loop could not deliver falls back to the deterministic renderer', () => {
+  const primary = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  const loop = primary.indexOf('const result=await runCosAgentLoop(')
+  const fallback = primary.indexOf('const priceChart=detectPriceHistoryChartRequest(turn.input,earlierUserTurns)')
+  assert.ok(loop > 0 && fallback > loop)
+  assert.match(primary, /source:'cos-market-chart'/)
 })

@@ -49,6 +49,7 @@ const SIGNATURE_FIRST_NAME_RE = /^\p{Lu}\p{Ll}{1,19}$/u
 const SIGNATURE_FULL_NAME_RE = /^\p{Lu}\p{Ll}+(?:\s+\p{Lu}[\p{L}'.-]*){1,3}$/u
 const FORWARDING_OPENER_RE = /(?:^|[.!?]\s+|\n\s*)((?:please\s+)?see\s+(?:below|(?:the\s+)?(?:e-?mail|message|note|thread)\s+below|attached)|fyi\b|forwarding\b)/giu
 const ADDRESS_WINDOW_CHARS = 80
+const GREETING_SOURCE = '(?:hi|hello|hey|dear|thank\\s+you|thanks|good\\s+(?:morning|afternoon|evening)|hola|ol[aá]|bonjour|hallo|ciao|cze[sś][ćc])'
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -64,8 +65,10 @@ function addresseeReplyStart(text: string): number | null {
     const fullName = following[0] || ''
     if (!SIGNATURE_FULL_NAME_RE.test(fullName) || !fullName.split(/\s+/)[0].startsWith(name)) continue
     // Only the signature of the person the draft is written to; the user's own signature stays.
+    // The name must be the one the greeting addresses ("Thank you Tim,", "Hi Tim"), not any name in
+    // the opening: "Hi Sam, this is Luis" signed "Luis / Luis Example" keeps the user's signature.
     const opening = text.slice(0, Math.min(offset, ADDRESS_WINDOW_CHARS))
-    if (!new RegExp(`(?:^|[^\\p{L}])${escapeRegExp(name)}(?:[^\\p{L}]|$)`, 'u').test(opening)) continue
+    if (!new RegExp(`(?:^|[^\\p{L}])${GREETING_SOURCE}[\\s,]+(?:(?:mr|ms|mrs|dr)\\.?\\s+)?${escapeRegExp(name)}(?:[^\\p{L}]|$)`, 'iu').test(opening)) continue
 
     const before = text.slice(0, offset)
     let start = offset

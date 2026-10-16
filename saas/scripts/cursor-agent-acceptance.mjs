@@ -54,32 +54,64 @@ export function cursorEvents(text) {
   }
   return {events,sessionId}
 }
-export async function runCursorAcceptance({root,objective,agent='agent',env=process.env,timeoutMs=900_000}) {
+export function nextCursorRepairPrompt({missing,receipts,passed}) {
+  return [
+    'Repair this existing workspace in place. Do not restart or delete work.',
+    'Missing required files: '+JSON.stringify(missing),
+    'Passed Node tests: '+passed+' (minimum 20 required).',
+    ...receipts.filter(r=>r.exitCode!==0||r.timedOut).map(r=>
+      'FAILED '+r.command+' exit='+r.exitCode+' timeout='+r.timedOut+
+      '\nSTDOUT:\n'+r.stdout.slice(-6000)+'\nSTDERR:\n'+r.stderr.slice(-6000)),
+    'Edit the source and tests to address these exact failures. Verify with actual terminal commands.'
+  ].join('\n\n')
+}
+export async function runCursorAcceptance({root,objective,agent='agent',env=process.env,timeoutMs=240_000,maxRepairRounds=2}) {
   root=resolve(root)
   await mkdir(root,{recursive:true})
   const safeEnv={PATH:env.PATH,HOME:env.HOME,CURSOR_API_KEY:env.CURSOR_API_KEY}
   if(!safeEnv.CURSOR_API_KEY)throw new Error('cursor_api_key_required')
-  const prompt=objective+'\nBuild the application in this working directory. Do not merely describe changes. Run and repair tests; do not claim success without actual passing commands.'
-  const agentRun=await execute(agent,['-p','--force','--output-format','stream-json',prompt],{cwd:root,env:safeEnv,timeoutMs})
-  const parsed=cursorEvents(agentRun.stdout)
-  const present=await listFiles(root)
-  const missing=REQUIRED.filter(p=>!present.includes(p))
-  const receipts=[]
-  // Independently run tests AFTER Cursor is finished. A model statement is never a verification receipt.
-  for(const [cmd,args] of [['npm',['test']],['node',['--test',...REQUIRED.filter(p=>p.startsWith('test/'))]],['node',['index.js']]]) {
-    const execution=await execute(cmd,args,{cwd:root,env:{PATH:env.PATH,HOME:env.HOME},timeoutMs:120_000})
-    receipts.push({command:cmd+' '+args.join(' '),...execution})
+  const rounds=[]
+  let sessionId=null
+  let prompt=objective+'\nBuild the application in this working directory. Do not merely describe changes. Run and repair tests; do not claim success without actual passing commands.'
+  let status='FAIL',missing=[...REQUIRED],receipts=[],passed=0
+  const begin=Date.now()
+  for(let round=0;round<=maxRepairRounds;round++) {
+    const args=['-p','--force','--output-format','stream-json']
+    if(sessionId)args.push('--resume',sessionId)
+    args.push(prompt)
+    const agentRun=await execute(agent,args,{cwd:root,env:safeEnv,timeoutMs})
+    const parsed=cursorEvents(agentRun.stdout)
+    sessionId=parsed.sessionId??sessionId
+    const present=await listFiles(root)
+    missing=REQUIRED.filter(p=>!present.includes(p))
+    receipts=[]
+    // Execute the exact acceptance commands independently, after the agent exits.
+    // No remembered test result or assistant assertion can produce a PASS.
+    for(const [command,cmd,args] of [
+      ['npm test','npm',['test']],
+      ['node --test test/*.test.js','node',['--test',...REQUIRED.filter(p=>p.startsWith('test/'))]],
+      ['node index.js','node',['index.js']]
+    ]) {
+      const execution=await execute(cmd,args,{cwd:root,env:{PATH:env.PATH,HOME:env.HOME},timeoutMs:120_000})
+      receipts.push({command,...execution})
+    }
+    const matches=[...receipts[0].stdout.matchAll(/(?:^|\n)\s*(?:#|ℹ)\s+pass\s+(\d+)/g)]
+    passed=matches.length?Number(matches.at(-1)[1]):0
+    status=missing.length===0 && receipts.every(r=>r.exitCode===0&&!r.timedOut) && passed>=20?'PASS':'FAIL'
+    rounds.push({index:round,agent:{exitCode:agentRun.exitCode,timedOut:agentRun.timedOut,durationMs:agentRun.durationMs,
+      stderr:agentRun.stderr.slice(-8000),sessionId:parsed.sessionId,events:parsed.events},status,missing,testsPassed:passed,receipts})
+    // Persist every attempt so interrupted or unsuccessful runs retain real evidence.
+    await mkdir(join(root,'evidence'),{recursive:true})
+    await writeFile(join(root,'evidence','acceptance.json'),JSON.stringify({
+      schema:'itmounts.cursor.acceptance.v2',status,root,required:REQUIRED.length,present:REQUIRED.length-missing.length,
+      missing,testsPassed:passed,elapsedMs:Date.now()-begin,sessionId,rounds
+    },null,2))
+    if(status==='PASS')break
+    if(round===maxRepairRounds||!sessionId||agentRun.timedOut||agentRun.exitCode!==0)break
+    prompt=nextCursorRepairPrompt({missing,receipts,passed})
   }
-  const testOutput=receipts[0].stdout
-  const matches=[...testOutput.matchAll(/(?:^|\n)\s*(?:#|ℹ)\s+pass\s+(\d+)/g)]
-  const passed=matches.length?Number(matches.at(-1)[1]):0
-  const status=missing.length===0 && receipts.every(r=>r.exitCode===0&&!r.timedOut) && passed>=20?'PASS':'FAIL'
-  const evidence={schema:'itmounts.cursor.acceptance.v1',status,root,required:REQUIRED.length,present:REQUIRED.length-missing.length,missing,
-    testsPassed:passed,agent:{exitCode:agentRun.exitCode,timedOut:agentRun.timedOut,durationMs:agentRun.durationMs,
-      stderr:agentRun.stderr.slice(-8000),sessionId:parsed.sessionId,events:parsed.events},receipts}
-  await mkdir(join(root,'evidence'),{recursive:true})
-  await writeFile(join(root,'evidence','acceptance.json'),JSON.stringify(evidence,null,2))
-  return evidence
+  return {schema:'itmounts.cursor.acceptance.v2',status,root,required:REQUIRED.length,
+    present:REQUIRED.length-missing.length,missing,testsPassed:passed,sessionId,rounds,receipts}
 }
 if(process.argv[1] && resolve(process.argv[1])===resolve(new URL(import.meta.url).pathname)) {
   const root=process.argv[2], objectivePath=process.argv[3]

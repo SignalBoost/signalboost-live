@@ -316,7 +316,7 @@ test('tools never spend the answer reserve, and the last round answers', async (
     request: 'chart VNCE stock price',
     language: 'en',
     now: () => clock,
-    deadlineAt: 45_000,
+    deadlineAt: 38_000,
     model: async input => {
       choices.push(input.toolChoice)
       return choices.length === 1 ? call('c1', 'fetch_url', { url: YAHOO_URL }) : answer('VNCE closed at $13.33.')
@@ -324,7 +324,7 @@ test('tools never spend the answer reserve, and the last round answers', async (
     ports: ports(fakePython({ stdout: '' }), { fetchPublic: async (url, timeoutMs) => { budgets.push(timeoutMs); clock += timeoutMs; return { status: 200, text: '13.33', finalUrl: url, contentType: 'text/plain' } } }),
     policy: { maxPythonRuns: 1, browserAllowed: false },
   })
-  assert.deepEqual(budgets, [20_000])
+  assert.deepEqual(budgets, [10_000])
   assert.deepEqual(choices, ['auto', 'none'])
   assert.equal(result?.reply, 'VNCE closed at $13.33.')
 })
@@ -349,6 +349,23 @@ test('a host that failed is not retried in the same turn', async () => {
   assert.equal(attempts.length, 1)
   const results = seen.at(-1)!.filter(message => message.role === 'tool').map(message => String(message.content))
   assert.match(results[1], /^Skipped https:\/\/slow\.example\.org\/series\.csv\?x=1: slow\.example\.org already failed/)
+})
+
+test('URLs carrying API keys are refused without a request', async () => {
+  const attempts: string[] = []
+  const seen: LocalModelChatMessage[][] = []
+  await runCosAgentLoop({
+    request: 'chart the US unemployment rate',
+    language: 'en',
+    model: scriptedModel([call('a', 'fetch_url', { url: 'https://api.example.org/obs?series_id=X&api_key=abcdef123456&file_type=json' }), answer('done')], seen),
+    ports: ports(fakePython({ stdout: '' }), { fetchPublic: async url => { attempts.push(url); return { status: 200, text: 'ok', finalUrl: url, contentType: 'text/plain' } } }),
+    policy: { maxPythonRuns: 1, browserAllowed: false },
+    deadlineAt: Date.now() + 100_000,
+  })
+  assert.equal(attempts.length, 0)
+  const result = String(seen.at(-1)!.find(message => message.role === 'tool')?.content)
+  assert.match(result, /^Refused https:\/\/api\.example\.org\/obs\?series_id=…&api_key=…&file_type=…: URLs carrying API keys/)
+  assert.doesNotMatch(result, /abcdef123456/)
 })
 
 // Production 2026-10-16: the unemployment turn found BLS monthly data, hit one Python error, and

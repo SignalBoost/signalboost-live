@@ -1,2 +1,2 @@
-base_sha=90a5200dd8e3d323f5c839aaf28daf75921ea9f3
-branch=fix/cos-agent-loop-lean-rounds-20261016
+base_sha=fe4ea9bfbe10d2f48acdcf671859e39ec98da4e4
+branch=fix/cos-agent-loop-fast-model-20261016

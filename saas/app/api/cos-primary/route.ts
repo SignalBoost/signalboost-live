@@ -384,7 +384,15 @@ async function agentComputeResponse(turn:AgentComputeTurn):Promise<NextResponse|
   const earlierUserTurns=history.filter((message:{role:string})=>message.role==='user').map((message:{content:string})=>message.content)
   const priceChart=detectPriceHistoryChartRequest(turn.input,earlierUserTurns)
   const priceHistory=priceChart?await fetchPriceHistory(priceChart):null
-  if(!priceChart||!priceHistory)return null
+  if(!priceChart||!priceHistory){
+    // A chart of real data was asked for and could not be built from retrieved data. Fail closed
+    // instead of letting a one-pass answer fill the chart with remembered figures (production
+    // 2026-10-16: "US unemployment rate over the past 5 years" got an invented, projected table).
+    const reply=freshEvidenceUnavailableReply(turn.language,turn.input)
+    const built=agentChartJson(turn.startedAt,turn.input,{reply,source:'cos-agent-tool-loop-unavailable',sources:[],reasonerLabel:null,modelInvoked:Boolean(trace.model),loop})
+    await writeCosPrimaryProvenance(turn.userId,reply,built.executionProvenance,'cos-agent-tool-loop-unavailable',{prompt:turn.input,answered:false,confidence:0,branch:'agent_tool_loop_unavailable'})
+    return built.response
+  }
   const chart=buildPriceHistoryChart(priceChart,priceHistory,turn.language)
   const built=agentChartJson(turn.startedAt,turn.input,{reply:chart.reply,source:'cos-market-chart',png:chart.png,filename:chart.filename,sources:[priceHistory.source.url],reasonerLabel:null,modelInvoked:false,loop})
   await writeCosPrimaryProvenance(turn.userId,chart.reply,built.executionProvenance,'cos-market-chart',{prompt:turn.input,answered:true,confidence:1,branch:'market_chart'})

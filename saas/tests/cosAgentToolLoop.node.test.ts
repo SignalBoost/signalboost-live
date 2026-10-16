@@ -211,6 +211,8 @@ test('compute turns run behind the COS ingress, before image generation can take
   assert.match(primary, /writeCosPrimaryProvenance\(turn\.userId,result\.reply,built\.executionProvenance,'cos-agent-tool-loop'/)
   // A chart request is released only with a verified chart.
   assert.match(primary, /if\(result&&\(!chartRequested\|\|result\.images\.length\)\)/)
+  // A chart request the loop could not build fails closed rather than reaching a one-pass answer.
+  assert.match(primary, /const reply=freshEvidenceUnavailableReply\(turn\.language,turn\.input\)\n\s*const built=agentChartJson\(turn\.startedAt,turn\.input,\{reply,source:'cos-agent-tool-loop-unavailable'/)
 })
 
 test('a model cannot fan out past the host tool budget in one round', async () => {
@@ -273,6 +275,10 @@ test('agent-loop model rounds are not clamped to the one-pass interactive timeou
   assert.ok(clamp.indexOf('agentToolLoopRound(args)') < clamp.indexOf('COS_INTERACTIVE_MODEL_TIMEOUT_MS'))
   const seam = readFileSync(join(process.cwd(), 'lib/ai/cos/cosAgentDecision.ts'), 'utf8')
   assert.match(seam, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'agent_tool_loop' \}/)
+  // Production 2026-10-16: the configured reasoner never finished a code round in 60 s; rounds on
+  // DeepInfra use the fast models the edit lane already runs, the second only when the first fails.
+  assert.match(seam, /process\.env\.COS_FAST_TEXT_MODEL\?\.trim\(\) \|\| 'deepseek-ai\/DeepSeek-V4-Flash-0731'/)
+  assert.match(seam, /\{ \.\.\.config, model, timeoutMs: attemptMs \}/)
 })
 
 test('JSON downloads are shown to the model as structure, not raw values', async () => {

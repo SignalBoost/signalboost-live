@@ -447,3 +447,53 @@ export class BuilderV2Agent {
     return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
   }
 }
+
+function describeStep(receipt: BuilderV2Receipt): string {
+  const output = receipt.output as { path?: unknown; exitCode?: unknown; requestedCommand?: unknown; syntaxError?: unknown } | undefined
+  const path = typeof output?.path === 'string' ? output.path : ''
+  if (receipt.tool === 'run_tests') {
+    const command = typeof output?.requestedCommand === 'string' ? output.requestedCommand : 'command'
+    return `ran \`${command}\` (${receipt.ok ? 'passed' : `exit ${String(output?.exitCode ?? '?')}`})`
+  }
+  const verb = { write_file: 'wrote', edit_file: 'edited', read_file: 'read', list_files: 'listed files', search_files: 'searched' }[receipt.tool]
+  const outcome = !receipt.ok ? ` (failed: ${receipt.error ?? 'error'})` : typeof output?.syntaxError === 'string' ? ' (syntax error)' : ''
+  return `${verb}${path ? ` ${path}` : ''}${outcome}`
+}
+
+/**
+ * The job's progress for the person who started it, from host receipts only (Lovable shows each step of a running
+ * build; Cursor shows the task's progress): required files written, each required command's latest real result,
+ * tests passing, the last actions and the latest failure output.
+ */
+export function builderV2ProgressReport(objective: string, files: readonly string[], steps: readonly BuilderV2Receipt[],
+  slice?: Readonly<{ current: number; max: number }>): string {
+  const contract = builderTaskContract(objective)
+  const acceptance = builderV2Acceptance(objective, files, steps)
+  const lastChange = steps.findLastIndex(receipt => receipt.changed)
+  const lines: string[] = [`Progress${slice ? ` (work slice ${slice.current} of ${slice.max})` : ''}:`]
+  if (contract.files.length) {
+    const written = contract.files.length - acceptance.missingFiles.length
+    const missing = acceptance.missingFiles.slice(0, 5).join(', ') + (acceptance.missingFiles.length > 5 ? ', …' : '')
+    lines.push(`- Required files: ${written} of ${contract.files.length} written${missing ? `. Missing: ${missing}` : ''}`)
+  }
+  if (contract.commands.length) {
+    const results = contract.commands.map(command => {
+      const at = steps.findLastIndex(receipt => receipt.tool === 'run_tests'
+        && (receipt.output as { requestedCommand?: unknown } | undefined)?.requestedCommand === command)
+      if (at < 0) return `\`${command}\` not run yet`
+      const exit = (steps[at].output as { exitCode?: unknown } | undefined)?.exitCode
+      return `\`${command}\` ${steps[at].ok ? 'passed' : `failed (exit ${String(exit ?? '?')})`}${at < lastChange ? ' before the latest change' : ''}`
+    })
+    lines.push(`- Required commands: ${results.join(' · ')}`)
+  }
+  if (contract.minimumTests) lines.push(`- Tests passing: ${acceptance.testsPassed} of ${contract.minimumTests} required`)
+  if (steps.length) lines.push(`- Last steps: ${steps.slice(-5).map(describeStep).join(' · ')}`)
+  const failed = steps.findLast(receipt => receipt.tool === 'run_tests' && !receipt.ok)
+  const failedAt = failed ? steps.lastIndexOf(failed) : -1
+  if (failed && failedAt > lastChange) {
+    const output = failed.output as { stderr?: unknown; stdout?: unknown } | undefined
+    const text = [output?.stderr, output?.stdout].filter((part): part is string => typeof part === 'string' && part.trim().length > 0).join('\n')
+    if (text) lines.push(`- Latest failure output:\n\`\`\`text\n${text.trim().split('\n').slice(-12).join('\n').slice(-1200)}\n\`\`\``)
+  }
+  return lines.join('\n')
+}

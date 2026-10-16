@@ -52,7 +52,7 @@ with tempfile.TemporaryDirectory(prefix='itmounts-ghidra-') as temp:
         if not (source/'support'/'analyzeHeadless').is_file():
             raise SystemExit('Missing official Ghidra headless analyzer')
         shutil.move(str(source), str(root))
-        for launcher in ('ghidraRun', 'support/analyzeHeadless'):
+        for launcher in ('ghidraRun', 'support/analyzeHeadless', 'support/launch.sh'):
             path = root / launcher
             if path.is_file():
                 path.chmod(path.stat().st_mode | 0o111)

@@ -177,6 +177,15 @@ export async function POST(request: Request) {
     if (requestedWorkspaceId && !UUID.test(requestedWorkspaceId)) {
       return noStore({ error: 'Invalid workspace id.' }, { status: 400 })
     }
+    // Owner-scoped fresh jobs can explicitly exercise V2 without converting existing V1 checkpoints.
+    // Reject unauthorized V2 requests rather than silently executing the legacy engine.
+    const requestedEngine = body?.builderEngine
+    if (requestedEngine !== undefined && requestedEngine !== 'v1' && requestedEngine !== 'v2') {
+      return noStore({ error: 'builder_engine_invalid' }, { status: 400 })
+    }
+    if (requestedEngine === 'v2' && !access.isOwner) {
+      return noStore({ error: 'builder_v2_owner_required' }, { status: 403 })
+    }
     const newProjectRequested = isNewBuilderProjectObjective(objective)
     let workspaceId = newProjectRequested ? crypto.randomUUID() : requestedWorkspaceId || crypto.randomUUID()
 
@@ -391,7 +400,8 @@ export async function POST(request: Request) {
               ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
             }
           : { ...(project.context ? { projectContext: project.context } : {}),
-              ...(continuationWorkspace ? { requiresExistingSource: true } : {}) },
+              ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
+              ...(requestedEngine === 'v2' ? { builderEngine: 'v2' } : {}) },
       ownerAuthorized: access.isOwner === true,
       runningReply: reply,
     })

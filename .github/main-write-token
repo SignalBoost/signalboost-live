@@ -1,2 +1,2 @@
-base_sha=6d40bddc5097c96045e42ba9c02538f4a16ebc00
-branch=feat/builder-v2-syntax-check-on-write-20261016
+base_sha=66e6748b7f83fa98701b2905b5f56abe07785178
+branch=feat/cursor-repair-loop-20261016

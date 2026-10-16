@@ -55,7 +55,7 @@ export function createCosAgentPorts(policy: AgentToolPolicy): AgentToolPorts {
       const found = await getExternalInfo(query, 8, { bypassCache: true })
       return found.results.map(result => ({ title: result.title, url: result.url, snippet: result.snippet }))
     },
-    fetchPublic: (url: string) => guardedPublicFetch(url, { headers: { ...FETCH_HEADERS }, timeoutMs: 20_000, maxBytes: 3_000_000 }),
+    fetchPublic: (url: string, timeoutMs: number) => guardedPublicFetch(url, { headers: { ...FETCH_HEADERS }, timeoutMs, maxBytes: 3_000_000 }),
     python: new VercelPythonSession(),
     ...(policy.browserAllowed ? { browse: browseWithPlaywright } : {}),
   })

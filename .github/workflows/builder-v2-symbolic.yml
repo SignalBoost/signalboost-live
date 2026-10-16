@@ -33,4 +33,4 @@ jobs:
       - name: Execute production decision logic against every Z3 state
         env:
           BUILDER_V2_Z3_FILE: ${{ runner.temp }}/v2-symbolic.json
-        run: node --test tests/builderV2SymbolicTimeout.node.test.ts
+        run: npx tsx --test tests/builderV2SymbolicTimeout.node.test.ts

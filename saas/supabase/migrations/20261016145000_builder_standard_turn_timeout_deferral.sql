@@ -83,7 +83,7 @@ as $$
           )
         )
       ))
-      or (status = 'paused' and claim_generation < 4 and checkpoint is not null
+      or (status = 'paused' and claim_generation < 24 and checkpoint is not null
           and job_kind = 'standard' and coalesce((metadata->>'platformRepair')::boolean, false) = false)
     )
     returning *;

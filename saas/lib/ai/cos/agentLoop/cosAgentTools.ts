@@ -15,7 +15,7 @@ export type AgentBrowseResult = Readonly<{ ok: boolean; text: string; error?: st
 
 export type AgentToolPorts = Readonly<{
   search(query: string): Promise<readonly AgentSearchResult[]>
-  fetchPublic(url: string): Promise<AgentFetchResult>
+  fetchPublic(url: string, timeoutMs: number): Promise<AgentFetchResult>
   python: PythonSession
   /** Governed real-browser fallback; absent when host policy does not grant it for this requester. */
   browse?: (url: string, budgetMs: number) => Promise<AgentBrowseResult>
@@ -46,6 +46,10 @@ export function emptyEvidence(userText: string): AgentEvidence {
 
 // Short previews keep each round's context small (the full body is in data/ for the code to read).
 const OBSERVATION_LIMIT = 3_000
+// Time kept back for the final answer round: tools never spend it.
+export const ANSWER_RESERVE_MS = 25_000
+const FETCH_TIMEOUT_MS = 20_000
+const PYTHON_TIMEOUT_MS = 40_000
 
 /**
  * An image is evidence-backed only when the program that drew it actually opened a staged data
@@ -159,7 +163,7 @@ export async function executeAgentTool(input: {
 
   switch (input.name) {
     case 'web_search': {
-      if (input.remainingMs() < 8_000) return 'Error: no time left in this turn for more searches. Answer with what you have.'
+      if (input.remainingMs() - ANSWER_RESERVE_MS < 5_000) return 'Error: no time left in this turn for more searches. Answer with what you have.'
       const query = String(args.query || '').trim().slice(0, 300)
       if (!query) return 'Error: query is required.'
       const results = await input.ports.search(query).catch(() => [] as AgentSearchResult[])
@@ -172,7 +176,8 @@ export async function executeAgentTool(input: {
     case 'browse_page': {
       const url = String(args.url || '').trim()
       if (!/^https?:\/\//i.test(url)) return 'Error: an absolute http(s) URL is required.'
-      if (input.remainingMs() < 8_000) return 'Error: no time left in this turn for more downloads. Answer with what you have.'
+      const fetchBudgetMs = Math.min(FETCH_TIMEOUT_MS, input.remainingMs() - ANSWER_RESERVE_MS)
+      if (fetchBudgetMs < 5_000) return 'Error: no time left in this turn for more downloads. Answer with what you have.'
       let body: string
       let finalUrl = url
       let extension: string
@@ -186,7 +191,7 @@ export async function executeAgentTool(input: {
         extension = 'txt'
       } else {
         try {
-          const fetched = await input.ports.fetchPublic(url)
+          const fetched = await input.ports.fetchPublic(url, fetchBudgetMs)
           if (fetched.status >= 400) return record(`HTTP ${fetched.status} from ${fetched.finalUrl}. Try another source or endpoint.`)
           finalUrl = fetched.finalUrl
           extension = extensionFor(fetched.contentType, finalUrl)
@@ -211,10 +216,11 @@ export async function executeAgentTool(input: {
 
     case 'run_python': {
       if (evidence.pythonRuns >= input.policy.maxPythonRuns) return 'Error: the Python run limit for this turn is reached. Answer with what you have.'
-      if (input.remainingMs() < 25_000) return 'Error: not enough time left in this turn to run code. Answer with what you have.'
+      const pythonBudgetMs = Math.min(PYTHON_TIMEOUT_MS, input.remainingMs() - ANSWER_RESERVE_MS)
+      if (pythonBudgetMs < 15_000) return 'Error: not enough time left in this turn to run code. Answer with what you have.'
       const code = String(args.code || '')
       evidence.pythonRuns += 1
-      const result = await input.ports.python.run({ code, files: evidence.files })
+      const result = await input.ports.python.run({ code, files: evidence.files, timeoutMs: pythonBudgetMs })
       const accepted = result.exitCode === 0 && imageBackedByStagedData(result.dataReads)
       if (accepted) evidence.images.push(...result.images)
       else evidence.droppedImages += result.images.length

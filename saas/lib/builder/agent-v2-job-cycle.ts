@@ -56,10 +56,13 @@ export async function runBuilderV2JobCycle(input: {
   // A model failure pauses only after the slice made progress, the rule V1 continuations use. A slice
   // without progress fails with the model's error: production 2026-10-16, an always-refused
   // model paused every slice instantly and spent all 24 slices with only package.json written.
-  // Progress means a file changed or a command passed in this slice; reads, lists and failed edits do not count
-  // (Codex review on #4595), or a read-then-refused pattern would still spend every slice.
-  const newReceipts = (result.checkpoint?.steps ?? []).slice(job.checkpoint?.steps.length ?? 0)
-  const madeProgress = newReceipts.some(receipt => receipt.changed || (receipt.tool === 'run_tests' && receipt.ok))
+  // Progress means the slice changed a file or verified a revision that was not verified before (the checkpoint's
+  // own counters). Reads, lists, failed edits and a rerun of an already-passing command add nothing (Codex review
+  // on #4595 and #4597), so a slice of only those followed by a model failure does not earn another slice.
+  const before = job.checkpoint
+  const after = result.checkpoint
+  const madeProgress = Boolean(after) && (after!.revision > (before?.revision ?? 0)
+    || after!.verifiedRevision > (before?.verifiedRevision ?? -1))
   if (result.reason === 'builder_v2_model_unavailable' && !madeProgress) {
     return { status: 'failed', result, reason: `builder_v2_model_unavailable: ${result.summary || 'builder_v2_model_error'}` }
   }

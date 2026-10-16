@@ -1,2 +1,2 @@
-base_sha=ad6ad3d3a155e8ebf7c72fc0beb64650ebc1082a
-branch=feat/cos-agent-tool-loop-20261015
+base_sha=316df2cdb6fc95d1dca365de77b245a567f04d3e
+branch=fix/cos-agent-loop-diagnostics-20261015

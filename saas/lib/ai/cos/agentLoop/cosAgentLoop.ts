@@ -37,12 +37,77 @@ export type AgentLoopTrace = {
   outcome: 'answered' | 'model_unavailable' | 'no_answer' | 'unsupported_numbers' | 'error' | 'running'
   rounds: number
   model: string
-  steps: { tool: string; observation: string }[]
+  steps: AgentTraceStep[]
   unsupportedNumbers: string[]
   /** Why the last model round produced nothing, when it did not. */
   modelError: string
   /** Wall-clock of each model round, ms. */
   roundMs: number[]
+}
+
+/**
+ * Sanitized metadata for one tool call. Raw observations can carry the user's request text, page
+ * contents or URL query strings; the trace is logged and persisted in execution_provenance, so it
+ * records only the tool, outcome, source host/path, size, exit code and error class.
+ */
+export type AgentTraceStep = {
+  tool: string
+  status: 'ok' | 'error'
+  /** Short machine label for a failure (e.g. http_404, refused_credentials, NameError). */
+  error?: string
+  host?: string
+  path?: string
+  chars?: number
+  results?: number
+  exitCode?: number
+  images?: number
+}
+
+const URL_IN_TEXT = /https?:\/\/[^\s)\]>"']+/
+
+function urlParts(text: string): Pick<AgentTraceStep, 'host' | 'path'> {
+  const match = text.match(URL_IN_TEXT)
+  if (!match) return {}
+  try {
+    const url = new URL(match[0])
+    return { host: url.hostname.toLowerCase(), path: url.pathname.slice(0, 120) }
+  } catch {
+    return {}
+  }
+}
+
+/** Removes query strings and fragments from any URL in a diagnostic message. */
+export function redactUrlQueries(text: string): string {
+  return String(text || '').replace(/(https?:\/\/[^\s?#)\]>"']+)[?#][^\s)\]>"']*/g, '$1')
+}
+
+export function agentTraceStep(tool: string, observation: string): AgentTraceStep {
+  const text = String(observation || '')
+  const first = text.split('\n', 1)[0]
+  const fetched = first.match(/^Fetched (\S+) \((\w+), (\d+) chars\)/)
+  if (fetched) return { tool, status: 'ok', ...urlParts(fetched[1]), chars: Number(fetched[3]) }
+  const exit = first.match(/^exit_code=(-?\d+)/)
+  if (exit) {
+    const exitCode = Number(exit[1])
+    const errorClass = exitCode === 0 ? null : (text.match(/^(\w+(?:Error|Exception|Exit|Interrupt))\b/m)?.[1] || (/\(timed out\)/.test(first) ? 'timed_out' : 'nonzero_exit'))
+    const saved = text.match(/^images saved: (.+?) \(/m)?.[1]
+    const images = saved && saved !== 'none' ? saved.split(', ').length : 0
+    const rejected = /^images REJECTED/m.test(text)
+    return { tool, status: exitCode === 0 && !rejected ? 'ok' : 'error', exitCode, images, ...(errorClass ? { error: errorClass } : rejected ? { error: 'images_rejected' } : {}) }
+  }
+  if (tool === 'web_search') {
+    if (/^No results for /.test(first)) return { tool, status: 'ok', results: 0 }
+    if (!/^Error:/.test(first)) return { tool, status: 'ok', results: (text.match(/^\[\d+\] /gm) || []).length }
+  }
+  const http = first.match(/^HTTP (\d{3}) from (\S+)/)
+  if (http) return { tool, status: 'error', error: `http_${http[1]}`, ...urlParts(http[2]) }
+  if (/^Refused /.test(first)) return { tool, status: 'error', error: 'refused_credentials', ...urlParts(first) }
+  if (/^Skipped /.test(first)) return { tool, status: 'error', error: 'skipped_failed_host', ...urlParts(first) }
+  const failed = first.match(/^(?:Could not fetch|Browser could not load) (\S+): ([\w.-]{1,60})/)
+  if (failed) return { tool, status: 'error', error: failed[2].replace(/\.$/, ''), ...urlParts(failed[1]) }
+  if (/^Error: .*budget|limit .* reached|no time left|not enough time/i.test(first)) return { tool, status: 'error', error: 'budget' }
+  if (/^Error: /.test(first)) return { tool, status: 'error', error: 'invalid_call' }
+  return { tool, status: 'error', error: 'unrecognized' }
 }
 
 export function newAgentLoopTrace(): AgentLoopTrace {
@@ -227,7 +292,7 @@ export async function runCosAgentLoop(input: {
         toolChoice: finalRound ? 'none' : 'auto',
         timeoutMs: Math.min(ROUND_TIMEOUT_MS, remainingMs() - 2_000),
       }).catch((error: unknown) => {
-        trace.modelError = (error instanceof Error ? error.message : String(error)).slice(0, 600)
+        trace.modelError = redactUrlQueries(error instanceof Error ? error.message : String(error)).slice(0, 600)
         return null
       })
       trace.rounds = rounds
@@ -253,7 +318,7 @@ export async function runCosAgentLoop(input: {
           ? await executeAgentTool({ name: call.function.name, argumentsJson: call.function.arguments, ports: input.ports, policy: input.policy, evidence, remainingMs })
           : 'Error: tool budget for this turn is spent; this call was not executed. Answer with what you have.'
         messages.push({ role: 'tool', tool_call_id: call.id, content: observation })
-        trace.steps.push({ tool: call.function.name, observation: observation.slice(0, 400) })
+        trace.steps.push(agentTraceStep(call.function.name, observation))
       }
     }
 

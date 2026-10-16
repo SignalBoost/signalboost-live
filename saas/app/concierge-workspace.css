@@ -125,24 +125,54 @@ body:has(.sb-ai-app-shell--home) > footer {
   color-scheme: dark;
 }
 
+/* Each saved conversation is a card: title, then date · message count. */
 .concierge-shell .cos-history-row {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  border-radius: 8px;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding: 2px 4px 2px 2px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .04);
 }
 
-.concierge-shell .cos-history-row .cos-history-entry {
-  flex: 1 1 auto;
-  min-width: 0;
+.concierge-shell .cos-history-row.is-current {
+  border-color: rgba(26, 240, 255, .35);
+  background: rgba(26, 240, 255, .1);
 }
 
 .concierge-shell .cos-history-row:hover {
-  background: rgba(255, 255, 255, .06);
+  border-color: rgba(255, 255, 255, .18);
+  background: rgba(255, 255, 255, .07);
+}
+
+.concierge-shell .cos-history-row .cos-history-entry {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 10px;
+  white-space: normal;
 }
 
 .concierge-shell .cos-history-row .cos-history-entry:hover {
   background: transparent;
+}
+
+.concierge-shell .cos-history-title {
+  overflow: hidden;
+  color: #fff;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.concierge-shell .cos-history-meta {
+  color: rgba(26, 240, 255, .62);
+  font-size: 10.5px;
 }
 
 /* Delete controls: a trash button on every conversation (always visible, brighter on hover or

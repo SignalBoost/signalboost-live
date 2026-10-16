@@ -274,3 +274,21 @@ test('agent-loop model rounds are not clamped to the one-pass interactive timeou
   const seam = readFileSync(join(process.cwd(), 'lib/ai/cos/cosAgentDecision.ts'), 'utf8')
   assert.match(seam, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'agent_tool_loop' \}/)
 })
+
+test('JSON downloads are shown to the model as structure, not raw values', async () => {
+  const yahoo = JSON.stringify({ chart: { result: [{ meta: { currency: 'USD', symbol: 'VNCE' }, timestamp: Array.from({ length: 127 }, (_, i) => 1776000000 + i * 86400), indicators: { quote: [{ close: Array.from({ length: 127 }, (_, i) => 3 + i / 10) }] } }] } })
+  const seen: LocalModelChatMessage[][] = []
+  await runCosAgentLoop({
+    request: 'chart VNCE stock price',
+    language: 'en',
+    model: scriptedModel([call('c1', 'fetch_url', { url: YAHOO_URL }), answer('done')], seen),
+    ports: ports(fakePython({ stdout: '' }), { fetchPublic: async url => ({ status: 200, text: yahoo, finalUrl: url, contentType: 'application/json' }) }),
+    policy: { maxPythonRuns: 1, browserAllowed: false },
+    deadlineAt: Date.now() + 100_000,
+  })
+  const observation = String(seen.at(-1)!.find(message => message.role === 'tool')?.content)
+  assert.match(observation, /chart\.result: array\(1\)/)
+  assert.match(observation, /chart\.result\[0\]\.timestamp: array\(127\)/)
+  assert.match(observation, /chart\.result\[0\]\.indicators\.quote\[0\]\.close: array\(127\)/)
+  assert.ok(observation.length < 3_000, `observation stays small (${observation.length})`)
+})

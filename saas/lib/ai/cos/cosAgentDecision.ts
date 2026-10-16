@@ -330,7 +330,7 @@ export async function runCosAgentToolTurn(input: {
       tools: input.tools,
       toolChoice: input.toolChoice,
       temperature: 0.2,
-      maxTokens: 3_000,
+      maxTokens: 2_000,
       // Code-writing rounds need repeated identifiers and indentation.
       frequencyPenalty: 0,
       presencePenalty: 0,

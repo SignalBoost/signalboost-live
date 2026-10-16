@@ -1,2 +1,2 @@
-base_sha=7f8b5a8bbb881f279a0274c8823359c45cd4feab
-branch=fix/cos-agent-loop-round-timeout-20261016
+base_sha=90a5200dd8e3d323f5c839aaf28daf75921ea9f3
+branch=fix/cos-agent-loop-lean-rounds-20261016

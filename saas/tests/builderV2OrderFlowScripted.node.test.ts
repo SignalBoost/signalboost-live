@@ -77,7 +77,8 @@ test('Builder V2 builds a drawn-tree spec end to end: fenced replies, checklist 
   const outcome = await agent.run({ workspaceId: 'mini', objective, maxSteps: 24 })
 
   assert.equal(outcome.ok, true, outcome.reason)
-  assert.equal(outcome.summary, 'MiniFlow verified')
+  // The host ran the required commands after the repair and completed the job on their real receipts.
+  assert.equal(outcome.summary, 'Every required command passed on the host after the latest source change.')
   // The checklist the model saw is the full drawn-tree contract.
   const checklist = JSON.parse(prompts[0]).checklist
   assert.deepEqual(checklist.files, ['package.json', 'index.js', 'src/cart.js', 'test/cart.test.js'])
@@ -88,9 +89,10 @@ test('Builder V2 builds a drawn-tree spec end to end: fenced replies, checklist 
   assert.match(prompts[4], /index\.js/)
   // Real failing run, tolerant edit, real passing runs.
   const runs = outcome.steps.filter(step => step.tool === 'run_tests')
-  assert.deepEqual(runs.map(step => step.ok), [false, true, true])
-  assert.match(String((runs[1].output as { stdout: string }).stdout), /# pass 2|ℹ pass 2/)
-  assert.match(String((runs[2].output as { stdout: string }).stdout), /Order total: 10/)
+  // Host run after the last file (fails), the model's own run (fails), then host verification after the repair.
+  assert.deepEqual(runs.map(step => step.ok), [false, false, true, true])
+  assert.match(String((runs[2].output as { stdout: string }).stdout), /# pass 2|ℹ pass 2/)
+  assert.match(String((runs[3].output as { stdout: string }).stdout), /Order total: 10/)
   assert.match((await workspace.readFile('mini', 'src/cart.js'))!.content, /item\.price \* item\.qty/)
 })
 

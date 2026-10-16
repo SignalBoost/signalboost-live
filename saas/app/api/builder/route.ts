@@ -183,9 +183,6 @@ export async function POST(request: Request) {
     if (requestedEngine !== undefined && requestedEngine !== 'v1' && requestedEngine !== 'v2') {
       return noStore({ error: 'builder_engine_invalid' }, { status: 400 })
     }
-    if (requestedEngine === 'v2' && !access.isOwner) {
-      return noStore({ error: 'builder_v2_owner_required' }, { status: 403 })
-    }
     const newProjectRequested = isNewBuilderProjectObjective(objective)
     let workspaceId = newProjectRequested ? crypto.randomUUID() : requestedWorkspaceId || crypto.randomUUID()
 
@@ -404,7 +401,7 @@ export async function POST(request: Request) {
             }
           : { ...(project.context ? { projectContext: project.context } : {}),
               ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
-              ...(requestedEngine === 'v2' ? { builderEngine: 'v2' } : {}) },
+              ...((requestedEngine === 'v2' || (requestedEngine !== 'v1' && !requestedWorkspaceId && !project.context)) ? { builderEngine: 'v2' } : {}) },
       ownerAuthorized: access.isOwner === true,
       runningReply: reply,
     })

@@ -371,10 +371,9 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       return
     }
 
-    // V2 canary is an explicit owner-only opt-in. Never reinterpret a V1
-    // checkpoint or send an ordinary customer job through an unverified engine.
-    if (job.ownerAuthorized === true && job.jobKind === 'standard'
-      && job.metadata.builderEngine === 'v2') {
+    // V2 is selected by durable job metadata for all surfaces. Existing V1
+    // checkpoint jobs remain V1 because their engine tag is absent.
+    if (job.jobKind === 'standard' && job.metadata.builderEngine === 'v2') {
       const workspace = createSupabaseBuilderWorkspace(job.userId)
       if (!workspace) { await terminalFailure(job, 'builder_v2_workspace_unavailable'); return }
       const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort({ yieldToChat: true }), {

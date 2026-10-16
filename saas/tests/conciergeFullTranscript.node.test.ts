@@ -77,14 +77,13 @@ test('observed private-data refusal wording triggers bounded corrective handling
 
 test('homepage restores a welcome-first front door and retains the assistant-style conversation shell', () => {
   const source = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
-  // Layout widened when the render card was removed: content is the page now, so the
-  // shell must be wide and must not clip. Pinned as a range, not a magic number.
-  assert.match(source, /max-width:1[4-9]\d\dpx/)
-  assert.match(source, /sans-serif;overflow:visible\}/)
+  // The whole screen is the rendering canvas: the page component carries no shell
+  // width/box of its own (layout lives in concierge-workspace.css) and no landing CTAs.
+  assert.doesNotMatch(source, /\.concierge-shell\{/)
+  assert.doesNotMatch(source, /max-width:1\d\d\dpx/)
   assert.match(source, /className="welcome-card"/)
   assert.match(source, /copy\.welcomeQuestion/)
-  assert.match(source, /copy\.platformHome/)
-  assert.match(source, /href="\/home"/)
+  assert.doesNotMatch(source, /welcome-actions|welcome-mark/)
   assert.match(source, /className="assistant-header"/)
   assert.match(source, /className="thread"/)
   assert.match(source, /className="message-row user-row"/)

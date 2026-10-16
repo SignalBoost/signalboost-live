@@ -5,6 +5,7 @@ import test from 'node:test'
 const root = new URL('../', import.meta.url)
 const shell = readFileSync(new URL('components/layout/AppShell.tsx', root), 'utf8')
 const css = readFileSync(new URL('app/concierge-workspace.css', root), 'utf8')
+const globals = readFileSync(new URL('app/globals.css', root), 'utf8')
 const home = readFileSync(new URL('app/page.tsx', root), 'utf8')
 
 test('global shell never mounts a Concierge dock on non-home pages', () => {
@@ -18,8 +19,10 @@ test('homepage retains its own complete Concierge chat experience', () => {
   assert.match(home, /<AssistantMessage content=\{turn\.response\}/)
 })
 test('responsive canvas does not reserve global dock width or truncate chart media', () => {
-  assert.match(css, /sb-ai-app-shell--canvas > \.sb-ai-workspace/)
+  assert.match(globals, /\.sb-ai-app-shell \{[^}]*display: block;[^}]*max-width: none;/)
+  assert.doesNotMatch(globals, /\.sb-ai-app-shell \{[^}]*grid-template-columns/)
+  assert.doesNotMatch(globals, /min\(1184px/)
   assert.match(css, /\.concierge-shell \.assistant-content img/)
-  assert.match(css, /max-width: 100% !important/)
+  assert.match(css, /max-width: 100%;/)
   assert.match(css, /object-fit: contain/)
 })

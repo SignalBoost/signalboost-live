@@ -134,13 +134,13 @@ html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; backgrou
 @media (max-width: 820px) { .dashboard-module-grid { grid-template-columns: 1fr !important; } }
 
 /* ── Layout ── */
-.sb-page-shell, .sb-dashboard-shell { width: min(1184px, calc(100% - 32px)); margin: 0 auto; }
+/* Full-canvas pages: no centered max-width box; one consistent responsive gutter. */
+.sb-page-shell, .sb-dashboard-shell { width: auto; max-width: none; margin-inline: clamp(16px, 2.4vw, 40px); }
 
-/* ── App shell: the single container every /dashboard page renders inside.
-     Centers content, sets consistent vertical rhythm, keeps cards anchored. ── */
-.sb-app-shell { width: min(1184px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 72px; box-sizing: border-box; }
+/* ── App shell: the wrapper every /dashboard page renders inside. It spans the full
+     canvas edge to edge; each page supplies its own padding. ── */
+.sb-app-shell { width: auto; max-width: none; margin: 0; padding: 0; box-sizing: border-box; }
 .sb-app-shell > * { box-sizing: border-box; }
-@media (max-width: 640px) { .sb-app-shell { width: calc(100% - 24px); padding: 16px 0 56px; } }
 .sb-section { padding: 64px 0; }
 
 .sb-glass, .sb-card { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
@@ -182,7 +182,7 @@ html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; backgrou
 .sb-ai-feedback p { margin-top: 6px; }
 
 @media (max-width: 1180px) { .sb-dashboard-shell { grid-template-columns: 220px minmax(0, 1fr); } .sb-live-preview { position: static; grid-column: 1 / -1; } }
-@media (max-width: 820px) { .sb-page-shell, .sb-dashboard-shell { width: min(100% - 24px, 1184px); } .sb-dashboard-shell { display: block; padding-top: 16px; } .sb-sidebar { position: static; margin-bottom: 16px; } .sb-sidebar__nav { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sb-live-preview { margin-top: 16px; } .sb-section { padding: 44px 0; } }
+@media (max-width: 820px) { .sb-page-shell, .sb-dashboard-shell { margin-inline: 12px; } .sb-dashboard-shell { display: block; padding-top: 16px; } .sb-sidebar { position: static; margin-bottom: 16px; } .sb-sidebar__nav { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sb-live-preview { margin-top: 16px; } .sb-section { padding: 44px 0; } }
 
 /* ── Service rail ── */
 .sb-service-rail { display: flex; gap: var(--space-2); overflow-x: auto; padding: var(--space-3) var(--space-8); background: linear-gradient(135deg, rgba(8, 10, 20, .78), rgba(15, 23, 42, .55)); border-bottom: 1px solid rgba(26,240,255,.16); box-shadow: 0 18px 60px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter: blur(14px); }
@@ -457,10 +457,9 @@ html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; backgrou
 /* Docs layout: fixed rail on wide screens, stacked on narrow */
 @media (min-width: 821px) { .sb-docs-grid { grid-template-columns: 240px minmax(0, 1fr) !important; } }
 
-/* ── AI Dock layout: reserves a permanent right column so assistant UI never overlays workspace content. ── */
-.sb-ai-app-shell { --sb-ai-dock-width: 400px; --sb-ai-dock-tablet-width: 320px; --sb-ai-dock-collapsed-width: 56px; display: grid; grid-template-columns: minmax(0, 1fr) var(--sb-ai-dock-width); align-items: start; gap: 20px; width: 100%; max-width: 100%; margin: 0; padding: 0 20px 0 0; box-sizing: border-box; }
+/* ── App canvas: every route gets the full width. No reserved dock column, no centered page box. ── */
+.sb-ai-app-shell { --sb-ai-dock-width: 400px; --sb-ai-dock-tablet-width: 320px; --sb-ai-dock-collapsed-width: 56px; display: block; width: 100%; max-width: none; margin: 0; padding: 0; box-sizing: border-box; }
 .sb-ai-workspace { min-width: 0; width: 100%; }
-.sb-ai-workspace .sb-app-shell, .sb-ai-workspace .sb-page-shell, .sb-ai-workspace .sb-dashboard-shell { margin-left: 0; margin-right: 0; max-width: min(1184px, 100%); }
 .sb-ai-dock { position: sticky; top: 88px; align-self: start; width: var(--sb-ai-dock-width); height: calc(100vh - 104px); min-width: 0; z-index: 2; }
 .sb-ai-dock.is-collapsed { display: flex; justify-content: flex-end; width: var(--sb-ai-dock-width); }
 .sb-ai-dock-tab { width: var(--sb-ai-dock-collapsed-width); height: min(240px, calc(100vh - 128px)); margin-inline-start: auto; border: 1px solid rgba(255,195,0,.4); border-radius: 0; border-start-start-radius: 22px; border-end-start-radius: 22px; background: linear-gradient(180deg, rgba(255,195,0,.95), rgba(249,115,22,.95)); color: #07111f; box-shadow: 0 18px 48px rgba(255,149,0,.25); font-weight: 950; letter-spacing: .12em; writing-mode: vertical-rl; text-orientation: mixed; display: inline-flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; transition: transform 180ms ease, box-shadow 180ms ease; }
@@ -468,8 +467,8 @@ html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; backgrou
 [dir="rtl"] .sb-ai-dock-tab:hover, [dir="rtl"] .sb-ai-dock-tab:focus-visible { transform: translateX(3px); }
 .sb-ai-dock-panel { height: 100%; max-height: 100%; width: 100%; border-radius: 0; border-start-start-radius: 28px; border-end-start-radius: 28px; background: linear-gradient(160deg, rgba(15,23,42,.94), rgba(3,7,18,.96)); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transform-origin: right center; animation: sbDockIn 180ms ease both; }
 @keyframes sbDockIn { from { opacity: .82; transform: translateX(12px) scaleX(.98); } to { opacity: 1; transform: translateX(0) scaleX(1); } }
-@media (max-width: 1180px) { .sb-ai-app-shell { grid-template-columns: minmax(0, 1fr) var(--sb-ai-dock-tablet-width); gap: 14px; padding-inline-end: 12px; } .sb-ai-dock, .sb-ai-dock.is-collapsed { width: var(--sb-ai-dock-tablet-width); } }
-@media (max-width: 860px) { .sb-ai-app-shell { display: block; padding-inline-end: 0; } .sb-ai-dock { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: 100%; height: auto; z-index: 80; pointer-events: none; } .sb-ai-dock.is-collapsed { width: 100%; justify-content: flex-end; padding-block: 0 12px; padding-inline: 0 12px; box-sizing: border-box; } .sb-ai-dock-tab { pointer-events: auto; width: auto; height: 48px; min-width: 88px; border-radius: 999px; writing-mode: horizontal-tb; letter-spacing: .04em; } .sb-ai-dock-panel { pointer-events: auto; height: min(78vh, 680px); max-height: calc(100vh - 88px); border-radius: 28px 28px 0 0; animation-name: sbDockSheetIn; } }
+@media (max-width: 1180px) { .sb-ai-dock, .sb-ai-dock.is-collapsed { width: var(--sb-ai-dock-tablet-width); } }
+@media (max-width: 860px) { .sb-ai-dock { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: 100%; height: auto; z-index: 80; pointer-events: none; } .sb-ai-dock.is-collapsed { width: 100%; justify-content: flex-end; padding-block: 0 12px; padding-inline: 0 12px; box-sizing: border-box; } .sb-ai-dock-tab { pointer-events: auto; width: auto; height: 48px; min-width: 88px; border-radius: 999px; writing-mode: horizontal-tb; letter-spacing: .04em; } .sb-ai-dock-panel { pointer-events: auto; height: min(78vh, 680px); max-height: calc(100vh - 88px); border-radius: 28px 28px 0 0; animation-name: sbDockSheetIn; } }
 @keyframes sbDockSheetIn { from { opacity: .88; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
 
 
@@ -481,4 +480,19 @@ html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; backgrou
   .sb-lab-prompt-controls { flex-wrap: wrap; }
   .sb-lab-prompt-controls > input:not([type="file"]) { flex-basis: calc(100% - 54px) !important; min-width: 0; font-size: 16px !important; }
   .sb-lab-prompt-controls > button { flex: 1 1 auto; min-height: 44px; }
+}
+
+/* ── Full-canvas policy for page wrappers that still carry their own centered max-width box.
+     Wide wrappers (800px+) near the top of a page, or Tailwind page containers, span the
+     full canvas and keep only their own padding as the gutter; narrow centered forms and
+     dialogs keep their width. ── */
+.sb-ai-app-shell--canvas > .sb-ai-workspace > :is([style*="max-width:1"], [style*="max-width: 1"], [style*="max-width:8"], [style*="max-width: 8"], [style*="max-width:9"], [style*="max-width: 9"], [style*="max-width:min(1"], [style*="max-width: min(1"])[style*="auto"]:not([style*="max-width:100%"], [style*="max-width: 100%"]),
+.sb-ai-app-shell--canvas > .sb-ai-workspace > * > :is([style*="max-width:1"], [style*="max-width: 1"], [style*="max-width:8"], [style*="max-width: 8"], [style*="max-width:9"], [style*="max-width: 9"], [style*="max-width:min(1"], [style*="max-width: min(1"])[style*="auto"]:not([style*="max-width:100%"], [style*="max-width: 100%"]),
+.sb-ai-app-shell--canvas > .sb-ai-workspace > * > * > :is([style*="max-width:1"], [style*="max-width: 1"], [style*="max-width:8"], [style*="max-width: 8"], [style*="max-width:9"], [style*="max-width: 9"], [style*="max-width:min(1"], [style*="max-width: min(1"])[style*="auto"]:not([style*="max-width:100%"], [style*="max-width: 100%"]) {
+  max-width: none !important;
+  margin-inline: 0 !important;
+}
+.sb-ai-app-shell--canvas :is(.max-w-4xl, .max-w-5xl, .max-w-6xl, .max-w-7xl, .max-w-screen-lg, .max-w-screen-xl, .max-w-screen-2xl, .max-w-\[1200px\]).mx-auto {
+  max-width: none;
+  margin-inline: 0;
 }

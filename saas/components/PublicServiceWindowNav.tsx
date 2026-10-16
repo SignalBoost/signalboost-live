@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
+import { supabase } from '@/utils/supabase/client'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 type GroupId = 'free' | 'growth' | 'office'
@@ -120,12 +121,26 @@ export default function PublicServiceWindowNav() {
   const { lang } = useI18n()
   const copy = COPY[activeLang(lang)]
   const [openGroup, setOpenGroup] = useState<GroupId | null>(null)
+  const [signedIn, setSignedIn] = useState(false)
 
+  // This bar is the pre-signup shortcut row. Signed-in users already have the full navbar,
+  // so a second navigation row is only shown to visitors.
+  useEffect(() => {
+    let mounted = true
+    void supabase.auth.getSession().then(({ data }) => { if (mounted) setSignedIn(Boolean(data?.session?.user)) })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => { if (mounted) setSignedIn(Boolean(session?.user)) })
+    return () => {
+      mounted = false
+      listener.subscription.unsubscribe()
+    }
+  }, [])
+
+  if (signedIn) return null
   if (pathname?.startsWith('/dashboard') || pathname?.startsWith('/admin') || pathname?.startsWith('/hub')) return null
 
   return (
     <section aria-label={copy.intro} style={{ position: 'relative', zIndex: 90, borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(2,6,23,.82)', backdropFilter: 'blur(12px)', overflow: 'visible' }}>
-      <style>{"\n        .sb-public-window{display:flex;justify-content:flex-end;gap:10px;align-items:center;flex-wrap:wrap;overflow:visible;padding:8px 22px;}\n        .sb-public-group{position:relative;flex:0 0 auto;}\n        .sb-public-panel{position:absolute;top:calc(100% + 8px);left:0;width:310px;max-width:92vw;border:1px solid rgba(26,240,255,.22);background:linear-gradient(145deg,rgba(3,7,18,.99),rgba(15,23,42,.98));border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);padding:12px;z-index:1200;}\n        .sb-public-link{display:flex;gap:10px;align-items:center;text-decoration:none;color:#fff;border-radius:12px;padding:10px;}\n        .sb-public-link:hover{background:rgba(255,255,255,.07);}\n        @media(max-width:760px){.sb-public-window{padding:8px 14px}.sb-public-intro{display:none}.sb-public-panel{position:fixed;left:12px;right:12px;width:auto;top:108px}}\n      "}</style>
+      <style>{"\n        .sb-public-window{display:flex;justify-content:flex-end;gap:10px;align-items:center;flex-wrap:wrap;overflow:visible;padding:8px clamp(14px, 2vw, 28px);}\n        .sb-public-group{position:relative;flex:0 0 auto;}\n        .sb-public-panel{position:absolute;top:calc(100% + 8px);left:0;width:310px;max-width:92vw;border:1px solid rgba(26,240,255,.22);background:linear-gradient(145deg,rgba(3,7,18,.99),rgba(15,23,42,.98));border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);padding:12px;z-index:1200;}\n        .sb-public-link{display:flex;gap:10px;align-items:center;text-decoration:none;color:#fff;border-radius:12px;padding:10px;}\n        .sb-public-link:hover{background:rgba(255,255,255,.07);}\n        @media(max-width:760px){.sb-public-window{padding:8px 14px}.sb-public-intro{display:none}.sb-public-panel{position:fixed;left:12px;right:12px;width:auto;top:108px}}\n      "}</style>
       <div className="sb-public-window">
         <span className="sb-public-intro" style={{ color: 'rgba(148,163,184,.88)', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap' }}>{copy.intro}</span>
         {GROUPS.map(group => {
@@ -136,7 +151,7 @@ export default function PublicServiceWindowNav() {
                 type="button"
                 aria-expanded={open}
                 onClick={() => setOpenGroup(open ? null : group.id)}
-                style={{ border: open ? '1px solid rgba(26,240,255,.45)' : '1px solid rgba(255,255,255,.12)', background: open ? 'rgba(26,240,255,.12)' : 'rgba(255,255,255,.04)', color: '#fff', borderRadius: 999, padding: '7px 11px', fontWeight: 900, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                style={{ border: open ? '1px solid rgba(26,240,255,.45)' : '1px solid rgba(255,255,255,.12)', background: open ? 'rgba(26,240,255,.12)' : 'rgba(255,255,255,.04)', color: '#fff', borderRadius: 8, padding: '6px 10px', fontWeight: 700, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
                 {copy.groups[group.id]} {open ? '▴' : '▾'}
               </button>

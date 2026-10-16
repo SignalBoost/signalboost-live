@@ -6,6 +6,7 @@ const assistantPage = readFileSync(new URL('../app/dashboard/assistant/page.tsx'
 const progressClient = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
 const browserRoute = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
 const homepageWorkspaceCss = readFileSync(new URL('../app/concierge-workspace.css', import.meta.url), 'utf8')
+const homepagePage = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
 
 test('Full Assistant live page uses observable progress and the canonical COS browser ingress', () => {
   assert.match(assistantPage, /postWithAgentProgress\(\{/)
@@ -62,9 +63,9 @@ test('Full Assistant durable Builder polling survives transient read-only transp
 })
 
 test('Homepage Concierge renders assistant content full bleed without visual card chrome or page-wide horizontal scrolling', () => {
-  assert.match(homepageWorkspaceCss, /\.concierge-shell \.exchange\s*\{[\s\S]*?width:\s*100%\s*!important;[\s\S]*?max-width:\s*none\s*!important;/)
-  assert.match(homepageWorkspaceCss, /\.concierge-shell \.assistant-message\s*\{[\s\S]*?width:\s*100%\s*!important;[\s\S]*?max-width:\s*none\s*!important;/)
-  assert.match(homepageWorkspaceCss, /\.concierge-shell \[data-concierge-visual-preview="true"\]\s*\{[\s\S]*?aspect-ratio:\s*auto\s*!important;[\s\S]*?padding:\s*0\s*!important;[\s\S]*?border:\s*0\s*!important;[\s\S]*?background:\s*transparent\s*!important;/)
-  assert.match(homepageWorkspaceCss, /\.concierge-shell \.thread\s*\{[\s\S]*?overflow-x:\s*hidden\s*!important;/)
+  assert.match(homepageWorkspaceCss, /\.concierge-shell \.exchange\s*\{[\s\S]*?width:\s*100%;/)
+  assert.match(homepageWorkspaceCss, /\.concierge-shell \.message\s*\{[\s\S]*?width:\s*100%;[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;/)
+  assert.match(homepageWorkspaceCss, /\.concierge-shell\s*\{[\s\S]*?overflow:\s*clip;/)
+  assert.match(homepagePage, /data-concierge-visual-preview="true"[\s\S]*?padding: 0,[\s\S]*?border: 0,[\s\S]*?background: 'transparent'/)
   assert.match(homepageWorkspaceCss, /\.concierge-shell \.assistant-message pre\s*\{[\s\S]*?overflow-x:\s*auto;/)
 })

@@ -1,2 +1,2 @@
-base_sha=f100fd0baef714ae9048282bcccedd58172215fd
-branch=fix/v2-host-first-verified-20261016
+base_sha=f4a492baec4ec89276a9a63504f4c2168a14f5b9
+branch=feat/builder-v2-batched-actions-host-verify-20261016

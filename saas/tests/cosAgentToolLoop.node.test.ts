@@ -328,3 +328,25 @@ test('tools never spend the answer reserve, and the last round answers', async (
   assert.deepEqual(choices, ['auto', 'none'])
   assert.equal(result?.reply, 'VNCE closed at $13.33.')
 })
+
+// Production 2026-10-16: the unemployment turn already had World Bank data, then spent its budget
+// retrying a host that timed out on every attempt. A failed host is not retried in the same turn.
+test('a host that failed is not retried in the same turn', async () => {
+  const attempts: string[] = []
+  const seen: LocalModelChatMessage[][] = []
+  await runCosAgentLoop({
+    request: 'chart the US unemployment rate',
+    language: 'en',
+    model: scriptedModel([
+      call('a', 'fetch_url', { url: 'https://slow.example.org/series.csv' }),
+      call('b', 'fetch_url', { url: 'https://slow.example.org/series.csv?x=1' }),
+      answer('done'),
+    ], seen),
+    ports: ports(fakePython({ stdout: '' }), { fetchPublic: async url => { attempts.push(url); throw new Error('public_fetch_timeout') } }),
+    policy: { maxPythonRuns: 1, browserAllowed: false },
+    deadlineAt: Date.now() + 100_000,
+  })
+  assert.equal(attempts.length, 1)
+  const results = seen.at(-1)!.filter(message => message.role === 'tool').map(message => String(message.content))
+  assert.match(results[1], /^Skipped https:\/\/slow\.example\.org\/series\.csv\?x=1: slow\.example\.org already failed/)
+})

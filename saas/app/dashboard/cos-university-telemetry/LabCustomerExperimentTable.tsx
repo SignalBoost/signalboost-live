@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { buildLabExperimentComparison } from '@/lib/lab/labExperimentComparison'
 import { summarizeLabProviderOutcomes } from '@/lib/lab/labProviderOutcomeSummary'
+import { buildLabExperimentCsv } from '@/lib/lab/labExperimentCsv'
 import type { LabRunForTracking } from '@/lib/lab/mlflowRunExport'
 
 const labels: Record<string, readonly string[]> = {
@@ -31,6 +32,14 @@ const outcomeLabels: Record<string, readonly string[]> = {
  ko:['실행','완료','실패','진행 중','취소','결과물','관측된 결과'],
  ar:['تشغيلات','مكتملة','فاشلة','جارية','ملغاة','آثار نموذجية','نتائج التدريب المرصودة'],
 }
+const csvLabels: Record<string,string> = {
+ en:'Export filtered runs (CSV)',es:'Exportar ejecuciones filtradas (CSV)',
+ pt:'Exportar execuções filtradas (CSV)',pl:'Eksportuj wybrane treningi (CSV)',
+ ru:'Экспорт отобранных запусков (CSV)',de:'Gefilterte Läufe exportieren (CSV)',
+ fr:'Exporter les exécutions filtrées (CSV)',it:'Esporta esecuzioni filtrate (CSV)',
+ ja:'絞り込んだ実行をエクスポート（CSV）',ko:'필터링된 실행 내보내기 (CSV)',
+ ar:'تصدير التشغيلات المحددة (CSV)',
+}
 export default function LabCustomerExperimentTable({ runs, language }: { runs: readonly LabRunForTracking[]; language: string }) {
  const [provider, setProvider] = useState('')
  const [status, setStatus] = useState('')
@@ -44,6 +53,13 @@ export default function LabCustomerExperimentTable({ runs, language }: { runs: r
  const statuses = [...new Set(records.map(x => x.state))].sort()
  const filtered = records.filter(x => (!provider || x.computeProvider === provider) && (!status || x.state === status))
  const ordered = descending ? [...filtered].reverse() : filtered
+ function downloadCsv() {
+  const csv = buildLabExperimentCsv(runs, {provider,status})
+  const url = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}))
+  const a = document.createElement('a')
+  a.href=url; a.download='itmounts-lab-experiments.csv'
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+ }
  return <details className="mt-3 rounded border border-white/20 p-3 text-sm">
   <summary className="cursor-pointer font-medium">{copy[0]} ({records.length})</summary>
   <p className="my-2 text-xs opacity-75">{copy[1]}</p>
@@ -58,6 +74,7 @@ export default function LabCustomerExperimentTable({ runs, language }: { runs: r
    <select aria-label={copy[2]} value={provider} onChange={e=>setProvider(e.target.value)} className="max-w-full rounded border bg-slate-900 p-1 text-white"><option value="">{copy[7]}</option>{providers.map(x=><option key={x} value={x}>{x}</option>)}</select>
    <select aria-label={copy[3]} value={status} onChange={e=>setStatus(e.target.value)} className="max-w-full rounded border bg-slate-900 p-1 text-white"><option value="">{copy[8]}</option>{statuses.map(x=><option key={x} value={x}>{x}</option>)}</select>
    <button type="button" className="rounded border px-2 py-1" onClick={()=>setDescending(x=>!x)}>{copy[6]} {descending ? '↓' : '↑'}</button>
+   <button type="button" className="rounded border px-2 py-1" onClick={downloadCsv}>{csvLabels[language] ?? csvLabels.en}</button>
   </div>
   <div className="max-w-full overflow-x-auto">
    <table className="w-full min-w-[640px] text-start text-xs"><thead><tr>{[copy[2],copy[3],copy[4],copy[5],copy[6]].map(x=><th key={x} scope="col" className="border-b p-2">{x}</th>)}</tr></thead>

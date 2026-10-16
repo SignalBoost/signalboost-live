@@ -1,2 +1,2 @@
-base_sha=63816d583926d5fbf50378403e15b2a3e87f7b66
-branch=fix/cos-agent-strip-reasoning-notes-20261016
+base_sha=6a36c2066bd58fdd5faea427bd833c7517386056
+branch=fix/cos-agent-duplicate-answer-20261016

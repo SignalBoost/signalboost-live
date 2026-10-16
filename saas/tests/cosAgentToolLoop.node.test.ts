@@ -3,7 +3,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { agentTraceStep, cosAgentSystemPrompt, redactUrlQueries, stripProcessNarration, stripSandboxPaths, newAgentLoopTrace, runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
+import { agentTraceStep, cosAgentSystemPrompt, redactUrlQueries, keepFinalDraft, stripProcessNarration, stripSandboxPaths, newAgentLoopTrace, runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
 import { agentToolDefinitions, htmlToText, imageBackedByStagedData, type AgentToolPorts } from '../lib/ai/cos/agentLoop/cosAgentTools.ts'
 import { optionalPackagesFor, runnerSource, VercelPythonSession, type PythonSession } from '../lib/ai/cos/agentLoop/pythonSandbox.ts'
 import { execFileSync } from 'node:child_process'
@@ -478,4 +478,17 @@ test('cos-primary answers live facts through the seeded agent loop before one-pa
   const synthesis = route.indexOf('let localSynthesis=await synthesizeFreshEvidenceLocally(')
   assert.ok(loop > 0 && synthesis > loop, 'agent loop runs first; one-pass synthesis is the fallback')
   assert.match(route.slice(loop, synthesis), /seedSearch:\{query:lookupInput,results:freshSources\}/)
+})
+
+
+// Production 2026-10-16 (Microsoft CEO): one model reply held two full drafts, the second glued onto
+// the first draft's last source URL; and the Canberra answer opened with "The data is confirmed...".
+test('only the final draft of a multi-draft reply is kept', () => {
+  const production = 'The current CEO of Microsoft is **Satya Nadella**. He became CEO in **February 2014**.\n\nSources:\n- https://news.microsoft.com/source/leadership/\n- https://news.microsoft.com/source/exec/satya-nadella/The current CEO of Microsoft is **Satya Nadella**. He took on the role in **February 2014**, succeeding Steve Ballmer.\n\nSources:\n- [Microsoft Leadership](https://news.microsoft.com/source/leadership/)'
+  assert.equal(keepFinalDraft(production), 'The current CEO of Microsoft is **Satya Nadella**. He took on the role in **February 2014**, succeeding Steve Ballmer.\n\nSources:\n- [Microsoft Leadership](https://news.microsoft.com/source/leadership/)')
+  const separated = 'Draft one.\n\nSources:\n- [A](https://a.com/x)\n\nFinal answer here.\n\n**Sources:**\n- [B](https://b.com/y)'
+  assert.equal(keepFinalDraft(separated), 'Final answer here.\n\n**Sources:**\n- [B](https://b.com/y)')
+  const single = 'Tokyo is the capital.\n\nSources:\n- [World Bank](https://data.worldbank.org/indicator/SP.POP.TOTL?locations=JP)'
+  assert.equal(keepFinalDraft(single), single)
+  assert.equal(stripProcessNarration('The data is confirmed from the official ABS source.\n\nThe capital of Australia is **Canberra**.'), 'The capital of Australia is **Canberra**.')
 })

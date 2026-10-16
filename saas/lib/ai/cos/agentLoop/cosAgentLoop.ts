@@ -247,7 +247,7 @@ export function stripSandboxPaths(answer: string): string {
 // Production 2026-10-16: answers carried the model's working notes ahead of the answer — "The data
 // is verified and the chart is created. Let me present the results.", "The user asked a simple
 // factual question. No data computation or chart is needed. Let me provide the answer directly."
-const PROCESS_NOTE = /\b(?:let me (?!know\b)\w+|the user (?:asked|wants|is asking)|no (?:data computation|computation|chart) is needed|this is a simple (?:factual )?question|i (?:have|now have|found) (?:the|enough|all)\b|the search results (?:clearly )?(?:confirm|show)|multiple sources confirm|(?:the )?data (?:is|has been) verified|(?:the )?chart (?:is|has been) (?:created|generated|saved|ready)|here(?:'s| is| are) (?:the|a) (?:summary|results?)\b)/i
+const PROCESS_NOTE = /\b(?:let me (?!know\b)\w+|the user (?:asked|wants|is asking)|no (?:data computation|computation|chart) is needed|this is a simple (?:factual )?question|i (?:have|now have|found) (?:the|enough|all)\b|the search results (?:clearly )?(?:confirm|show)|multiple sources confirm|(?:the )?data (?:is|has been) (?:verified|confirmed)|(?:the )?chart (?:is|has been) (?:created|generated|saved|ready)|here(?:'s| is| are) (?:the|a) (?:summary|results?)\b)/i
 const ANSWER_HEADING = /^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:final )?answer(?:\*\*)?\s*:?\s*\n+/i
 
 /**
@@ -262,6 +262,31 @@ export function stripProcessNarration(answer: string): string {
   if (cut < 0) return original
   const rest = paragraphs.slice(cut + 1).join('\n\n').replace(ANSWER_HEADING, '').trim()
   return rest || original
+}
+
+const SOURCES_HEADING = /^[ \t]*(?:\*\*)?(?:sources?|fuentes|fontes|quellen|źródła|источники|sorgenti|出典|출처|المصادر)(?:\*\*)?[ \t]*:?[ \t]*(?:\*\*)?[ \t]*$/gim
+const SOURCE_ITEM = /^\s*(?:[-*•]|\d+[.)]|\[\d+\])\s+/
+
+/**
+ * Keeps only the final draft when one model reply holds several complete drafts, each closing with
+ * its own Sources list. Production 2026-10-16 (Microsoft CEO): two full answers back to back, the
+ * second glued onto the first draft's last source URL.
+ */
+export function keepFinalDraft(answer: string): string {
+  const text = String(answer || '')
+  const headings = [...text.matchAll(SOURCES_HEADING)]
+  if (headings.length < 2) return text
+  const previous = headings[headings.length - 2]
+  const lines = text.slice(previous.index! + previous[0].length).split('\n')
+  let index = 0
+  while (index < lines.length && (!lines[index].trim() || SOURCE_ITEM.test(lines[index]) || /^\s*https?:\/\//.test(lines[index]))) {
+    // A draft that starts on the same line as the previous draft's last URL.
+    const glued = lines[index].match(/https?:\/\/[^\s)\]]*?[\/\d](?=\p{Lu}\p{Ll}+\s)/u)
+    if (glued) return [lines[index].slice(glued.index! + glued[0].length), ...lines.slice(index + 1)].join('\n').trim() || text
+    index += 1
+  }
+  const rest = lines.slice(index).join('\n').trim()
+  return rest || text
 }
 
 export function stripUnverifiedUrls(answer: string, sourceUrls: ReadonlySet<string>): { text: string; dropped: number } {
@@ -404,7 +429,7 @@ export async function runCosAgentLoop(input: {
     }
     trace.outcome = 'answered'
 
-    const { text, dropped } = stripUnverifiedUrls(stripProcessNarration(stripSandboxPaths(answer)), evidence.sourceUrls)
+    const { text, dropped } = stripUnverifiedUrls(stripProcessNarration(keepFinalDraft(stripSandboxPaths(answer))), evidence.sourceUrls)
     return {
       reply: text,
       images: evidence.images.slice(0, 3),

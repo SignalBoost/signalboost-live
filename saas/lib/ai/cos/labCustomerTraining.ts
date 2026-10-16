@@ -260,6 +260,9 @@ export function interpretWorkerCallback(run: RedeemedRun, payload: any): Callbac
     if (trainHashes.length < 8 || holdoutHashes.length < 2 || ![...trainHashes, ...holdoutHashes].every((h: string) => HEX64.test(h))) {
       return { kind: 'reject', reason: 'partition_invalid' }
     }
+    // A valid artifact partition must contain unique items with no training/holdout reuse.
+    const allHashes = [...trainHashes, ...holdoutHashes]
+    if (new Set(allHashes).size !== allHashes.length) return { kind: 'reject', reason: 'partition_overlap_or_duplicate' }
     const trainingManifestHash = manifestHash(trainHashes)
     const holdoutManifestHash = manifestHash(holdoutHashes)
     return {

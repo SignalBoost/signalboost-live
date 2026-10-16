@@ -451,6 +451,12 @@ body:has(.sb-ai-app-shell--home) > footer {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The open history panel takes its own column: the conversation starts after it instead of
+   running underneath it (production 2026-10-16: transcript text was hidden behind the panel). */
+@media (min-width: 901px) {
+  .concierge-shell:has(> .cos-home-history.is-open) { padding-inline-start: 262px !important; }
+  .concierge-shell .cos-home-history:not(.is-open) { width: auto; }
+}
 @media (max-width: 900px) {
   .concierge-shell .cos-home-history { position: relative; inset: auto; margin: 8px 10px 0; width: min(238px, calc(100% - 20px)); }
   .concierge-shell .cos-history-items { max-height: 35vh; }

@@ -37,7 +37,7 @@ export default function LabCustomerExperimentTable({ runs, language }: { runs: r
    <button type="button" className="rounded border px-2 py-1" onClick={()=>setDescending(x=>!x)}>{copy[6]} {descending ? '↓' : '↑'}</button>
   </div>
   <div className="max-w-full overflow-x-auto">
-   <table className="w-full min-w-[640px] text-left text-xs"><thead><tr>{[copy[2],copy[3],copy[4],copy[5],copy[6]].map(x=><th key={x} scope="col" className="border-b p-2">{x}</th>)}</tr></thead>
+   <table className="w-full min-w-[640px] text-start text-xs"><thead><tr>{[copy[2],copy[3],copy[4],copy[5],copy[6]].map(x=><th key={x} scope="col" className="border-b p-2">{x}</th>)}</tr></thead>
    <tbody>{ordered.map(x=><tr key={x.runId} className="border-b border-white/10"><td className="p-2">{x.computeProvider || '—'}</td><td className="p-2">{x.state}</td><td className="p-2 break-all">{x.baseModel}</td><td className="p-2 break-all">{x.tunedModelId || x.artifactRepo || '—'}{x.artifactRevision && <span className="block opacity-60">{x.artifactRevision}</span>}</td><td className="p-2">{new Date(x.createdAt).toLocaleDateString(language)}</td></tr>)}</tbody></table>
    {!ordered.length && <p className="p-2 text-xs">{copy[9]}</p>}
   </div>

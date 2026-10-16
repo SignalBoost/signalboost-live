@@ -406,7 +406,7 @@ test('public Concierge offers one metered downloadable visual trial before signu
   assert.match(visualRoute, /data:\$\{mime\};base64,\$\{b64\}/)
   assert.match(visualRoute, /signup_required_for_more: true/)
   assert.match(browserRoute, /if \(!workspaceId \|\| !imagePath[\s\S]*NextResponse\.json\(payload/)
-  assert.match(home, /GUEST_VISUAL_DATA_URL_RE/)
+  assert.match(home, /const structuredVisual = safeDeliveredVisual\(payload\?\.visual\)/)
   assert.match(home, /download=\{turn\.visualFilename/)
   assert.match(dock, /SAFE_VISUAL_PREVIEW_RE/)
   assert.match(dock, /download=\{message\.visualFilename/)

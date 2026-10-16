@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { previewLabDataset } from '../lib/lab/labDatasetPreflight.ts'
+import { previewLabDataset, previewLabPrompts } from '../lib/lab/labDatasetPreflight.ts'
 
 const row = (prompt: string, response: string) => JSON.stringify({ prompt, response })
 test('dataset preflight counts clean 20-row input without provider calls', () => {
@@ -28,4 +28,18 @@ test('empty and non-string fields are invalid rather than stringified', () => {
   const preview = previewLabDataset(['{}', '{"prompt":null,"response":"x"}', '{"prompt":"a","response":{}}', row('valid', 'answer')].join('\n'))
   assert.equal(preview.invalidLines, 3)
   assert.equal(preview.uniquePrompts, 1)
+})
+
+test('teacher prompt preview deduplicates after the server 4000-character boundary', () => {
+  const shared='a'.repeat(4000)
+  const preview=previewLabPrompts([shared+'x',shared+'y','valid'].join('\n'))
+  assert.equal(preview.uniquePrompts,2)
+  assert.equal(preview.duplicatePrompts,1)
+  assert.equal(preview.truncatedPrompts,2)
+  assert.equal(preview.ready,false)
+})
+test('teacher prompt preview accepts a bounded distinct 20-prompt batch', () => {
+  const preview=previewLabPrompts(Array.from({length:20},(_,n)=>'prompt-'+n).join('\n'))
+  assert.equal(preview.uniquePrompts,20)
+  assert.equal(preview.ready,true)
 })

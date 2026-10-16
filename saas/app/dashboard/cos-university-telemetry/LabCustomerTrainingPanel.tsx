@@ -9,7 +9,7 @@ import { fmt, type LabCustomerTrainingCopy } from '@/lib/i18n/labCustomerTrainin
 import { ADD_KEY_OPTION, providerOptions, sortProviders, type ProviderOption } from '@/lib/lab/labProviderOptions'
 import { cleanPastedKey, detectProviderFromKey } from '@/lib/lab/labKeyEntry'
 import { LAB_OPEN_SOURCES } from '@/lib/lab/labOpenSources'
-import { previewLabDataset } from '@/lib/lab/labDatasetPreflight'
+import { previewLabDataset, previewLabPrompts } from '@/lib/lab/labDatasetPreflight'
 import LabCustomerModelPassport from './LabCustomerModelPassport.tsx'
 import LabCustomerResponseComparison from './LabCustomerResponseComparison.tsx'
 import LabCustomerTrainingAdvisor from './LabCustomerTrainingAdvisor.tsx'
@@ -141,7 +141,8 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   }
   const baseModelValid = Boolean(BASE_MODEL_ID[computeProviderKind]?.test(baseModel))
   const selectedTeacherCredentials = teacherCredentials.filter(item => item.providerKind === teacherProviderKind)
-  const promptCount = useMemo(() => new Set(prompts.split('\n').map(line => line.trim()).filter(Boolean)).size, [prompts])
+  const promptPreview = useMemo(() => previewLabPrompts(prompts), [prompts])
+  const promptCount = promptPreview.uniquePrompts
   const exampleCount = useMemo(() => examples.split('\n').filter(line => { try { const o = JSON.parse(line); return o?.prompt && o?.response } catch { return false } }).length, [examples])
   const preflight = useMemo(() => previewLabDataset(examples), [examples])
   const preflightLabels = DATASET_PREFLIGHT_LABELS[language] ?? DATASET_PREFLIGHT_LABELS.en
@@ -504,6 +505,10 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             {source === 'teacher' ? (
               <label className="text-sm sm:col-span-2">{fmt(copy.prompts, { n: promptCount })}
                 <textarea className="mt-1 h-40 w-full rounded border px-2 py-1 font-mono text-xs" value={prompts} onChange={event => { setPrompts(event.target.value); setBillingConfirmed(false) }} />
+                {prompts.trim() && <div aria-live="polite" className="mt-2 text-xs">
+                  <p>{preflightLabels[1]}: {promptPreview.uniquePrompts} · {preflightLabels[3]}: {promptPreview.duplicatePrompts} · {preflightLabels[5]}: {promptPreview.truncatedPrompts}</p>
+                  {promptPreview.truncatedPrompts > 0 && <p role="alert" className="text-amber-200">{preflightLabels[8]}</p>}
+                </div>}
               </label>
             ) : (
               <label className="text-sm sm:col-span-2">{fmt(copy.examples, { n: exampleCount })}
@@ -519,7 +524,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             )}
           </div>
           <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={billingConfirmed} onChange={event => setBillingConfirmed(event.target.checked)} /> {copy.billingConfirmation}</label>
-          <button className="rounded border px-3 py-1" disabled={busy || !billingConfirmed || !computeProviderKind || !computeId || !baseModelValid || itemCount < 20 || itemCount > 128 || (source !== 'teacher' && !preflight.ready) || (source === 'teacher' && (!teacherProviderKind || !teacherId || !teacherModel))} onClick={startRun}>{copy.start}</button>
+          <button className="rounded border px-3 py-1" disabled={busy || !billingConfirmed || !computeProviderKind || !computeId || !baseModelValid || itemCount < 20 || itemCount > 128 || (source === 'teacher' && !promptPreview.ready) || (source !== 'teacher' && !preflight.ready) || (source === 'teacher' && (!teacherProviderKind || !teacherId || !teacherModel))} onClick={startRun}>{copy.start}</button>
         </div>
       )}
 

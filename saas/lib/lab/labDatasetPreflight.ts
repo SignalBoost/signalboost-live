@@ -35,3 +35,30 @@ export function previewLabDataset(raw: string): DatasetPreflight {
     ready: byPrompt.size >= 20 && byPrompt.size <= 128 && invalidLines === 0 && conflictingPrompts === 0 && truncatedFields === 0 && extraRows === 0,
   })
 }
+
+/**
+ * Mirrors the server's parsePrompts transformation before customer teacher calls.
+ * In particular, prompts exceeding 4,000 characters are truncated before dedupe.
+ * No customer text leaves the browser during this preview.
+ */
+export type PromptPreflight = Readonly<{
+  uniquePrompts: number; duplicatePrompts: number; truncatedPrompts: number;
+  totalPrompts: number; ready: boolean;
+}>
+export function previewLabPrompts(raw: string): PromptPreflight {
+  const seen = new Set<string>()
+  let duplicatePrompts = 0, truncatedPrompts = 0, totalPrompts = 0
+  for (const line of raw.split(/\r?\n/)) {
+    const cleaned = line.trim()
+    if (!cleaned) continue
+    totalPrompts++
+    if (cleaned.length > 4000) truncatedPrompts++
+    const prompt = cleaned.slice(0, 4000)
+    if (seen.has(prompt)) duplicatePrompts++
+    else seen.add(prompt)
+  }
+  return Object.freeze({
+    uniquePrompts: seen.size, duplicatePrompts, truncatedPrompts, totalPrompts,
+    ready: seen.size >= 20 && seen.size <= 128 && truncatedPrompts === 0,
+  })
+}

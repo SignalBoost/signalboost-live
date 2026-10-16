@@ -5,6 +5,7 @@ import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveS
 import { createSupabaseCOSStores, cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import type { MassDistillationSubjectSupply } from './cosUniversityMassDistillation.ts'
 import { installHostedTeacherCurriculum } from './cosUniversityHostedTeacherCurriculum.ts'
+import { installBuilderGapDerivedCurriculum } from './cosUniversityBuilderGapCurriculum.ts'
 import { COS_UNIVERSITY_SUBJECTS } from './cosUniversity.ts'
 import { installBuilderGapDerivedCurriculum } from './cosUniversityBuilderGapCurriculum.ts'
 import { installResidencyGapDerivedCurriculum } from './cosUniversityResidencyGapCurriculum.ts'

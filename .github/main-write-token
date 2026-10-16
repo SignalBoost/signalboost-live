@@ -1,2 +1,5 @@
-base_sha=51d3f7be67428db184981ea5efa354c857a4c7ce
-branch=fix/cos-agent-no-process-narration-20261016
+# SignalBoost main integration serialization token
+# Every pull request targeting main must replace BOTH values below.
+# This shared-file write intentionally makes concurrent PRs conflict after one merges.
+base_sha=c3a26da6654a8488dc78862c1517fc678718c403
+branch=cos/platform-repair-c3a26da6-d999c25313

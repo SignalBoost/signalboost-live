@@ -177,6 +177,15 @@ export async function POST(request: Request) {
     if (requestedWorkspaceId && !UUID.test(requestedWorkspaceId)) {
       return noStore({ error: 'Invalid workspace id.' }, { status: 400 })
     }
+    // Owner-scoped fresh jobs can explicitly exercise V2 without converting existing V1 checkpoints.
+    // Reject unauthorized V2 requests rather than silently executing the legacy engine.
+    const requestedEngine = body?.builderEngine
+    if (requestedEngine !== undefined && requestedEngine !== 'v1' && requestedEngine !== 'v2') {
+      return noStore({ error: 'builder_engine_invalid' }, { status: 400 })
+    }
+    if (requestedEngine === 'v2' && !access.isOwner) {
+      return noStore({ error: 'builder_v2_owner_required' }, { status: 403 })
+    }
     const newProjectRequested = isNewBuilderProjectObjective(objective)
     let workspaceId = newProjectRequested ? crypto.randomUUID() : requestedWorkspaceId || crypto.randomUUID()
 
@@ -248,6 +257,9 @@ export async function POST(request: Request) {
       }, { status: 202 })
     }
     if (project.blocked) return noStore({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: 503 })
+    if (requestedEngine === 'v2' && (requestedWorkspaceId || project.context)) {
+      return noStore({ error: 'builder_v2_requires_fresh_workspace' }, { status: 409 })
+    }
     workspaceId = project.workspaceId || workspaceId
     // A saved workspace may be opened from another browser conversation.
     // Its owner's active claim always wins; never start a competing job
@@ -391,7 +403,8 @@ export async function POST(request: Request) {
               ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
             }
           : { ...(project.context ? { projectContext: project.context } : {}),
-              ...(continuationWorkspace ? { requiresExistingSource: true } : {}) },
+              ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
+              ...(requestedEngine === 'v2' ? { builderEngine: 'v2' } : {}) },
       ownerAuthorized: access.isOwner === true,
       runningReply: reply,
     })

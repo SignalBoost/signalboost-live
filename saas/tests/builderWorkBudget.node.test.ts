@@ -119,3 +119,20 @@ test('work limit never instructs the customer to type continue', () => {
   assert.doesNotMatch(source, /Reply \\"continue\\" in this workspace/)
   assert.match(source, /resume an eligible checkpoint automatically/)
 })
+
+// Bounded state exploration: verification-only slices must not be treated as terminal stalls.
+test('verification pending survives nonproductive slices but never bypasses the hard claim ceiling', () => {
+  const previous = checkpoint([write('a.js'), run(19, 2)])
+  const verifying = { ...checkpoint([write('a.js'), run(19, 2), failedRead('a.js')]), verificationPending: true } as BuilderLoopCheckpoint
+  const stalled = { ...verifying, verificationPending: false } as BuilderLoopCheckpoint
+  for (let claim = 1; claim <= MAX_WORK_SLICES + 2; claim++) {
+    for (let deferrals = 0; deferrals <= 3; deferrals++) {
+      const job = { claimGeneration: claim, checkpoint: previous, metadata: { builderCapacityDeferrals: deferrals } }
+      assert.equal(builderMayContinue(job, verifying), claim < MAX_WORK_SLICES,
+        `verification state: claim=${claim} deferrals=${deferrals}`)
+      if (claim - deferrals >= BASE_WORK_SLICES && claim < MAX_WORK_SLICES) {
+        assert.equal(builderMayContinue(job, stalled), false, `actual stall: claim=${claim} deferrals=${deferrals}`)
+      }
+    }
+  }
+})

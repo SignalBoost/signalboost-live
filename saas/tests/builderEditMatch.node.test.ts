@@ -86,7 +86,7 @@ test('a tolerant edit reports the exact text it removed and inserted', () => {
 test('the Builder trace records the applied delta, not the model copy, for a tolerant edit', async () => {
   const { BuilderToolLoop } = await import('../lib/builder/tool-loop.ts')
   const workspace = new InMemoryBuilderWorkspace()
-  await workspace.writeFile('trace', 'app.js', 'class A {\n  f() {\n    return 1\n  }\n}\n')
+  await workspace.writeFile('trace', 'app.js', 'module.exports = {\n  f() {\n    return 1\n  }\n}\n')
   const controls = [
     '{"type":"tool","toolId":"edit_file","input":{"path":"app.js","search":"return 1","replace":"return 2"}}',
     '{"type":"tool","toolId":"edit_file","input":{"path":"app.js","search":"f() {\\n  return 2\\n}","replace":"f() {\\n  return 3\\n}"}}',
@@ -99,5 +99,5 @@ test('the Builder trace records the applied delta, not the model copy, for a tol
   assert.equal(edits.length, 2)
   assert.equal(edits[1].input.search, '  f() {\n    return 2\n  }')
   assert.equal(edits[1].input.replace, '  f() {\n    return 3\n  }')
-  assert.equal((await workspace.readFile('trace', 'app.js'))?.content, 'class A {\n  f() {\n    return 3\n  }\n}\n')
+  assert.equal((await workspace.readFile('trace', 'app.js'))?.content, 'module.exports = {\n  f() {\n    return 3\n  }\n}\n')
 })

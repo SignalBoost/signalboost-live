@@ -573,7 +573,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               <LabCustomerModelPassport run={run} language={language} />
               {org && <LabCustomerRunTimeline key={run.runId} organizationId={org.organizationId} runId={run.runId} language={language} />}
               {run.stage === 'completed' && <LabCustomerHoldoutEvaluation key={run.runId} language={language} runId={run.runId} baseModel={run.baseModel} trainedModel={run.tunedModelId || run.artifactRepo || ""} />}
-              {run.stage === 'completed' && (run.tunedModelId || run.artifactRevision) && <LabCustomerResponseComparison key={run.runId} language={language} baseModel={run.baseModel} trainedModel={run.tunedModelId || run.artifactRepo || run.artifactRevision || '—'} />}
+              {run.stage === 'completed' && (run.tunedModelId || run.artifactRevision) && <LabCustomerResponseComparison key={run.runId} language={language} runId={run.runId} baseModel={run.baseModel} trainedModel={run.tunedModelId || run.artifactRepo || run.artifactRevision || '—'} />}
               {files[run.runId] && (
                 <ul className="mt-2 space-y-1">
                   {files[run.runId].map(file => <li key={file.path}><a className="underline" href={fileUrl(run.runId, file.path)}>{file.path}</a> <span className="opacity-70">({(file.size / 1e6).toFixed(1)} {copy.mb})</span></li>)}

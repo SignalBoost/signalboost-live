@@ -137,7 +137,7 @@ export function cosAgentSystemPrompt(language: string, today: Date = new Date())
     'Use what you have: once a fetched dataset answers the request, draw the chart from it in the next step instead of searching for a better one, and state its granularity and source (for example annual World Bank figures instead of monthly ones).',
     'Verify and plot in the SAME program: one run that loads the data, checks it, prints the figures and saves the chart. Exploring a file is fine, but never spend a separate run only to print what the chart run will print.',
     'Charts: design them yourself with matplotlib — clear title with the subject and period, labelled axes with units, readable date ticks, a grid, the source named in a footnote. Save PNG to out/ with dpi=150. One chart unless more were asked for.',
-    'Answer: when finished, reply WITHOUT calling tools. Lead with the result, give the key figures you printed, mention that the chart is attached when you made one, and end with "Sources:" listing the URLs you actually used as markdown links. Never paste code or raw data dumps into the answer. Do not give investment, legal or medical advice.',
+    'Answer: when finished, reply WITHOUT calling tools. Lead with the result, give the key figures you printed, mention that the chart is attached when you made one (never name its file or any data/ or out/ path), and end with "Sources:" listing the URLs you actually used as markdown links. Never paste code or raw data dumps into the answer. Do not give investment, legal or medical advice.',
     `Write the answer in the language of the user's request (interface language code: ${language || 'en'}).`,
   ].join('\n')
 }
@@ -227,6 +227,22 @@ function hostOf(url: string): string {
  * query1.finance.yahoo.com API call). Siblings under a shared suffix (phishing.co.uk after
  * bbc.co.uk) are not related and are removed.
  */
+const SANDBOX_PATH = /(?<![\w/.-])`?(?:\/tmp\/work\/)?(?:out|data)\/[\w.-]+\.[a-z0-9]+`?/gi
+
+/**
+ * Removes sandbox file paths (out/chart.png, data/source_1.json) from the answer: they are internal
+ * to the turn and meaningless to the user, who sees the chart itself. Production 2026-10-16: "The
+ * chart is attached as `out/vnce_6mo.png`."
+ */
+export function stripSandboxPaths(answer: string): string {
+  return String(answer || '')
+    .replace(SANDBOX_PATH, '')
+    .replace(/(^|[ \t(])(?:saved\s+)?(?:as|at|in|to|from)[ \t]*(?=[.,;:)]|$)/gim, '$1')
+    .replace(/\(\s*\)/g, '')
+    .replace(/[ \t]+([.,;:])/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+}
+
 export function stripUnverifiedUrls(answer: string, sourceUrls: ReadonlySet<string>): { text: string; dropped: number } {
   const known = new Set([...sourceUrls].map(urlKey))
   const knownHosts = [...new Set([...sourceUrls].map(hostOf).filter(Boolean))]
@@ -351,7 +367,7 @@ export async function runCosAgentLoop(input: {
     }
     trace.outcome = 'answered'
 
-    const { text, dropped } = stripUnverifiedUrls(answer, evidence.sourceUrls)
+    const { text, dropped } = stripUnverifiedUrls(stripSandboxPaths(answer), evidence.sourceUrls)
     return {
       reply: text,
       images: evidence.images.slice(0, 3),

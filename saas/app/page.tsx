@@ -25,6 +25,7 @@ import BuilderFilePreviews from '@/components/BuilderFilePreviews'
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 import { boundComposerIntake } from '@/lib/ai/cos/composerIntakeBound'
 import VoiceInputButton from '@/components/VoiceInputButton'
+import { safeDeliveredVisual } from '@/lib/concierge/deliveredVisual'
 import { CONCIERGE_RESUME_KEYS, forgetResumeId, loadResumableConversation, pairResumedTurns, readResumeId, rememberResumeId } from '@/lib/concierge/conversationResume'
 
 type Attachment = {
@@ -42,16 +43,6 @@ const BUILDER_SOURCE_FILE_RE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|jso
 const ATTACH_INPUT_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,.txt,.md,.csv,.js,.mjs,.cjs,.ts,.mts,.cts,.py,.tsx,.jsx,.html,.css,.json,.sql,.sh,.bash,.java,.cpp,.cc,.cxx,.cs,.go,.rs,.php,.rb,.swift,.kt'
 const BUILDER_WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const IMAGE_FILE_RE = /\.(?:png|jpe?g|webp)$/i
-const OWNER_SCOPED_PREVIEW_RE = /^\/api\/builder\/workspaces\/[0-9a-f-]+\/files\/.+\?preview=1$/i
-const GUEST_VISUAL_DATA_URL_RE = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i
-const MAX_GUEST_VISUAL_URL_CHARS = 8_000_000
-
-function safeVisualPreviewUrl(value: unknown): string {
-  if (typeof value !== 'string') return ''
-  if (OWNER_SCOPED_PREVIEW_RE.test(value)) return value
-  return value.length <= MAX_GUEST_VISUAL_URL_CHARS && GUEST_VISUAL_DATA_URL_RE.test(value) ? value : ''
-}
-
 function builderPreviewUrl(workspaceId: string, path: string): string {
   if (!BUILDER_WORKSPACE_ID_RE.test(workspaceId) || !path || !IMAGE_FILE_RE.test(path)) return ''
   const encodedPath = path.split('/').map(encodeURIComponent).join('/')
@@ -280,12 +271,11 @@ export default function Home() {
       const builderFiles = Array.isArray(payload?.files)
         ? payload.files.filter((value: unknown): value is string => typeof value === 'string').slice(0, 50)
         : []
-      const structuredVisualPreviewUrl = safeVisualPreviewUrl(payload?.visual?.previewUrl)
-      const visualFilename = typeof payload?.visual?.filename === 'string' && /^[a-z0-9._-]{1,120}$/i.test(payload.visual.filename)
-        ? payload.visual.filename
-        : 'visual.png'
+      // Same validation for a live answer and one recovered from History (deliveredVisual.ts).
+      const structuredVisual = safeDeliveredVisual(payload?.visual)
+      const visualFilename = structuredVisual?.filename || 'visual.png'
       const imagePath = builderFiles.find((path) => IMAGE_FILE_RE.test(path)) || ''
-      const visualPreviewUrl = structuredVisualPreviewUrl || builderPreviewUrl(builderWorkspaceId, imagePath)
+      const visualPreviewUrl = structuredVisual?.previewUrl || builderPreviewUrl(builderWorkspaceId, imagePath)
       return { reply, suggestedFollowups, builderWorkspaceId, builderFiles, visualPreviewUrl, visualFilename }
     }
 

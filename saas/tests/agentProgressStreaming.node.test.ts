@@ -140,9 +140,9 @@ test('lost COS POST transport performs read-only History recovery before showing
   const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
   assert.match(client, /const historyWatchEligible = !builderRequest && Boolean\(conversationIdForTurn\) && Boolean\(userTextForTurn\)/)
   assert.match(client, /Promise\.race\(\[posted, historyFound\]\)/)
-  assert.match(client, /const reply = await watched/)
+  assert.match(client, /const turn = await watched/)
   assert.match(client, /source: 'cos-transport-history-recovery'/)
-  assert.ok(client.indexOf('const reply = await watched') < client.indexOf("source: 'assistant-transport-unconfirmed'"))
+  assert.ok(client.indexOf('const turn = await watched') < client.indexOf("source: 'assistant-transport-unconfirmed'"))
   // The watch is read-only: it GETs History and never re-sends the POST.
   const watch = client.slice(client.indexOf('async function watchHistoryForCompletedTurn'), client.indexOf('function bodyRecord'))
   assert.match(watch, /method: 'GET'/)

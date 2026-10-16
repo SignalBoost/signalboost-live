@@ -16,6 +16,7 @@ import { enqueueDurableCosTurn, finishDurableCosTurn } from '@/lib/ai/cos/durabl
 import { runWithTurnDeadline } from '@/lib/ai/cos/cosTurnBudget.ts'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy.ts'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory.ts'
+import { provenanceWithDeliveredVisual } from '@/lib/concierge/deliveredVisual.ts'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -377,7 +378,8 @@ export async function POST(req: NextRequest): Promise<Response> {
           userId,
           userMessage: prompt,
           assistantReply: reply,
-          provenance: payload?.execution_provenance ?? null,
+          // A chart/image delivered with the answer is saved with it, so History shows it too.
+          provenance: provenanceWithDeliveredVisual(payload?.execution_provenance ?? null, payload?.visual),
         })
       }
     }

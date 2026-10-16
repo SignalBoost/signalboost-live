@@ -9,6 +9,8 @@
 //    no saved turns, get a 401, and simply start fresh.
 //  - "New chat" forgets the id, so the next question starts a new conversation.
 
+import { deliveredVisualFromProvenance, type DeliveredVisual } from './deliveredVisual.ts'
+
 export const CONCIERGE_RESUME_KEYS = Object.freeze({
   homepage: 'itmounts.concierge.homepage.conversationId',
   dock: 'itmounts.concierge.dock.conversationId',
@@ -18,8 +20,8 @@ export const CONCIERGE_RESUME_MAX_MESSAGES = 40
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export type ResumedMessage = { role: 'user' | 'assistant'; content: string }
-export type ResumedTurn = { request: string; response: string }
+export type ResumedMessage = { role: 'user' | 'assistant'; content: string; visual?: DeliveredVisual }
+export type ResumedTurn = { request: string; response: string; visualPreviewUrl?: string; visualFilename?: string }
 
 function storage(): Storage | null {
   try { return typeof window === 'undefined' ? null : window.localStorage } catch { return null }
@@ -41,12 +43,16 @@ export function forgetResumeId(key: string): void {
   try { storage()?.removeItem(key) } catch { /* storage blocked */ }
 }
 
-/** Keeps only plain user/assistant text, in stored order, bounded to the most recent messages. */
+/** Keeps user/assistant text (and the chart/image delivered with an answer), in stored order,
+ *  bounded to the most recent messages. */
 export function resumableMessages(raw: unknown): ResumedMessage[] {
   const rows = Array.isArray(raw) ? raw : []
   const messages = rows
     .filter((row: any) => (row?.role === 'user' || row?.role === 'assistant') && typeof row?.content === 'string' && row.content.trim())
-    .map((row: any) => ({ role: row.role as 'user' | 'assistant', content: String(row.content) }))
+    .map((row: any): ResumedMessage => {
+      const visual = row.role === 'assistant' ? deliveredVisualFromProvenance(row.provenance) : null
+      return { role: row.role as 'user' | 'assistant', content: String(row.content), ...(visual ? { visual } : {}) }
+    })
   return messages.slice(-CONCIERGE_RESUME_MAX_MESSAGES)
 }
 
@@ -56,7 +62,14 @@ export function pairResumedTurns(messages: readonly ResumedMessage[]): ResumedTu
   let pending = ''
   for (const message of messages) {
     if (message.role === 'user') { pending = message.content; continue }
-    if (pending) { turns.push({ request: pending, response: message.content }); pending = '' }
+    if (pending) {
+      turns.push({
+        request: pending,
+        response: message.content,
+        ...(message.visual ? { visualPreviewUrl: message.visual.previewUrl, visualFilename: message.visual.filename } : {}),
+      })
+      pending = ''
+    }
   }
   return turns
 }

@@ -1,3 +1,5 @@
+import { deliveredVisualFromProvenance, type DeliveredVisual } from '../../concierge/deliveredVisual.ts'
+
 export type StoredAssistantMessage = {
   role?: unknown
   content?: unknown
@@ -44,12 +46,24 @@ function sameStoredPrompt(stored: unknown, expected: string): boolean {
  * COS benchmarks, so content equality alone is not enough: the matching user message must
  * also have been created at or after this send (with a small clock-skew allowance).
  */
+export type RecoveredAssistantTurn = { reply: string; visual: DeliveredVisual | null }
+
 export function findRecoveredAssistantReply(
   messages: StoredAssistantMessage[],
   expectedUserContent: string,
   sentAtMs: number,
   clockSkewAllowanceMs = 10_000,
 ): string | null {
+  return findRecoveredAssistantTurn(messages, expectedUserContent, sentAtMs, clockSkewAllowanceMs)?.reply ?? null
+}
+
+/** The saved answer for a send, with the chart/image that was delivered with it (if any). */
+export function findRecoveredAssistantTurn(
+  messages: StoredAssistantMessage[],
+  expectedUserContent: string,
+  sentAtMs: number,
+  clockSkewAllowanceMs = 10_000,
+): RecoveredAssistantTurn | null {
   const expected = normalize(expectedUserContent)
   if (!expected || !Array.isArray(messages) || !messages.length) return null
   const earliestAllowed = sentAtMs - Math.max(0, clockSkewAllowanceMs)
@@ -68,7 +82,7 @@ export function findRecoveredAssistantReply(
       const candidateProvenance = provenanceRecord(candidate.provenance)
       if (candidateProvenance?.schema === 'signalboost-cos-turn-v1' && candidateProvenance?.status === 'running') continue
       const reply = String(candidate.content ?? '').trim()
-      if (reply) return reply
+      if (reply) return { reply, visual: deliveredVisualFromProvenance(candidate.provenance) }
     }
   }
 

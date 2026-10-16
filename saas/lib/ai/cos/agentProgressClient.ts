@@ -1,6 +1,6 @@
 import { isConciergeBuilderObjective, structuredApplicationBuild } from './cosReasoningRolePolicy.ts'
 import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMessage } from './operator-progress.ts'
-import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findDurableCosTurnReply, findRecoveredAssistantReply } from './assistantTransportRecovery.ts'
+import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findDurableCosTurnReply, findRecoveredAssistantTurn, type RecoveredAssistantTurn } from './assistantTransportRecovery.ts'
 import { planResearchTask } from './researchBudget.ts'
 
 export type AgentProgressEvent = {
@@ -68,8 +68,8 @@ function wait(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /**
- * Read-only History watch for one sent COS turn. Returns the saved assistant reply for this exact
- * send (matched by prompt and send time, see findRecoveredAssistantReply) or null at the deadline.
+ * Read-only History watch for one sent COS turn. Returns the saved assistant turn (reply and delivered visual) for this exact
+ * send (matched by prompt and send time, see findRecoveredAssistantTurn) or null at the deadline.
  * It never POSTs, so it can never replay an action.
  */
 async function watchHistoryForCompletedTurn(args: {
@@ -77,7 +77,7 @@ async function watchHistoryForCompletedTurn(args: {
   userText: string
   sentAtMs: number
   signal: AbortSignal
-}): Promise<string | null> {
+}): Promise<RecoveredAssistantTurn | null> {
   const deadlineMs = args.sentAtMs + COS_HISTORY_WATCH_DEADLINE_MS
   await wait(COS_HISTORY_WATCH_START_MS, args.signal)
   while (Date.now() < deadlineMs) {
@@ -94,12 +94,12 @@ async function watchHistoryForCompletedTurn(args: {
       if (history.status === 401 || history.status === 403) return null
       if (history.ok) {
         const payload = await history.json().catch(() => null)
-        const reply = findRecoveredAssistantReply(
+        const turn = findRecoveredAssistantTurn(
           Array.isArray(payload?.messages) ? payload.messages : [],
           args.userText,
           args.sentAtMs,
         )
-        if (reply) return reply
+        if (turn) return turn
       }
     } catch (error) {
       if (args.signal.aborted) throw error
@@ -120,7 +120,7 @@ async function recoverSavedTurnOnce(args: {
   userText: string
   sentAtMs: number
   signal: AbortSignal
-}): Promise<string | null> {
+}): Promise<RecoveredAssistantTurn | null> {
   if (!args.conversationId || !args.userText || args.signal.aborted) return null
   try {
     const response = await fetch(`/api/assistant/chats?id=${encodeURIComponent(args.conversationId)}`, {
@@ -132,12 +132,17 @@ async function recoverSavedTurnOnce(args: {
     })
     if (!response.ok) return null
     const payload = await response.json().catch(() => null)
-    return findRecoveredAssistantReply(
+    return findRecoveredAssistantTurn(
       Array.isArray(payload?.messages) ? payload.messages : [],
       args.userText,
       args.sentAtMs,
     )
   } catch { return null }
+}
+
+/** A turn recovered from History is shown exactly like a live answer, chart included. */
+function historyRecoveryData(turn: RecoveredAssistantTurn) {
+  return { reply: turn.reply, source: 'cos-transport-history-recovery', ...(turn.visual ? { visual: turn.visual } : {}) }
 }
 
 function bodyRecord(value: unknown): Record<string, any> | null {
@@ -351,7 +356,7 @@ export async function postWithAgentProgress(args: {
   type TransportOutcome =
     | { kind: 'response'; response: Response }
     | { kind: 'error'; error: unknown }
-    | { kind: 'history'; reply: string }
+    | { kind: 'history'; turn: RecoveredAssistantTurn }
   const posted: Promise<TransportOutcome> = fetch(endpoint, {
     method: 'POST',
     credentials: 'include',
@@ -366,7 +371,7 @@ export async function postWithAgentProgress(args: {
     (value): TransportOutcome => ({ kind: 'response', response: value }),
     (error): TransportOutcome => ({ kind: 'error', error }),
   )
-  const watched: Promise<string | null> = historyWatchEligible
+  const watched: Promise<RecoveredAssistantTurn | null> = historyWatchEligible
     ? watchHistoryForCompletedTurn({
         conversationId: conversationIdForTurn,
         userText: userTextForTurn,
@@ -374,8 +379,8 @@ export async function postWithAgentProgress(args: {
         signal: AbortSignal.any([args.signal, watchAbort.signal]),
       }).catch(() => null)
     : Promise.resolve(null)
-  const historyFound: Promise<TransportOutcome> = watched.then(reply => reply
-    ? { kind: 'history', reply }
+  const historyFound: Promise<TransportOutcome> = watched.then(turn => turn
+    ? { kind: 'history', turn }
     : new Promise<TransportOutcome>(() => undefined))
 
   let response: Response
@@ -395,7 +400,7 @@ export async function postWithAgentProgress(args: {
         }) : null
         if (saved) {
           report('complete', 'Recovered the completed COS answer from History')
-          return { ok: true, status: 200, data: { reply: saved, source: 'cos-transport-history-recovery' } }
+          return { ok: true, status: 200, data: historyRecoveryData(saved) }
         }
         report('complete', 'Concierge stopped waiting for the unavailable response')
         return {
@@ -414,8 +419,8 @@ export async function postWithAgentProgress(args: {
       // Keep reading History until the turn's deadline; never replay a possible action.
       if (historyWatchEligible) {
         report('running', 'The connection to COS was interrupted — waiting for the saved answer in History (the request is not replayed)')
-        const reply = await watched
-        if (reply) outcome = { kind: 'history', reply }
+        const turn = await watched
+        if (turn) outcome = { kind: 'history', turn }
       }
     }
     if (outcome.kind === 'history') {
@@ -428,7 +433,7 @@ export async function postWithAgentProgress(args: {
     if (outcome.kind === 'history') {
       fetchAbort.abort()
       report('complete', 'Recovered the completed COS answer from History')
-      return { ok: true, status: 200, data: { reply: outcome.reply, source: 'cos-transport-history-recovery' } }
+      return { ok: true, status: 200, data: historyRecoveryData(outcome.turn) }
     }
     if (outcome.kind === 'error') {
       report('complete', operatorProgressMessage({ stage: 'blocked', target: progressTarget, builder: builderActive }))
@@ -467,7 +472,7 @@ export async function postWithAgentProgress(args: {
     })
     if (saved) {
       report('complete', 'Recovered the completed COS answer from History')
-      return { ok: true, status: 200, data: { reply: saved, source: 'cos-transport-history-recovery' } }
+      return { ok: true, status: 200, data: historyRecoveryData(saved) }
     }
   }
   const turnId = typeof data?.turnId === 'string' ? data.turnId : ''

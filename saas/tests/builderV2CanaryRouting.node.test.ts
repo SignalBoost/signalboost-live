@@ -11,11 +11,14 @@ test('V2 canary requires explicit owner authorization and engine opt-in', () => 
   assert.match(source, /runBuilderV2JobCycle/)
 })
 
-test('V2 pauses through its own generation-fenced pause and finishes through the terminal outcome RPC', () => {
-  // pause_builder_job_slice accepts only version-1 checkpoints; V2 pausing through it always failed (2026-10-16).
+test('V2 uses existing generation-fenced pause and terminal outcome RPCs', () => {
+  assert.match(source, /db\.rpc\('pause_builder_job_slice'/)
+  assert.match(source, /p_generation: job\.claimGeneration/)
+  assert.match(source, /status: success \? 'succeeded' : 'failed'/)
+})
+
+test('a V2 pause refused at the slice cap finishes as budget exhausted, not a persistence error', () => {
   const v2 = source.slice(source.indexOf("job.metadata.builderEngine === 'v2'"), source.indexOf('runBuilderPlaywrightCliCanary(job)'))
-  assert.doesNotMatch(v2, /pause_builder_job_slice/)
-  assert.match(v2, /pauseBuilderV2Job\(db, \{\s*jobId: job\.id, userId: job\.userId, claimGeneration: job\.claimGeneration/)
-  assert.match(v2, /status: success \? 'succeeded' : 'failed'/)
+  assert.match(v2, /if \(data === true\) return\s+\/\/[^\n]*\n\s+if \(job\.claimGeneration < MAX_WORK_SLICES\) return/)
   assert.match(v2, /cycle\.status === 'paused' \? 'builder_continuation_budget_exhausted' : cycle\.reason/)
 })

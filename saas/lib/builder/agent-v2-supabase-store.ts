@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { BuilderV2LeaseStore } from './agent-v2-job-cycle.ts'
 import type { BuilderV2Checkpoint } from './agent-v2.ts'
-import { MAX_WORK_SLICES } from './work-budget.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -43,36 +42,4 @@ export function createBuilderV2SupabaseLeaseStore(db: SupabaseClient, userId: st
       return Array.isArray(data) && data.length === 1
     },
   }
-}
-
-/**
- * Pause a V2 slice with its checkpoint so the scheduler resumes it. Production 2026-10-16: V2 paused through
- * pause_builder_job_slice, which accepts only version-1 (V1) checkpoints, so every V2 pause raised and the job
- * failed with builder_v2_checkpoint_persist_failed. Same fences as that function: the running claim of this
- * generation, under the slice cap, a standard V2 job, and the checkpoint's own workspace.
- * Returns false when the claim is stale or the slice cap is reached.
- */
-export async function pauseBuilderV2Job(db: SupabaseClient, input: Readonly<{
-  jobId: string; userId: string; claimGeneration: number; checkpoint: BuilderV2Checkpoint
-  reply: string; result: Record<string, unknown>
-}>): Promise<boolean> {
-  if (!UUID.test(input.jobId) || !UUID.test(input.userId) || input.checkpoint.version !== 2
-    || !Number.isSafeInteger(input.claimGeneration) || input.claimGeneration < 1) return false
-  const { data, error } = await db.from('builder_jobs')
-    .update({ status: 'paused', checkpoint: input.checkpoint, result: input.result, updated_at: new Date().toISOString() })
-    .eq('id', input.jobId).eq('user_id', input.userId)
-    .eq('status', 'running').eq('claim_generation', input.claimGeneration).lt('claim_generation', MAX_WORK_SLICES)
-    .eq('job_kind', 'standard').eq('workspace_id', input.checkpoint.workspaceId)
-    .contains('metadata', { builderEngine: 'v2' })
-    .select('id,history_message_id,conversation_id,workspace_id')
-  if (error) throw new Error(`builder_v2_job_pause: ${error.message}`)
-  const row = Array.isArray(data) && data.length === 1 ? data[0] as Record<string, unknown> : null
-  if (!row) return false
-  await db.from('assistant_messages').update({
-    content: input.reply.slice(0, 16_000),
-    provenance: { schema: 'signalboost-builder-job-v1', jobId: input.jobId, workspaceId: row.workspace_id, status: 'paused' },
-  }).eq('id', row.history_message_id).eq('user_id', input.userId)
-  await db.from('assistant_conversations').update({ updated_at: new Date().toISOString() })
-    .eq('id', row.conversation_id).eq('user_id', input.userId)
-  return true
 }

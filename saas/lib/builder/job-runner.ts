@@ -20,7 +20,7 @@ import { BuilderToolLoop } from './tool-loop.ts'
 import { BuilderV2Agent } from './agent-v2.ts'
 import { BuilderV2Dispatcher } from './agent-v2-dispatcher.ts'
 import { runBuilderV2JobCycle } from './agent-v2-job-cycle.ts'
-import { createBuilderV2SupabaseLeaseStore, pauseBuilderV2Job } from './agent-v2-supabase-store.ts'
+import { createBuilderV2SupabaseLeaseStore } from './agent-v2-supabase-store.ts'
 import { createBuilderMcpReadPort } from './mcp-read-port.ts'
 import { createBuilderPlaywrightCliPort } from './playwright-cli-port.ts'
 import { VercelSandboxBuilderRunner } from './vercel-sandbox-runner.ts'
@@ -389,12 +389,14 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
       if (cycle.status === 'paused' && cycle.result?.checkpoint) {
         const reply = historyReply('Builder V2 saved its progress and will continue automatically. Verification is not complete.', job.workspaceId, files)
-        if (await pauseBuilderV2Job(db, {
-          jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
-          checkpoint: cycle.result.checkpoint, reply,
-          result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, engine: 'v2' },
-        })) return
-        // Not paused: either the slice cap is reached (finish with that outcome below) or another claim owns the job.
+        const { data, error } = await db.rpc('pause_builder_job_slice', {
+          p_job_id: job.id, p_user_id: job.userId, p_generation: job.claimGeneration,
+          p_checkpoint: cycle.result.checkpoint, p_reply: reply,
+          p_result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, engine: 'v2' },
+        })
+        if (error) throw new Error(`builder_v2_checkpoint_persist_failed: ${error.message}`)
+        if (data === true) return
+        // Not paused: at the slice cap the job finishes below with that outcome; otherwise another claim owns it.
         if (job.claimGeneration < MAX_WORK_SLICES) return
       }
       const success = cycle.status === 'verified'

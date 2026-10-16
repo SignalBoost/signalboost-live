@@ -1,2 +1,2 @@
-base_sha=51d3f7be67428db184981ea5efa354c857a4c7ce
-branch=fix/cos-agent-no-process-narration-20261016
+base_sha=c3a26da6654a8488dc78862c1517fc678718c403
+branch=fix/builder-progress-aware-orderflow-20261016

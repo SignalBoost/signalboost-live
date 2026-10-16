@@ -51,7 +51,9 @@ export function emptyEvidence(userText: string): AgentEvidence {
 const OBSERVATION_LIMIT = 3_000
 // Time kept back for the final answer round: tools never spend it.
 export const ANSWER_RESERVE_MS = 25_000
-const FETCH_TIMEOUT_MS = 20_000
+// A responsive public endpoint answers in a few seconds; a slow one costs the turn its answer.
+const FETCH_TIMEOUT_MS = 10_000
+const CREDENTIAL_PARAM = /[?&](?:api[_-]?key|apikey|access[_-]?token|token|key|secret|password|client[_-]?secret)=/i
 const PYTHON_TIMEOUT_MS = 40_000
 
 /**
@@ -193,6 +195,9 @@ export async function executeAgentTool(input: {
         body = browsed.text
         extension = 'txt'
       } else {
+        // COS never sends credentials it was not given: a model-written key is invented, and a real one
+        // would leak into logs and provenance. Production 2026-10-16: the loop made up a FRED api_key.
+        if (CREDENTIAL_PARAM.test(url)) return record(`Refused ${url.replace(/([?&][^=]+=)[^&]*/g, '$1…')}: URLs carrying API keys or tokens are not allowed. Use a keyless public endpoint.`)
         let host = ''
         try { host = new URL(url).hostname.toLowerCase() } catch {}
         if (host && evidence.failedHosts.has(host)) {

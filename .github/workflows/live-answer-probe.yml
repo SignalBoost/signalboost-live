@@ -73,5 +73,6 @@ jobs:
           }
           notice('provenance', JSON.stringify(pick))
           notice('keys', Object.keys(data).join(','))
-          if (p.agent_tool_loop) notice('agent tool loop', JSON.stringify(p.agent_tool_loop).slice(0, 4000))
+          const loopTrace = data.agent_tool_loop || p.agent_tool_loop
+          if (loopTrace) for (let i = 0; i < Math.min(4, Math.ceil(JSON.stringify(loopTrace).length / 3500)); i++) notice(`agent tool loop ${i + 1}`, JSON.stringify(loopTrace).slice(i * 3500, (i + 1) * 3500))
           NODE

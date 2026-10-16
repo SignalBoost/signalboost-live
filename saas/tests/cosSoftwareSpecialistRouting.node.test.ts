@@ -398,3 +398,20 @@ test('a product description without a file tree or file paths does not become a 
   })
   assert.equal(routed, null)
 })
+
+
+test('an explanation request that carries a file tree and test commands stays a conversation', () => {
+  for (const opening of [
+    'Explain how to build an application with this project structure:',
+    'How would I build an app with this file structure?',
+    'Can you describe how to create this project structure?',
+  ]) {
+    const objective = [opening, '├── index.js', '├── src/', '│   └── cart.js', 'src/orders.js', 'and what npm test would do.'].join('\n')
+    const routed = conciergeBuilderRequest({
+      messages: [{ role: 'user', content: objective }],
+      context: { conversationId: 'b7a51c1e-1f7f-4c39-9a7e-1c2f8f3d2a13' },
+      attachments: [],
+    })
+    assert.equal(routed, null, opening)
+  }
+})

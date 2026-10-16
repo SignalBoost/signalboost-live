@@ -436,6 +436,9 @@ test('answers start with the result, not the agent narrating its process', () =>
   assert.equal(stripProcessNarration('The search results show that Canberra is the capital of Australia.\n\nSources:\n- [Britannica](https://www.britannica.com/place/Canberra)'), 'The search results show that Canberra is the capital of Australia.\n\nSources:\n- [Britannica](https://www.britannica.com/place/Canberra)')
   assert.equal(stripProcessNarration('Gold fell 3.12%. The chart is attached.'), 'Gold fell 3.12%. The chart is attached.')
   // Production 2026-10-16 (Microsoft CEO, after #4574).
+  // Codex #4576: the same opening that carries the answer is an answer, not a note.
+  assert.equal(stripProcessNarration('The answer is clear: Satya Nadella is the CEO of Microsoft.'), 'The answer is clear: Satya Nadella is the CEO of Microsoft.')
+  assert.equal(stripProcessNarration('The answer is verified.\n\nSatya Nadella is the CEO.'), 'Satya Nadella is the CEO.')
   assert.equal(stripProcessNarration('The official Microsoft source confirms: Satya Nadella is Chairman and CEO.\n\nThe answer is clear and verified from the official Microsoft leadership page.\n\nThe current CEO of Microsoft is **Satya Nadella**.'), 'The official Microsoft source confirms: Satya Nadella is Chairman and CEO.\n\nThe current CEO of Microsoft is **Satya Nadella**.')
   assert.equal(stripProcessNarration('Ottawa is the capital of Canada.\n\nLet me know if you want the metro population too.'), 'Ottawa is the capital of Canada.\n\nLet me know if you want the metro population too.')
   assert.equal(stripProcessNarration('Let me present the results.'), 'Let me present the results.')

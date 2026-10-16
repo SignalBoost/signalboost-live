@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs'
 import { readBuilderObjective } from '../lib/builder/request-contract.ts'
 import {
   parseSignalBoostRepositoryRepairTarget,
+  isExplicitIsolatedProjectBuild,
+  isOwnerRepairWithoutSource,
   resolveSignalBoostRepositoryCommit,
   signalBoostDeployedRepairTarget,
   signalBoostRepositoryRepairObjective,
@@ -295,4 +297,29 @@ test('production TypeScript diagnostics use a narrow compiler proof instead of r
       'Failed to type check.',
     ],
   } as any), 'npm exec -- tsc --noEmit')
+})
+
+test('new OrderFlow application specification never becomes owner platform repair', () => {
+  const objective = [
+    '# OrderFlow — End-to-End Builder Acceptance Test',
+    'Build a complete, working OrderFlow application using Node.js and JavaScript.',
+    'This is a real end-to-end acceptance test of the Builder platform.',
+    '## Required project structure',
+    'Create all 15 files:',
+    'orderflow/src/catalog.js',
+    'orderflow/src/cart.js',
+    'orderflow/test/catalog.test.js',
+    'orderflow/test/checkout.test.js',
+    '## Mandatory verification',
+    'Execute npm test, node --test test/*.test.js, and node index.js.',
+    'If a command fails, inspect its error and repair the implementation.',
+  ].join('\n')
+  assert.equal(isExplicitIsolatedProjectBuild(objective), true)
+  assert.equal(isOwnerRepairWithoutSource({
+    objective, isOwner: true, hasAttachedSource: false,
+    hasRepositoryImport: false, workspaceHasFiles: false, hasProjectContext: false,
+  }), false)
+  assert.equal(signalBoostDeployedRepairTarget(objective, {
+    commitSha: 'a'.repeat(40), branch: 'main',
+  }, { ownerRepairWithoutSource: true }), null)
 })

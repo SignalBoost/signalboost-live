@@ -39,18 +39,18 @@ test('homepage Concierge is visibly an assistant workspace, not the old landing 
 
   assert.match(layout, /import '\.\/concierge-workspace\.css'/)
   assert.match(workspaceCss, /body:has\(\.sb-ai-app-shell--home\) > footer\s*\{[\s\S]*display:\s*none;/)
-  assert.match(workspaceCss, /\.concierge-shell\s*\{[\s\S]*width:\s*100% !important;[\s\S]*border:\s*0 !important;[\s\S]*border-radius:\s*0 !important;/)
-  assert.match(workspaceCss, /\.concierge-shell \.welcome-card\s*\{[\s\S]*justify-content:\s*flex-end !important;[\s\S]*text-align:\s*end;/)
-  assert.match(workspaceCss, /\.concierge-shell \.welcome-copy\s*\{[\s\S]*margin-inline-start:\s*auto;[\s\S]*margin-inline-end:\s*clamp\(/)
-  assert.match(workspaceCss, /\.concierge-shell \.welcome-composer\s*\{[\s\S]*align-self:\s*flex-end;[\s\S]*margin-inline-start:\s*auto !important;/)
-  assert.match(workspaceCss, /\.concierge-shell \.welcome-actions,[\s\S]*\.concierge-shell \.welcome-mark,[\s\S]*a\[href="\/dashboard\/assistant"\][\s\S]*display:\s*none !important;/)
-  assert.match(workspaceCss, /\.concierge-shell \.welcome-composer\s*\{[\s\S]*position:\s*relative !important;[\s\S]*width:\s*min\(920px/)
-  assert.match(workspaceCss, /\.assistant-header \.header-copy\s*\{[\s\S]*position:\s*absolute !important;[\s\S]*clip:\s*rect\(0, 0, 0, 0\) !important;/)
-  assert.doesNotMatch(workspaceCss, /\.assistant-header \.header-copy,[\s\S]*display:\s*none !important;/)
-  assert.match(workspaceCss, /\.assistant-header \.header-actions a\s*\{[\s\S]*display:\s*none !important;/)
-  assert.match(workspaceCss, /\.concierge-shell \.thread\s*\{[\s\S]*max-height:\s*none !important;[\s\S]*overflow-y:\s*auto !important;/)
-  assert.match(workspaceCss, /\.concierge-shell \.assistant-message\s*\{[\s\S]*background:\s*transparent !important;/)
-  assert.match(workspaceCss, /\.composer-area:not\(\.welcome-composer\)[\s\S]*position:\s*sticky !important;[\s\S]*bottom:\s*0;/)
+  // One rendering canvas, prompt pinned at the bottom, no centered box and no cards.
+  assert.match(workspaceCss, /\.concierge-shell\s*\{[\s\S]*?display:\s*flex;[\s\S]*?flex-direction:\s*column;[\s\S]*?width:\s*100%;[\s\S]*?\}/)
+  assert.doesNotMatch(workspaceCss, /\.concierge-shell\s*\{[^}]*max-width:\s*\d/)
+  assert.doesNotMatch(workspaceCss, /grid-template-columns/)
+  assert.match(workspaceCss, /\.concierge-shell \.composer-area\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?bottom:\s*0;/)
+  assert.match(workspaceCss, /\.concierge-shell \.welcome-card\s*\{[\s\S]*?justify-content:\s*flex-end;[\s\S]*?text-align:\s*start;/)
+  assert.match(workspaceCss, /\.concierge-shell \.message\s*\{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;/)
+  assert.match(workspaceCss, /\.concierge-shell \.user-message\s*\{[\s\S]*?border-inline-start:/)
+  assert.match(workspaceCss, /\.concierge-shell > \.cos-home-history\s*\{[\s\S]*?position:\s*absolute;/)
+  assert.match(homepage, /const \[savedChatsOpen, setSavedChatsOpen\] = useState\(false\)/)
+  assert.doesNotMatch(homepage, /welcome-actions|welcome-mark|header-copy/)
+  assert.match(homepage, /<h1 className="sr-only">\{copy\.chatTitle\}<\/h1>/)
 
   // Existing artifact capabilities remain on the same surface: readable/copyable text previews,
   // direct downloads, and inline HTML preview. The visual correction changes layout only.

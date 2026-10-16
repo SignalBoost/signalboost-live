@@ -96,3 +96,9 @@ test('a passing npm test does not complete a build that is still missing a drawn
   assert.deepEqual(progress.missingFiles, ['index.js'])
   assert.deepEqual(progress.pendingCommands, ['node index.js'])
 })
+
+test('standard tree output without trailing slashes on directories keeps nested paths', async () => {
+  const { builderTaskContract: contractOf } = await import('../lib/builder/task-contract.ts')
+  const contract = contractOf(['## Project structure', '```text', 'app', '├── package.json', '├── src', '│   └── index.js', '└── test', '    └── index.test.js', '```'].join('\n'))
+  assert.deepEqual(contract.files, ['package.json', 'src/index.js', 'test/index.test.js'])
+})

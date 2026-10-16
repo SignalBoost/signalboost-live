@@ -76,11 +76,12 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
       // A drawn tree names entries without their parent directory. Rebuild each path from its depth;
       // the glyph-less top-level "project/" line is the workspace root itself, not a subdirectory.
       const branch = TREE_BRANCH.exec(raw)
-      if (branch || (fence && tree.length === 0 && /^[\w.-]+\/$/.test(line))) {
+      if (branch || (fence && tree.length === 0 && /^[\w.-]+\/?$/.test(line) && !/\.[a-z0-9]+$/i.test(line))) {
         const depth = branch ? Math.round(branch[1].replace(/│|\|/g, ' ').length / 4) + 1 : 0
         const name = branch ? branch[2] : ''
         tree.length = Math.min(tree.length, depth)
-        if (!branch || name.endsWith('/')) { tree[depth] = branch ? name.slice(0, -1) : ''; continue }
+        // `tree` prints directories without a trailing slash ("├── src"); a name with no extension is a directory.
+        if (!branch || name.endsWith('/') || !/\.[a-z0-9]+$/i.test(name)) { tree[depth] = branch ? name.replace(/\/$/, '') : ''; continue }
         const path = [...tree.slice(1, depth), name].filter(Boolean).join('/')
         if (FILE.test(path) && !path.split('/').includes('..')) files.add(path)
         continue

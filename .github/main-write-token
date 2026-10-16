@@ -1,2 +1,2 @@
-base_sha=aaecaaeb1d1a33bfca125df9968b4ae278aa44cb
-branch=test/lab-provider-job-state-exhaustive-20261016
+base_sha=6c47f31133331846695c0929a91afaad4eb9cbbe
+branch=fix/builder-contract-tree-dirs-no-slash-20261016

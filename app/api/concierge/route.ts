@@ -127,11 +127,6 @@ function currentUtcMonthStart(nowMs = Date.now()): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
 }
 
-function nextUtcMonthStart(nowMs = Date.now()): Date {
-  const now = new Date(nowMs)
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
-}
-
 function usageCacheKey(userId: string, monthStartIso: string) {
   return `${userId}:${monthStartIso}`
 }
@@ -226,47 +221,22 @@ async function resolveUsedMinutesWithTimeout(
   }
 }
 
-// Short-TTL per-user/month cache for the monthly usage figure. Without it, a
-// high-rate authenticated caller could force resolveUsedMinutes' paginated reads
-// on every POST. Cache keys include the UTC month start so values computed just
-// before a month boundary cannot leak into the next month.
-const USAGE_TTL_MS = 60_000
+// Completed monthly usage values are intentionally not cached. Additional
+// video_jobs export rows can be written at any time; reusing a finished value
+// would temporarily understate consumption. We still coalesce concurrent
+// lookups for the same user/month so a burst of simultaneous requests shares one
+// database read, but every later request performs a fresh lookup.
 const USAGE_LOOKUP_TIMEOUT_MS = 5_000
-// Hard cap on distinct cached users/months per instance.
-const USAGE_CACHE_MAX = 5000
 const USAGE_INFLIGHT_MAX = 500
-const usageCache = new Map<string, { value: number | null; expires: number }>()
 const usageInflight = new Map<string, Promise<number | null>>()
 
-function pruneUsageCache(now: number) {
-  if (usageCache.size <= USAGE_CACHE_MAX) return
-  // Purge expired first (cheap), then evict oldest until under the hard cap.
-  for (const [k, v] of usageCache) {
-    if (v.expires <= now) usageCache.delete(k)
-  }
-  while (usageCache.size > USAGE_CACHE_MAX) {
-    const oldest = usageCache.keys().next().value
-    if (oldest === undefined) break
-    usageCache.delete(oldest)
-  }
-}
-
-async function resolveUsedMinutesCached(
+async function resolveUsedMinutesFresh(
   supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>,
   userId: string,
 ): Promise<number | null> {
   const now = Date.now()
   const monthStartIso = currentUtcMonthStart(now).toISOString()
-  const monthEndMs = nextUtcMonthStart(now).getTime()
   const cacheKey = usageCacheKey(userId, monthStartIso)
-  const hit = usageCache.get(cacheKey)
-  if (hit && hit.expires > now) {
-    // Touch: re-insert to mark most-recently-used (Map keeps insertion order).
-    usageCache.delete(cacheKey)
-    usageCache.set(cacheKey, hit)
-    return hit.value
-  }
-  if (hit) usageCache.delete(cacheKey) // stale
 
   const existing = usageInflight.get(cacheKey)
   if (existing) return existing
@@ -276,15 +246,6 @@ async function resolveUsedMinutesCached(
   if (usageInflight.size >= USAGE_INFLIGHT_MAX) return null
 
   const pending = resolveUsedMinutesWithTimeout(supabase, userId, monthStartIso)
-    .then(value => {
-      const finishedAt = Date.now()
-      usageCache.set(cacheKey, {
-        value,
-        expires: Math.min(finishedAt + USAGE_TTL_MS, monthEndMs),
-      })
-      pruneUsageCache(finishedAt)
-      return value
-    })
     .finally(() => {
       usageInflight.delete(cacheKey)
     })
@@ -362,7 +323,7 @@ export async function POST(req: Request) {
   // (usageUnavailable) so the concierge gives neutral guidance instead of a
   // 0-used quota it didn't verify. Tier still degrades safely to least-privilege.
   const { tier, billingProvider } = await resolveEntitlements(supabase, user.id)
-  const usedMinutes = await resolveUsedMinutesCached(supabase, user.id)
+  const usedMinutes = await resolveUsedMinutesFresh(supabase, user.id)
 
   return NextResponse.json(
     answerSignalBoostConcierge(query, locale, {

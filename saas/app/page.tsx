@@ -64,7 +64,7 @@ export default function Home() {
   const copy = getConciergeTranscriptCopy(lang)
   const [question, setQuestion] = useState('')
   const [turns, setTurns] = useState<ConciergeTranscriptTurn[]>([])
-  const [savedChats, setSavedChats] = useState<Array<{ id: string; title: string; updated_at: string }>>([])
+  const [savedChats, setSavedChats] = useState<Array<{ id: string; title: string; updated_at: string; message_count?: number }>>([])
   const [savedChatsOpen, setSavedChatsOpen] = useState(true)
   const [savedChatsError, setSavedChatsError] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
@@ -180,6 +180,11 @@ export default function Home() {
     } catch {
       setSavedChatsError(true)
     }
+  }
+
+  const historyDate = (iso: string) => {
+    const date = new Date(iso)
+    return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(lang, { month: 'short', day: 'numeric' })
   }
 
   // Users can remove one conversation or their whole history. The API only ever deletes rows
@@ -341,8 +346,11 @@ export default function Home() {
           {savedChatsError ? <p role="status">{copy.historyUnavailable}</p> : null}
           {deleteFailed ? <p role="status">{copy.deleteFailed}</p> : null}
           {savedChats.map(chat => (
-            <div className="cos-history-row" key={chat.id}>
-              <button type="button" className="cos-history-entry" onClick={() => { closeHistoryOnPhone(); void openSavedChat(chat.id) }} title={chat.title}>{chat.title || copy.newChat}</button>
+            <div className={'cos-history-row' + (conversationIdRef.current === chat.id ? ' is-current' : '')} key={chat.id}>
+              <button type="button" className="cos-history-entry" onClick={() => { closeHistoryOnPhone(); void openSavedChat(chat.id) }} title={chat.title}>
+                <span className="cos-history-title">{chat.title || copy.newChat}</span>
+                <span className="cos-history-meta">{[historyDate(chat.updated_at), chat.message_count].filter(part => part !== '' && part != null).join(' · ')}</span>
+              </button>
               <button type="button" className="cos-history-delete" onClick={() => void deleteSavedChats(chat.id)} aria-label={`${copy.deleteChat}: ${chat.title || copy.newChat}`} title={copy.deleteChat}>🗑</button>
             </div>
           ))}

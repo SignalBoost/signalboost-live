@@ -42,3 +42,9 @@ test('homepage history lets the user delete one conversation or the whole histor
     assert.equal((copySource.match(new RegExp(`\\n    ${key}: `, 'g')) || []).length, 11, key)
   }
 })
+test('homepage history cards show the title and a localized date with the message count', () => {
+  assert.match(home, /<span className="cos-history-title">\{chat\.title \|\| copy\.newChat\}<\/span>/)
+  assert.match(home, /<span className="cos-history-meta">\{\[historyDate\(chat\.updated_at\), chat\.message_count\]/)
+  assert.match(home, /toLocaleDateString\(lang, \{ month: 'short', day: 'numeric' \}\)/)
+  assert.match(css, /\.concierge-shell \.cos-history-meta \{/)
+})

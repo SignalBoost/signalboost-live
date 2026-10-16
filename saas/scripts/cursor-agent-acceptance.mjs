@@ -97,7 +97,7 @@ export async function runCursorAcceptance({root,objective,agent='agent',env=proc
     }
     const matches=[...receipts[0].stdout.matchAll(/(?:^|\n)\s*(?:#|ℹ)\s+pass\s+(\d+)/g)]
     passed=matches.length?Number(matches.at(-1)[1]):0
-    status=missing.length===0 && receipts.every(r=>r.exitCode===0&&!r.timedOut) && passed>=20?'PASS':'FAIL'
+    status=agentRun.exitCode===0 && !agentRun.timedOut && missing.length===0 && receipts.every(r=>r.exitCode===0&&!r.timedOut) && passed>=20?'PASS':'FAIL'
     rounds.push({index:round,agent:{exitCode:agentRun.exitCode,timedOut:agentRun.timedOut,durationMs:agentRun.durationMs,
       stderr:agentRun.stderr.slice(-8000),sessionId:parsed.sessionId,events:parsed.events},status,missing,testsPassed:passed,receipts})
     // Persist every attempt so interrupted or unsuccessful runs retain real evidence.
@@ -107,7 +107,7 @@ export async function runCursorAcceptance({root,objective,agent='agent',env=proc
       missing,testsPassed:passed,elapsedMs:Date.now()-begin,sessionId,rounds
     },null,2))
     if(status==='PASS')break
-    if(round===maxRepairRounds||!sessionId||agentRun.timedOut||agentRun.exitCode!==0)break
+    if(round===maxRepairRounds||!sessionId)break
     prompt=nextCursorRepairPrompt({missing,receipts,passed})
   }
   return {schema:'itmounts.cursor.acceptance.v2',status,root,required:REQUIRED.length,

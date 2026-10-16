@@ -157,3 +157,29 @@ test('long builds checkpoint compact receipts that still validate on resume', as
     .run({ workspaceId: 'c', objective, maxSteps: 5, checkpoint })
   assert.equal(sliceTwo.ok, true, sliceTwo.reason)
 })
+
+test('production 2026-10-16: a model refused before any step fails at once instead of spending every slice', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  let saves = 0
+  let generation = 0
+  const prior: BuilderV2Checkpoint | null = null
+  const store: BuilderV2LeaseStore = {
+    async load() { return { workspaceId: 'busy', objective: 'Create index.js', claimGeneration: generation, checkpoint: prior } },
+    async save() { saves++; return true },
+  }
+  const agent = new BuilderV2Agent({ async generate() { throw new Error('builder_runpod_primary_busy') } },
+    new BuilderV2Dispatcher(workspace, passing), workspace)
+  generation = 1
+  const cycle = await runBuilderV2JobCycle({ jobId: 'j', claimGeneration: 1, store, agent, maxSteps: 24 })
+  assert.equal(cycle.status, 'failed')
+  assert.equal(cycle.reason, 'builder_v2_model_unavailable: builder_runpod_primary_busy')
+  assert.equal(saves, 0)
+})
+
+test('a V2 job a person started keeps the model while they chat; only self-healing work yields', async () => {
+  const { readFileSync } = await import('node:fs')
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  const v2 = runner.slice(runner.indexOf("job.metadata.builderEngine === 'v2'"), runner.indexOf('runBuilderV2JobCycle({'))
+  assert.match(v2, /createBuilderCodingAiPort\(\{ yieldToChat: selfHealingCapacityJob\(job\) \}\)/)
+  assert.doesNotMatch(runner, /yieldToChat: true/)
+})

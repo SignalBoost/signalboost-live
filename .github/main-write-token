@@ -1,2 +1,2 @@
-base_sha=505f49a98b7b8bdf4928ba2ee85a38596241aabf
-branch=fix/builder-creation-spec-no-existing-source-20261016
+base_sha=d878b2f235cd7cadb6d6083ed6dec94625aa9c19
+branch=fix/builder-v2-tolerant-control-and-early-finish-20261016

@@ -91,10 +91,36 @@ export type BuilderV2Outcome = Readonly<{
   checkpoint?: BuilderV2Checkpoint
 }>
 
+/**
+ * The control object a model returned. Coding models commonly wrap their JSON in a ```json fence or emit a
+ * reasoning block first; one such reply must not end a whole build. Only a complete JSON object is accepted.
+ */
+function controlObject(value: string): unknown {
+  const text = value.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/```(?:json)?/gi, '').trim()
+  try { return JSON.parse(text) } catch { /* fall through to the first balanced object */ }
+  for (let start = text.indexOf('{'); start >= 0; start = text.indexOf('{', start + 1)) {
+    let depth = 0
+    let quoted = false
+    for (let at = start; at < text.length; at++) {
+      const char = text[at]
+      if (quoted) {
+        if (char === '\\') at++
+        else if (char === '"') quoted = false
+        continue
+      }
+      if (char === '"') quoted = true
+      else if (char === '{') depth++
+      else if (char === '}' && --depth === 0) {
+        try { return JSON.parse(text.slice(start, at + 1)) } catch { break }
+      }
+    }
+  }
+  return null
+}
+
 function parseDecision(value: string | null): Decision | null {
   if (!value) return null
-  let object: unknown
-  try { object = JSON.parse(value) } catch { return null }
+  const object = controlObject(value)
   if (!object || typeof object !== 'object') return null
   const v = object as Record<string, unknown>
   if (v.type === 'finish' && typeof v.summary === 'string') return { type: 'finish', summary: v.summary }
@@ -176,15 +202,17 @@ export class BuilderV2Agent {
       const decision = parseDecision(raw)
       if (!decision) return { ok: false, reason: 'builder_v2_invalid_model_action', steps }
       if (decision.type === 'finish') {
-        if (!(verifiedRevision === revision && verifiedRevision >= 0)) return { ok: false, reason: 'builder_v2_unverified_completion', steps }
+        const verified = verifiedRevision === revision && verifiedRevision >= 0
         const listed = await this.dispatcher.dispatch(options.workspaceId, { tool: 'list_files' })
         const files = Array.isArray(listed.output) ? listed.output.map(file => String((file as { path?: unknown }).path)) : []
         const acceptance = builderV2Acceptance(options.objective, files, steps)
-        if (acceptance.satisfied) return { ok: true, reason: 'verified', steps, summary: decision.summary }
-        // Not a receipt: the counters rebuilt from receipts on resume stay valid. Bounded so a model that keeps
-        // claiming completion ends with the exact unmet checklist instead of looping.
-        if (++checklistRejections >= 3) return { ok: false, reason: 'builder_v2_checklist_incomplete', steps, checkpoint: await snapshot() }
-        lastReceipt = JSON.stringify({ tool: 'finish', ok: false, error: 'builder_v2_checklist_incomplete', ...acceptance,
+        if (verified && acceptance.satisfied) return { ok: true, reason: 'verified', steps, summary: decision.summary }
+        // An early or unverified finish is feedback, not the end of the build: the model receives the exact unmet
+        // checklist and keeps working. Not a receipt, so counters rebuilt from receipts on resume stay valid.
+        // Bounded so a model that keeps claiming completion ends with the unmet checklist instead of looping.
+        const error = verified ? 'builder_v2_checklist_incomplete' : 'builder_v2_unverified_completion'
+        if (++checklistRejections >= 3) return { ok: false, reason: error, steps, checkpoint: await snapshot() }
+        lastReceipt = JSON.stringify({ tool: 'finish', ok: false, error, ...acceptance,
           next: acceptance.missingFiles.length ? ['write_file'] : ['run_tests', 'edit_file'] }).slice(0, 20_000)
         continue
       }

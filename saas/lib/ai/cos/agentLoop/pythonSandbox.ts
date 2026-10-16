@@ -6,6 +6,7 @@
 // pinned libraries install, then closed (deny-all) before any model code runs. One sandbox per turn,
 // reused across run_python calls, always stopped when the turn ends.
 
+import { randomUUID } from 'node:crypto'
 import { Sandbox } from '@vercel/sandbox'
 
 const WORK = '/tmp/work'
@@ -17,6 +18,29 @@ const STDOUT_LIMIT = 8_000
 const STDERR_LIMIT = 4_000
 const MAX_IMAGES = 3
 const MAX_IMAGE_BYTES = 4_000_000
+// Runs the model's program with file opens instrumented: every path under data/ that the program
+// opens is appended to a per-session log the harness reads afterwards. builtins.open and io.open
+// cover open(), json.load(open()), pathlib, csv and pandas readers.
+export function runnerSource(readLog: string): string {
+  return [
+    'import builtins, io, os, runpy',
+    '_original_open = io.open',
+    `_log = ${JSON.stringify(readLog)}`,
+    'def _tracked_open(file, *args, **kwargs):',
+    '    try:',
+    '        path = os.path.relpath(os.path.abspath(os.fspath(file)), "/tmp/work")',
+    '        if path.startswith("data" + os.sep) and os.path.isfile(os.path.join("/tmp/work", path)):',
+    '            with _original_open(_log, "a") as handle:',
+    '                handle.write(path + "\\n")',
+    '    except Exception:',
+    '        pass',
+    '    return _original_open(file, *args, **kwargs)',
+    'builtins.open = _tracked_open',
+    'io.open = _tracked_open',
+    'runpy.run_path("main.py", run_name="__main__")',
+  ].join('\n')
+}
+
 const PACKAGE_INDEX_HOSTS = Object.freeze(['pypi.org', 'files.pythonhosted.org'])
 // Libraries the model may import. Only these are ever installed; nothing else reaches the index.
 const BASE_PACKAGES = Object.freeze(['matplotlib==3.10.7', 'numpy==2.3.4'])
@@ -25,6 +49,8 @@ const OPTIONAL_PACKAGES: Readonly<Record<string, string>> = Object.freeze({ pand
 export type StagedFile = Readonly<{ path: string; content: string }>
 export type PythonImage = Readonly<{ name: string; png: Buffer }>
 export type PythonRunResult = Readonly<{
+  /** data/ files the program actually opened (instrumented, not inferred from the source text). */
+  dataReads: readonly string[]
   exitCode: number
   stdout: string
   stderr: string
@@ -61,6 +87,7 @@ export class VercelPythonSession implements PythonSession {
   private sandbox: SandboxInstance | null = null
   private readonly installed = new Set<string>()
   private readonly createSandbox: typeof Sandbox.create
+  private readonly readLog = `/tmp/.cos-reads-${randomUUID()}`
 
   constructor(createSandbox: typeof Sandbox.create = Sandbox.create) {
     this.createSandbox = createSandbox
@@ -111,23 +138,24 @@ export class VercelPythonSession implements PythonSession {
   async run(input: { code: string; files: readonly StagedFile[] }): Promise<PythonRunResult> {
     const code = String(input.code || '')
     if (!code.trim() || code.length > 40_000) {
-      return { exitCode: 2, stdout: '', stderr: 'code must be 1-40000 characters', images: [], timedOut: false }
+      return { dataReads: [], exitCode: 2, stdout: '', stderr: 'code must be 1-40000 characters', images: [], timedOut: false }
     }
     try {
       const sandbox = await this.ready()
       const installError = await this.install(sandbox, [...BASE_PACKAGES, ...optionalPackagesFor(code)])
-      if (installError) return { exitCode: 3, stdout: '', stderr: `Package installation failed: ${installError}`, images: [], timedOut: false }
-      await sandbox.runCommand({ cmd: 'sh', args: ['-c', `rm -f ${WORK}/out/*`], timeoutMs: 10_000 })
+      if (installError) return { dataReads: [], exitCode: 3, stdout: '', stderr: `Package installation failed: ${installError}`, images: [], timedOut: false }
+      await sandbox.runCommand({ cmd: 'sh', args: ['-c', `rm -f ${WORK}/out/* ${this.readLog}`], timeoutMs: 10_000 })
       await sandbox.writeFiles([
         ...input.files.map(file => ({ path: `${WORK}/${file.path}`, content: Buffer.from(file.content, 'utf8') })),
         { path: `${WORK}/main.py`, content: Buffer.from(code, 'utf8') },
+        { path: `${WORK}/.cos_runner.py`, content: Buffer.from(runnerSource(this.readLog), 'utf8') },
       ])
       let exitCode = 124
       let stdout = ''
       let stderr = ''
       let timedOut = false
       try {
-        const result = await sandbox.runCommand({ cmd: 'python3', args: ['main.py'], cwd: WORK, timeoutMs: RUN_TIMEOUT_MS })
+        const result = await sandbox.runCommand({ cmd: 'python3', args: ['.cos_runner.py'], cwd: WORK, timeoutMs: RUN_TIMEOUT_MS })
         exitCode = result.exitCode
         ;[stdout, stderr] = await Promise.all([result.stdout(), result.stderr()])
       } catch (error) {
@@ -140,10 +168,12 @@ export class VercelPythonSession implements PythonSession {
         const png = await sandbox.readFileToBuffer({ path: `${WORK}/out/${name}` })
         if (png && png.length <= MAX_IMAGE_BYTES && png.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) images.push({ name, png })
       }
-      return { exitCode, stdout: bounded(stdout, STDOUT_LIMIT), stderr: bounded(stderr, STDERR_LIMIT), images, timedOut }
+      const reads = await sandbox.readFileToBuffer({ path: this.readLog }).catch(() => null)
+      const dataReads = [...new Set(String(reads || '').split('\n').map(value => value.trim()).filter(value => value.startsWith('data/')))]
+      return { dataReads, exitCode, stdout: bounded(stdout, STDOUT_LIMIT), stderr: bounded(stderr, STDERR_LIMIT), images, timedOut }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'sandbox unavailable'
-      return { exitCode: 125, stdout: '', stderr: bounded(`Sandbox unavailable: ${message}`, STDERR_LIMIT), images: [], timedOut: false }
+      return { dataReads: [], exitCode: 125, stdout: '', stderr: bounded(`Sandbox unavailable: ${message}`, STDERR_LIMIT), images: [], timedOut: false }
     }
   }
 

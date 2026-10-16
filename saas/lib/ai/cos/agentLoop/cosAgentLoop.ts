@@ -33,6 +33,9 @@ export type CosAgentLoopResult = Readonly<{
 }>
 
 const MAX_ROUNDS = 8
+// Host-owned tool budget: a model that emits many parallel calls cannot fan out past these.
+const MAX_CALLS_PER_ROUND = 4
+const MAX_TOOL_CALLS = 12
 const ROUND_TIMEOUT_MS = 45_000
 const MIN_ROUND_MS = 8_000
 
@@ -80,22 +83,28 @@ function urlKey(url: string): string {
   }
 }
 
-/** Remove markdown links / bare URLs the turn never searched or fetched. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Remove markdown links / bare URLs the turn never searched or fetched. A cited URL is verified
+ * when its host is a retrieved host, or a parent/child of one (finance.yahoo.com for a
+ * query1.finance.yahoo.com API call). Siblings under a shared suffix (phishing.co.uk after
+ * bbc.co.uk) are not related and are removed.
+ */
 export function stripUnverifiedUrls(answer: string, sourceUrls: ReadonlySet<string>): { text: string; dropped: number } {
   const known = new Set([...sourceUrls].map(urlKey))
-  const knownHosts = new Set([...sourceUrls].map(url => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return '' } }))
+  const knownHosts = [...new Set([...sourceUrls].map(hostOf).filter(Boolean))]
   let dropped = 0
   const verified = (url: string) => {
-    const key = urlKey(url)
-    if (known.has(key)) return true
-    // A human-facing page on a host the turn fetched (e.g. finance.yahoo.com for a query1 API call) is allowed.
-    try {
-      const host = new URL(url).hostname.replace(/^www\./, '')
-      const root = host.split('.').slice(-2).join('.')
-      return [...knownHosts].some(candidate => candidate === host || candidate.endsWith(`.${root}`) || candidate === root)
-    } catch {
-      return false
-    }
+    if (known.has(urlKey(url))) return true
+    const host = hostOf(url)
+    return Boolean(host) && knownHosts.some(candidate => candidate === host || candidate.endsWith(`.${host}`) || host.endsWith(`.${candidate}`))
   }
   const text = String(answer || '')
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (whole, label, url) => {
@@ -156,9 +165,14 @@ export async function runCosAgentLoop(input: {
         break
       }
       messages.push(assistantMessage(turn))
-      for (const call of calls) {
-        toolCalls.push(call.function.name)
-        const observation = await executeAgentTool({ name: call.function.name, argumentsJson: call.function.arguments, ports: input.ports, policy: input.policy, evidence, remainingMs })
+      for (const [index, call] of calls.entries()) {
+        // Every call the model issued gets a tool result (the protocol requires it); only calls
+        // within the host budget and deadline execute.
+        const allowed = index < MAX_CALLS_PER_ROUND && toolCalls.length < MAX_TOOL_CALLS && remainingMs() > MIN_ROUND_MS
+        if (allowed) toolCalls.push(call.function.name)
+        const observation = allowed
+          ? await executeAgentTool({ name: call.function.name, argumentsJson: call.function.arguments, ports: input.ports, policy: input.policy, evidence, remainingMs })
+          : 'Error: tool budget for this turn is spent; this call was not executed. Answer with what you have.'
         messages.push({ role: 'tool', tool_call_id: call.id, content: observation })
       }
     }

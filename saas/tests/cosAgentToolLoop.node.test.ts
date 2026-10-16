@@ -4,8 +4,11 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
-import { agentToolDefinitions, htmlToText, imageReadsStagedData, type AgentToolPorts } from '../lib/ai/cos/agentLoop/cosAgentTools.ts'
-import { optionalPackagesFor, VercelPythonSession, type PythonSession } from '../lib/ai/cos/agentLoop/pythonSandbox.ts'
+import { agentToolDefinitions, htmlToText, imageBackedByStagedData, type AgentToolPorts } from '../lib/ai/cos/agentLoop/cosAgentTools.ts'
+import { optionalPackagesFor, runnerSource, VercelPythonSession, type PythonSession } from '../lib/ai/cos/agentLoop/pythonSandbox.ts'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync, existsSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { requiresAgentTools } from '../lib/ai/cos/agentLoop/agentToolIntent.ts'
 import type { LocalModelChatMessage, LocalModelTurnResult } from '../lib/ai/local-inference.ts'
 
@@ -32,7 +35,8 @@ function fakePython(result: { stdout: string; images?: number }): PythonSession 
     closed: false,
     async run(input: { code: string; files: readonly { path: string; content: string }[] }) {
       session.runs.push({ code: input.code, files: input.files.map(file => file.path) })
-      return { exitCode: 0, stdout: result.stdout, stderr: '', images: Array.from({ length: result.images ?? 1 }, (_, i) => ({ name: `chart${i}.png`, png: PNG })), timedOut: false }
+      const dataReads = input.files.map(file => file.path).filter(path => input.code.includes(`open("${path}")`) || input.code.includes(`open('${path}')`))
+      return { dataReads, exitCode: 0, stdout: result.stdout, stderr: '', images: Array.from({ length: result.images ?? 1 }, (_, i) => ({ name: `chart${i}.png`, png: PNG })), timedOut: false }
     },
     async close() { session.closed = true },
   }
@@ -109,14 +113,16 @@ test('a chart drawn from values typed into the code is rejected', async () => {
   const result = await runCosAgentLoop({
     request: 'graph the price of VNCE',
     language: 'en',
-    model: scriptedModel([call('c1', 'run_python', { code: 'plt.plot([1,2,3]); plt.savefig("out/chart.png")' }), answer('Here is the chart.')]),
+    // A data/ path in a comment is not a read: acceptance comes from instrumented file opens.
+    model: scriptedModel([call('c1', 'run_python', { code: 'plt.plot([1,2,3])  # data/source_1.csv\nplt.savefig("out/chart.png")' }), answer('Here is the chart.')]),
     ports: ports(fakePython({ stdout: '' })),
     policy: { maxPythonRuns: 2, browserAllowed: false },
     deadlineAt: Date.now() + 100_000,
   })
   assert.equal(result?.images.length, 0)
   assert.equal(result?.verification.droppedImages, 1)
-  assert.equal(imageReadsStagedData('pd.read_csv("data/source_1.csv")'), true)
+  assert.equal(imageBackedByStagedData(['data/source_1.csv']), true)
+  assert.equal(imageBackedByStagedData([]), false)
 })
 
 test('host policy owns the tool set and the code-run budget', async () => {
@@ -146,6 +152,9 @@ test('host policy owns the tool set and the code-run budget', async () => {
 test('HTML pages keep table rows readable for the model and the code', () => {
   assert.equal(htmlToText('<table><tr><td>Oct 15</td><td>13.33</td></tr><tr><td>Oct 14</td><td>13.10</td></tr></table><script>x()</script>'), 'Oct 15\t13.33\t\nOct 14\t13.10')
   assert.deepEqual(stripUnverifiedUrls('See https://finance.yahoo.com/quote/VNCE and https://evil.example.org/', new Set([YAHOO_URL])), { text: 'See https://finance.yahoo.com/quote/VNCE and', dropped: 1 })
+  // Codex review on #4501: a sibling under a shared public suffix is not the fetched site.
+  assert.equal(stripUnverifiedUrls('[x](https://phishing.co.uk/a)', new Set(['https://www.bbc.co.uk/news'])).dropped, 1)
+  assert.equal(stripUnverifiedUrls('[x](https://bbc.co.uk/sport)', new Set(['https://www.bbc.co.uk/news'])).dropped, 0)
 })
 
 test('the Python sandbox opens the package index only to install, never while model code runs', async () => {
@@ -158,7 +167,7 @@ test('the Python sandbox opens the package index only to install, never while mo
     },
     async updateNetworkPolicy(policy: unknown) { events.push(`network ${JSON.stringify(policy)}`) },
     async writeFiles(files: { path: string }[]) { events.push(`write ${files.map(file => file.path).join(',')}`) },
-    async readFileToBuffer() { return PNG },
+    async readFileToBuffer(file: { path: string }) { return file.path.includes('.cos-reads-') ? Buffer.from('data/source_1.csv\n') : PNG },
     async stop() { events.push('stop') },
   }
   let created: any
@@ -168,8 +177,9 @@ test('the Python sandbox opens the package index only to install, never while mo
   assert.equal(created.networkPolicy, 'deny-all')
   assert.equal(created.runtime, 'python3.13')
   assert.equal(result.images.length, 1)
+  assert.deepEqual(result.dataReads, ['data/source_1.csv'])
   const install = events.findIndex(event => event.startsWith('python3 -m pip install'))
-  const run = events.findIndex(event => event === 'python3 main.py')
+  const run = events.findIndex(event => event === 'python3 .cos_runner.py')
   assert.ok(events[install - 1].startsWith('network {"allow"'))
   assert.equal(events[install + 1], 'network "deny-all"')
   assert.ok(run > install + 1)
@@ -188,10 +198,48 @@ test('chart-of-data requests reach the agent loop; pictures do not', () => {
   assert.equal(requiresAgentTools('draw a graphic', ''), false)
 })
 
-test('the Concierge runs the agent loop before image generation and on the planner compute request', () => {
-  const route = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
-  const guard = route.indexOf('requiresAgentTools(prompt, priorAnswer)')
-  assert.ok(guard > 0 && guard < route.indexOf('isConciergeVisualObjective(prompt)'))
-  assert.match(route, /agentDecision\.capabilities\.includes\('compute'\)\) \{\n\s*const agentResponse = await runAgentLoopTurn\(\)/)
-  assert.match(route, /source: 'cos-agent-tool-loop'/)
+test('compute turns run behind the COS ingress, before image generation can take them', () => {
+  const browser = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
+  const primary = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  const guard = browser.indexOf('const agentToolsRequired = !hasAttachments && requiresAgentTools(prompt, priorAnswer)')
+  assert.ok(guard > 0 && guard < browser.indexOf('isConciergeVisualObjective(prompt)'))
+  assert.match(browser, /if \(!operationalEvidence && !agentToolsRequired\) \{\n\s*if \(isConciergeArtifactObjective\(prompt\)\)/)
+  assert.match(browser, /capabilities: \['compute'\], searchQueries: \[\], reason: 'host_compute_guard'/)
+  // The loop itself runs only in cos-primary, with provenance written like every other answer.
+  assert.doesNotMatch(browser, /runCosAgentLoop/)
+  assert.match(primary, /if\(agentCapabilities\.has\('compute'\)\)\{\n\s*const computed=await agentComputeResponse/)
+  assert.match(primary, /writeCosPrimaryProvenance\(turn\.userId,result\.reply,built\.executionProvenance,'cos-agent-tool-loop'/)
+  // A chart request is released only with a verified chart.
+  assert.match(primary, /if\(result&&\(!chartRequested\|\|result\.images\.length\)\)/)
 })
+
+test('a model cannot fan out past the host tool budget in one round', async () => {
+  const fetched: string[] = []
+  const many: LocalModelTurnResult = { content: null, toolCalls: Array.from({ length: 9 }, (_, i) => ({ id: `f${i}`, type: 'function' as const, function: { name: 'fetch_url', arguments: JSON.stringify({ url: `https://example.com/${i}` }) } })), finishReason: 'tool_calls', provider: 'test', model: 'agent' }
+  const seen: LocalModelChatMessage[][] = []
+  await runCosAgentLoop({
+    request: 'compare these pages',
+    language: 'en',
+    model: scriptedModel([many, answer('done')], seen),
+    ports: ports(fakePython({ stdout: '' }), { fetchPublic: async url => { fetched.push(url); return { status: 200, text: 'ok', finalUrl: url, contentType: 'text/plain' } } }),
+    policy: { maxPythonRuns: 2, browserAllowed: false },
+    deadlineAt: Date.now() + 100_000,
+  })
+  assert.equal(fetched.length, 4)
+  // Every issued call still receives a tool result, as the native protocol requires.
+  assert.equal(seen.at(-1)!.filter(message => message.role === 'tool').length, 9)
+})
+
+test('the sandbox runner records only files the program really opens', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cos-runner-'))
+  const work = '/tmp/work'
+  execFileSync('mkdir', ['-p', `${work}/data`])
+  writeFileSync(`${work}/data/source_1.csv`, 'a,b\n1,2\n')
+  const log = join(dir, 'reads')
+  writeFileSync(`${work}/.cos_runner_test.py`, runnerSource(log).replace('"main.py"', JSON.stringify(join(dir, 'main.py'))))
+  writeFileSync(join(dir, 'main.py'), 'import csv\nrows = list(csv.reader(open("data/source_1.csv")))\nprint(len(rows))  # data/other.csv only in a comment\n')
+  assert.equal(execFileSync('python3', ['.cos_runner_test.py'], { cwd: work }).toString().trim(), '2')
+  assert.equal(readFileSync(log, 'utf8').trim(), 'data/source_1.csv')
+  assert.ok(existsSync(log))
+})
+

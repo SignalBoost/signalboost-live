@@ -47,12 +47,12 @@ export function emptyEvidence(userText: string): AgentEvidence {
 const OBSERVATION_LIMIT = 12_000
 
 /**
- * An image is evidence-backed only when the code that drew it read a staged data file (retrieved
- * this turn, or the user's own text in data/user_request.txt). A chart of values typed from model
- * memory is withheld.
+ * An image is evidence-backed only when the program that drew it actually opened a staged data
+ * file (retrieved this turn, or the user's own text in data/user_request.txt). The sandbox
+ * instruments file opens; a path mentioned in a comment or an unused string does not count.
  */
-export function imageReadsStagedData(code: string): boolean {
-  return /data\//.test(String(code || ''))
+export function imageBackedByStagedData(dataReads: readonly string[]): boolean {
+  return dataReads.some(path => path.startsWith('data/'))
 }
 
 function tool(name: string, description: string, properties: Record<string, unknown>, required: string[]): LocalModelToolDefinition {
@@ -124,6 +124,7 @@ export async function executeAgentTool(input: {
 
   switch (input.name) {
     case 'web_search': {
+      if (input.remainingMs() < 8_000) return 'Error: no time left in this turn for more searches. Answer with what you have.'
       const query = String(args.query || '').trim().slice(0, 300)
       if (!query) return 'Error: query is required.'
       const results = await input.ports.search(query).catch(() => [] as AgentSearchResult[])
@@ -136,6 +137,7 @@ export async function executeAgentTool(input: {
     case 'browse_page': {
       const url = String(args.url || '').trim()
       if (!/^https?:\/\//i.test(url)) return 'Error: an absolute http(s) URL is required.'
+      if (input.remainingMs() < 8_000) return 'Error: no time left in this turn for more downloads. Answer with what you have.'
       let body: string
       let finalUrl = url
       let extension: string
@@ -177,7 +179,7 @@ export async function executeAgentTool(input: {
       const code = String(args.code || '')
       evidence.pythonRuns += 1
       const result = await input.ports.python.run({ code, files: evidence.files })
-      const accepted = result.exitCode === 0 && imageReadsStagedData(code)
+      const accepted = result.exitCode === 0 && imageBackedByStagedData(result.dataReads)
       if (accepted) evidence.images.push(...result.images)
       else evidence.droppedImages += result.images.length
       return record([
@@ -188,7 +190,7 @@ export async function executeAgentTool(input: {
           ? 'images saved: none'
           : accepted
             ? `images saved: ${result.images.map(image => `out/${image.name}`).join(', ')} (they will be shown to the user with your answer)`
-            : 'images REJECTED by the harness: the code did not read its values from a data/ file. Plot only data loaded from data/.',
+            : 'images REJECTED by the harness: the program did not open any data/ file. Plot only data loaded from data/.',
       ].filter(Boolean).join('\n'))
     }
 

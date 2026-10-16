@@ -1,2 +1,2 @@
-base_sha=512583017fe52eb718f8899b4a7ff1f593e7c8c3
-branch=fix/builder-route-explanation-opening-20261015
+base_sha=ee4c1fa8b804fe3d71165b6c00590a037216adac
+branch=fix/cos-agent-loop-model-error-20261015

@@ -148,3 +148,26 @@ test('lost COS POST transport performs read-only History recovery before showing
   assert.match(watch, /method: 'GET'/)
   assert.doesNotMatch(watch, /method: 'POST'/)
 })
+
+test('OrderFlow owner Assistant acceptance specification reaches durable Builder instead of generic COS chat', () => {
+  const objective = [
+    '# OrderFlow — End-to-End Builder Acceptance Test',
+    'Build a complete, working OrderFlow application using Node.js and JavaScript.',
+    'Project structure: create all required files under orderflow/',
+    'src/catalog.js src/cart.js src/inventory.js src/orders.js src/checkout.js src/reports.js src/errors.js',
+    'test/catalog.test.js test/cart.test.js test/inventory.test.js test/orders.test.js test/checkout.test.js',
+    'At least 20 automated tests. Execute npm test, node --test test/*.test.js, and node index.js.',
+    'Do not claim success without recorded exit codes and persisted project files.',
+  ].join('\\n')
+  const request = conciergeBuilderRequest({
+    messages: [{ role: 'user', content: objective }],
+    context: { currentPage: '/dashboard/assistant', conversationId: '12345678-1234-1234-1234-123456789abc' },
+  })
+  assert.ok(request)
+  assert.equal(request.endpoint, '/api/builder')
+  assert.equal(request.body.objective, objective)
+  assert.deepEqual(request.body.files, [])
+  const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
+  assert.match(client, /const builderRequest = conciergeBuilderRequest\\(args\\.body\\)/)
+  assert.doesNotMatch(client, /args\\.target === 'concierge' \\? conciergeBuilderRequest/)
+})

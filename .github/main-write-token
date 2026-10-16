@@ -1,2 +1,2 @@
-base_sha=89d5cd3318afea697d3b567ade2c58db7679a48a
-branch=fix/lab-holdout-duplicate-prompts-20261016
+base_sha=2c6a4fbbf510462bc47c78930254f2a9d0b66cbe
+branch=fix/lab-standalone-score-duplicate-20261016

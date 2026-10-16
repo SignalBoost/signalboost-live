@@ -231,7 +231,7 @@ test('Codex review on #4597: rerunning an already-passing command before a model
 
 test('Codex review on #4598: a newly passing required command before a model failure is progress', async () => {
   const workspace = new InMemoryBuilderWorkspace()
-  const objective = 'Create index.js.\n```bash\nnpm test\nnode index.js\n```'
+  const objective = 'Create index.js.\n## Mandatory verification\nExecute all two commands:\n```bash\nnpm test\nnode index.js\n```'
   const first = scripted([
     tool({ tool: 'write_file', path: 'index.js', content: 'module.exports = 1\n' }),
     tool({ tool: 'run_tests', command: 'npm test' }),
@@ -252,4 +252,28 @@ test('Codex review on #4598: a newly passing required command before a model fai
     agent: new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, passing), workspace), maxSteps: 24 })
   assert.equal(cycle.status, 'paused')
   assert.equal(saved?.steps.length, 3)
+})
+
+test('Codex review on #4599: an ad-hoc passing command is not progress toward required commands', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const objective = 'Create index.js.\n## Mandatory verification\nExecute all two commands:\n```bash\nnpm test\nnode index.js\n```'
+  const first = scripted([
+    tool({ tool: 'write_file', path: 'index.js', content: 'module.exports = 1\n' }),
+    tool({ tool: 'run_tests', command: 'npm test' }),
+  ])
+  const sliceOne = await new BuilderV2Agent(first.ai, new BuilderV2Dispatcher(workspace, passing), workspace)
+    .run({ workspaceId: 'ah', objective, maxSteps: 2 })
+  let saved: BuilderV2Checkpoint | null = sliceOne.checkpoint!
+  const store: BuilderV2LeaseStore = {
+    async load() { return { workspaceId: 'ah', objective, claimGeneration: 2, checkpoint: saved } },
+    async save(_id, _claim, checkpoint) { saved = checkpoint; return true },
+  }
+  let call = 0
+  const ai = { async generate() {
+    if (call++ === 0) return tool({ tool: 'run_tests', command: 'node -e "1"' })
+    throw new Error('builder_model_deadline_exceeded')
+  } }
+  const cycle = await runBuilderV2JobCycle({ jobId: 'j', claimGeneration: 2, store,
+    agent: new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, passing), workspace), maxSteps: 24 })
+  assert.equal(cycle.status, 'failed')
 })

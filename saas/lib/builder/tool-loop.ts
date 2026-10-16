@@ -17,6 +17,7 @@ import { validateBuilderLock } from './dependencies.ts'
 import { BUILDER_REASONING_GUIDANCE } from './user-guidance.ts'
 import { detectContractOscillation, formatContractOscillation } from './contract-oscillation.ts'
 import { builderVerificationOrder, pendingBuilderVerificationOrder, verificationOrderGuidance, isVerificationProtectedPath } from './verification-order.ts'
+import { applySearchReplace } from './edit-match.ts'
 
 type ToolAction = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> }
 type Action = ToolAction | { type: 'answer'; answer: string }
@@ -1272,9 +1273,14 @@ export class BuilderToolLoop {
             workingFiles.set(filePath, existingFile)
             output = { path: filePath, alreadyPresent: true, bytes: Buffer.byteLength(existingFile.content) }
           } else {
+            const before = action.toolId === 'edit_file' ? await this.workspace.readFile(input.workspaceId, filePath) : null
             const file = action.toolId === 'write_file'
               ? await this.workspace.writeFile(input.workspaceId, filePath, proposedContent)
               : await this.workspace.editFile(input.workspaceId, filePath, text(action.input.search), text(action.input.replace))
+            // A whitespace-tolerant edit removes the file's own text, not the model's copy of it. Record the exact
+            // removed and inserted text so persisted change evidence matches what was actually applied.
+            const applied = before ? applySearchReplace(before.content, text(action.input.search), text(action.input.replace)) : null
+            if (applied?.ok) action.input = { ...action.input, search: applied.applied.search, replace: applied.applied.replace }
             chunks.delete(file.path)
             workingFiles.set(file.path, file)
             output = summarize(file)

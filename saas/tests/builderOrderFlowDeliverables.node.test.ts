@@ -102,3 +102,9 @@ test('standard tree output without trailing slashes on directories keeps nested 
   const contract = contractOf(['## Project structure', '```text', 'app', '├── package.json', '├── src', '│   └── index.js', '└── test', '    └── index.test.js', '```'].join('\n'))
   assert.deepEqual(contract.files, ['package.json', 'src/index.js', 'test/index.test.js'])
 })
+
+test('a dotted directory name in a tree is recognised from its nested children', async () => {
+  const { builderTaskContract: contractOf } = await import('../lib/builder/task-contract.ts')
+  const contract = contractOf(['## Project structure', '```text', 'app', '├── src.v2', '│   └── index.js', '└── package.json', '```'].join('\n'))
+  assert.deepEqual(contract.files, ['src.v2/index.js', 'package.json'])
+})

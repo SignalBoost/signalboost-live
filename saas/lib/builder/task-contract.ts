@@ -2,9 +2,14 @@ import type { BuilderToolTrace } from './contracts.ts'
 
 export type BuilderTaskContract = Readonly<{ files: readonly string[]; commands: readonly string[]; requiresRun: boolean; minimumTests: number }>
 
-const FILE = /^(?:[\w-]+\/)*[\w.-]+\.[a-z0-9]+$/i
+const FILE = /^(?:[\w.-]+\/)*[\w.-]+\.[a-z0-9]+$/i
 // "├── src/", "│   └── cart.js", "|-- index.js": captures the indentation before the branch and the entry name.
 const TREE_BRANCH = /^([ │|]*?)(?:[├└]──|[|`+]--)\s*([\w.-]+\/?)\s*$/
+/** Depth of a drawn tree entry (1 = directly under the root), or 0 when the line is not a tree entry. */
+function treeDepth(raw: string | undefined): number {
+  const branch = TREE_BRANCH.exec(raw ?? '')
+  return branch ? Math.round(branch[1].replace(/│|\|/g, ' ').length / 4) + 1 : 0
+}
 const clean = (value: string) => value.trim().replace(/^[-*]\s+/, '').replace(/^`|`[.,;]?$|[.,;]$/g, '')
 
 /** Inline Run: clauses end at an unquoted sentence boundary, never inside a filename. */
@@ -47,7 +52,8 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
   let runList = false
   let fence = false
   const tree: string[] = []
-  for (const raw of objective.split(/\r?\n/)) {
+  const lines = objective.split(/\r?\n/)
+  for (const [index, raw] of lines.entries()) {
     const line = raw.trim()
     // Markdown acceptance specifications place deliverable lists inside fenced
     // blocks. The fence is a delimiter, not a missing file or command.
@@ -76,12 +82,13 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
       // A drawn tree names entries without their parent directory. Rebuild each path from its depth;
       // the glyph-less top-level "project/" line is the workspace root itself, not a subdirectory.
       const branch = TREE_BRANCH.exec(raw)
-      if (branch || (fence && tree.length === 0 && /^[\w.-]+\/?$/.test(line) && !/\.[a-z0-9]+$/i.test(line))) {
-        const depth = branch ? Math.round(branch[1].replace(/│|\|/g, ' ').length / 4) + 1 : 0
+      if (branch || (fence && tree.length === 0 && /^[\w.-]+\/?$/.test(line) && treeDepth(lines[index + 1]) > 0)) {
+        const depth = branch ? treeDepth(raw) : 0
         const name = branch ? branch[2] : ''
         tree.length = Math.min(tree.length, depth)
-        // `tree` prints directories without a trailing slash ("├── src"); a name with no extension is a directory.
-        if (!branch || name.endsWith('/') || !/\.[a-z0-9]+$/i.test(name)) { tree[depth] = branch ? name.replace(/\/$/, '') : ''; continue }
+        // `tree` prints directories without a trailing slash ("├── src", "├── src.v2"): an entry is a directory
+        // when it ends in "/" or the next tree entry is nested deeper under it.
+        if (!branch || name.endsWith('/') || treeDepth(lines[index + 1]) > depth) { tree[depth] = branch ? name.replace(/\/$/, '') : ''; continue }
         const path = [...tree.slice(1, depth), name].filter(Boolean).join('/')
         if (FILE.test(path) && !path.split('/').includes('..')) files.add(path)
         continue

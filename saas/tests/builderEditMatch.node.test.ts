@@ -62,3 +62,42 @@ test('the workspace store applies the same tolerant edit', async () => {
   assert.match(file.content, /\n  return items\.reduce/)
   await assert.rejects(workspace.editFile('w', 'src/cart.js', 'missing', 'x'), /builder_edit_target_not_found/)
 })
+
+test('overlapping exact matches are ambiguous ("aa" in "aaa")', () => {
+  assert.deepEqual(applySearchReplace('aaa', 'aa', 'X'), { ok: false, error: 'builder_edit_target_ambiguous' })
+})
+
+test('a tolerant edit in a mixed line-ending file leaves every untouched line ending as it was', () => {
+  const file = 'a\r\nb  \nc\r\nd\n'
+  const result = applySearchReplace(file, 'b\nc', 'B\nC')
+  assert.equal(result.ok, true)
+  if (result.ok) assert.equal(result.content, 'a\r\nB\nC\r\nd\n')
+})
+
+test('a tolerant edit reports the exact text it removed and inserted', () => {
+  const result = applySearchReplace('  if (x) {  \n    go()\n  }\n', 'if (x) {\n  go()\n}', 'if (y) {\n  stop()\n}')
+  assert.equal(result.ok, true)
+  if (result.ok) {
+    assert.deepEqual(result.applied, { search: '  if (x) {  \n    go()\n  }', replace: '  if (y) {\n    stop()\n  }' })
+    assert.equal(result.content, '  if (y) {\n    stop()\n  }\n')
+  }
+})
+
+test('the Builder trace records the applied delta, not the model copy, for a tolerant edit', async () => {
+  const { BuilderToolLoop } = await import('../lib/builder/tool-loop.ts')
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('trace', 'app.js', 'class A {\n  f() {\n    return 1\n  }\n}\n')
+  const controls = [
+    '{"type":"tool","toolId":"edit_file","input":{"path":"app.js","search":"return 1","replace":"return 2"}}',
+    '{"type":"tool","toolId":"edit_file","input":{"path":"app.js","search":"f() {\\n  return 2\\n}","replace":"f() {\\n  return 3\\n}"}}',
+    '{"type":"answer","answer":"done"}',
+  ]
+  let at = 0
+  const result = await new BuilderToolLoop({ async generate() { return controls[at++] ?? null } }, workspace,
+    { async run() { return { exitCode: 0, stdout: '', stderr: '', timedOut: false } } }).run({ objective: 'Update app.js', workspaceId: 'trace', maxRounds: 4 })
+  const edits = result.trace.filter(item => item.toolId === 'edit_file' && item.ok)
+  assert.equal(edits.length, 2)
+  assert.equal(edits[1].input.search, '  f() {\n    return 2\n  }')
+  assert.equal(edits[1].input.replace, '  f() {\n    return 3\n  }')
+  assert.equal((await workspace.readFile('trace', 'app.js'))?.content, 'class A {\n  f() {\n    return 3\n  }\n}\n')
+})

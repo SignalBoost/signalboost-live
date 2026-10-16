@@ -377,6 +377,7 @@ test('the step budget leaves room to fix a failed program', () => {
   // Production 2026-10-16: the unemployment turn verified 60 monthly points in one run and hit the
   // run limit before plotting. Verification and plotting happen in one program.
   assert.match(loop, /Verify and plot in the SAME program/)
+  assert.match(loop, /try at most three sources/)
   assert.match(loop, /const MAX_ROUNDS = 14/)
   assert.match(loop, /const MAX_TOOL_CALLS = 20/)
 })

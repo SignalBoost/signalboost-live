@@ -29,7 +29,7 @@ import { isConciergeVisualObjective } from '@/lib/visuals/intent'
 import { buildPriceHistoryChart, detectPriceHistoryChartRequest, fetchPriceHistory, priceHistoryUnavailableReply } from '@/lib/market/priceHistoryChart'
 import { blockedGoal, completedGoal } from '@/lib/ai/cos/goalCompletion'
 import { runCosAgentLoop } from '@/lib/ai/cos/agentLoop/cosAgentLoop'
-import { cosAgentModelTurn, cosAgentToolPolicy, createCosAgentPorts } from '@/lib/ai/cos/agentLoop/cosAgentRuntime'
+import { cosAgentToolPolicy, createCosAgentPorts } from '@/lib/ai/cos/agentLoop/cosAgentRuntime'
 import { requiresAgentTools } from '@/lib/ai/cos/agentLoop/agentToolIntent'
 import { resolveSemanticVisualRequest, shouldResolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
 import { publicConciergeIdentityReply, publicConciergeIdentityReplyForIntent } from '@/lib/ai/cos/publicConciergeIdentity'
@@ -38,7 +38,7 @@ import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
-import { decideCosAgentTurn, stableKnowledgeQuestionNeedsNoPlanner, type CosAgentDecision } from '@/lib/ai/cos/cosAgentDecision'
+import { decideCosAgentTurn, runCosAgentToolTurn, stableKnowledgeQuestionNeedsNoPlanner, type CosAgentDecision } from '@/lib/ai/cos/cosAgentDecision'
 import { encodePlannerSearchQueriesHeader, PLANNER_SEARCH_QUERIES_HEADER } from '@/lib/ai/cos/plannerSearchQueries'
 import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioScope'
@@ -233,7 +233,7 @@ async function executeBrowserTurn(req: NextRequest) {
       request: prompt,
       conversation,
       language,
-      model: cosAgentModelTurn,
+      model: runCosAgentToolTurn,
       ports: createCosAgentPorts(policy),
       policy,
       deadlineAt: startedAt + Math.min(AGENT_LOOP_BUDGET_MS, remaining === null ? AGENT_LOOP_BUDGET_MS : Math.max(0, remaining - 10_000)),

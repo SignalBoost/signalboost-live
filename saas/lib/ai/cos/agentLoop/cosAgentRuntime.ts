@@ -2,15 +2,14 @@
 //
 // Production bindings for the COS agent loop: the platform's search, the SSRF-guarded public
 // fetch, the Vercel Sandbox Python session, the governed Playwright port (owner only, pinned to
-// the one origin being opened), and the platform model transport with native tool calling.
+// the one origin being opened). The model turn is owned by the canonical COS agent seam
+// (cosAgentDecision.ts → runCosAgentToolTurn).
 // A buyer replaces these bindings, not the loop.
 
-import { callLocalModelTurn, localInferenceConfigFromEnv } from '../../local-inference.ts'
 import { getExternalInfo } from '../../tools/getExternalInfo.ts'
 import { assertPublicHttpUrl, guardedPublicFetch } from '../../../security/publicFetchGuard.ts'
 import { createBuilderPlaywrightCliPort } from '../../../builder/playwright-cli-port.ts'
 import { VercelPythonSession } from './pythonSandbox.ts'
-import type { AgentModelTurn } from './cosAgentLoop.ts'
 import type { AgentBrowseResult, AgentToolPolicy, AgentToolPorts } from './cosAgentTools.ts'
 
 const FETCH_HEADERS = Object.freeze({
@@ -59,30 +58,5 @@ export function createCosAgentPorts(policy: AgentToolPolicy): AgentToolPorts {
     fetchPublic: (url: string) => guardedPublicFetch(url, { headers: { ...FETCH_HEADERS }, timeoutMs: 12_000, maxBytes: 3_000_000 }),
     python: new VercelPythonSession(),
     ...(policy.browserAllowed ? { browse: browseWithPlaywright } : {}),
-  })
-}
-
-export const cosAgentModelTurn: AgentModelTurn = async input => {
-  const config = localInferenceConfigFromEnv()
-  return callLocalModelTurn({
-    usageContext: { feature: 'cos_interactive_answer', purpose: 'agent_tool_loop' },
-    prompt: '',
-    systemPrompt: input.systemPrompt,
-    messages: input.messages,
-    tools: input.tools,
-    toolChoice: input.toolChoice,
-    temperature: 0.2,
-    maxTokens: 3_000,
-    // Code-writing rounds need repeated identifiers and indentation.
-    frequencyPenalty: 0,
-    presencePenalty: 0,
-    disableThinking: true,
-    timeoutMs: input.timeoutMs,
-    allowConfiguredFallback: true,
-    persistUsage: true,
-    maxEstimatedCostUsd: 0.05,
-  }, { ...config, timeoutMs: input.timeoutMs }).catch(error => {
-    console.warn('[cos-agent-loop] model turn failed', error instanceof Error ? error.message : String(error))
-    return null
   })
 }

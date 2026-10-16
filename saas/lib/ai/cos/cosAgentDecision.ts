@@ -6,7 +6,7 @@
 // or request the minimum capabilities required to finish. A capability request is intent, NEVER
 // authority: Referee/host policy still decides what may execute.
 
-import { callLocalModel, callLocalModelTurn, localInferenceConfigFromEnv, type LocalModelToolDefinition } from '../local-inference.ts'
+import { callLocalModel, callLocalModelTurn, localInferenceConfigFromEnv, type LocalModelChatMessage, type LocalModelToolDefinition, type LocalModelTurnResult } from '../local-inference.ts'
 import { extractBalancedJsonObject } from './reasonerOutput.ts'
 import { plannerSearchQueriesFromToolArguments, sanitizePlannerSearchQueries, PLANNER_SEARCH_QUERY_MAX_COUNT } from './plannerSearchQueries.ts'
 
@@ -305,4 +305,40 @@ export async function decideCosAgentTurn(input: {
   })
 
   return raw ? parseCosAgentDecision(raw, configuredReasonerLabel()) : null
+}
+
+/**
+ * One native tool-calling round of the COS agent loop (lib/ai/cos/agentLoop). It lives in this
+ * canonical agent seam so every model turn the loop takes uses the same governed transport as the
+ * planner. The loop owns tools, budgets and verification; this function only runs the round.
+ */
+export async function runCosAgentToolTurn(input: {
+  systemPrompt: string
+  messages: readonly LocalModelChatMessage[]
+  tools: readonly LocalModelToolDefinition[]
+  toolChoice: 'auto' | 'none'
+  timeoutMs: number
+}): Promise<LocalModelTurnResult | null> {
+  const config = localInferenceConfigFromEnv()
+  return callLocalModelTurn({
+    usageContext: { feature: 'cos_interactive_answer', purpose: 'agent_tool_loop' },
+    prompt: '',
+    systemPrompt: input.systemPrompt,
+    messages: input.messages,
+    tools: input.tools,
+    toolChoice: input.toolChoice,
+    temperature: 0.2,
+    maxTokens: 3_000,
+    // Code-writing rounds need repeated identifiers and indentation.
+    frequencyPenalty: 0,
+    presencePenalty: 0,
+    disableThinking: true,
+    timeoutMs: input.timeoutMs,
+    allowConfiguredFallback: true,
+    persistUsage: true,
+    maxEstimatedCostUsd: 0.05,
+  }, { ...config, timeoutMs: input.timeoutMs }).catch(error => {
+    console.warn('[cos-agent-loop] model turn failed', error instanceof Error ? error.message : String(error))
+    return null
+  })
 }

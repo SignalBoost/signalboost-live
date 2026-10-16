@@ -1,2 +1,2 @@
-base_sha=4e73424a29203442e99d85f64f10d803934ad4fc
-branch=fix/cos-agent-loop-rounding-verification-20261016
+base_sha=91ae6b4c56cd9cf6f691ac76e37edb498c137062
+branch=fix/orderflow-isolated-build-routing-20261015

@@ -1,6 +1,6 @@
 // saas/lib/builder/repository-repair-target.ts
 import { analyzeOperationalLog } from '../ai/cos/pastedOperationalLog.ts'
-import { isRepairObjective } from './regression-gate.ts'
+import { isRepairObjective, opensWithCreationDirective } from './regression-gate.ts'
 
 export const SIGNALBOOST_REPOSITORY = 'SignalBoost/signalboost-live' as const
 export const SIGNALBOOST_REPOSITORY_URL = 'https://github.com/SignalBoost/signalboost-live.git' as const
@@ -54,6 +54,11 @@ function isExplicitPlatformRepairObjective(input: string): boolean {
       PLATFORM_REPAIR_ACTION.test(objective)
       && PLATFORM_REPAIR_SUBJECT.test(objective)
       && PLATFORM_REPAIR_FAILURE.test(objective)
+      // Production 2026-10-15: "Build a complete OrderFlow application…" mentioned "repair the implementation",
+      // "the Builder platform" and "rerun the failed command" in its acceptance criteria, so a new-project build
+      // was repaired against this repository instead. A build directive owns the request; words inside its
+      // criteria describe the work, not a platform defect.
+      && !opensWithCreationDirective(objective)
     )
 }
 

@@ -38,6 +38,11 @@ function openingDirective(objective: string): string {
 // said "If a test fails, identify the defect…", and "the defect" turned the whole build into a repair with no source.
 const HYPOTHETICAL_CLAUSE = /(?:^|(?<=[.!?:;\n]))[ \t]*(?:[-*>]\s+)?(?:if|unless|in case|should (?:a|an|the|any)\b)\b[^.!?\n]*[.!?]?/gim
 
+/** True when the first instruction line asks to build/create/implement something new. */
+export function opensWithCreationDirective(objective: string): boolean {
+  return CREATION_DIRECTIVE.test(openingDirective(String(objective || '')))
+}
+
 export function isRepairObjective(objective: string): boolean {
   const value = String(objective || '')
   // Pasted failure evidence is a repair request on its own: a stack trace carries no

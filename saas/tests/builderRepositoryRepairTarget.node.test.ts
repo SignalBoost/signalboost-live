@@ -296,3 +296,25 @@ test('production TypeScript diagnostics use a narrow compiler proof instead of r
     ],
   } as any), 'npm exec -- tsc --noEmit')
 })
+
+test('production 2026-10-15: a new application build whose criteria mention repair, Builder and failed commands is not a platform repair', () => {
+  const objective = [
+    '# OrderFlow — End-to-End Builder Acceptance Test',
+    '## Objective',
+    'Build a complete, working **OrderFlow** application using Node.js and JavaScript.',
+    '**This is a real end-to-end acceptance test of the Builder platform.**',
+    '## 4. Mandatory verification',
+    'If a command fails, inspect its real error, repair the implementation, and rerun the failed command.',
+  ].join('\n')
+  assert.equal(signalBoostDeployedRepairTarget(objective, { commitSha: 'a'.repeat(40), branch: 'main' }), null)
+})
+
+test('a plain-language report about the broken Builder platform is still a platform repair', () => {
+  for (const objective of [
+    'Fix the builder, it is broken',
+    'The Builder job failed again; please diagnose and repair the platform.',
+    'COS Builder is stuck and the job finished without a final result. Repair it.',
+  ]) {
+    assert.equal(signalBoostDeployedRepairTarget(objective, { commitSha: 'b'.repeat(40), branch: 'main' })?.trigger, 'deployed_platform_objective', objective)
+  }
+})

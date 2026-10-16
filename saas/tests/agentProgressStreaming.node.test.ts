@@ -168,6 +168,6 @@ test('OrderFlow owner Assistant acceptance specification reaches durable Builder
   assert.equal(request.body.objective, objective)
   assert.deepEqual(request.body.files, [])
   const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
-  assert.match(client, /const builderRequest = conciergeBuilderRequest\\(args\\.body\\)/)
+  assert.match(client, /const builderRequest = conciergeBuilderRequest\(args\.body\)/)
   assert.doesNotMatch(client, /args\\.target === 'concierge' \\? conciergeBuilderRequest/)
 })

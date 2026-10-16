@@ -3,7 +3,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { newAgentLoopTrace, runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
+import { cosAgentSystemPrompt, newAgentLoopTrace, runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
 import { agentToolDefinitions, htmlToText, imageBackedByStagedData, type AgentToolPorts } from '../lib/ai/cos/agentLoop/cosAgentTools.ts'
 import { optionalPackagesFor, runnerSource, VercelPythonSession, type PythonSession } from '../lib/ai/cos/agentLoop/pythonSandbox.ts'
 import { execFileSync } from 'node:child_process'
@@ -385,4 +385,8 @@ test('the step budget leaves room to fix a failed program', () => {
   assert.match(loop, /try at most three sources/)
   assert.match(loop, /const MAX_ROUNDS = 14/)
   assert.match(loop, /const MAX_TOOL_CALLS = 20/)
+})
+
+test('the agent knows today to resolve relative periods', () => {
+  assert.match(cosAgentSystemPrompt('en', new Date('2026-10-16T03:00:00Z')), /^Today is 2026-10-16 \(UTC\)\. Resolve relative periods/)
 })

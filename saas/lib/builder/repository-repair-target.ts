@@ -43,6 +43,11 @@ const PLATFORM_PUBLISH_INTENT = /\b(?:commit(?:\s+it)?|push|open\s+(?:a\s+)?pr|p
 // conditional test-repair instructions must not grant Platform Engineer authority.
 export function isExplicitIsolatedProjectBuild(input: string): boolean {
   const opening = String(input || '').trim().slice(0, 1000)
+  const applicationSpecification = /build a complete|build a working|create a complete/i.test(opening)
+    && /project structure|create all [0-9]+ files/i.test(input)
+    && input.includes('src/') && input.includes('test/')
+    && /npm test|node --test/i.test(input)
+  if (applicationSpecification) return true
   return /\b(?:build|create|implement|develop)\b[\s\S]{0,220}\b(?:from scratch|new isolated workspace|new workspace|new project)\b/i.test(opening)
     && /\b(?:application|app|project|system|service|website|tool)\b/i.test(opening)
 }

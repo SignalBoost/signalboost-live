@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs'
 import { readBuilderObjective } from '../lib/builder/request-contract.ts'
 import {
   parseSignalBoostRepositoryRepairTarget,
+  isExplicitIsolatedProjectBuild,
+  isOwnerRepairWithoutSource,
   resolveSignalBoostRepositoryCommit,
   signalBoostDeployedRepairTarget,
   signalBoostRepositoryRepairObjective,

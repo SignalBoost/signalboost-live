@@ -75,6 +75,7 @@ import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/l
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { newAgentLoopTrace, redactUrlQueries, runCosAgentLoop } from '@/lib/ai/cos/agentLoop/cosAgentLoop'
+import { agentEvidenceSources, agentLiveFactReleasable, citedAgentSources } from '@/lib/ai/cos/agentLoop/agentLiveFactRelease'
 import { cosAgentToolPolicy, createCosAgentPorts } from '@/lib/ai/cos/agentLoop/cosAgentRuntime'
 import { requiresAgentTools } from '@/lib/ai/cos/agentLoop/agentToolIntent'
 import { runCosAgentToolTurn } from '@/lib/ai/cos/cosAgentDecision'
@@ -324,10 +325,21 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
 // response window, and the loop stops launching tools as soon as its deadline is spent.
 const AGENT_LOOP_BUDGET_MS=110_000
 
-type AgentComputeTurn={startedAt:number;input:string;language:string;body:any;userId:string|null;ownerAuthenticated:boolean;precedingAssistant:string|null;seedSearch?:{query:string;results:readonly{title:string;url:string;snippet:string}[]}}
+type AgentComputeTurn={startedAt:number;input:string;language:string;body:any;userId:string|null;ownerAuthenticated:boolean;precedingAssistant:string|null;seedSearch?:{query:string;results:readonly{title:string;url:string;snippet:string}[]}
+  /** A live-fact question: the answer must cite retrieved evidence meeting the citation requirement, and the loop leaves time for the one-pass fallback. */
+  liveFact?:{sources:FreshEvidenceSource[]}}
+// Live facts run inside the interactive turn: the loop is bounded and always leaves the one-pass
+// fallback time to answer (Codex #4564). Chart/compute turns keep the full loop budget.
+const LIVE_FACT_LOOP_BUDGET_MS=30_000
+const LIVE_FACT_FALLBACK_RESERVE_MS=15_000
+const LIVE_FACT_MIN_LOOP_MS=10_000
+// The final answer round for a live fact takes 2-7 s in production (2026-10-16 probes); the 25 s
+// chart reserve would leave a 30 s live-fact loop no time for tools (Codex #4574).
+const LIVE_FACT_ANSWER_RESERVE_MS=8_000
 
-function agentChartJson(startedAt:number,input:string,payload:{reply:string;source:string;png?:Buffer;filename?:string;sources:string[];reasonerLabel:string|null;modelInvoked:boolean;loop?:unknown}){
-  const executionProvenance=authoritativeProvenance(null,{invoked:false})
+function agentChartJson(startedAt:number,input:string,payload:{reply:string;source:string;png?:Buffer;filename?:string;sources:FreshEvidenceSource[];reasonerLabel:string|null;modelInvoked:boolean;loop?:unknown}){
+  // Structured evidence records (Codex #4564): provenance introspection and answerEvidenceSources read source objects, not URL strings.
+  const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:payload.sources,retrievedAt:new Date().toISOString(),attempted:payload.sources.length>0,error:null,synthesisAccepted:null})
   if(payload.reasonerLabel){
     ;(executionProvenance as any).local_reasoning={invoked:true,model:payload.reasonerLabel,confidence:1}
     ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,provider:null,model:payload.reasonerLabel,from_cache:false}
@@ -335,7 +347,7 @@ function agentChartJson(startedAt:number,input:string,payload:{reply:string;sour
   ;(executionProvenance as any).agent_tool_loop=payload.loop??null
   const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:payload.reply,source:payload.modelInvoked?'local_cos_reasoning':'deterministic',confidence:1,provenance:executionProvenance,externalAiInvoked:false})
   const dataUrl=payload.png?`data:image/png;base64,${payload.png.toString('base64')}`:''
-  return{executionProvenance,response:NextResponse.json({ok:true,reply:payload.reply,source:payload.source,confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:payload.modelInvoked,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,live_evidence_retrieved_this_turn:payload.sources.length>0,live_evidence_sources:payload.sources,...(dataUrl?{visual:{previewUrl:dataUrl,downloadUrl:dataUrl,filename:payload.filename||'chart.png',alt:input.slice(0,200)}}:{}),agent_tool_loop:payload.loop??undefined,execution_allowed:false,external_action_taken:false})}
+  return{executionProvenance,response:NextResponse.json({ok:true,reply:payload.reply,source:payload.source,confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:payload.modelInvoked,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,live_evidence_retrieved_this_turn:payload.sources.length>0,live_evidence_sources:payload.sources.map(source=>({id:source.id,title:source.title,url:source.url})),...(dataUrl?{visual:{previewUrl:dataUrl,downloadUrl:dataUrl,filename:payload.filename||'chart.png',alt:input.slice(0,200)}}:{}),agent_tool_loop:payload.loop??undefined,execution_allowed:false,external_action_taken:false})}
 }
 
 /**
@@ -348,7 +360,12 @@ function agentChartJson(startedAt:number,input:string,payload:{reply:string;sour
 async function agentComputeResponse(turn:AgentComputeTurn):Promise<NextResponse|null>{
   const loopStartedAt=Date.now()
   const remaining=turnDeadlineRemainingMs()
-  const policy=cosAgentToolPolicy({ownerAuthenticated:turn.ownerAuthenticated,signedIn:Boolean(turn.userId)})
+  const loopBudgetMs=turn.liveFact
+    ? Math.min(LIVE_FACT_LOOP_BUDGET_MS,remaining===null?LIVE_FACT_LOOP_BUDGET_MS:remaining-LIVE_FACT_FALLBACK_RESERVE_MS)
+    : Math.min(AGENT_LOOP_BUDGET_MS,remaining===null?AGENT_LOOP_BUDGET_MS:Math.max(0,remaining-10_000))
+  if(turn.liveFact&&loopBudgetMs<LIVE_FACT_MIN_LOOP_MS)return null
+  const basePolicy=cosAgentToolPolicy({ownerAuthenticated:turn.ownerAuthenticated,signedIn:Boolean(turn.userId)})
+  const policy=turn.liveFact?{...basePolicy,answerReserveMs:LIVE_FACT_ANSWER_RESERVE_MS}:basePolicy
   const history=(Array.isArray(turn.body?.messages)?turn.body.messages:[])
     .filter((message:any)=>(message?.role==='user'||message?.role==='assistant')&&typeof message?.content==='string')
     .slice(0,-1)
@@ -363,7 +380,7 @@ async function agentComputeResponse(turn:AgentComputeTurn):Promise<NextResponse|
     critic:runCosAgentToolTurn,
     ports:createCosAgentPorts(policy),
     policy,
-    deadlineAt:loopStartedAt+Math.min(AGENT_LOOP_BUDGET_MS,remaining===null?AGENT_LOOP_BUDGET_MS:Math.max(0,remaining-10_000)),
+    deadlineAt:loopStartedAt+loopBudgetMs,
     seedSearch:turn.seedSearch,
   }).catch(error=>{
     trace.outcome='error'
@@ -376,9 +393,16 @@ async function agentComputeResponse(turn:AgentComputeTurn):Promise<NextResponse|
   recordCosLatencyStage('primary:agent_loop',Date.now()-loopStartedAt)
   // Recorded in provenance on every path, so a fallback answer still shows what the loop did and why.
   const loop={outcome:trace.outcome,rounds:trace.rounds,model:trace.model||null,model_error:trace.modelError||null,round_ms:trace.roundMs,steps:trace.steps,stuck:trace.stuck,critic:trace.critic,unsupported_numbers:trace.unsupportedNumbers,python_runs:result?.pythonRuns??0,images:result?.images.length??0,verification:result?.verification??null}
+  const evidenceSources=result?agentEvidenceSources(result.sources,turn.liveFact?.sources):[]
+  if(result&&turn.liveFact&&!chartRequested&&!agentLiveFactReleasable(result.reply,turn.input,evidenceSources)){
+    // Same release gate as one-pass fresh synthesis: an answer that cites no qualifying retrieved
+    // evidence is not released as grounded; the one-pass synthesis (with its own gate) answers instead.
+    console.info('[cos-agent-loop-live-fact-withheld]',JSON.stringify({at:new Date().toISOString(),cited:citedAgentSources(result.reply,evidenceSources).length,retrieved:evidenceSources.length}))
+    return null
+  }
   if(result&&(!chartRequested||result.images.length)){
     const image=result.images[0]
-    const built=agentChartJson(turn.startedAt,turn.input,{reply:result.reply,source:'cos-agent-tool-loop',png:image?.png,filename:image?.name.replace(/[^a-z0-9._-]+/gi,'-'),sources:result.sources,reasonerLabel:result.model?`managed-open-model:${result.model}`:null,modelInvoked:true,loop})
+    const built=agentChartJson(turn.startedAt,turn.input,{reply:result.reply,source:'cos-agent-tool-loop',png:image?.png,filename:image?.name.replace(/[^a-z0-9._-]+/gi,'-'),sources:evidenceSources,reasonerLabel:result.model?`managed-open-model:${result.model}`:null,modelInvoked:true,loop})
     await writeCosPrimaryProvenance(turn.userId,result.reply,built.executionProvenance,'cos-agent-tool-loop',{prompt:turn.input,answered:true,confidence:1,branch:'agent_tool_loop'})
     return built.response
   }
@@ -396,7 +420,7 @@ async function agentComputeResponse(turn:AgentComputeTurn):Promise<NextResponse|
     return built.response
   }
   const chart=buildPriceHistoryChart(priceChart,priceHistory,turn.language)
-  const built=agentChartJson(turn.startedAt,turn.input,{reply:chart.reply,source:'cos-market-chart',png:chart.png,filename:chart.filename,sources:[priceHistory.source.url],reasonerLabel:null,modelInvoked:false,loop})
+  const built=agentChartJson(turn.startedAt,turn.input,{reply:chart.reply,source:'cos-market-chart',png:chart.png,filename:chart.filename,sources:agentEvidenceSources([priceHistory.source.url]),reasonerLabel:null,modelInvoked:false,loop})
   await writeCosPrimaryProvenance(turn.userId,chart.reply,built.executionProvenance,'cos-market-chart',{prompt:turn.input,answered:true,confidence:1,branch:'market_chart'})
   return built.response
 }
@@ -1000,7 +1024,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       // loop's first observation, and the model searches again for any part of the question it does
       // not cover (production 2026-10-16: "capital of Australia and its population" answered only the
       // capital from one search pass). The one-pass synthesis below remains the fallback.
-      const agentAnswered=await agentComputeResponse({startedAt,input,language,body,userId,ownerAuthenticated:access?.isOwner===true&&Boolean(userId),precedingAssistant:precedingAssistant||null,seedSearch:{query:lookupInput,results:freshSources}})
+      const agentAnswered=await agentComputeResponse({startedAt,input,language,body,userId,ownerAuthenticated:access?.isOwner===true&&Boolean(userId),precedingAssistant:precedingAssistant||null,seedSearch:{query:lookupInput,results:freshSources},liveFact:{sources:freshSources}})
       if(agentAnswered)return agentAnswered
       freshLocalAttempted=true
       freshLocalModel=localReasonerLabel()

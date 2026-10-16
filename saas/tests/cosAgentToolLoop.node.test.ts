@@ -426,11 +426,20 @@ test('answers start with the result, not the agent narrating its process', () =>
   assert.equal(stripProcessNarration('The data is verified and the chart is created. Let me present the results.\n\nHere\'s the chart of gold.'), 'Here\'s the chart of gold.')
   assert.equal(stripProcessNarration('The data is verified and the chart is created. Here\'s the summary:\n\n## VNCE'), '## VNCE')
   assert.equal(stripProcessNarration('Here are the results.\n\n**VNCE** rose 338.4% over six months.'), '**VNCE** rose 338.4% over six months.')
-  // Production 2026-10-16 (Microsoft CEO): notes, then the answer.
-  assert.equal(stripProcessNarration('The search results clearly confirm the answer. Satya Nadella is the current CEO.\n\nThe user asked a simple factual question. No data computation or chart is needed. Let me provide the answer directly.\n\nThe current CEO of Microsoft is **Satya Nadella**, since February 2014.\n\nSources:\n- [Microsoft](https://news.microsoft.com/source/leadership/)'), 'The current CEO of Microsoft is **Satya Nadella**, since February 2014.\n\nSources:\n- [Microsoft](https://news.microsoft.com/source/leadership/)')
-  // Production 2026-10-16 (Canberra): notes, verification chatter, then an "## Answer" section.
+  // Codex #4565 P2: a note separated by a single newline, or by nothing, is still a note.
+  assert.equal(stripProcessNarration('The data is verified and the chart is created.\nHere\'s the chart of gold.'), 'Here\'s the chart of gold.')
+  // Production 2026-10-16 (Microsoft CEO): every note sentence goes; every fact stays.
+  assert.equal(stripProcessNarration('The search results clearly confirm the answer. Satya Nadella is the current CEO.\n\nThe user asked a simple factual question. No data computation or chart is needed. Let me provide the answer directly.\n\nThe current CEO of Microsoft is **Satya Nadella**, since February 2014.\n\nSources:\n- [Microsoft](https://news.microsoft.com/source/leadership/)'), 'Satya Nadella is the current CEO.\n\nThe current CEO of Microsoft is **Satya Nadella**, since February 2014.\n\nSources:\n- [Microsoft](https://news.microsoft.com/source/leadership/)')
+  // Production 2026-10-16 (Canberra): an explicit "## Answer" heading ends the preamble.
   assert.equal(stripProcessNarration('I have the authoritative figure from the ABS. Canberra 484,630.\n\nLet me confirm the figure is clearly stated in the data.\n\nThe ABS table shows 484,630.\n\nThis is a simple factual question, so no chart is needed. Let me provide the answer.\n\n## Answer\n\n**The capital of Australia is Canberra.** Population 484,630 (ABS, 30 June 2025).'), '**The capital of Australia is Canberra.** Population 484,630 (ABS, 30 June 2025).')
+  // Codex #4565 P1: a substantive sentence that mentions sources is an answer, not a note.
+  assert.equal(stripProcessNarration('The search results show that Canberra is the capital of Australia.\n\nSources:\n- [Britannica](https://www.britannica.com/place/Canberra)'), 'The search results show that Canberra is the capital of Australia.\n\nSources:\n- [Britannica](https://www.britannica.com/place/Canberra)')
   assert.equal(stripProcessNarration('Gold fell 3.12%. The chart is attached.'), 'Gold fell 3.12%. The chart is attached.')
+  // Production 2026-10-16 (Microsoft CEO, after #4574).
+  // Codex #4576: the same opening that carries the answer is an answer, not a note.
+  assert.equal(stripProcessNarration('The answer is clear: Satya Nadella is the CEO of Microsoft.'), 'The answer is clear: Satya Nadella is the CEO of Microsoft.')
+  assert.equal(stripProcessNarration('The answer is verified.\n\nSatya Nadella is the CEO.'), 'Satya Nadella is the CEO.')
+  assert.equal(stripProcessNarration('The official Microsoft source confirms: Satya Nadella is Chairman and CEO.\n\nThe answer is clear and verified from the official Microsoft leadership page.\n\nThe current CEO of Microsoft is **Satya Nadella**.'), 'The official Microsoft source confirms: Satya Nadella is Chairman and CEO.\n\nThe current CEO of Microsoft is **Satya Nadella**.')
   assert.equal(stripProcessNarration('Ottawa is the capital of Canada.\n\nLet me know if you want the metro population too.'), 'Ottawa is the capital of Canada.\n\nLet me know if you want the metro population too.')
   assert.equal(stripProcessNarration('Let me present the results.'), 'Let me present the results.')
 })
@@ -568,4 +577,81 @@ test('cos-primary runs the completeness critic and credits OpenHands', () => {
   assert.match(route, /critic:runCosAgentToolTurn/)
   const notice = readFileSync(join(process.cwd(), 'lib/ai/cos/agentLoop/THIRD_PARTY_NOTICES.md'), 'utf8')
   assert.match(notice, /MIT License[\s\S]*OpenHands contributors/)
+})
+
+
+// Codex #4567: the critic reviews what will be delivered, and a regressing refinement never wins.
+test('critic reviews the delivered draft and keeps the better-covered answer', async () => {
+  const reviewedTexts: string[] = []
+  const critic: AgentModelTurn = async request => {
+    const text = String(request.messages.at(-1)?.content)
+    reviewedTexts.push(text)
+    return answer(reviewedTexts.length === 1
+      ? '{"parts":[{"ask":"a","answered":true},{"ask":"b","answered":false}]}'
+      : '{"parts":[{"ask":"a","answered":false},{"ask":"b","answered":false}]}')
+  }
+  const trace = newAgentLoopTrace()
+  const result = await runCosAgentLoop({
+    trace,
+    request: 'a and b',
+    language: 'en',
+    model: scriptedModel([answer('Let me present the results.\n\nA is alpha.'), answer('Nothing useful.')]),
+    critic,
+    ports: ports(fakePython({ stdout: '' })),
+    policy: { maxPythonRuns: 1, browserAllowed: false },
+    deadlineAt: Date.now() + 100_000,
+  })
+  assert.doesNotMatch(reviewedTexts[0], /Let me present/, 'the critic sees the normalized answer')
+  assert.equal(result?.reply, 'A is alpha.', 'the refinement covered less, so the reviewed draft is delivered')
+  assert.deepEqual(trace.critic.map(entry => entry.missing), [1, 2])
+})
+
+// Codex #4564: agent live-fact answers meet the same release gate as one-pass fresh synthesis,
+// carry structured source records, and leave the one-pass fallback time to answer.
+import { agentEvidenceSources, agentLiveFactReleasable } from '../lib/ai/cos/agentLoop/agentLiveFactRelease.ts'
+
+test('agent live-fact answers must cite qualifying retrieved evidence', () => {
+  const canberra = agentEvidenceSources(['https://www.abs.gov.au/statistics/people/population/regional-population/latest-release', 'https://www.britannica.com/place/Canberra'])
+  assert.deepEqual(canberra.map(source => source.id), ['LIVE1', 'LIVE2'])
+  assert.equal(canberra[1].title, 'britannica.com')
+  assert.equal(agentLiveFactReleasable('Canberra; population 484,630.\n\nSources:\n- [ABS](https://www.abs.gov.au/statistics/people/population/regional-population/latest-release)', 'what is the capital of Australia and its population?', canberra), true)
+  assert.equal(agentLiveFactReleasable('Canberra; population 484,630.', 'what is the capital of Australia and its population?', canberra), false, 'an answer citing nothing retrieved is not released as grounded')
+  assert.equal(agentLiveFactReleasable('See https://example.com/other', 'what is the capital of Australia?', canberra), false, 'a cited URL that was not retrieved does not count')
+  // Office-holder authority: the existing policy decides, unchanged.
+  assert.equal(agentLiveFactReleasable('Keir Starmer.\n\nSources:\n- [BBC](https://www.bbc.com/news/x)', 'who is the current prime minister of the UK?', agentEvidenceSources(['https://www.bbc.com/news/x'])), false)
+  assert.equal(agentLiveFactReleasable('Keir Starmer.\n\nSources:\n- [Gov](https://www.gov.uk/government/people/keir-starmer)', 'who is the current prime minister of the UK?', agentEvidenceSources(['https://www.gov.uk/government/people/keir-starmer'])), true)
+  // A source already retrieved by the host keeps its record.
+  const known = agentEvidenceSources(['https://www.britannica.com/place/Canberra'], [{ id: 'LIVE7', title: 'Canberra | Britannica', url: 'https://britannica.com/place/Canberra/', snippet: 'capital' }])
+  assert.deepEqual([known[0].id, known[0].title], ['LIVE1', 'Canberra | Britannica'])
+})
+
+test('cos-primary gates, records and bounds agent live-fact answers', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  assert.match(route, /liveFact:\{sources:freshSources\}/)
+  assert.match(route, /turn\.liveFact&&!chartRequested&&!agentLiveFactReleasable\(result\.reply,turn\.input,evidenceSources\)/)
+  assert.match(route, /LIVE_FACT_LOOP_BUDGET_MS=30_000/)
+  assert.match(route, /remaining-LIVE_FACT_FALLBACK_RESERVE_MS/)
+  assert.match(route, /if\(turn\.liveFact&&loopBudgetMs<LIVE_FACT_MIN_LOOP_MS\)return null/)
+  assert.match(route, /attachFreshEvidenceProvenance\(authoritativeProvenance\(null,\{invoked:false\}\),\{sources:payload\.sources/)
+  assert.match(route, /live_evidence_sources:payload\.sources\.map\(source=>\(\{id:source\.id,title:source\.title,url:source\.url\}\)\)/)
+})
+
+// Codex #4574: a 30 s live-fact loop with the 25 s chart reserve could never call a tool.
+test('a short live-fact loop with its own answer reserve still searches', async () => {
+  const choices: unknown[] = []
+  const searched: string[] = []
+  const model: AgentModelTurn = async request => {
+    choices.push(request.toolChoice)
+    return choices.length === 1 ? call('c1', 'web_search', { query: 'Canberra population' }) : answer('Canberra.')
+  }
+  const run = (answerReserveMs?: number) => runCosAgentLoop({ request: 'capital of Australia and its population?', language: 'en', model, ports: ports(fakePython({ stdout: '' }), { search: async query => { searched.push(query); return [] } }), policy: { maxPythonRuns: 1, browserAllowed: false, answerReserveMs }, deadlineAt: Date.now() + 25_000 })
+  await run(8_000)
+  assert.equal(choices[0], 'auto')
+  assert.deepEqual(searched, ['Canberra population'])
+  choices.length = 0
+  searched.length = 0
+  await run(undefined)
+  assert.equal(choices[0], 'none', 'with the default 25 s reserve, a short loop goes straight to the answer')
+  const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  assert.match(route, /turn\.liveFact\?\{\.\.\.basePolicy,answerReserveMs:LIVE_FACT_ANSWER_RESERVE_MS\}:basePolicy/)
 })

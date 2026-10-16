@@ -3,7 +3,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { agentTraceStep, cosAgentSystemPrompt, redactUrlQueries, newAgentLoopTrace, runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
+import { agentTraceStep, cosAgentSystemPrompt, redactUrlQueries, stripSandboxPaths, newAgentLoopTrace, runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
 import { agentToolDefinitions, htmlToText, imageBackedByStagedData, type AgentToolPorts } from '../lib/ai/cos/agentLoop/cosAgentTools.ts'
 import { optionalPackagesFor, runnerSource, VercelPythonSession, type PythonSession } from '../lib/ai/cos/agentLoop/pythonSandbox.ts'
 import { execFileSync } from 'node:child_process'
@@ -408,4 +408,15 @@ test('loop trace steps carry sanitized metadata, never raw observations', () => 
   assert.equal(agentTraceStep('fetch_url', 'Error: tool budget for this turn is spent; this call was not executed.').error, 'budget')
   for (const step of [fetched, python]) assert.doesNotMatch(JSON.stringify(step), /SECRET|secret request|private user/)
   assert.equal(redactUrlQueries('deepinfra: HTTP 400 at https://x.io/v1/chat?key=abc#f failed'), 'deepinfra: HTTP 400 at https://x.io/v1/chat failed')
+})
+
+
+// Production 2026-10-16: the VNCE answer ended "The chart is attached as `out/vnce_6mo.png`."
+test('answers never expose sandbox file paths', () => {
+  assert.equal(stripSandboxPaths('The chart is attached as `out/vnce_6mo.png`.'), 'The chart is attached.')
+  assert.equal(stripSandboxPaths('I read data/source_1.json and saved the chart to out/chart.png.'), 'I read and saved the chart.')
+  assert.equal(stripSandboxPaths('Daily closes (from `data/source_2.csv`), latest $13.33.'), 'Daily closes, latest $13.33.')
+  assert.equal(stripSandboxPaths('**Sources:**\n- [Yahoo](https://query1.finance.yahoo.com/v8/finance/chart/VNCE)'), '**Sources:**\n- [Yahoo](https://query1.finance.yahoo.com/v8/finance/chart/VNCE)')
+  assert.equal(stripSandboxPaths('Revenue grew in the outdoor/data segment.'), 'Revenue grew in the outdoor/data segment.')
+  assert.equal(stripSandboxPaths('See https://shop.example.com/checkout/out/page.html for details.'), 'See https://shop.example.com/checkout/out/page.html for details.')
 })

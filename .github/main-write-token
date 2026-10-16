@@ -1,2 +1,2 @@
-base_sha=61feca575ff205c10445ad93532b5b621261f748
-branch=fix/cos-agent-trace-redaction-20261016
+base_sha=f7bf24f677e337969e457be2503aa79efab83e1d
+branch=fix/cos-agent-hide-sandbox-paths-20261016

@@ -46,3 +46,53 @@ test('OrderFlow stress test pins all fifteen output files and both execution pro
   assert.ok(partial.missingFiles.includes('README.md'))
   assert.equal(partial.satisfied, false)
 })
+
+test('production 2026-10-16: the OrderFlow tree and verification block become the full checklist', async () => {
+  const { builderTaskContract: contractOf } = await import('../lib/builder/task-contract.ts')
+  const objective = [
+    '# OrderFlow — End-to-End Builder Acceptance Test',
+    '## 2. Required project structure',
+    'Create all 15 files:',
+    '```text',
+    'orderflow/',
+    '├── package.json',
+    '├── README.md',
+    '├── index.js',
+    '├── src/',
+    '│   ├── catalog.js',
+    '│   └── errors.js',
+    '├── test/',
+    '│   ├── catalog.test.js',
+    '│   └── checkout.test.js',
+    '```',
+    'Use Node.js built-in testing tools.',
+    '## 3. Automated tests',
+    'Implement at least **20 meaningful automated tests**, covering:',
+    '## 4. Mandatory verification',
+    'Execute all three commands:',
+    '```bash',
+    'npm test',
+    'node --test test/*.test.js',
+    'node index.js',
+    '```',
+    'Record the actual exit code and relevant stdout/stderr for each command.',
+  ].join('\n')
+  const contract = contractOf(objective)
+  assert.deepEqual(contract.files, ['package.json', 'README.md', 'index.js', 'src/catalog.js', 'src/errors.js', 'test/catalog.test.js', 'test/checkout.test.js'])
+  assert.deepEqual(contract.commands, ['npm test', 'node --test test/*.test.js', 'node index.js'])
+  assert.equal(contract.minimumTests, 20)
+})
+
+test('a passing npm test does not complete a build that is still missing a drawn-tree deliverable', async () => {
+  const { builderTaskContract: contractOf, builderTaskProgress } = await import('../lib/builder/task-contract.ts')
+  const contract = contractOf(['## Project structure', '```text', 'app/', '├── index.js', '└── test/', '    └── a.test.js', '```', '## Mandatory verification', '```bash', 'npm test', 'node index.js', '```'].join('\n'))
+  assert.deepEqual(contract.files, ['index.js', 'test/a.test.js'])
+  const trace = [
+    { round: 1, toolId: 'write_file', ok: true, input: { path: 'test/a.test.js' } },
+    { round: 2, toolId: 'run', ok: true, input: { command: 'npm test' }, output: { exitCode: 0, stdout: 'ℹ pass 1\nℹ fail 0' } },
+  ] as any
+  const progress = builderTaskProgress(contract, ['test/a.test.js'], trace)
+  assert.equal(progress.satisfied, false)
+  assert.deepEqual(progress.missingFiles, ['index.js'])
+  assert.deepEqual(progress.pendingCommands, ['node index.js'])
+})

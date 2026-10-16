@@ -3,7 +3,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { agentTraceStep, cosAgentSystemPrompt, redactUrlQueries, stripLeadingNarration, stripSandboxPaths, newAgentLoopTrace, runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
+import { agentTraceStep, cosAgentSystemPrompt, redactUrlQueries, stripProcessNarration, stripSandboxPaths, newAgentLoopTrace, runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
 import { agentToolDefinitions, htmlToText, imageBackedByStagedData, type AgentToolPorts } from '../lib/ai/cos/agentLoop/cosAgentTools.ts'
 import { optionalPackagesFor, runnerSource, VercelPythonSession, type PythonSession } from '../lib/ai/cos/agentLoop/pythonSandbox.ts'
 import { execFileSync } from 'node:child_process'
@@ -423,10 +423,16 @@ test('answers never expose sandbox file paths', () => {
 
 
 test('answers start with the result, not the agent narrating its process', () => {
-  assert.equal(stripLeadingNarration('The data is verified and the chart is created. Let me present the results.\n\nHere\'s the chart of gold.'), 'Here\'s the chart of gold.')
-  assert.equal(stripLeadingNarration('The data is verified and the chart is created. Here\'s the summary:\n\n## VNCE'), '## VNCE')
-  assert.equal(stripLeadingNarration('Gold fell 3.12%. The chart is attached.'), 'Gold fell 3.12%. The chart is attached.')
-  assert.equal(stripLeadingNarration('Let me present the results.'), 'Let me present the results.')
+  assert.equal(stripProcessNarration('The data is verified and the chart is created. Let me present the results.\n\nHere\'s the chart of gold.'), 'Here\'s the chart of gold.')
+  assert.equal(stripProcessNarration('The data is verified and the chart is created. Here\'s the summary:\n\n## VNCE'), '## VNCE')
+  assert.equal(stripProcessNarration('Here are the results.\n\n**VNCE** rose 338.4% over six months.'), '**VNCE** rose 338.4% over six months.')
+  // Production 2026-10-16 (Microsoft CEO): notes, then the answer.
+  assert.equal(stripProcessNarration('The search results clearly confirm the answer. Satya Nadella is the current CEO.\n\nThe user asked a simple factual question. No data computation or chart is needed. Let me provide the answer directly.\n\nThe current CEO of Microsoft is **Satya Nadella**, since February 2014.\n\nSources:\n- [Microsoft](https://news.microsoft.com/source/leadership/)'), 'The current CEO of Microsoft is **Satya Nadella**, since February 2014.\n\nSources:\n- [Microsoft](https://news.microsoft.com/source/leadership/)')
+  // Production 2026-10-16 (Canberra): notes, verification chatter, then an "## Answer" section.
+  assert.equal(stripProcessNarration('I have the authoritative figure from the ABS. Canberra 484,630.\n\nLet me confirm the figure is clearly stated in the data.\n\nThe ABS table shows 484,630.\n\nThis is a simple factual question, so no chart is needed. Let me provide the answer.\n\n## Answer\n\n**The capital of Australia is Canberra.** Population 484,630 (ABS, 30 June 2025).'), '**The capital of Australia is Canberra.** Population 484,630 (ABS, 30 June 2025).')
+  assert.equal(stripProcessNarration('Gold fell 3.12%. The chart is attached.'), 'Gold fell 3.12%. The chart is attached.')
+  assert.equal(stripProcessNarration('Ottawa is the capital of Canada.\n\nLet me know if you want the metro population too.'), 'Ottawa is the capital of Canada.\n\nLet me know if you want the metro population too.')
+  assert.equal(stripProcessNarration('Let me present the results.'), 'Let me present the results.')
 })
 
 // Production 2026-10-16: "capital of Australia and its population" answered only the capital from

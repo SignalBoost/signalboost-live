@@ -16,6 +16,7 @@ if (bypassAudit.status !== 0) process.exit(bypassAudit.status ?? 1)
 
 const tests = [
   'tests/labCustomerTraining.node.test.ts',
+  'tests/labExperimentComparison.node.test.ts',
   'tests/labCustomerTrainingSpend.node.test.ts',
   'tests/labCustomerJobStateExhaustive.node.test.ts',
   'tests/labCustomerTeacherSpend.node.test.ts',

@@ -11,6 +11,7 @@ import { cleanPastedKey, detectProviderFromKey } from '@/lib/lab/labKeyEntry'
 import { LAB_OPEN_SOURCES } from '@/lib/lab/labOpenSources'
 import { previewLabDataset, previewLabPrompts } from '@/lib/lab/labDatasetPreflight'
 import { buildLabMlflowRunSnapshot } from '@/lib/lab/mlflowRunExport'
+import { buildLabExperimentComparison } from '@/lib/lab/labExperimentComparison'
 import LabCustomerModelPassport from './LabCustomerModelPassport.tsx'
 import LabCustomerResponseComparison from './LabCustomerResponseComparison.tsx'
 import LabCustomerTrainingAdvisor from './LabCustomerTrainingAdvisor.tsx'
@@ -362,6 +363,27 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     link.remove()
     URL.revokeObjectURL(url)
   }
+  function exportExperimentComparison() {
+    // Runs have already been fetched for the currently selected LAB organization.
+    if (!runs.length) return
+    const comparison = buildLabExperimentComparison(runs)
+    const blob = new Blob([JSON.stringify(comparison, null, 2) + '\n'], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'itmounts-experiment-comparison.json'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+  const comparisonLabels: Record<string,string> = {
+    en:'Export experiment comparison',es:'Exportar comparación de experimentos',
+    pt:'Exportar comparação de experimentos',pl:'Eksportuj porównanie eksperymentów',
+    ru:'Экспорт сравнения экспериментов',de:'Experimentvergleich exportieren',
+    fr:'Exporter la comparaison des expériences',it:'Esporta confronto esperimenti',
+    ja:'実験比較をエクスポート',ko:'실험 비교 내보내기',ar:'تصدير مقارنة التجارب',
+  }
   const exportLabels: Record<string, string> = {
     en: 'Export tracking metadata', es: 'Exportar metadatos de seguimiento',
     pt: 'Exportar metadados de rastreamento', pl: 'Eksportuj metadane śledzenia',
@@ -552,6 +574,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
 
       <div className="space-y-2">
         <h3 className="font-medium">{copy.progressHeading}</h3>
+        {runs.length > 0 && <button type="button" className="underline text-sm" onClick={exportExperimentComparison}>{comparisonLabels[language] ?? comparisonLabels.en}</button>}
         {!runs.length && <p className="text-sm opacity-70">{copy.noRuns}</p>}
         <ul className="space-y-3">
           {runs.map(run => (

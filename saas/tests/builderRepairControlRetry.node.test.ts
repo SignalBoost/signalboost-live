@@ -16,3 +16,12 @@ test('rejected repair inspection triggers another controlled edit opportunity', 
   assert.doesNotMatch(block, /return \{ ok: false, error:.*builder_repair_mutation_not_produced/)
   assert.match(loop, /builder_stalled_repeated_inspection/)
 })
+
+test('new application jobs prioritize missing deliverables over stale inspection', () => {
+  assert.match(loop, /const missingBuildDeliverables = !repairObjective && builderTaskProgress\(task, workspacePaths, trace\)\.missingFiles\.length > 0/)
+  assert.match(loop, /!missingBuildDeliverables && deniedInspections >= 4/)
+  assert.match(loop, /!missingBuildDeliverables && consecutiveRepeatRejections >= MAX_CONSECUTIVE_REPEAT_REJECTIONS/)
+  assert.match(loop, /!missingBuildDeliverables \|\| deniedInspections < 2 \|\| toolId === 'write_file'/)
+  assert.match(loop, /progress\.missingFiles\[0\]/)
+  assert.match(loop, /const verificationCommand =/)
+})

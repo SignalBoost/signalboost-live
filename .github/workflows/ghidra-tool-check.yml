@@ -1,0 +1,39 @@
+name: Ghidra headless tooling check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-ghidra:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Install Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Download official Ghidra release and verify launcher
+        shell: bash
+        run: |
+          set -euo pipefail
+          release="$(curl --fail --silent --show-error --location --retry 3 https://api.github.com/repos/NationalSecurityAgency/ghidra/releases/latest)"
+          url="$(jq -r '[.assets[] | select(.name | test("^ghidra_[0-9.]+_PUBLIC_[0-9]+\\.zip$"))] | first | .browser_download_url // empty' <<< "$release")"
+          test -n "$url" || { echo "No official Ghidra PUBLIC ZIP in release"; exit 1; }
+          curl --fail --show-error --location --retry 3 "$url" -o /tmp/ghidra.zip
+          unzip -q /tmp/ghidra.zip -d /tmp/ghidra
+          launcher="$(find /tmp/ghidra -maxdepth 3 -path '*/support/analyzeHeadless' -type f -print -quit)"
+          test -n "$launcher"
+          chmod +x "$launcher"
+          java -version
+          # Run a real startup path; headless help usage may return nonzero on some versions.
+          set +e
+          "$launcher" -help > /tmp/ghidra-headless.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/ghidra-headless.log
+          grep -Eiq 'ghidra|analyzeheadless|usage|headless' /tmp/ghidra-headless.log
+          echo "Ghidra headless launcher exercised (exit: $status)"

@@ -320,25 +320,33 @@ export async function runCosAgentToolTurn(input: {
   timeoutMs: number
 }): Promise<LocalModelTurnResult | null> {
   const config = localInferenceConfigFromEnv()
-  return callLocalModelTurn({
-    usageContext: { feature: 'cos_interactive_answer', purpose: 'agent_tool_loop' },
-    prompt: '',
-    systemPrompt: input.systemPrompt,
-    messages: input.messages,
-    tools: input.tools,
-    toolChoice: input.toolChoice,
-    temperature: 0.2,
-    maxTokens: 3_000,
-    // Code-writing rounds need repeated identifiers and indentation.
-    frequencyPenalty: 0,
-    presencePenalty: 0,
-    disableThinking: true,
-    timeoutMs: input.timeoutMs,
-    allowConfiguredFallback: true,
-    persistUsage: true,
-    maxEstimatedCostUsd: 0.05,
-  }, { ...config, timeoutMs: input.timeoutMs }).catch(error => {
-    console.warn('[cos-agent-loop] model turn failed', error instanceof Error ? error.message : String(error))
-    return null
-  })
+  let noResult = ''
+  try {
+    const turn = await callLocalModelTurn({
+      usageContext: { feature: 'cos_interactive_answer', purpose: 'agent_tool_loop' },
+      prompt: '',
+      systemPrompt: input.systemPrompt,
+      messages: input.messages,
+      tools: input.tools,
+      toolChoice: input.toolChoice,
+      temperature: 0.2,
+      maxTokens: 3_000,
+      // Code-writing rounds need repeated identifiers and indentation.
+      frequencyPenalty: 0,
+      presencePenalty: 0,
+      disableThinking: true,
+      timeoutMs: input.timeoutMs,
+      allowConfiguredFallback: true,
+      persistUsage: true,
+      maxEstimatedCostUsd: 0.05,
+      onNoResult: reason => { noResult = reason },
+    }, { ...config, timeoutMs: input.timeoutMs })
+    // The loop records why a round produced nothing; a silent null hides provider rejections.
+    if (!turn) throw new Error(noResult || 'model returned no turn')
+    return turn
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.warn('[cos-agent-loop] model turn failed', message)
+    throw new Error(message.slice(0, 600))
+  }
 }

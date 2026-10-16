@@ -3,7 +3,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
+import { newAgentLoopTrace, runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
 import { agentToolDefinitions, htmlToText, imageBackedByStagedData, type AgentToolPorts } from '../lib/ai/cos/agentLoop/cosAgentTools.ts'
 import { optionalPackagesFor, runnerSource, VercelPythonSession, type PythonSession } from '../lib/ai/cos/agentLoop/pythonSandbox.ts'
 import { execFileSync } from 'node:child_process'
@@ -243,3 +243,18 @@ test('the sandbox runner records only files the program really opens', () => {
   assert.ok(existsSync(log))
 })
 
+
+test('the loop trace records why a turn produced no answer', async () => {
+  const run = async (turns: LocalModelTurnResult[]) => {
+    const trace = newAgentLoopTrace()
+    await runCosAgentLoop({ trace, request: 'chart VNCE stock price', language: 'en', model: scriptedModel(turns), ports: ports(fakePython({ stdout: STDOUT })), policy: { maxPythonRuns: 2, browserAllowed: false }, deadlineAt: Date.now() + 100_000 })
+    return trace
+  }
+  assert.equal((await run([])).outcome, 'model_unavailable')
+  const unsupported = await run([call('c1', 'fetch_url', { url: YAHOO_URL }), answer('Up 412%.'), answer('Up 412%.')])
+  assert.equal(unsupported.outcome, 'unsupported_numbers')
+  assert.deepEqual(unsupported.unsupportedNumbers, ['412'])
+  assert.equal(unsupported.steps[0].tool, 'fetch_url')
+  assert.match(unsupported.steps[0].observation, /^Fetched https:\/\/query1\.finance\.yahoo\.com/)
+  assert.equal((await run([call('c1', 'fetch_url', { url: YAHOO_URL }), answer('VNCE closed at $13.33.')])).outcome, 'answered')
+})

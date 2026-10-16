@@ -32,6 +32,19 @@ export type CosAgentLoopResult = Readonly<{
   model: string
 }>
 
+/** What the loop did, for provenance and diagnosis whether or not it produced an answer. */
+export type AgentLoopTrace = {
+  outcome: 'answered' | 'model_unavailable' | 'no_answer' | 'unsupported_numbers' | 'error' | 'running'
+  rounds: number
+  model: string
+  steps: { tool: string; observation: string }[]
+  unsupportedNumbers: string[]
+}
+
+export function newAgentLoopTrace(): AgentLoopTrace {
+  return { outcome: 'running', rounds: 0, model: '', steps: [], unsupportedNumbers: [] }
+}
+
 const MAX_ROUNDS = 8
 // Host-owned tool budget: a model that emits many parallel calls cannot fan out past these.
 const MAX_CALLS_PER_ROUND = 4
@@ -133,7 +146,9 @@ export async function runCosAgentLoop(input: {
   policy: AgentToolPolicy
   deadlineAt: number
   now?: () => number
+  trace?: AgentLoopTrace
 }): Promise<CosAgentLoopResult | null> {
+  const trace = input.trace ?? newAgentLoopTrace()
   const now = input.now ?? Date.now
   const remainingMs = () => input.deadlineAt - now()
   const tools = agentToolDefinitions(input.policy)
@@ -157,8 +172,13 @@ export async function runCosAgentLoop(input: {
         toolChoice: finalRound ? 'none' : 'auto',
         timeoutMs: Math.min(ROUND_TIMEOUT_MS, remainingMs() - 2_000),
       })
-      if (!turn) break
+      trace.rounds = rounds
+      if (!turn) {
+        trace.outcome = 'model_unavailable'
+        break
+      }
       model = `${turn.provider}:${turn.model}`
+      trace.model = model
       const calls: readonly LocalModelToolCall[] = finalRound ? [] : turn.toolCalls
       if (!calls.length) {
         answer = String(turn.content || '').trim()
@@ -174,10 +194,14 @@ export async function runCosAgentLoop(input: {
           ? await executeAgentTool({ name: call.function.name, argumentsJson: call.function.arguments, ports: input.ports, policy: input.policy, evidence, remainingMs })
           : 'Error: tool budget for this turn is spent; this call was not executed. Answer with what you have.'
         messages.push({ role: 'tool', tool_call_id: call.id, content: observation })
+        trace.steps.push({ tool: call.function.name, observation: observation.slice(0, 400) })
       }
     }
 
-    if (!answer) return null
+    if (!answer) {
+      if (trace.outcome === 'running') trace.outcome = 'no_answer'
+      return null
+    }
 
     const grounded = [input.request, ...history.filter(message => message.role === 'user').map(message => message.content), ...evidence.observations]
     let unsupported = unsupportedAnswerNumbers(answer, grounded)
@@ -193,7 +217,12 @@ export async function runCosAgentLoop(input: {
         unsupported = unsupportedAnswerNumbers(answer, grounded)
       }
     }
-    if (unsupported.length) return null
+    if (unsupported.length) {
+      trace.outcome = 'unsupported_numbers'
+      trace.unsupportedNumbers = unsupported.slice(0, 20)
+      return null
+    }
+    trace.outcome = 'answered'
 
     const { text, dropped } = stripUnverifiedUrls(answer, evidence.sourceUrls)
     return {

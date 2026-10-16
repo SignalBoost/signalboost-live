@@ -74,7 +74,7 @@ import { looksLikeArtifactContinuation } from '@/lib/ai/cos/artifactContinuation
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
-import { runCosAgentLoop } from '@/lib/ai/cos/agentLoop/cosAgentLoop'
+import { newAgentLoopTrace, runCosAgentLoop } from '@/lib/ai/cos/agentLoop/cosAgentLoop'
 import { cosAgentToolPolicy, createCosAgentPorts } from '@/lib/ai/cos/agentLoop/cosAgentRuntime'
 import { requiresAgentTools } from '@/lib/ai/cos/agentLoop/agentToolIntent'
 import { runCosAgentToolTurn } from '@/lib/ai/cos/cosAgentDecision'
@@ -353,7 +353,9 @@ async function agentComputeResponse(turn:AgentComputeTurn):Promise<NextResponse|
     .filter((message:any)=>(message?.role==='user'||message?.role==='assistant')&&typeof message?.content==='string')
     .slice(0,-1)
     .map((message:any)=>({role:message.role as 'user'|'assistant',content:String(message.content)}))
+  const trace=newAgentLoopTrace()
   const result=await runCosAgentLoop({
+    trace,
     request:turn.input,
     conversation:history,
     language:turn.language,
@@ -361,11 +363,17 @@ async function agentComputeResponse(turn:AgentComputeTurn):Promise<NextResponse|
     ports:createCosAgentPorts(policy),
     policy,
     deadlineAt:loopStartedAt+Math.min(AGENT_LOOP_BUDGET_MS,remaining===null?AGENT_LOOP_BUDGET_MS:Math.max(0,remaining-10_000)),
-  }).catch(error=>{console.warn('[cos-agent-loop] failed',error instanceof Error?error.message:String(error));return null})
+  }).catch(error=>{
+    trace.outcome='error'
+    trace.steps.push({tool:'loop',observation:(error instanceof Error?error.message:String(error)).slice(0,400)})
+    console.warn('[cos-agent-loop] failed',error instanceof Error?error.message:String(error))
+    return null
+  })
   const chartRequested=requiresAgentTools(turn.input,turn.precedingAssistant)
-  console.info('[cos-agent-loop]',JSON.stringify({at:new Date().toISOString(),ok:Boolean(result),chartRequested,ms:Date.now()-loopStartedAt,rounds:result?.rounds??null,toolCalls:result?.toolCalls??[],pythonRuns:result?.pythonRuns??0,images:result?.images.length??0,verification:result?.verification??null,model:result?.model??null}))
+  console.info('[cos-agent-loop]',JSON.stringify({at:new Date().toISOString(),ok:Boolean(result),chartRequested,ms:Date.now()-loopStartedAt,outcome:trace.outcome,rounds:trace.rounds,steps:trace.steps.map(step=>({tool:step.tool,observation:step.observation.slice(0,200)})),pythonRuns:result?.pythonRuns??0,images:result?.images.length??0,verification:result?.verification??null,model:trace.model||null}))
   recordCosLatencyStage('primary:agent_loop',Date.now()-loopStartedAt)
-  const loop=result?{rounds:result.rounds,tool_calls:result.toolCalls,python_runs:result.pythonRuns,verification:result.verification,model:result.model}:null
+  // Recorded in provenance on every path, so a fallback answer still shows what the loop did and why.
+  const loop={outcome:trace.outcome,rounds:trace.rounds,model:trace.model||null,steps:trace.steps,unsupported_numbers:trace.unsupportedNumbers,python_runs:result?.pythonRuns??0,images:result?.images.length??0,verification:result?.verification??null}
   if(result&&(!chartRequested||result.images.length)){
     const image=result.images[0]
     const built=agentChartJson(turn.startedAt,turn.input,{reply:result.reply,source:'cos-agent-tool-loop',png:image?.png,filename:image?.name.replace(/[^a-z0-9._-]+/gi,'-'),sources:result.sources,reasonerLabel:result.model?`managed-open-model:${result.model}`:null,modelInvoked:true,loop})

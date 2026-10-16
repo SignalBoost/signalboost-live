@@ -49,7 +49,7 @@ test('Z3 model replay: all 48 real customer LAB reservation and recovery paths',
     try {
       const outcome = await runReservedJob({ plan, customerHfToken: 'customer-key', ports, book })
       status = outcome.status
-      if (status === 'submitted') {
+      if (outcome.status === 'submitted') {
         assert.equal(outcome.jobId, job.jobId)
         assert.equal(outcome.recoveredByName, c.submitFailure && c.lookup === 'found')
       }

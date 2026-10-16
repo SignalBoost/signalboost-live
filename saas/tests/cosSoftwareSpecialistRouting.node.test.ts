@@ -415,3 +415,20 @@ test('an explanation request that carries a file tree and test commands stays a 
     assert.equal(routed, null, opening)
   }
 })
+
+
+test('a build request that opens with a question word but is addressed to the agent still goes to Builder', () => {
+  for (const opening of [
+    'What I need you to build is a complete application with this project structure:',
+    'How about you build this application with the following project structure?',
+    "Why don't you create this app? Project structure:",
+  ]) {
+    const objective = [opening, '├── index.js', '├── src/', '│   └── cart.js', 'Run npm test and node --test test/*.test.js.'].join('\n')
+    const routed = conciergeBuilderRequest({
+      messages: [{ role: 'user', content: objective }],
+      context: { conversationId: 'b7a51c1e-1f7f-4c39-9a7e-1c2f8f3d2a14' },
+      attachments: [],
+    })
+    assert.equal(routed?.endpoint, '/api/builder', opening)
+  }
+})

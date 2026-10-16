@@ -230,7 +230,15 @@ function isEmptyThinkingTruncation(error: unknown): boolean {
     && (error as Error & { emptyContent?: boolean }).emptyContent === true
 }
 
+function agentToolLoopRound(args: LocalModelCallArgs): boolean {
+  return String(args.usageContext?.purpose || '').trim().toLowerCase() === 'agent_tool_loop'
+}
+
 function interactiveModelTimeoutMs(args: LocalModelCallArgs, configTimeoutMs: number): number {
+  // An agent-loop round may write a whole analysis program; the loop owns its per-round bound
+  // (cosAgentLoop ROUND_TIMEOUT_MS) inside the turn deadline. Production 2026-10-16: the 20 s
+  // one-pass answer clamp cut the code-writing round ("Inference transport deadline exceeded").
+  if (agentToolLoopRound(args)) return Math.min(configTimeoutMs, 60_000)
   const directEdit = directTextTransformation(args)
   const authoring = interactiveAuthoring(args)
   const simpleKnowledge = simpleKnowledgeResponse(args)

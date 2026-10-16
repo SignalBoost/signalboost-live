@@ -4,19 +4,22 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 const features = ['task_planning','workspace_editing','terminal_execution','test_repair','checkpoint_resume','stall_recovery','context_management','tool_integration','verification_gate','artifact_delivery']
 const methods = new Set(['rea-static','rea-runtime','documented-behavior','controlled-probe'])
+const platforms = ['Cursor', 'Windsurf', 'Lovable', 'v0']
 export function buildTransferReport(input) {
   if (!Array.isArray(input?.findings)) throw Error('A curated findings array is required; REA static output is not proof of runtime behavior')
+  const targets = input.targets === undefined ? ['Cursor'] : input.targets
+  if (!Array.isArray(targets) || !targets.length || targets.some(t => !platforms.includes(t)) || new Set(targets).size !== targets.length) throw Error('targets must be distinct supported platforms')
   const capabilities = features.map(id => {
-    const evidence = input.findings.filter(f => f && f.target === 'Cursor' && f.capability === id && methods.has(f.method)
+    const evidence = input.findings.filter(f => f && targets.includes(f.target) && f.capability === id && methods.has(f.method)
       && typeof f.evidence_location === 'string' && f.evidence_location.trim()
       && typeof f.observation === 'string' && f.observation.trim())
     const observed = evidence.some(f => f.method === 'rea-runtime' || f.method === 'controlled-probe')
     return { id, status: observed ? 'behavior_observed' : evidence.length ? 'static_or_documented_only' : 'unverified',
-      evidence: evidence.map(f => ({ method:f.method, location:f.evidence_location, observation:f.observation,
+      evidence: evidence.map(f => ({ target:f.target, method:f.method, location:f.evidence_location, observation:f.observation,
         limitations:String(f.limitations || '') })),
       next: observed ? 'Implement an independent equivalent in iTMounts and test live' : 'Obtain a controlled behavioral probe before claiming parity' }
   })
-  return { target:'Cursor', destination:'iTMounts Builder', capabilities,
+  return { target:targets.length === 1 ? targets[0] : 'multi-platform', targets, destination:'iTMounts Builder', capabilities,
     observed_count:capabilities.filter(c=>c.status==='behavior_observed').length,
     acceptance:{ project:'OrderFlow', files:15, minimumTests:20,
       commands:['npm test','node --test test/*.test.js','node index.js'],

@@ -91,9 +91,12 @@ body:has(.sb-ai-app-shell--home) > footer {
 }
 
 .concierge-shell .cos-history-entry {
+  /* A long list scrolls; rows must never shrink to fit it (that clipped every title). */
+  flex: 0 0 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.35;
   color: rgba(226, 232, 240, .86);
 }
 
@@ -117,6 +120,9 @@ body:has(.sb-ai-app-shell--home) > footer {
   margin-top: 6px;
   overflow-y: auto;
   scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, .35) transparent;
+  color-scheme: dark;
 }
 
 .concierge-shell .cos-history-items p {

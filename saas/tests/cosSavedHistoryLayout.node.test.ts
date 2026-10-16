@@ -24,4 +24,8 @@ test('homepage reads only authenticated server history and resumes existing conv
   // screens the shell reserves the panel's column while it is open.
   assert.match(css, /\.concierge-shell:has\(> \.cos-home-history\.is-open\) \{ padding-inline-start: 262px !important; \}/)
   assert.match(home, /<nav className=\{'cos-home-history'/)
+  // Production 2026-10-16: with a full list, flex rows shrank to fit the column and every title was
+  // cut in half. Rows keep their height and the list scrolls instead.
+  assert.match(css, /\.concierge-shell \.cos-history-entry \{[^}]*flex: 0 0 auto;/)
+  assert.match(css, /\.concierge-shell \.cos-history-items \{[^}]*overflow-y: auto;[^}]*color-scheme: dark;/)
 })

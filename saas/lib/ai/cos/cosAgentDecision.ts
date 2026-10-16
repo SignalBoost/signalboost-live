@@ -320,33 +320,53 @@ export async function runCosAgentToolTurn(input: {
   timeoutMs: number
 }): Promise<LocalModelTurnResult | null> {
   const config = localInferenceConfigFromEnv()
-  let noResult = ''
-  try {
-    const turn = await callLocalModelTurn({
-      usageContext: { feature: 'cos_interactive_answer', purpose: 'agent_tool_loop' },
-      prompt: '',
-      systemPrompt: input.systemPrompt,
-      messages: input.messages,
-      tools: input.tools,
-      toolChoice: input.toolChoice,
-      temperature: 0.2,
-      maxTokens: 2_000,
-      // Code-writing rounds need repeated identifiers and indentation.
-      frequencyPenalty: 0,
-      presencePenalty: 0,
-      disableThinking: true,
-      timeoutMs: input.timeoutMs,
-      allowConfiguredFallback: true,
-      persistUsage: true,
-      maxEstimatedCostUsd: 0.05,
-      onNoResult: reason => { noResult = reason },
-    }, { ...config, timeoutMs: input.timeoutMs })
-    // The loop records why a round produced nothing; a silent null hides provider rejections.
-    if (!turn) throw new Error(noResult || 'model returned no turn')
-    return turn
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    console.warn('[cos-agent-loop] model turn failed', message)
-    throw new Error(message.slice(0, 600))
+  // Production 2026-10-16 (round_ms [14259, 60135]): the configured reasoner (Qwen3.6-35B-A3B) never
+  // finished a code-writing round within 60 s. On DeepInfra, loop rounds use the fast models the edit
+  // lane already runs in production, the second only when the first returns nothing; other
+  // providers keep their configured model.
+  const deepInfra = /deepinfra/i.test(String(config.provider || '')) || /deepinfra\.com/i.test(config.baseUrl)
+  const models = deepInfra
+    ? [...new Set([
+        process.env.COS_FAST_TEXT_MODEL?.trim() || 'deepseek-ai/DeepSeek-V4-Flash-0731',
+        process.env.COS_DIRECT_TEXT_MODEL?.trim() || 'zai-org/GLM-5.3-Flash',
+      ])]
+    : [config.model]
+  const startedAt = Date.now()
+  const failures: string[] = []
+  for (const [index, model] of models.entries()) {
+    const remaining = input.timeoutMs - (Date.now() - startedAt)
+    if (remaining < 5_000) break
+    // The first model gets most of the round; a second attempt keeps at least a third of it.
+    const attemptMs = index === models.length - 1 ? remaining : Math.max(5_000, Math.floor(remaining * 0.65))
+    let noResult = ''
+    try {
+      const turn = await callLocalModelTurn({
+        usageContext: { feature: 'cos_interactive_answer', purpose: 'agent_tool_loop' },
+        prompt: '',
+        systemPrompt: input.systemPrompt,
+        messages: input.messages,
+        tools: input.tools,
+        toolChoice: input.toolChoice,
+        temperature: 0.2,
+        maxTokens: 2_000,
+        // Code-writing rounds need repeated identifiers and indentation.
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        disableThinking: true,
+        timeoutMs: attemptMs,
+        allowConfiguredFallback: false,
+        persistUsage: true,
+        maxEstimatedCostUsd: 0.05,
+        onNoResult: reason => { noResult = reason },
+      }, { ...config, model, timeoutMs: attemptMs })
+      if (turn) return turn
+      failures.push(noResult || `${model}: model returned no turn`)
+    } catch (error) {
+      failures.push(`${model}: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }
+  const message = (failures.join(' | ') || 'no time left for a model round').slice(0, 600)
+  // The loop records why a round produced nothing; a silent null hides provider rejections.
+  console.warn('[cos-agent-loop] model turn failed', message)
+  throw new Error(message)
 }

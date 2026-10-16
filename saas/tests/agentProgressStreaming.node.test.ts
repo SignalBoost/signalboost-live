@@ -109,7 +109,7 @@ test('non-code Concierge attachments stay on ordinary Concierge transport', () =
 test('progress client selects durable Builder only after shared Builder-intent classification', () => {
   const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
   assert.match(client, /isConciergeBuilderObjective\(objective, \{ attachmentNames, attachmentMimeTypes \}\)/)
-  assert.match(client, /args\.target === 'concierge' \? conciergeBuilderRequest\(args\.body\) : null/)
+  assert.match(client, /const builderRequest = conciergeBuilderRequest\(args\.body\)/)
   assert.match(client, /const endpoint = builderRequest\?\.endpoint \?\? '\/api\/cos-browser'/)
   assert.match(client, /credentials: 'include'/)
 })
@@ -158,7 +158,7 @@ test('OrderFlow owner Assistant acceptance specification reaches durable Builder
     'test/catalog.test.js test/cart.test.js test/inventory.test.js test/orders.test.js test/checkout.test.js',
     'At least 20 automated tests. Execute npm test, node --test test/*.test.js, and node index.js.',
     'Do not claim success without recorded exit codes and persisted project files.',
-  ].join('\\n')
+  ].join('\n')
   const request = conciergeBuilderRequest({
     messages: [{ role: 'user', content: objective }],
     context: { currentPage: '/dashboard/assistant', conversationId: '12345678-1234-1234-1234-123456789abc' },

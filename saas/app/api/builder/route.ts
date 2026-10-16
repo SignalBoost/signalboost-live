@@ -319,7 +319,12 @@ export async function POST(request: Request) {
     // prior jobs in this same authenticated conversation prove continuity.
     // Defer a transient empty listing to the claimed worker, where actual
     // source availability is rechecked before any coding tool can run.
-    const continuationWorkspace = !newProjectRequested && !repositoryTarget && files.length === 0
+    // An empty workspace can still receive a complete new-application specification: the first instruction
+    // builds/creates something and the request lists its required files. Production 2026-10-16: the OrderFlow
+    // spec sent with an empty saved workspace selected was refused as if it were a continuation. Such a request
+    // creates source rather than resuming it, so neither this route nor the worker requires existing source.
+    const creationSpecification = opensWithCreationDirective(objective) && builderTaskContract(objective).files.length >= 2
+    const continuationWorkspace = !newProjectRequested && !creationSpecification && !repositoryTarget && files.length === 0
       && Boolean(project.workspaceId || requestedWorkspaceId)
     if (continuationWorkspace) {
       // Verify the workspace is owned by this user without creating one.
@@ -334,11 +339,7 @@ export async function POST(request: Request) {
       }
       try {
         const listed = await workspace.listFiles(workspaceId)
-        // An empty workspace can still receive a complete new-application specification: the first instruction
-        // builds/creates something and the request lists its required files. Production 2026-10-16: the OrderFlow
-        // spec sent with an empty saved workspace selected was refused here as if it were a continuation.
-        const creationSpecification = opensWithCreationDirective(objective) && builderTaskContract(objective).files.length >= 2
-        if (!project.context && !creationSpecification && !hasWorkspaceSource(listed.map(file => file.path))) {
+        if (!project.context && !hasWorkspaceSource(listed.map(file => file.path))) {
           return noStore({
             error: 'Selected workspace is empty. Choose the original project or connect/import the repository. No job was created.',
             execution_allowed: false,

@@ -251,6 +251,11 @@ test('the loop trace records why a turn produced no answer', async () => {
     return trace
   }
   assert.equal((await run([])).outcome, 'model_unavailable')
+  // A provider rejection is recorded, not swallowed.
+  const rejected = newAgentLoopTrace()
+  await runCosAgentLoop({ trace: rejected, request: 'chart VNCE stock price', language: 'en', model: async () => { throw new Error('deepinfra:m: HTTP 400: bad tool message') }, ports: ports(fakePython({ stdout: '' })), policy: { maxPythonRuns: 1, browserAllowed: false }, deadlineAt: Date.now() + 100_000 })
+  assert.equal(rejected.outcome, 'model_unavailable')
+  assert.equal(rejected.modelError, 'deepinfra:m: HTTP 400: bad tool message')
   const unsupported = await run([call('c1', 'fetch_url', { url: YAHOO_URL }), answer('Up 412%.'), answer('Up 412%.')])
   assert.equal(unsupported.outcome, 'unsupported_numbers')
   assert.deepEqual(unsupported.unsupportedNumbers, ['412'])

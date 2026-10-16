@@ -39,10 +39,12 @@ export type AgentLoopTrace = {
   model: string
   steps: { tool: string; observation: string }[]
   unsupportedNumbers: string[]
+  /** Why the last model round produced nothing, when it did not. */
+  modelError: string
 }
 
 export function newAgentLoopTrace(): AgentLoopTrace {
-  return { outcome: 'running', rounds: 0, model: '', steps: [], unsupportedNumbers: [] }
+  return { outcome: 'running', rounds: 0, model: '', steps: [], unsupportedNumbers: [], modelError: '' }
 }
 
 const MAX_ROUNDS = 8
@@ -171,6 +173,9 @@ export async function runCosAgentLoop(input: {
         tools,
         toolChoice: finalRound ? 'none' : 'auto',
         timeoutMs: Math.min(ROUND_TIMEOUT_MS, remainingMs() - 2_000),
+      }).catch((error: unknown) => {
+        trace.modelError = (error instanceof Error ? error.message : String(error)).slice(0, 600)
+        return null
       })
       trace.rounds = rounds
       if (!turn) {
@@ -209,7 +214,10 @@ export async function runCosAgentLoop(input: {
     if (unsupported.length && remainingMs() > MIN_ROUND_MS) {
       messages.push({ role: 'assistant', content: answer })
       messages.push({ role: 'user', content: `HARNESS VERIFICATION: these numbers in your answer do not appear in any tool output or in my request: ${unsupported.join(', ')}. Rewrite the answer using only figures that your tool outputs printed; remove any figure you cannot support. Do not call tools.` })
-      const repair = await input.model({ systemPrompt, messages, tools, toolChoice: 'none', timeoutMs: Math.min(ROUND_TIMEOUT_MS, remainingMs() - 2_000) })
+      const repair = await input.model({ systemPrompt, messages, tools, toolChoice: 'none', timeoutMs: Math.min(ROUND_TIMEOUT_MS, remainingMs() - 2_000) }).catch((error: unknown) => {
+        trace.modelError = (error instanceof Error ? error.message : String(error)).slice(0, 600)
+        return null
+      })
       const repairedText = String(repair?.content || '').trim()
       if (repairedText) {
         answer = repairedText

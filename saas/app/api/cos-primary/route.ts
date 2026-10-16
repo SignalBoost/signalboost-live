@@ -370,10 +370,10 @@ async function agentComputeResponse(turn:AgentComputeTurn):Promise<NextResponse|
     return null
   })
   const chartRequested=requiresAgentTools(turn.input,turn.precedingAssistant)
-  console.info('[cos-agent-loop]',JSON.stringify({at:new Date().toISOString(),ok:Boolean(result),chartRequested,ms:Date.now()-loopStartedAt,outcome:trace.outcome,rounds:trace.rounds,steps:trace.steps.map(step=>({tool:step.tool,observation:step.observation.slice(0,200)})),pythonRuns:result?.pythonRuns??0,images:result?.images.length??0,verification:result?.verification??null,model:trace.model||null}))
+  console.info('[cos-agent-loop]',JSON.stringify({at:new Date().toISOString(),ok:Boolean(result),chartRequested,ms:Date.now()-loopStartedAt,outcome:trace.outcome,modelError:trace.modelError||null,rounds:trace.rounds,steps:trace.steps.map(step=>({tool:step.tool,observation:step.observation.slice(0,200)})),pythonRuns:result?.pythonRuns??0,images:result?.images.length??0,verification:result?.verification??null,model:trace.model||null}))
   recordCosLatencyStage('primary:agent_loop',Date.now()-loopStartedAt)
   // Recorded in provenance on every path, so a fallback answer still shows what the loop did and why.
-  const loop={outcome:trace.outcome,rounds:trace.rounds,model:trace.model||null,steps:trace.steps,unsupported_numbers:trace.unsupportedNumbers,python_runs:result?.pythonRuns??0,images:result?.images.length??0,verification:result?.verification??null}
+  const loop={outcome:trace.outcome,rounds:trace.rounds,model:trace.model||null,model_error:trace.modelError||null,steps:trace.steps,unsupported_numbers:trace.unsupportedNumbers,python_runs:result?.pythonRuns??0,images:result?.images.length??0,verification:result?.verification??null}
   if(result&&(!chartRequested||result.images.length)){
     const image=result.images[0]
     const built=agentChartJson(turn.startedAt,turn.input,{reply:result.reply,source:'cos-agent-tool-loop',png:image?.png,filename:image?.name.replace(/[^a-z0-9._-]+/gi,'-'),sources:result.sources,reasonerLabel:result.model?`managed-open-model:${result.model}`:null,modelInvoked:true,loop})

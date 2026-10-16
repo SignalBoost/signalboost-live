@@ -85,6 +85,8 @@ export interface LocalModelCallArgs {
   toolChoice?: LocalModelToolChoice
   /** Prior non-system messages for a multi-step model/tool loop. The host-owned system prompt is prepended. */
   messages?: readonly LocalModelChatMessage[]
+  /** Told why a provider call produced no turn (HTTP/transport error text, or an empty response). Diagnostics only. */
+  onNoResult?: (reason: string) => void
 }
 
 /**
@@ -685,7 +687,10 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
     error.emptyContent = !text
     throw error
   }
-  if (errorText !== null || (text === null && toolCalls.length === 0)) return null
+  if (errorText !== null || (text === null && toolCalls.length === 0)) {
+    args.onNoResult?.(`${provider}:${model}: ${String(errorText ?? 'empty response').slice(0, 600)}`)
+    return null
+  }
   // Record who served every successful completion (production 2026-09-30 04:53 UTC: RunPod answered, provenance
   // said deepinfra, because this normal return did not record it).
   noteServedInference(provider, model)

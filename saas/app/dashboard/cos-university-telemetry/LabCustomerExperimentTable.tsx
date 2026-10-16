@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { buildLabExperimentComparison } from '@/lib/lab/labExperimentComparison'
+import { summarizeLabProviderOutcomes } from '@/lib/lab/labProviderOutcomeSummary'
 import type { LabRunForTracking } from '@/lib/lab/mlflowRunExport'
 
 const labels: Record<string, readonly string[]> = {
@@ -24,6 +25,7 @@ export default function LabCustomerExperimentTable({ runs, language }: { runs: r
  const copy = labels[language] ?? labels.en
  const comparison = useMemo(() => runs.length ? buildLabExperimentComparison(runs.slice(0,100)) : null, [runs])
  const records = comparison?.runs ?? []
+ const providerOutcomes = useMemo(() => summarizeLabProviderOutcomes(runs), [runs])
  const providers = [...new Set(records.map(x => x.computeProvider).filter(Boolean))].sort()
  const statuses = [...new Set(records.map(x => x.state))].sort()
  const filtered = records.filter(x => (!provider || x.computeProvider === provider) && (!status || x.state === status))
@@ -31,6 +33,13 @@ export default function LabCustomerExperimentTable({ runs, language }: { runs: r
  return <details className="mt-3 rounded border border-white/20 p-3 text-sm">
   <summary className="cursor-pointer font-medium">{copy[0]} ({records.length})</summary>
   <p className="my-2 text-xs opacity-75">{copy[1]}</p>
+  <div className="mb-3 flex flex-wrap gap-2" aria-label="Observed training outcomes">
+    {providerOutcomes.map(item => <div key={item.provider} className="rounded border border-white/20 px-3 py-2 text-xs">
+      <strong>{item.provider}</strong>
+      <div>{item.total} runs · {item.finished} finished · {item.failed} failed · {item.running} running · {item.cancelled} cancelled</div>
+      <div>{item.artifacts} artifact records</div>
+    </div>)}
+  </div>
   <div className="mb-3 flex flex-wrap items-center gap-2">
    <select aria-label={copy[2]} value={provider} onChange={e=>setProvider(e.target.value)} className="max-w-full rounded border bg-slate-900 p-1 text-white"><option value="">{copy[7]}</option>{providers.map(x=><option key={x} value={x}>{x}</option>)}</select>
    <select aria-label={copy[3]} value={status} onChange={e=>setStatus(e.target.value)} className="max-w-full rounded border bg-slate-900 p-1 text-white"><option value="">{copy[8]}</option>{statuses.map(x=><option key={x} value={x}>{x}</option>)}</select>

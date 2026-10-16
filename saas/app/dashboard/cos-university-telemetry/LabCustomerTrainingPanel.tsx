@@ -10,6 +10,7 @@ import { ADD_KEY_OPTION, providerOptions, sortProviders, type ProviderOption } f
 import { cleanPastedKey, detectProviderFromKey } from '@/lib/lab/labKeyEntry'
 import { LAB_OPEN_SOURCES } from '@/lib/lab/labOpenSources'
 import { previewLabDataset, previewLabPrompts } from '@/lib/lab/labDatasetPreflight'
+import { buildLabMlflowRunSnapshot } from '@/lib/lab/mlflowRunExport'
 import LabCustomerModelPassport from './LabCustomerModelPassport.tsx'
 import LabCustomerResponseComparison from './LabCustomerResponseComparison.tsx'
 import LabCustomerTrainingAdvisor from './LabCustomerTrainingAdvisor.tsx'
@@ -348,6 +349,27 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
       }
     }
   }
+  function exportTrackingSnapshot(run: Run) {
+    // Read-only metadata from an already loaded, tenant-scoped run. No MLflow upload.
+    const snapshot = buildLabMlflowRunSnapshot(run)
+    const blob = new Blob([JSON.stringify(snapshot, null, 2) + '\n'], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'itmounts-mlflow-run-' + run.runId + '.json'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+  const exportLabels: Record<string, string> = {
+    en: 'Export tracking metadata', es: 'Exportar metadatos de seguimiento',
+    pt: 'Exportar metadados de rastreamento', pl: 'Eksportuj metadane śledzenia',
+    ru: 'Экспорт метаданных отслеживания', de: 'Tracking-Metadaten exportieren',
+    fr: 'Exporter les métadonnées de suivi', it: 'Esporta metadati di tracciamento',
+    ja: '追跡メタデータをエクスポート', ko: '추적 메타데이터 내보내기',
+    ar: 'تصدير بيانات التعقب'
+  }
   const fileUrl = (runId: string, path: string) => `/api/lab/training/download?organizationId=${organizationId}&runId=${runId}&path=${encodeURIComponent(path)}`
 
   const inlineKeyForm = (target: 'teacher' | 'training') => inlineKey?.target === target && (
@@ -546,6 +568,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
                 {canManage && !['completed', 'failed', 'cancelled'].includes(run.stage) && <button className="underline" disabled={busy} onClick={() => refreshRun(run.runId)}>{copy.checkStatus}</button>}
                 {canManage && POLLED_TRAINING.has(run.computeProviderKind ?? '') && !['completed', 'failed', 'cancelled'].includes(run.stage) && <button className="underline" disabled={busy} onClick={() => cancelRun(run.runId)}>{copy.cancelTraining}</button>}
                 {run.stage === 'completed' && run.artifactRepo && <button className="underline" onClick={() => download(run.runId)}>{copy.downloadModel}</button>}
+                <button type="button" className="underline" onClick={() => exportTrackingSnapshot(run)}>{exportLabels[language] ?? exportLabels.en}</button>
               </div>
               <LabCustomerModelPassport run={run} language={language} />
               {org && <LabCustomerRunTimeline key={run.runId} organizationId={org.organizationId} runId={run.runId} language={language} />}

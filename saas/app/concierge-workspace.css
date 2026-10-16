@@ -393,3 +393,46 @@ body:has(.sb-ai-app-shell--home) > footer {
 
 /* Compact suggestions follow the right-anchored prompt without constraining result media. */
 .concierge-shell .welcome-composer .suggestions { justify-content: flex-end !important; }
+
+/* Left task history stays out of the full-width COS rendering surface. */
+.concierge-shell .cos-home-history {
+  position: absolute;
+  inset-block-start: 14px;
+  inset-inline-start: 12px;
+  z-index: 12;
+  width: 238px;
+  max-width: min(238px, 86vw);
+  color: #e2e8f0;
+}
+.concierge-shell .cos-history-toggle,
+.concierge-shell .cos-history-entry {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: start;
+  background: #101829;
+  color: inherit;
+  border: 1px solid rgba(148,163,184,.22);
+  border-radius: 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.concierge-shell .cos-history-items {
+  max-height: min(52vh, 450px);
+  margin-block-start: 6px;
+  overflow-y: auto;
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(4,8,18,.96);
+}
+.concierge-shell .cos-history-entry {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .concierge-shell .cos-home-history { position: relative; inset: auto; margin: 8px 10px 0; width: min(238px, calc(100% - 20px)); }
+  .concierge-shell .cos-history-items { max-height: 35vh; }
+}

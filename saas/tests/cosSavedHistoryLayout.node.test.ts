@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+
+const dashboard = readFileSync(new URL('../app/dashboard/assistant/page.tsx', import.meta.url), 'utf8')
+const home = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
+const css = readFileSync(new URL('../app/concierge-workspace.css', import.meta.url), 'utf8')
+
+test('dashboard mounts saved history left of flexible unrestricted rendering workspace', () => {
+  assert.ok(dashboard.indexOf('cos-history-sidebar') < dashboard.indexOf('Unified assistant workspace'))
+  assert.match(dashboard, /flexDirection: 'row'/)
+  assert.match(dashboard, /flex: 1, minWidth: 0/)
+  assert.match(dashboard, /void openHistory\(\)/)
+  assert.doesNotMatch(dashboard, /setHistoryOpen\(false\)\s*\n\s*\} catch/)
+})
+test('homepage reads only authenticated server history and resumes existing conversations', () => {
+  assert.match(home, /fetch\('\/api\/assistant\/chats'/)
+  assert.match(home, /loadResumableConversation\(id\)/)
+  assert.match(home, /pairResumedTurns\(messages\)/)
+  assert.match(home, /rememberResumeId\(CONCIERGE_RESUME_KEYS\.homepage, id\)/)
+  assert.match(home, /cos-home-history/)
+  assert.match(css, /\.concierge-shell \.cos-home-history/)
+})

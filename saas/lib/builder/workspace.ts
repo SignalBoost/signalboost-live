@@ -1,4 +1,5 @@
 import type { BuilderFile, BuilderWorkspacePort } from './contracts.ts'
+import { applySearchReplace } from './edit-match.ts'
 
 const MAX_FILE_BYTES = 512 * 1024
 const MAX_FILES = 100
@@ -50,8 +51,8 @@ export class InMemoryBuilderWorkspace implements BuilderWorkspacePort {
   async editFile(workspaceId: string, path: string, search: string, replace: string) {
     const current = await this.readFile(workspaceId, path)
     if (!current) throw new Error('builder_file_not_found')
-    if (!search || current.content.indexOf(search) < 0) throw new Error('builder_edit_target_not_found')
-    if (current.content.indexOf(search) !== current.content.lastIndexOf(search)) throw new Error('builder_edit_target_ambiguous')
-    return this.writeFile(workspaceId, current.path, current.content.replace(search, String(replace ?? '')))
+    const edited = applySearchReplace(current.content, search, replace)
+    if (edited.ok === false) throw new Error(edited.error)
+    return this.writeFile(workspaceId, current.path, edited.content)
   }
 }

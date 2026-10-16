@@ -1,2 +1,2 @@
-base_sha=6c47f31133331846695c0929a91afaad4eb9cbbe
-branch=fix/builder-contract-tree-dirs-no-slash-20261016
+base_sha=58b667a3c873ba076fbbd6be7b9494f88cd1c734
+branch=fix/builder-tolerant-search-replace-20261016

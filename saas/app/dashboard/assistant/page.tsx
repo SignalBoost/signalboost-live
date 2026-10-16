@@ -513,7 +513,7 @@ export default function AssistantPage() {
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 112px)', minHeight: 560, maxWidth: 1600, margin: '0 auto', padding: '16px', width: '100%', boxSizing: 'border-box', color: 'var(--text-primary)' }}
+      style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 112px)', minHeight: 0, maxWidth: 'none', margin: 0, padding: 0, width: '100%', boxSizing: 'border-box', color: 'var(--text-primary)' }}
     >
       {/* ── Drag-over overlay ── */}
       {dragOver && (
@@ -526,7 +526,7 @@ export default function AssistantPage() {
       )}
 
       {/* ── Unified assistant workspace ── */}
-      <section style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'radial-gradient(circle at 12% 0%, rgba(26,240,255,.11), transparent 28rem), linear-gradient(145deg, rgba(15,23,42,.9), rgba(3,7,18,.82))', border: '1px solid rgba(26,240,255,.2)', borderRadius: 24, boxShadow: '0 22px 70px rgba(0,0,0,.34)' }}>
+      <section style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'transparent', border: 'none', borderRadius: 0, boxShadow: 'none' }}>
         <div style={{ minHeight: 64, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottom: '1px solid rgba(255,255,255,.09)', flexShrink: 0 }}>
           <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
             <span style={{ color: '#facc15', fontSize: 12, fontWeight: 900, letterSpacing: '.08em', textTransform: 'uppercase' }}>✨ {c(COPY.eyebrow, l)}</span>
@@ -566,7 +566,7 @@ export default function AssistantPage() {
 
           {messages.map((msg, i) => (
             <div key={`${msg.role}-${i}`} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-              <div data-ai-content={msg.role === 'assistant' ? 'true' : undefined} data-sb-source-language={msg.role === 'assistant' ? msg.sourceLanguage : undefined} style={{ maxWidth: msg.role === 'user' ? '80%' : '100%', width: msg.role === 'assistant' ? '100%' : 'auto', padding: '12px 16px', borderRadius: 16, borderStartEndRadius: msg.role === 'user' ? 4 : 16, borderStartStartRadius: msg.role === 'user' ? 16 : 4, background: msg.role === 'user' ? 'rgba(255,195,0,.12)' : 'rgba(26,240,255,.07)', border: `1px solid ${msg.role === 'user' ? 'rgba(255,195,0,.28)' : 'rgba(26,240,255,.2)'}`, color: '#fff', fontSize: 14, lineHeight: 1.7, whiteSpace: msg.role === 'user' ? 'pre-wrap' : 'normal' }}>
+              <div data-ai-content={msg.role === 'assistant' ? 'true' : undefined} data-sb-source-language={msg.role === 'assistant' ? msg.sourceLanguage : undefined} style={{ maxWidth: msg.role === 'user' ? '80%' : '100%', width: msg.role === 'assistant' ? '100%' : 'auto', padding: '12px 16px', borderRadius: 16, borderStartEndRadius: msg.role === 'user' ? 4 : 16, borderStartStartRadius: msg.role === 'user' ? 16 : 4, background: msg.role === 'user' ? 'rgba(255,195,0,.12)' : 'transparent', border: msg.role === 'user' ? '1px solid rgba(255,195,0,.28)' : 'none', color: '#fff', fontSize: 14, lineHeight: 1.7, whiteSpace: msg.role === 'user' ? 'pre-wrap' : 'normal' }}>
                 {msg.role === 'assistant' ? (
                   <>
                     <VideoJsonMessage content={msg.content} />
@@ -657,7 +657,7 @@ export default function AssistantPage() {
       </div>
 
       {/* ── Input area ── */}
-      <div style={{ padding: '12px 16px 16px', flexShrink: 0, borderTop: '1px solid rgba(255,255,255,.09)', background: 'rgba(3,7,18,.48)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+      <div style={{ padding: '10px clamp(12px, 2vw, 24px) 14px', flexShrink: 0, borderTop: 'none', background: 'transparent', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
 
         {/* File error banner */}
         {fileError && (
@@ -688,7 +688,7 @@ export default function AssistantPage() {
         )}
 
         {/* Text input row */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', maxWidth: 980, margin: '0 auto', background: 'rgba(13,19,34,.95)', border: '1px solid rgba(103,232,249,.25)', borderRadius: 18, padding: 8 }}>
 
           {/* Hidden native file input */}
           <input
@@ -732,7 +732,7 @@ export default function AssistantPage() {
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input) } }}
             placeholder={c(COPY.placeholder, l)}
             rows={1}
-            style={{ flex: 1, padding: '13px 16px', borderRadius: 14, fontSize: 14, resize: 'none', lineHeight: 1.4, maxHeight: 200, overflowY: 'auto', fontFamily: 'inherit' }}
+            style={{ flex: 1, padding: '10px 12px', borderRadius: 12, fontSize: 14, resize: 'none', lineHeight: 1.4, maxHeight: 200, overflowY: 'auto', fontFamily: 'inherit' }}
             disabled={loading}
           />
 

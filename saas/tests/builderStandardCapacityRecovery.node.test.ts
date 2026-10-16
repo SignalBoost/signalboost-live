@@ -41,3 +41,14 @@ test('ordinary model-round timeouts retain the same durable job for bounded queu
   assert.match(migration, /v_timeout_deferrals >= 3/)
   assert.doesNotMatch(migration, /checkpoint = null|delete from public\.builder_workspace_files/i)
 })
+
+test('standard turn timeouts are durably retried within the same bounded identity and claim fence', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/20261016145000_builder_standard_turn_timeout_deferral.sql', import.meta.url), 'utf8')
+  assert.match(runner, /const standardBusy = job\.jobKind === 'standard'[\s\S]*error === BUILDER_TURN_TIMEOUT_ERROR/)
+  assert.match(runner, /result\.error === BUILDER_TURN_TIMEOUT_ERROR/)
+  assert.match(migration, /not v_self_healing and p_reason not in \('builder_runpod_primary_busy', 'builder_model_round_timeout', 'builder_turn_timeout'\)/)
+  assert.match(migration, /builderCapacityDeferredReason' in \('builder_runpod_primary_busy', 'builder_model_round_timeout', 'builder_turn_timeout'\)/)
+  assert.match(migration, /v_timeout_deferrals >= 3/)
+  assert.match(migration, /claim_generation = p_generation/)
+  assert.doesNotMatch(migration, /checkpoint = null|delete from public\.builder_workspace_files/i)
+})

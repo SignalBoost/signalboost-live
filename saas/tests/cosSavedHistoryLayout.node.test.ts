@@ -20,4 +20,8 @@ test('homepage reads only authenticated server history and resumes existing conv
   assert.match(home, /rememberResumeId\(CONCIERGE_RESUME_KEYS\.homepage, id\)/)
   assert.match(home, /cos-home-history/)
   assert.match(css, /\.concierge-shell \.cos-home-history/)
+  // Production 2026-10-16: the open panel covered the start of every transcript line. On wide
+  // screens the shell reserves the panel's column while it is open.
+  assert.match(css, /\.concierge-shell:has\(> \.cos-home-history\.is-open\) \{ padding-inline-start: 262px !important; \}/)
+  assert.match(home, /<nav className=\{'cos-home-history'/)
 })

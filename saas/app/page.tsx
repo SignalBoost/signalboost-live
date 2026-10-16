@@ -309,14 +309,15 @@ export default function Home() {
       onDrop={onDrop}
     >
       <div className="aurora" aria-hidden="true" />
-      <aside className={'cos-home-history' + (savedChatsOpen ? ' is-open' : '')} aria-label={copy.chatTitle}>
+      {/* Saved chats are task navigation, not a second Concierge panel. */}
+      <nav className={'cos-home-history' + (savedChatsOpen ? ' is-open' : '')} aria-label={copy.chatTitle}>
         <button type="button" className="cos-history-toggle" onClick={() => setSavedChatsOpen(value => !value)} aria-expanded={savedChatsOpen}>☰ {copy.chatTitle}</button>
         {savedChatsOpen ? <div className="cos-history-items">
           <button type="button" className="cos-history-entry" onClick={startNewChat}>＋ {copy.newChat}</button>
           {savedChatsError ? <p role="status">History unavailable</p> : null}
           {savedChats.map(chat => <button type="button" className="cos-history-entry" key={chat.id} onClick={() => void openSavedChat(chat.id)} title={chat.title}>{chat.title || copy.newChat}</button>)}
         </div> : null}
-      </aside>
+      </nav>
 
 
       {dragOver ? (

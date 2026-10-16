@@ -48,7 +48,10 @@ test('homepage Concierge is visibly an assistant workspace, not the old landing 
   assert.match(workspaceCss, /\.concierge-shell \.message\s*\{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;/)
   assert.match(workspaceCss, /\.concierge-shell \.user-message\s*\{[\s\S]*?border-inline-start:/)
   assert.match(workspaceCss, /\.concierge-shell > \.cos-home-history\s*\{[\s\S]*?position:\s*absolute;/)
-  assert.match(homepage, /const \[savedChatsOpen, setSavedChatsOpen\] = useState\(false\)/)
+  // History is a permanent left column on desktop and starts closed on phones.
+  assert.match(homepage, /const \[savedChatsOpen, setSavedChatsOpen\] = useState\(true\)/)
+  assert.match(homepage, /if \(isPhoneWidth\(\)\) setSavedChatsOpen\(false\)/)
+  assert.match(workspaceCss, /\.concierge-shell > \.cos-home-history\.is-open \{ width: 250px;/)
   assert.doesNotMatch(homepage, /welcome-actions|welcome-mark|header-copy/)
   assert.match(homepage, /<h1 className="sr-only">\{copy\.chatTitle\}<\/h1>/)
 

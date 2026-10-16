@@ -61,8 +61,8 @@ export function cosAgentSystemPrompt(language: string): string {
     'You are COS, an AI agent with tools. Solve the user\'s request completely, the way a careful analyst would: plan, gather real data with tools, compute with code, check the results, then answer.',
     'Tools: web_search finds sources; fetch_url downloads a page, JSON API or CSV and saves it to data/; run_python runs Python on those files and saves charts to out/; browse_page (when offered) opens a JavaScript page in a real browser and is the last resort.',
     'Data rules: never type data values into code from memory. Every number you plot or report must come from a file you fetched this turn (read it from data/) or from the user\'s own text (data/user_request.txt). If you cannot retrieve the data, say so plainly instead of estimating.',
-    'Prefer machine-readable public endpoints over HTML. Well-known keyless endpoints: Yahoo Finance daily prices https://query1.finance.yahoo.com/v8/finance/chart/<TICKER>?range=6mo&interval=1d (also range=1mo,3mo,1y,5y); Stooq daily CSV https://stooq.com/q/d/l/?s=<ticker>.us&i=d; FRED series CSV https://fred.stlouisfed.org/graph/fredgraph.csv?id=<SERIES>; World Bank https://api.worldbank.org/v2/country/<ISO3>/indicator/<CODE>?format=json&per_page=200. Use web_search to find others.',
-    'Verification is part of the job: in your Python, parse dates, sort them, drop duplicates and empty values, assert the series is non-empty and covers the requested period, and print the first and last dates, count, min, max and latest values. Use those printed values in your answer. If the check fails, fix the parsing or fetch another source.',
+    'Prefer machine-readable public endpoints over HTML. Well-known keyless endpoints: Yahoo Finance daily prices https://query1.finance.yahoo.com/v8/finance/chart/<TICKER>?range=6mo&interval=1d (also range=1mo,3mo,1y,5y); Stooq daily CSV https://stooq.com/q/d/l/?s=<ticker>.us&i=d; FRED series CSV https://fred.stlouisfed.org/graph/fredgraph.csv?id=<SERIES>; World Bank https://api.worldbank.org/v2/country/<ISO3>/indicator/<CODE>?format=json&per_page=200. Use web_search to find others. Never invent API keys or credentials: use only keyless endpoints, and if one fails or times out, try another source.',
+    'Verification is part of the job: in your Python, parse dates, sort them, drop duplicates and empty values, assert the series is non-empty and covers the requested period, and print the first and last dates, count, min, max, latest value and the percent change over the period. Use only those printed values in your answer. If the check fails, fix the parsing or fetch another source.',
     'Charts: design them yourself with matplotlib — clear title with the subject and period, labelled axes with units, readable date ticks, a grid, the source named in a footnote. Save PNG to out/ with dpi=150. One chart unless more were asked for.',
     'Answer: when finished, reply WITHOUT calling tools. Lead with the result, give the key figures you printed, mention that the chart is attached when you made one, and end with "Sources:" listing the URLs you actually used as markdown links. Never paste code or raw data dumps into the answer. Do not give investment, legal or medical advice.',
     `Write the answer in the language of the user's request (interface language code: ${language || 'en'}).`,
@@ -83,12 +83,42 @@ function digitGroupsOf(texts: readonly string[]): Set<string> {
   return groups
 }
 
-/** Number spans in the answer whose digits never appeared in the request or any observation. */
+const NUMERIC_VALUE = /\d+(?:,\d{3})*(?:\.\d+)?/g
+
+function numericValues(texts: readonly string[]): number[] {
+  const values: number[] = []
+  for (const text of texts) for (const match of String(text).match(NUMERIC_VALUE) || []) {
+    const value = Number(match.replace(/,/g, ''))
+    if (Number.isFinite(value)) values.push(value)
+  }
+  return values
+}
+
+/**
+ * A plain number in the answer is supported when it is a rounding of a value a tool printed
+ * ("13.36" for 13.359999656677246, "$3.05" for 3.049999952316284), or, for a round figure such as
+ * "over 300%", within 15% of one. Dates, times and ranges keep the exact digit-group check.
+ */
+function supportedByValue(span: string, values: readonly number[]): boolean {
+  if (!/^\d+(?:,\d{3})*(?:\.\d+)?$/.test(span)) return false
+  const value = Number(span.replace(/,/g, ''))
+  const decimals = span.includes('.') ? span.split('.')[1].length : 0
+  const tolerance = 0.5 * 10 ** -decimals + 1e-9
+  if (values.some(candidate => Math.abs(candidate - value) <= tolerance)) return true
+  const roundFigure = decimals === 0 && value >= 10 && value % 10 === 0
+  return roundFigure && values.some(candidate => candidate !== 0 && Math.abs(candidate - value) / Math.abs(candidate) <= 0.15)
+}
+
+/** Number spans in the answer that no request text or tool observation supports. */
 export function unsupportedAnswerNumbers(answer: string, grounded: readonly string[]): string[] {
   const allowed = digitGroupsOf(grounded)
+  const values = numericValues(grounded)
   const answerWithoutUrls = String(answer || '').replace(URL_RE, ' ')
   const spans: string[] = answerWithoutUrls.match(NUMBER_SPAN) ?? []
-  return [...new Set(spans.filter(span => (span.match(DIGIT_GROUP) ?? [] as string[]).some((group: string) => !allowed.has(String(Number(group))))))]
+  return [...new Set(spans.filter(span => {
+    const digitsSupported = (span.match(DIGIT_GROUP) ?? [] as string[]).every((group: string) => allowed.has(String(Number(group))))
+    return !digitsSupported && !supportedByValue(span.replace(/[.,]+$/, ''), values)
+  }))]
 }
 
 function urlKey(url: string): string {

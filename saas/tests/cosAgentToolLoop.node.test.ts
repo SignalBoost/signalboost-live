@@ -107,6 +107,12 @@ test('numbers that no tool printed are repaired, and withheld when they cannot b
   const withheld = await run([...fetchAndRun, answer('VNCE rose 412% to $13.33.'), answer('VNCE rose 412%.')])
   assert.equal(withheld, null)
   assert.deepEqual(unsupportedAnswerNumbers('Up 412% to $13.33 on 2026-10-15', [STDOUT]), ['412'])
+  // Production 2026-10-16: a correct chart was withheld because "13.36" (printed 13.359999656677246)
+  // and "over 300%" (printed 337.0) were not exact digit matches. Roundings and round figures pass.
+  const printed = 'Max: 13.359999656677246 on 2026-10-07\nFirst: 3.049999952316284\nChange: 337.0'
+  assert.deepEqual(unsupportedAnswerNumbers('High $13.36, start $3.05, up over 300% (337.0%).', [printed]), [])
+  assert.deepEqual(unsupportedAnswerNumbers('High $13.4 and $14.36.', [printed]), ['14.36'])
+  assert.deepEqual(unsupportedAnswerNumbers('Up over 500%.', [printed]), ['500'])
 })
 
 test('a chart drawn from values typed into the code is rejected', async () => {

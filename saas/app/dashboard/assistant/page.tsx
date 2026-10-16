@@ -688,7 +688,7 @@ export default function AssistantPage() {
         )}
 
         {/* Text input row */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', maxWidth: 980, margin: '0 auto', background: 'rgba(13,19,34,.95)', border: '1px solid rgba(103,232,249,.25)', borderRadius: 18, padding: 8 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', maxWidth: 980, marginLeft: 'auto', marginRight: 0, background: 'rgba(13,19,34,.95)', border: '1px solid rgba(103,232,249,.25)', borderRadius: 18, padding: 8 }}>
 
           {/* Hidden native file input */}
           <input

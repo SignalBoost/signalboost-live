@@ -425,7 +425,7 @@ export default function PremiumCustomerNavbarV2() {
       <style>{`
         .sbnav { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 14px; padding: 11px 22px; background: rgba(4, 8, 18, .95); border-bottom: 1px solid rgba(167, 139, 250, .35); backdrop-filter: blur(14px); }
         .sbnav-brand, .sbnav-trigger, .sbnav-row, .sbnav-mobile-row, .sbnav-compact-platform, .sbnav-compact-logout { color: #f8fafc; text-decoration: none; font: inherit; }
-        .sbnav-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 900; white-space: nowrap; }
+        .sbnav-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 900; white-space: nowrap; margin-left: auto; }
         .sbnav-brand-mark { color: ${PURPLE}; font-size: 24px; }
         .sbnav-desktop { display: flex; align-items: center; gap: 5px; min-width: 0; }
         .sbnav-menu { position: relative; }
@@ -436,7 +436,7 @@ export default function PremiumCustomerNavbarV2() {
         .sbnav-dropdown { position: absolute; top: calc(100% + 10px); left: 0; z-index: 120; display: grid; gap: 3px; min-width: 250px; max-height: min(70vh, 560px); overflow-y: auto; padding: 8px; border: 1px solid rgba(167,139,250,.45); border-radius: 14px; background: #0f172a; box-shadow: 0 18px 45px rgba(0,0,0,.42); }
         .sbnav-row, .sbnav-mobile-row { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-radius: 9px; padding: 9px 10px; background: transparent; cursor: pointer; text-align: left; color: rgba(226,232,240,.84); font-size: 13px; }
         .sbnav-row:hover, .sbnav-mobile-row:hover { background: rgba(255,255,255,.07); color: #fff; }
-        .sbnav-search { position: relative; margin-left: auto; width: min(250px, 22vw); flex: 0 1 250px; min-width: 0; }
+        .sbnav-search { position: relative; margin-left: 0; width: min(250px, 22vw); flex: 0 1 250px; min-width: 0; }
         .sbnav-search input { width: 100%; box-sizing: border-box; border: 1px solid rgba(167,139,250,.5); border-radius: 999px; padding: 8px 12px; background: rgba(15,23,42,.9); color: #fff; font: inherit; font-size: 13px; outline: none; }
         .sbnav-search input:focus { border-color: ${PURPLE}; box-shadow: 0 0 0 3px rgba(167,139,250,.16); }
         .sbnav-search-results { right: 0; left: auto; max-height: 320px; overflow-y: auto; }

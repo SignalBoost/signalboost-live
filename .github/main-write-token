@@ -1,2 +1,2 @@
-base_sha=b4d5e0c70b132c6bcb46393890dfccf11db26dc5
-branch=fix/owner-assistant-orderflow-builder-handoff-20261015
+base_sha=8e47eb7ecd217d6df8ac829ce06b7d95cee848aa
+branch=fix/builder-route-tree-format-builds-20261015

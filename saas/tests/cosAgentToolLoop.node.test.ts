@@ -492,3 +492,80 @@ test('only the final draft of a multi-draft reply is kept', () => {
   assert.equal(keepFinalDraft(single), single)
   assert.equal(stripProcessNarration('The data is confirmed from the official ABS source.\n\nThe capital of Australia is **Canberra**.'), 'The capital of Australia is **Canberra**.')
 })
+
+// OpenHands StuckDetector + critic/iterative refinement (MIT), ported in agentLoop/openhandsPatterns.ts.
+import { actionKey, detectStuck, parseCriticVerdict, shouldRefine } from '../lib/ai/cos/agentLoop/openhandsPatterns.ts'
+
+test('stuck detector: OpenHands patterns and thresholds', () => {
+  const step = (action: string, observation: string, error = false) => ({ action, observation, error })
+  assert.equal(detectStuck([step('a', 'x'), step('a', 'x'), step('a', 'x')]), null, 'below threshold')
+  assert.deepEqual(detectStuck([step('a', 'x'), step('a', 'x'), step('a', 'x'), step('a', 'x')]), { pattern: 'action_observation_loop', repetitions: 4 })
+  assert.deepEqual(detectStuck([step('a', 'e1', true), step('a', 'e2', true), step('a', 'e3', true), step('a', 'e4', true)]), { pattern: 'action_error_loop', repetitions: 4 })
+  assert.deepEqual(detectStuck(['a', 'b', 'a', 'b', 'a', 'b'].map(name => step(name, `obs-${name}`))), { pattern: 'alternating_pattern', repetitions: 6 })
+  assert.equal(detectStuck([step('a', 'x'), step('b', 'y'), step('a', 'x'), step('c', 'z')]), null)
+  assert.equal(actionKey('fetch_url', '{"url":"u","b":1}'), actionKey('fetch_url', '{"b":1,"url":"u"}'), 'argument order does not matter')
+})
+
+test('a stuck loop stops calling tools and answers with what it has', async () => {
+  const seen: { toolChoice: unknown }[] = []
+  const trace = newAgentLoopTrace()
+  const failing = call('c', 'fetch_url', { url: 'https://example.com/data.json' })
+  const model: AgentModelTurn = async request => {
+    seen.push({ toolChoice: request.toolChoice })
+    return seen.length <= 4 ? { ...failing, toolCalls: [{ ...failing.toolCalls[0], id: `c${seen.length}` }] } : answer('The source could not be reached.')
+  }
+  const result = await runCosAgentLoop({ trace, request: 'what does the data say?', language: 'en', model, ports: ports(fakePython({ stdout: '' }), { fetchPublic: async url => ({ status: 503, text: '', finalUrl: url, contentType: 'text/plain' }) }), policy: { maxPythonRuns: 1, browserAllowed: false }, deadlineAt: Date.now() + 100_000 })
+  assert.equal(trace.stuck, 'action_observation_loop', 'identical failing results match scenario 1 first, as in OpenHands')
+  assert.equal(seen.length, 5)
+  assert.equal(seen[4].toolChoice, 'none', 'the round after a stuck pattern has tools off')
+  assert.equal(result?.reply, 'The source could not be reached.')
+})
+
+test('critic refinement: an incomplete answer continues until the missing part is covered', async () => {
+  const seen: LocalModelChatMessage[][] = []
+  const searched: string[] = []
+  const reviews: string[] = []
+  const trace = newAgentLoopTrace()
+  const critic: AgentModelTurn = async request => {
+    reviews.push(String(request.messages.at(-1)?.content))
+    return answer(reviews.length === 1
+      ? '{"parts":[{"ask":"capital of Australia","answered":true},{"ask":"its population","answered":false}]}'
+      : '{"parts":[{"ask":"capital of Australia","answered":true},{"ask":"its population","answered":true}]}')
+  }
+  const result = await runCosAgentLoop({
+    trace,
+    request: 'what is the capital of Australia and its population?',
+    language: 'en',
+    model: scriptedModel([
+      answer('The capital of Australia is Canberra.'),
+      call('c1', 'web_search', { query: 'Canberra population' }),
+      answer('The capital of Australia is Canberra; its population is 484,630.'),
+    ], seen),
+    critic,
+    ports: ports(fakePython({ stdout: '' }), { search: async query => { searched.push(query); return [{ title: 'ABS', url: 'https://www.abs.gov.au/canberra', snippet: 'Canberra 484,630' }] } }),
+    policy: { maxPythonRuns: 1, browserAllowed: false },
+    deadlineAt: Date.now() + 100_000,
+  })
+  assert.match(String(seen[1].at(-1)?.content), /HARNESS REVIEW \(iteration 1\)[\s\S]*Not covered: its population/)
+  assert.deepEqual(searched, ['Canberra population'])
+  assert.equal(result?.reply, 'The capital of Australia is Canberra; its population is 484,630.')
+  assert.deepEqual(trace.critic, [{ parts: 2, missing: 1, refined: true }, { parts: 2, missing: 0, refined: false }])
+  assert.ok(!JSON.stringify(trace.critic).includes('population'), 'the trace keeps counts, not request text')
+})
+
+test('critic: an unusable verdict or a failed refinement never loses the answer', async () => {
+  assert.equal(parseCriticVerdict('looks fine to me'), null)
+  assert.deepEqual(parseCriticVerdict('```json\n{"parts":[{"ask":"a","answered":true},{"ask":"b","answered":false}]}\n```'), { score: 0.5, parts: 2, missing: ['b'] })
+  assert.equal(shouldRefine({ score: 0.5, parts: 2, missing: ['b'] }, 1), false, 'max one refinement iteration')
+  const unusable = await runCosAgentLoop({ request: 'q', language: 'en', model: scriptedModel([answer('Paris.')]), critic: async () => answer('no json'), ports: ports(fakePython({ stdout: '' })), policy: { maxPythonRuns: 1, browserAllowed: false }, deadlineAt: Date.now() + 100_000 })
+  assert.equal(unusable?.reply, 'Paris.')
+  const failedRefine = await runCosAgentLoop({ request: 'q and r', language: 'en', model: scriptedModel([answer('Only q.')]), critic: async () => answer('{"parts":[{"ask":"q","answered":true},{"ask":"r","answered":false}]}'), ports: ports(fakePython({ stdout: '' })), policy: { maxPythonRuns: 1, browserAllowed: false }, deadlineAt: Date.now() + 100_000 })
+  assert.equal(failedRefine?.reply, 'Only q.', 'the reviewed draft is kept when the refinement round returns nothing')
+})
+
+test('cos-primary runs the completeness critic and credits OpenHands', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  assert.match(route, /critic:runCosAgentToolTurn/)
+  const notice = readFileSync(join(process.cwd(), 'lib/ai/cos/agentLoop/THIRD_PARTY_NOTICES.md'), 'utf8')
+  assert.match(notice, /MIT License[\s\S]*OpenHands contributors/)
+})

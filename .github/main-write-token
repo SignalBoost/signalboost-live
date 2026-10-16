@@ -1,2 +1,2 @@
-base_sha=6a36c2066bd58fdd5faea427bd833c7517386056
-branch=fix/cos-agent-duplicate-answer-20261016
+base_sha=adf171c0101e183c3ba80e72f7b8b2e6db819d2c
+branch=feat/cos-agent-openhands-critic-stuck-20261016

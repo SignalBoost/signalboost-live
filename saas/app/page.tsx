@@ -65,6 +65,9 @@ export default function Home() {
   const copy = getConciergeTranscriptCopy(lang)
   const [question, setQuestion] = useState('')
   const [turns, setTurns] = useState<ConciergeTranscriptTurn[]>([])
+  const [savedChats, setSavedChats] = useState<Array<{ id: string; title: string; updated_at: string }>>([])
+  const [savedChatsOpen, setSavedChatsOpen] = useState(true)
+  const [savedChatsError, setSavedChatsError] = useState(false)
   const [pendingRequest, setPendingRequest] = useState('')
   const [loading, setLoading] = useState(false)
   const [activity, setActivity] = useState<AgentProgressEvent | null>(null)
@@ -158,6 +161,32 @@ export default function Home() {
     })
     return () => { cancelled = true }
   }, [])
+
+  async function refreshSavedChats() {
+    try {
+      const response = await fetch('/api/assistant/chats', { cache: 'no-store' })
+      if (!response.ok) throw new Error('history_unavailable')
+      const data = await response.json()
+      setSavedChats(Array.isArray(data?.conversations) ? data.conversations : [])
+      setSavedChatsError(false)
+    } catch {
+      setSavedChatsError(true)
+    }
+  }
+
+  async function openSavedChat(id: string) {
+    if (loading) return
+    const messages = await loadResumableConversation(id)
+    if (!messages) { setSavedChatsError(true); return }
+    conversationIdRef.current = id
+    rememberResumeId(CONCIERGE_RESUME_KEYS.homepage, id)
+    setTurns(pairResumedTurns(messages))
+    setQuestion('')
+    setPendingRequest('')
+    setFailed(false)
+  }
+
+  useEffect(() => { void refreshSavedChats() }, [turns.length])
 
   function startNewChat() {
     forgetResumeId(CONCIERGE_RESUME_KEYS.homepage)
@@ -280,6 +309,15 @@ export default function Home() {
       onDrop={onDrop}
     >
       <div className="aurora" aria-hidden="true" />
+      <aside className={'cos-home-history' + (savedChatsOpen ? ' is-open' : '')} aria-label={copy.chatTitle}>
+        <button type="button" className="cos-history-toggle" onClick={() => setSavedChatsOpen(value => !value)} aria-expanded={savedChatsOpen}>☰ {copy.chatTitle}</button>
+        {savedChatsOpen ? <div className="cos-history-items">
+          <button type="button" className="cos-history-entry" onClick={startNewChat}>＋ {copy.newChat}</button>
+          {savedChatsError ? <p role="status">History unavailable</p> : null}
+          {savedChats.map(chat => <button type="button" className="cos-history-entry" key={chat.id} onClick={() => void openSavedChat(chat.id)} title={chat.title}>{chat.title || copy.newChat}</button>)}
+        </div> : null}
+      </aside>
+
 
       {dragOver ? (
         <div className="drop-overlay" aria-live="polite">

@@ -1,2 +1,2 @@
-base_sha=9fdbc985b58518fbcb3b7c82234ed1ba94c5cf2d
-branch=fix/builder-new-app-into-empty-workspace-20261016
+base_sha=505f49a98b7b8bdf4928ba2ee85a38596241aabf
+branch=fix/builder-creation-spec-no-existing-source-20261016

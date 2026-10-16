@@ -1,2 +1,2 @@
-base_sha=83275cb72a104d23b75f9d2c053e03b84ba5dbbf
-branch=fix/cos-agent-loop-step-budget-20261016
+base_sha=7a171ee5f002880be44ff6cdb2732cf5f660a9e0
+branch=fix/cos-agent-loop-no-credential-urls-20261016

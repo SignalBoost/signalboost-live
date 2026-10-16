@@ -17,6 +17,7 @@ const copy: Record<string, string[]> = {
  ko:['응답 비교','수동 비교: 같은 질문에 대한 두 모델의 실제 응답을 붙여 넣으세요. 모델 실행이나 개선 검증은 하지 않습니다.','공통 질문','기본 모델 응답','학습 모델 응답','어느 답변이 더 좋나요?','평가 안 됨','기본','학습','동점','로컬 검토이며 독립 평가가 아닙니다.'],
  ar:['مقارنة الإجابات','مقارنة يدوية: الصق الردود الفعلية من النموذجين للسؤال نفسه. لا يتم تشغيل النماذج أو إثبات التحسن.','السؤال المشترك','رد النموذج الأساسي','رد النموذج المدرّب','أي الردين أفضل؟','لم يُقيّم','الأساسي','المدرّب','تعادل','مراجعة محلية وليست تقييماً مستقلاً.'],
 }
+const exportLabel: Record<string,string> = {en:'Export JSON',es:'Exportar JSON',pt:'Exportar JSON',pl:'Eksportuj JSON',ru:'Экспорт JSON',de:'JSON exportieren',fr:'Exporter JSON',it:'Esporta JSON',ja:'JSONをエクスポート',ko:'JSON 내보내기',ar:'تصدير JSON'}
 export default function LabCustomerResponseComparison({ language, runId, baseModel, trainedModel }: { language: string; runId: string; baseModel: string; trainedModel: string }) {
  const c = copy[language] ?? copy.en
  const [prompt, setPrompt] = useState('')
@@ -48,7 +49,7 @@ export default function LabCustomerResponseComparison({ language, runId, baseMod
    <label className="min-w-0">{c[4]} ({trainedModel})<textarea aria-label={c[4]} className="mt-1 h-40 w-full rounded border bg-transparent p-2" value={trained} maxLength={20000} onChange={e => { setTrained(e.target.value); setVote('') }} /></label>
   </div>
   <fieldset disabled={!valid} className="mt-2"><legend>{c[5]}</legend><div className="flex flex-wrap gap-3">{['base','trained','tie'].map((value,i)=><label key={value} className="inline-flex items-center gap-1"><input type="radio" name={`comparison-${baseModel}-${trainedModel}`} checked={vote===value} onChange={()=>setVote(value)} />{c[7+i]}</label>)}</div></fieldset>
-  {valid && !!vote && <button type="button" className="mt-2 rounded border px-3 py-1 text-xs" onClick={download}>Export JSON</button>}
+  {valid && !!vote && <button type="button" className="mt-2 rounded border px-3 py-1 text-xs" onClick={download}>{exportLabel[language] ?? exportLabel.en}</button>}
   <p className="mt-2 text-xs opacity-70">{c[10]} {vote && valid ? `· ${c[7+['base','trained','tie'].indexOf(vote)]}` : `· ${c[6]}`}</p>
  </details>
 }

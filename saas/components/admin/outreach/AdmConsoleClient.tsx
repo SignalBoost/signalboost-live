@@ -276,8 +276,25 @@ export default function AdmConsoleClient() {
                 <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-white/70">{selected.outreach_message}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <input value={sendEmail} onChange={e => setSendEmail(e.target.value)} placeholder={uiText('generatedUi.u_9e24adb947416462')} className="sb-input min-w-[180px] flex-1 rounded-xl px-3 py-2.5 text-sm" />
-                  <button disabled={busy || selected.status !== 'approved'} onClick={sendSelected} className="sb-button-secondary" style={{ opacity: busy || selected.status !== 'approved' ? 0.5 : 1 }}><LocalizedText fallback={uiText('generatedUi.u_b6185804241b3112')} /></button>
+                  <button
+                    disabled={busy || selected.status !== 'approved' || selected.status === 'sent'}
+                    onClick={sendSelected}
+                    className="sb-button-secondary"
+                    style={{ opacity: busy || selected.status !== 'approved' || selected.status === 'sent' ? 0.5 : 1 }}
+                  >
+                    <LocalizedText fallback={uiText('generatedUi.u_b6185804241b3112')} />
+                  </button>
                 </div>
+                {selected.status === 'pending' && (
+                  <p className="mt-2 text-xs" style={{ color: '#f59e0b' }}>
+                    {uiText('generatedUi.u_hint_approve_first', 'Approve this draft first, then use the Send button to release it.')}
+                  </p>
+                )}
+                {selected.status === 'sent' && (
+                  <p className="mt-2 text-xs" style={{ color: '#1af0ff' }}>
+                    {uiText('generatedUi.u_hint_already_sent', 'This draft has already been sent.')}
+                  </p>
+                )}
               </div>
             </div>
           ) : (

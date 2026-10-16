@@ -302,7 +302,7 @@ export async function postWithAgentProgress(args: {
     args.onProgress({ phase, message, sequence: ++sequence, elapsedMs: Date.now() - startedAt })
   }
 
-  const builderRequest = args.target === 'concierge' ? conciergeBuilderRequest(args.body) : null
+  const builderRequest = conciergeBuilderRequest(args.body)
   const requestBody = builderRequest?.body ?? args.body
   const repairRequest = isOperatorRepairRequest(requestBody)
   const progressTarget = args.target
@@ -320,7 +320,7 @@ export async function postWithAgentProgress(args: {
   report('running', repairRequest
     ? operatorProgressMessage({ stage: 'diagnosing', target: progressTarget, builder: builderActive })
     : builderRequest
-      ? 'Concierge sent the supplied source files to COS Builder'
+      ? 'Request routed to COS Builder for executable verification'
       : args.target === 'cos' ? 'COS is processing the request' : 'Concierge is consulting COS')
   const heartbeat = window.setInterval(() => report('running', repairRequest
     ? operatorProgressMessage({ stage: 'fixing', target: progressTarget, builder: builderActive })

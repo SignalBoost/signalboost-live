@@ -352,3 +352,49 @@ test('Concierge routes a from-scratch multi-file application build to durable Bu
   assert.equal(routed?.body.objective, objective)
   assert.deepEqual(routed?.body.files, [])
 })
+
+
+test('Concierge routes a from-scratch build whose required files are drawn as a directory tree (production 2026-10-15)', () => {
+  const objective = [
+    '# OrderFlow — End-to-End Builder Acceptance Test',
+    '## Objective',
+    'Build a complete, working **OrderFlow** application using Node.js and JavaScript.',
+    '## 2. Required project structure',
+    'Create all 15 files:',
+    '```text',
+    'orderflow/',
+    '├── package.json',
+    '├── index.js',
+    '├── src/',
+    '│   ├── catalog.js',
+    '│   └── errors.js',
+    '├── test/',
+    '│   └── checkout.test.js',
+    '```',
+    'Use Node.js built-in testing tools.',
+    '## 4. Mandatory verification',
+    '```bash',
+    'npm test',
+    'node --test test/*.test.js',
+    'node index.js',
+    '```',
+  ].join('\n')
+  const routed = conciergeBuilderRequest({
+    messages: [{ role: 'user', content: objective }],
+    context: { conversationId: 'b7a51c1e-1f7f-4c39-9a7e-1c2f8f3d2a11' },
+    attachments: [],
+  })
+  assert.equal(routed?.endpoint, '/api/builder')
+  assert.equal(routed?.body.objective, objective)
+  assert.deepEqual(routed?.body.files, [])
+})
+
+test('a product description without a file tree or file paths does not become a Builder job', () => {
+  const objective = 'Build a complete OrderFlow application idea for my team. Describe the project structure and how automated tests would work.'
+  const routed = conciergeBuilderRequest({
+    messages: [{ role: 'user', content: objective }],
+    context: { conversationId: 'b7a51c1e-1f7f-4c39-9a7e-1c2f8f3d2a12' },
+    attachments: [],
+  })
+  assert.equal(routed, null)
+})

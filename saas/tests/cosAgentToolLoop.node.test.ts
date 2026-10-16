@@ -304,3 +304,27 @@ test('JSON downloads are shown to the model as structure, not raw values', async
   assert.match(observation, /chart\.result\[0\]\.indicators\.quote\[0\]\.close: array\(127\)/)
   assert.ok(observation.length < 3_000, `observation stays small (${observation.length})`)
 })
+
+// Production 2026-10-16: slow sources used the whole budget and the unemployment turn ended with no
+// answer even though its code had already run. Tools never spend the answer reserve, and the last
+// round runs with tools off so the turn still answers from what it gathered.
+test('tools never spend the answer reserve, and the last round answers', async () => {
+  let clock = 0
+  const choices: string[] = []
+  const budgets: number[] = []
+  const result = await runCosAgentLoop({
+    request: 'chart VNCE stock price',
+    language: 'en',
+    now: () => clock,
+    deadlineAt: 45_000,
+    model: async input => {
+      choices.push(input.toolChoice)
+      return choices.length === 1 ? call('c1', 'fetch_url', { url: YAHOO_URL }) : answer('VNCE closed at $13.33.')
+    },
+    ports: ports(fakePython({ stdout: '' }), { fetchPublic: async (url, timeoutMs) => { budgets.push(timeoutMs); clock += timeoutMs; return { status: 200, text: '13.33', finalUrl: url, contentType: 'text/plain' } } }),
+    policy: { maxPythonRuns: 1, browserAllowed: false },
+  })
+  assert.deepEqual(budgets, [20_000])
+  assert.deepEqual(choices, ['auto', 'none'])
+  assert.equal(result?.reply, 'VNCE closed at $13.33.')
+})

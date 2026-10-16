@@ -59,7 +59,7 @@ export type PythonRunResult = Readonly<{
 }>
 
 export interface PythonSession {
-  run(input: { code: string; files: readonly StagedFile[] }): Promise<PythonRunResult>
+  run(input: { code: string; files: readonly StagedFile[]; timeoutMs?: number }): Promise<PythonRunResult>
   close(): Promise<void>
 }
 
@@ -135,7 +135,7 @@ export class VercelPythonSession implements PythonSession {
     }
   }
 
-  async run(input: { code: string; files: readonly StagedFile[] }): Promise<PythonRunResult> {
+  async run(input: { code: string; files: readonly StagedFile[]; timeoutMs?: number }): Promise<PythonRunResult> {
     const code = String(input.code || '')
     if (!code.trim() || code.length > 40_000) {
       return { dataReads: [], exitCode: 2, stdout: '', stderr: 'code must be 1-40000 characters', images: [], timedOut: false }
@@ -155,7 +155,7 @@ export class VercelPythonSession implements PythonSession {
       let stderr = ''
       let timedOut = false
       try {
-        const result = await sandbox.runCommand({ cmd: 'python3', args: ['.cos_runner.py'], cwd: WORK, timeoutMs: RUN_TIMEOUT_MS })
+        const result = await sandbox.runCommand({ cmd: 'python3', args: ['.cos_runner.py'], cwd: WORK, timeoutMs: Math.max(5_000, Math.min(RUN_TIMEOUT_MS, input.timeoutMs ?? RUN_TIMEOUT_MS)) })
         exitCode = result.exitCode
         ;[stdout, stderr] = await Promise.all([result.stdout(), result.stderr()])
       } catch (error) {

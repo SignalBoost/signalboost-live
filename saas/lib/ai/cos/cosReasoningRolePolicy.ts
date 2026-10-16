@@ -173,13 +173,18 @@ export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingC
 // an answer, even when the rest of the message carries a file tree and test commands.
 const EXPLANATION_OPENING = /^(?:please\s+|can\s+you\s+|could\s+you\s+)?(?:explain|describe|summari[sz]e|tell\s+me|walk\s+me\s+through|what|how|why)\b/i
 
+// A question word can still open a direct request: "What I need you to build is…", "How about you build…",
+// "Why don't you create…". An instruction addressed to the agent overrides the explanation reading.
+const DIRECTED_BUILD = /\byou\s+(?:to\s+)?(?:build|create|implement|make|write|code|scaffold)\b/i
+
 function openingInstruction(body: string): string {
   return body.split(/\r?\n/).map(line => line.trim()).find(line => line && !/^(?:#{1,6}\s|(?:[-*_=]\s*){3,}$|```)/.test(line)) || ''
 }
 
 export function structuredApplicationBuild(prompt: string): boolean {
   const body = String(prompt || '').slice(0, 12_000)
-  if (EXPLANATION_OPENING.test(openingInstruction(body))) return false
+  const opening = openingInstruction(body)
+  if (EXPLANATION_OPENING.test(opening) && !DIRECTED_BUILD.test(opening)) return false
   return /\b(?:build|create|implement)\b[\s\S]{0,200}\b(?:application|app|project|system)\b/i.test(body)
     && /\b(?:required files|file structure|project structure|create all|create the following files)\b/i.test(body)
     && (/(?:^|[\s`'"(])(?:src|test|tests)\/[\w.-]+\.(?:[cm]?js|tsx?|jsx|py)\b/m.test(body)

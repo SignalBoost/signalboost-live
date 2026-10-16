@@ -350,3 +350,13 @@ test('a host that failed is not retried in the same turn', async () => {
   const results = seen.at(-1)!.filter(message => message.role === 'tool').map(message => String(message.content))
   assert.match(results[1], /^Skipped https:\/\/slow\.example\.org\/series\.csv\?x=1: slow\.example\.org already failed/)
 })
+
+// Production 2026-10-16: the unemployment turn found BLS monthly data, hit one Python error, and
+// ran out of rounds (8) with time left. A code error gets a retry within the step budget.
+test('the step budget leaves room to fix a failed program', () => {
+  const runtime = readFileSync(join(process.cwd(), 'lib/ai/cos/agentLoop/cosAgentRuntime.ts'), 'utf8')
+  assert.match(runtime, /maxPythonRuns: input\.signedIn \|\| input\.ownerAuthenticated \? 5 : 3/)
+  const loop = readFileSync(join(process.cwd(), 'lib/ai/cos/agentLoop/cosAgentLoop.ts'), 'utf8')
+  assert.match(loop, /const MAX_ROUNDS = 14/)
+  assert.match(loop, /const MAX_TOOL_CALLS = 20/)
+})

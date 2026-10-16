@@ -12,6 +12,7 @@
 
 import type { LocalModelChatMessage, LocalModelToolCall, LocalModelToolDefinition, LocalModelTurnResult } from '../../local-inference.ts'
 import { ANSWER_RESERVE_MS, agentToolDefinitions, emptyEvidence, executeAgentTool, type AgentEvidence, type AgentToolPolicy, type AgentToolPorts } from './cosAgentTools.ts'
+import { humanSourceUrl, withHumanSourceLinks } from './humanSourceUrl.ts'
 
 export type AgentModelTurn = (input: {
   systemPrompt: string
@@ -288,9 +289,10 @@ export async function runCosAgentLoop(input: {
 
     const { text, dropped } = stripUnverifiedUrls(answer, evidence.sourceUrls)
     return {
-      reply: text,
+      // Verified against the URLs actually fetched, then shown as the public page for that data.
+      reply: withHumanSourceLinks(text),
       images: evidence.images.slice(0, 3),
-      sources: [...evidence.sourceUrls],
+      sources: [...new Set([...evidence.sourceUrls].map(humanSourceUrl))],
       rounds,
       toolCalls,
       pythonRuns: evidence.pythonRuns,

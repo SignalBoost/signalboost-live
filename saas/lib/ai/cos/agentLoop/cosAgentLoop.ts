@@ -138,7 +138,7 @@ export function cosAgentSystemPrompt(language: string, today: Date = new Date())
     'Use what you have: once a fetched dataset answers the request, draw the chart from it in the next step instead of searching for a better one, and state its granularity and source (for example annual World Bank figures instead of monthly ones).',
     'Verify and plot in the SAME program: one run that loads the data, checks it, prints the figures and saves the chart. Exploring a file is fine, but never spend a separate run only to print what the chart run will print.',
     'Charts: design them yourself with matplotlib — clear title with the subject and period, labelled axes with units, readable date ticks, a grid, the source named in a footnote. Save PNG to out/ with dpi=150. One chart unless more were asked for.',
-    'Answer: when finished, reply WITHOUT calling tools. Start directly with the result (no sentences about your own process such as "The data is verified" or "Let me present the results"), give the key figures you printed, mention that the chart is attached when you made one (never name its file or any data/ or out/ path), and end with "Sources:" listing the URLs you actually used as markdown links. Never paste code or raw data dumps into the answer. Do not give investment, legal or medical advice.',
+    'Answer: when finished, reply WITHOUT calling tools, with the final answer only — never your reasoning, checks or notes about the request. Start directly with the result (no sentences about your own process such as "The data is verified" or "Let me present the results"), give the key figures you printed, mention that the chart is attached when you made one (never name its file or any data/ or out/ path), and end with "Sources:" listing the URLs you actually used as markdown links. Never paste code or raw data dumps into the answer. Do not give investment, legal or medical advice.',
     `Write the answer in the language of the user's request (interface language code: ${language || 'en'}).`,
   ].join('\n')
 }
@@ -244,19 +244,24 @@ export function stripSandboxPaths(answer: string): string {
     .replace(/[ \t]{2,}/g, ' ')
 }
 
-// Production 2026-10-16: both probe answers opened with process narration ("The data is verified
-// and the chart is created. Let me present the results." / "...Here's the summary:").
-const LEADING_NARRATION = /^\s*(?:(?:the )?data (?:is|has been) verified[^.!\n]*[.!]|(?:the )?chart (?:is|has been) (?:created|generated|saved|ready)[^.!\n]*[.!]|let me (?:present|show|summari[sz]e|share)[^.!\n]*[.!:]|here(?:'s| is) (?:the|a) summary[^.!:\n]*[.!:])[ \t]*\n*/i
+// Production 2026-10-16: answers carried the model's working notes ahead of the answer — "The data
+// is verified and the chart is created. Let me present the results.", "The user asked a simple
+// factual question. No data computation or chart is needed. Let me provide the answer directly."
+const PROCESS_NOTE = /\b(?:let me (?!know\b)\w+|the user (?:asked|wants|is asking)|no (?:data computation|computation|chart) is needed|this is a simple (?:factual )?question|i (?:have|now have|found) (?:the|enough|all)\b|the search results (?:clearly )?(?:confirm|show)|multiple sources confirm|(?:the )?data (?:is|has been) verified|(?:the )?chart (?:is|has been) (?:created|generated|saved|ready)|here(?:'s| is| are) (?:the|a) (?:summary|results?)\b)/i
+const ANSWER_HEADING = /^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:final )?answer(?:\*\*)?\s*:?\s*\n+/i
 
-/** Drops leading sentences that narrate the agent's own process instead of answering. */
-export function stripLeadingNarration(answer: string): string {
-  let text = String(answer || '')
-  for (let guard = 0; guard < 4; guard += 1) {
-    const next = text.replace(LEADING_NARRATION, '')
-    if (next === text) break
-    text = next
-  }
-  return text.trim() || String(answer || '').trim()
+/**
+ * Drops the model's working notes that precede the real answer: everything up to the last paragraph
+ * that narrates its own process, when real content follows it. A closing "let me know" is not a note.
+ */
+export function stripProcessNarration(answer: string): string {
+  const original = String(answer || '').trim()
+  const paragraphs = original.split(/\n{2,}/)
+  let cut = -1
+  for (let index = 0; index < paragraphs.length - 1; index += 1) if (PROCESS_NOTE.test(paragraphs[index])) cut = index
+  if (cut < 0) return original
+  const rest = paragraphs.slice(cut + 1).join('\n\n').replace(ANSWER_HEADING, '').trim()
+  return rest || original
 }
 
 export function stripUnverifiedUrls(answer: string, sourceUrls: ReadonlySet<string>): { text: string; dropped: number } {
@@ -399,7 +404,7 @@ export async function runCosAgentLoop(input: {
     }
     trace.outcome = 'answered'
 
-    const { text, dropped } = stripUnverifiedUrls(stripLeadingNarration(stripSandboxPaths(answer)), evidence.sourceUrls)
+    const { text, dropped } = stripUnverifiedUrls(stripProcessNarration(stripSandboxPaths(answer)), evidence.sourceUrls)
     return {
       reply: text,
       images: evidence.images.slice(0, 3),

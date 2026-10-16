@@ -3,6 +3,8 @@ import type { BuilderToolTrace } from './contracts.ts'
 export type BuilderTaskContract = Readonly<{ files: readonly string[]; commands: readonly string[]; requiresRun: boolean; minimumTests: number }>
 
 const FILE = /^(?:[\w-]+\/)*[\w.-]+\.[a-z0-9]+$/i
+// "├── src/", "│   └── cart.js", "|-- index.js": captures the indentation before the branch and the entry name.
+const TREE_BRANCH = /^([ │|]*?)(?:[├└]──|[|`+]--)\s*([\w.-]+\/?)\s*$/
 const clean = (value: string) => value.trim().replace(/^[-*]\s+/, '').replace(/^`|`[.,;]?$|[.,;]$/g, '')
 
 /** Inline Run: clauses end at an unquoted sentence boundary, never inside a filename. */
@@ -44,6 +46,7 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
   let fileList = false
   let runList = false
   let fence = false
+  const tree: string[] = []
   for (const raw of objective.split(/\r?\n/)) {
     const line = raw.trim()
     // Markdown acceptance specifications place deliverable lists inside fenced
@@ -54,12 +57,13 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
     }
     // Only a fenced block under an explicit deliverable/verification heading is a checklist.
     if (fence && !fileList && !runList) continue
-    if (!fence && /^#{1,6}\\s/.test(line)) {
-      fileList = /(?:required files|project structure|deliverables)/i.test(line)
-      runList = /(?:required execution|verification commands)/i.test(line)
+    if (!fence && /^#{1,6}\s/.test(line)) {
+      fileList = /(?:required files|project structure|file structure|deliverables)/i.test(line)
+      runList = /(?:required execution|verification commands|mandatory verification)/i.test(line)
+      tree.length = 0
       continue
     }
-    if (/^run(?:\s+(?:these|the following)\s+commands)?(?:\s+against\s+the\s+actual\s+generated\s+files)?\s*:\s*$/i.test(line) || /^execute\s+(?:these|the following)\s+commands(?:\s+in\s+the\s+builder\s+workspace)?\s*:\s*$/i.test(line)) {
+    if (/^run(?:\s+(?:these|the following)\s+commands)?(?:\s+against\s+the\s+actual\s+generated\s+files)?\s*:\s*$/i.test(line) || /^execute\s+(?:these|the following|all(?:\s+\w+)?)\s+commands(?:\s+in\s+the\s+builder\s+workspace)?\s*:\s*$/i.test(line)) {
       runList = true
       fileList = false
       continue
@@ -69,6 +73,18 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
       continue
     }
     if (fileList && line) {
+      // A drawn tree names entries without their parent directory. Rebuild each path from its depth;
+      // the glyph-less top-level "project/" line is the workspace root itself, not a subdirectory.
+      const branch = TREE_BRANCH.exec(raw)
+      if (branch || (fence && tree.length === 0 && /^[\w.-]+\/$/.test(line))) {
+        const depth = branch ? Math.round(branch[1].replace(/│|\|/g, ' ').length / 4) + 1 : 0
+        const name = branch ? branch[2] : ''
+        tree.length = Math.min(tree.length, depth)
+        if (!branch || name.endsWith('/')) { tree[depth] = branch ? name.slice(0, -1) : ''; continue }
+        const path = [...tree.slice(1, depth), name].filter(Boolean).join('/')
+        if (FILE.test(path) && !path.split('/').includes('..')) files.add(path)
+        continue
+      }
       const path = clean(line).replace(/^\d+[.)]\s*/, '')
       if (FILE.test(path) && !path.split('/').includes('..')) files.add(path)
       else fileList = false
@@ -81,8 +97,10 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
     if (runList && /^(?:node|python3?|npm|pnpm|yarn|bun)\s+\S/.test(command) && command.length <= 2_000) commands.add(command)
     else if (line && !fence) runList = false
   }
-  const explicitCount = /\b(?:at least|minimum(?: of)?|all|verify|confirm)\s+(\d+)\s+(?:(?:independent|meaningful|automated|unit|integration|regression)\s+)*tests?\b/i.exec(objective)
-  const wordCount = /\b(?:all|verify|confirm)\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+tests?\b/i.exec(objective)
+  // Markdown emphasis ("at least **20 meaningful automated tests**") must not hide the requested count.
+  const plain = objective.replace(/\*\*|__/g, '')
+  const explicitCount = /\b(?:at least|minimum(?: of)?|all|verify|confirm)\s+(\d+)\s+(?:(?:independent|meaningful|automated|unit|integration|regression)\s+)*tests?\b/i.exec(plain)
+  const wordCount = /\b(?:all|verify|confirm)\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+tests?\b/i.exec(plain)
   const words: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 }
   const hasTestCommand = [...commands].some(command => /\b(?:test|spec)\b|--test\b/i.test(command)) || /\bnode\s+(?:--test\s+)?[^\s\n]*(?:test|spec)[^\s\n]*\.(?:[cm]?js|ts)\b/i.test(objective)
   const minimumTests = hasTestCommand ? (explicitCount ? Number(explicitCount[1]) : wordCount ? words[wordCount[1].toLowerCase()] : 0) : 0

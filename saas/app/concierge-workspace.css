@@ -346,3 +346,40 @@ body:has(.sb-ai-app-shell--home) > footer {
     padding: 9px 9px 11px;
   }
 }
+
+/* One full-width canvas across routes; no reserved sidebar dock columns. */
+.sb-ai-app-shell--canvas,
+.sb-ai-app-shell--canvas > .sb-ai-workspace {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  padding-right: 0 !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+/* Treat the conversation as the single viewport-sized workspace, not a nested image card. */
+.concierge-shell .thread-wrap,
+.concierge-shell .thread,
+.concierge-shell .assistant-row,
+.concierge-shell .assistant-message,
+.concierge-shell .assistant-content {
+  min-width: 0 !important;
+  max-width: none !important;
+}
+.concierge-shell .assistant-content img,
+.concierge-shell .assistant-content svg,
+.concierge-shell .assistant-content canvas,
+.concierge-shell .assistant-content video {
+  display: block;
+  width: auto;
+  max-width: 100% !important;
+  height: auto;
+  object-fit: contain;
+}
+.concierge-shell .assistant-content figure,
+.concierge-shell .assistant-content .image-container {
+  max-width: 100% !important;
+  height: auto !important;
+  overflow: visible !important;
+}

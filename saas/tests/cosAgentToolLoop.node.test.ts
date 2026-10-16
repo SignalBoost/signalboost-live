@@ -113,6 +113,11 @@ test('numbers that no tool printed are repaired, and withheld when they cannot b
   assert.deepEqual(unsupportedAnswerNumbers('High $13.36, start $3.05, up over 300% (337.0%).', [printed]), [])
   assert.deepEqual(unsupportedAnswerNumbers('High $13.4 and $14.36.', [printed]), ['14.36'])
   assert.deepEqual(unsupportedAnswerNumbers('Up over 500%.', [printed]), ['500'])
+  // Production 2026-10-16: a verified unemployment chart was withheld for "2021", "2022" (inside the
+  // 2020-2025 data) and the "19" of COVID-19. Years outside the data and invented figures still fail.
+  const bls = 'First: 2020-01-01 3.6\nLast: 2025-12-01 4.4\nMax: 14.8 at 2020-04-01'
+  assert.deepEqual(unsupportedAnswerNumbers('After the COVID-19 peak of 14.8% the rate fell through 2021 and 2022 to 4.4%.', [bls]), [])
+  assert.deepEqual(unsupportedAnswerNumbers('It was 6.1% in 2018.', [bls]), ['6.1', '2018'])
 })
 
 test('a chart drawn from values typed into the code is rejected', async () => {

@@ -118,11 +118,21 @@ function supportedByValue(span: string, values: readonly number[]): boolean {
 export function unsupportedAnswerNumbers(answer: string, grounded: readonly string[]): string[] {
   const allowed = digitGroupsOf(grounded)
   const values = numericValues(grounded)
-  const answerWithoutUrls = String(answer || '').replace(URL_RE, ' ')
+  // Years inside the period the retrieved data covers ("the 2021-2022 recovery" over 2020-2025
+  // data) describe that data; they are not new figures.
+  const years = [...allowed].map(Number).filter(value => value >= 1900 && value <= 2100)
+  const firstYear = years.length ? Math.min(...years) : null
+  const lastYear = years.length ? Math.max(...years) : null
+  // Names that carry digits ("COVID-19", "Q3", "PM2.5", "S&P 500" stays checked) are words, not figures.
+  const answerWithoutUrls = String(answer || '').replace(URL_RE, ' ').replace(/\b[A-Za-z]+-?\d+(?:\.\d+)?\b/g, ' ')
   const spans: string[] = answerWithoutUrls.match(NUMBER_SPAN) ?? []
   return [...new Set(spans.filter(span => {
-    const digitsSupported = (span.match(DIGIT_GROUP) ?? [] as string[]).every((group: string) => allowed.has(String(Number(group))))
-    return !digitsSupported && !supportedByValue(span.replace(/[.,]+$/, ''), values)
+    if (/^\d{4}$/.test(span) && firstYear !== null && lastYear !== null && Number(span) >= firstYear && Number(span) <= lastYear) return false
+    const plain = span.replace(/[.,]+$/, '')
+    // A plain figure must match a printed value (rounding allowed); digit groups alone would let
+    // "6.1" pass because a 6 and a 1 appear somewhere. Dates, times and ranges use the digit groups.
+    if (/^\d+(?:,\d{3})*(?:\.\d+)?$/.test(plain)) return !supportedByValue(plain, values)
+    return !(span.match(DIGIT_GROUP) ?? [] as string[]).every((group: string) => allowed.has(String(Number(group))))
   }))]
 }
 

@@ -322,7 +322,7 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
 // The agent loop's share of an interactive turn: tool rounds, sandbox and verification together.
 // Longer than a one-pass answer by nature; the browser's History watch covers turns past the
 // response window, and the loop stops launching tools as soon as its deadline is spent.
-const AGENT_LOOP_BUDGET_MS=90_000
+const AGENT_LOOP_BUDGET_MS=110_000
 
 type AgentComputeTurn={startedAt:number;input:string;language:string;body:any;userId:string|null;ownerAuthenticated:boolean;precedingAssistant:string|null}
 
@@ -373,7 +373,7 @@ async function agentComputeResponse(turn:AgentComputeTurn):Promise<NextResponse|
   console.info('[cos-agent-loop]',JSON.stringify({at:new Date().toISOString(),ok:Boolean(result),chartRequested,ms:Date.now()-loopStartedAt,outcome:trace.outcome,modelError:trace.modelError||null,rounds:trace.rounds,steps:trace.steps.map(step=>({tool:step.tool,observation:step.observation.slice(0,200)})),pythonRuns:result?.pythonRuns??0,images:result?.images.length??0,verification:result?.verification??null,model:trace.model||null}))
   recordCosLatencyStage('primary:agent_loop',Date.now()-loopStartedAt)
   // Recorded in provenance on every path, so a fallback answer still shows what the loop did and why.
-  const loop={outcome:trace.outcome,rounds:trace.rounds,model:trace.model||null,model_error:trace.modelError||null,steps:trace.steps,unsupported_numbers:trace.unsupportedNumbers,python_runs:result?.pythonRuns??0,images:result?.images.length??0,verification:result?.verification??null}
+  const loop={outcome:trace.outcome,rounds:trace.rounds,model:trace.model||null,model_error:trace.modelError||null,round_ms:trace.roundMs,steps:trace.steps,unsupported_numbers:trace.unsupportedNumbers,python_runs:result?.pythonRuns??0,images:result?.images.length??0,verification:result?.verification??null}
   if(result&&(!chartRequested||result.images.length)){
     const image=result.images[0]
     const built=agentChartJson(turn.startedAt,turn.input,{reply:result.reply,source:'cos-agent-tool-loop',png:image?.png,filename:image?.name.replace(/[^a-z0-9._-]+/gi,'-'),sources:result.sources,reasonerLabel:result.model?`managed-open-model:${result.model}`:null,modelInvoked:true,loop})

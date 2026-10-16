@@ -41,17 +41,19 @@ export type AgentLoopTrace = {
   unsupportedNumbers: string[]
   /** Why the last model round produced nothing, when it did not. */
   modelError: string
+  /** Wall-clock of each model round, ms. */
+  roundMs: number[]
 }
 
 export function newAgentLoopTrace(): AgentLoopTrace {
-  return { outcome: 'running', rounds: 0, model: '', steps: [], unsupportedNumbers: [], modelError: '' }
+  return { outcome: 'running', rounds: 0, model: '', steps: [], unsupportedNumbers: [], modelError: '', roundMs: [] }
 }
 
 const MAX_ROUNDS = 8
 // Host-owned tool budget: a model that emits many parallel calls cannot fan out past these.
 const MAX_CALLS_PER_ROUND = 4
 const MAX_TOOL_CALLS = 12
-const ROUND_TIMEOUT_MS = 45_000
+const ROUND_TIMEOUT_MS = 60_000
 const MIN_ROUND_MS = 8_000
 
 export function cosAgentSystemPrompt(language: string): string {
@@ -167,6 +169,7 @@ export async function runCosAgentLoop(input: {
     while (rounds < MAX_ROUNDS && remainingMs() > MIN_ROUND_MS) {
       rounds += 1
       const finalRound = rounds === MAX_ROUNDS || remainingMs() < 30_000
+      const roundStartedAt = now()
       const turn = await input.model({
         systemPrompt,
         messages,
@@ -178,6 +181,7 @@ export async function runCosAgentLoop(input: {
         return null
       })
       trace.rounds = rounds
+      trace.roundMs.push(now() - roundStartedAt)
       if (!turn) {
         trace.outcome = 'model_unavailable'
         break

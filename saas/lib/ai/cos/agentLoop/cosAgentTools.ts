@@ -44,7 +44,8 @@ export function emptyEvidence(userText: string): AgentEvidence {
   }
 }
 
-const OBSERVATION_LIMIT = 12_000
+// Short previews keep each round's context small (the full body is in data/ for the code to read).
+const OBSERVATION_LIMIT = 3_000
 
 /**
  * An image is evidence-backed only when the program that drew it actually opened a staged data
@@ -74,6 +75,40 @@ export function agentToolDefinitions(policy: AgentToolPolicy): readonly LocalMod
 function preview(text: string): string {
   const value = String(text || '')
   return value.length > OBSERVATION_LIMIT ? `${value.slice(0, OBSERVATION_LIMIT)}\n…[preview truncated; full ${value.length} chars saved to the data file]` : value
+}
+
+/**
+ * Structure of a JSON body (keys, types, array lengths, a sample element) so the model can write
+ * code against it without reading the raw values into its context.
+ */
+export function jsonOutline(text: string): string | null {
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch {
+    return null
+  }
+  const lines: string[] = []
+  const walk = (node: unknown, path: string, depth: number) => {
+    if (lines.length >= 60) return
+    if (Array.isArray(node)) {
+      const sample = node.slice(0, 3).map(item => (item !== null && typeof item === 'object' ? (Array.isArray(item) ? `array(${item.length})` : 'object') : JSON.stringify(item))).join(', ')
+      lines.push(`${path}: array(${node.length}) [${sample}${node.length > 3 ? ', …' : ''}]`)
+      if (depth < 6 && node.length && node[0] !== null && typeof node[0] === 'object') walk(node[0], `${path}[0]`, depth + 1)
+      return
+    }
+    if (node !== null && typeof node === 'object') {
+      for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
+        if (child !== null && typeof child === 'object') walk(child, path ? `${path}.${key}` : key, depth + 1)
+        else lines.push(`${path ? `${path}.` : ''}${key}: ${JSON.stringify(child)?.slice(0, 80)}`)
+        if (lines.length >= 60) return
+      }
+      return
+    }
+    lines.push(`${path || '(root)'}: ${JSON.stringify(node)?.slice(0, 80)}`)
+  }
+  walk(value, '', 0)
+  return lines.join('\n')
 }
 
 /** HTML → readable text that keeps table rows on separate lines with tab-separated cells. */
@@ -165,11 +200,12 @@ export async function executeAgentTool(input: {
       const path = stagedDataPath(`source_${index}.${extension}`)
       evidence.files.push({ path, content: body })
       evidence.sourceUrls.add(finalUrl)
+      const outline = extension === 'json' ? jsonOutline(body) : null
       const readable = extension === 'html' ? htmlToText(body) : body
       if (extension === 'html') evidence.files.push({ path: stagedDataPath(`source_${index}.txt`), content: readable })
       return record([
         `Fetched ${finalUrl} (${extension}, ${body.length} chars). Saved as ${path}${extension === 'html' ? ` and readable text as data/source_${index}.txt` : ''}.`,
-        preview(readable),
+        outline ? `JSON structure (read the file in Python for the values):\n${outline}` : preview(readable),
       ].join('\n'))
     }
 

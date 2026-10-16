@@ -16,3 +16,8 @@ test('rejects oversized or excessive evaluation sets',()=>{
  assert.throws(()=>scoreCustomerHoldout(row('q','x','x','x'.repeat(20001))),/holdout_row_invalid/)
  assert.throws(()=>scoreCustomerHoldout(Array.from({length:129},(_,i)=>row('q'+i,'x','x','x')).join('\n')),/holdout_count_invalid/)
 })
+
+test('direct scorer rejects case- and whitespace-equivalent holdout questions',()=>{
+ const repeated=[row(' Same   Question ','x','x','x'),row('same question','x','x','x')].join('\n')
+ assert.throws(()=>scoreCustomerHoldout(repeated),/holdout_prompt_duplicate/)
+})

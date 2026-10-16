@@ -13,6 +13,7 @@ import { previewLabDataset, previewLabPrompts } from '@/lib/lab/labDatasetPrefli
 import { buildLabMlflowRunSnapshot } from '@/lib/lab/mlflowRunExport'
 import { buildLabExperimentComparison } from '@/lib/lab/labExperimentComparison'
 import LabCustomerModelPassport from './LabCustomerModelPassport.tsx'
+import LabCustomerExperimentTable from './LabCustomerExperimentTable.tsx'
 import LabCustomerResponseComparison from './LabCustomerResponseComparison.tsx'
 import LabCustomerTrainingAdvisor from './LabCustomerTrainingAdvisor.tsx'
 import LabCustomerRunTimeline from './LabCustomerRunTimeline.tsx'
@@ -575,6 +576,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
       <div className="space-y-2">
         <h3 className="font-medium">{copy.progressHeading}</h3>
         {runs.length > 0 && <button type="button" className="underline text-sm" onClick={exportExperimentComparison}>{comparisonLabels[language] ?? comparisonLabels.en}</button>}
+        {runs.length > 0 && <LabCustomerExperimentTable runs={runs} language={language} />}
         {!runs.length && <p className="text-sm opacity-70">{copy.noRuns}</p>}
         <ul className="space-y-3">
           {runs.map(run => (

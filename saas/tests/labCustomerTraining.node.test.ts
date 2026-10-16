@@ -121,6 +121,9 @@ test('dataset callback starts training in the customer account; foreign accounts
     assert.equal(decision.train.revision.trainingManifestHash, lab.manifestHash(train))
     assert.equal(decision.train.trainingMode, 'fine_tune')
   }
+  assert.deepEqual(lab.interpretWorkerCallback(run, { ...payload, holdoutItemHashes: [train[0], hold[1]] }), { kind: 'reject', reason: 'partition_overlap_or_duplicate' })
+  assert.deepEqual(lab.interpretWorkerCallback(run, { ...payload, trainingItemHashes: [train[0], train[0], ...train.slice(2)] }), { kind: 'reject', reason: 'partition_overlap_or_duplicate' })
+  assert.deepEqual(lab.interpretWorkerCallback(run, { ...payload, holdoutItemHashes: [hold[0], hold[0]] }), { kind: 'reject', reason: 'partition_overlap_or_duplicate' })
   assert.deepEqual(lab.interpretWorkerCallback(run, { ...payload, trainingDataRef: 'hf://datasets/evil/x@1#train' }), { kind: 'reject', reason: 'dataset_outside_customer_account' })
   assert.deepEqual(lab.interpretWorkerCallback({ ...run, stage: 'training' }, payload), { kind: 'reject', reason: 'stage_conflict' })
   assert.deepEqual(lab.interpretWorkerCallback(run, { ...payload, candidateId: 'lab-other' }), { kind: 'reject', reason: 'candidate_mismatch' })

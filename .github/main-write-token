@@ -1,2 +1,2 @@
-base_sha=1a757d74e0db74a84259cc35926fa556bdda1eb6
-branch=fix/home-history-no-overlap-20261016
+base_sha=4e73424a29203442e99d85f64f10d803934ad4fc
+branch=fix/cos-agent-loop-rounding-verification-20261016

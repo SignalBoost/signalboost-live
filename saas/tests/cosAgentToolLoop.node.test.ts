@@ -3,7 +3,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { cosAgentSystemPrompt, newAgentLoopTrace, runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
+import { agentTraceStep, cosAgentSystemPrompt, redactUrlQueries, newAgentLoopTrace, runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
 import { agentToolDefinitions, htmlToText, imageBackedByStagedData, type AgentToolPorts } from '../lib/ai/cos/agentLoop/cosAgentTools.ts'
 import { optionalPackagesFor, runnerSource, VercelPythonSession, type PythonSession } from '../lib/ai/cos/agentLoop/pythonSandbox.ts'
 import { execFileSync } from 'node:child_process'
@@ -273,7 +273,9 @@ test('the loop trace records why a turn produced no answer', async () => {
   assert.equal(unsupported.outcome, 'unsupported_numbers')
   assert.deepEqual(unsupported.unsupportedNumbers, ['412'])
   assert.equal(unsupported.steps[0].tool, 'fetch_url')
-  assert.match(unsupported.steps[0].observation, /^Fetched https:\/\/query1\.finance\.yahoo\.com/)
+  assert.equal(unsupported.steps[0].status, 'ok')
+  assert.equal(unsupported.steps[0].host, 'query1.finance.yahoo.com')
+  assert.ok(!('observation' in unsupported.steps[0]), 'raw observation text is never kept in the trace')
   assert.equal((await run([call('c1', 'fetch_url', { url: YAHOO_URL }), answer('VNCE closed at $13.33.')])).outcome, 'answered')
 })
 
@@ -389,4 +391,21 @@ test('the step budget leaves room to fix a failed program', () => {
 
 test('the agent knows today to resolve relative periods', () => {
   assert.match(cosAgentSystemPrompt('en', new Date('2026-10-16T03:00:00Z')), /^Today is 2026-10-16 \(UTC\)\. Resolve relative periods/)
+})
+
+
+// Codex P1 on #4513: the trace is logged and persisted in execution_provenance, so it must hold
+// sanitized metadata only, never request text, page contents or URL query strings.
+test('loop trace steps carry sanitized metadata, never raw observations', () => {
+  const fetched = agentTraceStep('fetch_url', 'Fetched https://api.example.com/v1/series?token=SECRET&q=me (json, 5120 chars). Saved as data/source_1.json.\nJSON structure: private user text')
+  assert.deepEqual(fetched, { tool: 'fetch_url', status: 'ok', host: 'api.example.com', path: '/v1/series', chars: 5120 })
+  const python = agentTraceStep('run_python', 'exit_code=1\nstdout:\nmy secret request text\nstderr:\nTraceback (most recent call last):\nKeyError: \'close\'\nimages saved: none (if the user asked for a chart, your next run must save it to out/)')
+  assert.deepEqual(python, { tool: 'run_python', status: 'error', exitCode: 1, images: 0, error: 'KeyError' })
+  assert.deepEqual(agentTraceStep('run_python', 'exit_code=0\nstdout:\nrows 127\nimages saved: out/chart.png (they will be shown to the user with your answer)'), { tool: 'run_python', status: 'ok', exitCode: 0, images: 1 })
+  assert.deepEqual(agentTraceStep('web_search', '[1] A\nhttps://a.com\nsnippet\n\n[2] B\nhttps://b.com\nsnippet'), { tool: 'web_search', status: 'ok', results: 2 })
+  assert.deepEqual(agentTraceStep('fetch_url', 'HTTP 404 from https://stooq.com/q/d/l/?s=vnce.us&i=d. Try another source or endpoint.'), { tool: 'fetch_url', status: 'error', error: 'http_404', host: 'stooq.com', path: '/q/d/l/' })
+  assert.equal(agentTraceStep('fetch_url', 'Refused https://api.stlouisfed.org/fred?api_key=…: URLs carrying API keys').error, 'refused_credentials')
+  assert.equal(agentTraceStep('fetch_url', 'Error: tool budget for this turn is spent; this call was not executed.').error, 'budget')
+  for (const step of [fetched, python]) assert.doesNotMatch(JSON.stringify(step), /SECRET|secret request|private user/)
+  assert.equal(redactUrlQueries('deepinfra: HTTP 400 at https://x.io/v1/chat?key=abc#f failed'), 'deepinfra: HTTP 400 at https://x.io/v1/chat failed')
 })

@@ -435,6 +435,8 @@ test('answers start with the result, not the agent narrating its process', () =>
   // Codex #4565 P1: a substantive sentence that mentions sources is an answer, not a note.
   assert.equal(stripProcessNarration('The search results show that Canberra is the capital of Australia.\n\nSources:\n- [Britannica](https://www.britannica.com/place/Canberra)'), 'The search results show that Canberra is the capital of Australia.\n\nSources:\n- [Britannica](https://www.britannica.com/place/Canberra)')
   assert.equal(stripProcessNarration('Gold fell 3.12%. The chart is attached.'), 'Gold fell 3.12%. The chart is attached.')
+  // Production 2026-10-16 (Microsoft CEO, after #4574).
+  assert.equal(stripProcessNarration('The official Microsoft source confirms: Satya Nadella is Chairman and CEO.\n\nThe answer is clear and verified from the official Microsoft leadership page.\n\nThe current CEO of Microsoft is **Satya Nadella**.'), 'The official Microsoft source confirms: Satya Nadella is Chairman and CEO.\n\nThe current CEO of Microsoft is **Satya Nadella**.')
   assert.equal(stripProcessNarration('Ottawa is the capital of Canada.\n\nLet me know if you want the metro population too.'), 'Ottawa is the capital of Canada.\n\nLet me know if you want the metro population too.')
   assert.equal(stripProcessNarration('Let me present the results.'), 'Let me present the results.')
 })

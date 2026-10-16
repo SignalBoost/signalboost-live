@@ -254,7 +254,7 @@ export function stripSandboxPaths(answer: string): string {
 // factual question. No data computation or chart is needed. Let me provide the answer directly."
 // A sentence is a note only when it OPENS with process wording; a substantive sentence that merely
 // mentions sources ("The search results show that Canberra is the capital") is kept.
-const PROCESS_NOTE = /^(?:let me (?!know\b)\w+|the user (?:asked|wants|is asking)\b|no (?:data computation|computation|chart)\b[^.!?]*\bneeded\b|this is a simple\b|i (?:have|now have|found|will|'ll)\b|(?:the )?data (?:is|has been) (?:verified|confirmed)\b|(?:the )?chart (?:is|has been) (?:created|generated|saved|ready)\b|here(?:'s| is| are) (?:the|a) (?:summary|results?)\b|multiple sources confirm\b|(?:the )?search results (?:clearly )?(?:confirm|show)(?: the answer| this| it)?\s*[.!:]?$)/i
+const PROCESS_NOTE = /^(?:let me (?!know\b)\w+|the user (?:asked|wants|is asking)\b|no (?:data computation|computation|chart)\b[^.!?]*\bneeded\b|this is a simple\b|i (?:have|now have|found|will|'ll)\b|(?:the )?data (?:is|has been) (?:verified|confirmed)\b|(?:the )?chart (?:is|has been) (?:created|generated|saved|ready)\b|here(?:'s| is| are) (?:the|a) (?:summary|results?)\b|multiple sources confirm\b|the answer is (?:clear|verified|confirmed)\b|(?:the )?search results (?:clearly )?(?:confirm|show)(?: the answer| this| it)?\s*[.!:]?$)/i
 const ANSWER_HEADING = /(?:^|\n)[ \t]*(?:#{1,6}[ \t]*)?(?:\*\*)?(?:final )?answer(?:\*\*)?[ \t]*:?[ \t]*(?:\*\*)?[ \t]*\n/gi
 const LIST_LINE = /^\s*(?:[-*•]|\d+[.)]|\[\d+\])\s+/
 

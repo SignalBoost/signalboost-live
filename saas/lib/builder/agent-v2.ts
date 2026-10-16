@@ -264,6 +264,27 @@ export class BuilderV2Agent {
       } catch (error) {
         if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
         // A model timeout or outage is not a build failure: completed work is checkpointed and the next slice resumes.
+        // All requested files already exist: host-run the mandatory commands even if the model is offline.
+        // This is real execution, not a model assertion. Any failing command keeps acceptance FAIL.
+        if (checklist.files.length && missingFiles().length === 0 && checklist.commands.length) {
+          for (const command of checklist.commands) {
+            const receipt = await this.dispatcher.dispatch(options.workspaceId, { tool: 'run_tests', command })
+            steps.push(receipt)
+            verifiedRevision = receipt.ok ? revision : -1
+            lastReceipt = JSON.stringify(receipt).slice(0, 20_000)
+            if (receipt.changed || receipt.ok) unproductive = 0
+            else unproductive++
+            if (options.onCheckpoint) {
+              const checkpoint = await snapshot()
+              if (checkpoint) await options.onCheckpoint(checkpoint)
+            }
+            if (!receipt.ok) break
+          }
+          const acceptance = builderV2Acceptance(options.objective, knownFiles, steps)
+          if (acceptance.satisfied && verifiedRevision === revision) {
+            return { ok: true, reason: 'verified', summary: 'Host commands executed successfully after the latest source change', steps, checkpoint: await snapshot() }
+          }
+        }
         return { ok: false, reason: 'builder_v2_model_unavailable', summary: error instanceof Error ? error.message : 'builder_v2_model_error', steps, checkpoint: await snapshot() }
       }
       const decision = parseDecision(raw)

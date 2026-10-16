@@ -164,7 +164,7 @@ export class BuilderV2Agent {
       }
     }
     const steps: BuilderV2Receipt[] = [...(saved?.steps || [])]
-    const maxSteps = Math.max(1, Math.min(options.maxSteps ?? 60, 120))
+    const maxSteps = Math.min(120, steps.length + Math.max(1, Math.min(options.maxSteps ?? 60, 120)))
     let revision = saved?.revision ?? 0
     let verifiedRevision = saved?.verifiedRevision ?? -1
     let unproductive = saved?.unproductive ?? 0
@@ -227,7 +227,7 @@ export class BuilderV2Agent {
         const checkpoint = await snapshot()
         if (checkpoint) await options.onCheckpoint(checkpoint)
       }
-      if (unproductive >= 6) return { ok: false, reason: 'builder_v2_no_progress', steps, checkpoint: await snapshot() }
+      if (unproductive >= 6) return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
     }
     return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
   }

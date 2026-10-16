@@ -1,0 +1,46 @@
+name: Cursor Agent OrderFlow Acceptance
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Require Cursor credential
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        run: |
+          if [[ -z "$CURSOR_API_KEY" ]]; then
+            echo "::error::Repository secret CURSOR_API_KEY is required for live Cursor CLI execution"
+            exit 1
+          fi
+      - name: Install genuine Cursor CLI
+        run: |
+          curl --fail --silent --show-error https://cursor.com/install | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cursor/bin" >> "$GITHUB_PATH"
+      - name: Confirm Cursor CLI executable
+        run: agent --version
+      - name: Run real Cursor agent and independent acceptance commands
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/orderflow"
+          node scripts/cursor-agent-acceptance.mjs "$RUNNER_TEMP/orderflow" "$GITHUB_WORKSPACE/saas/scripts/fixtures/orderflow-objective.txt"
+      - name: Preserve files and execution evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cursor-orderflow-evidence
+          path: ${{ runner.temp }}/orderflow/
+          if-no-files-found: warn
+          retention-days: 7

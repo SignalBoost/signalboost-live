@@ -28,6 +28,9 @@ import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
 import { buildPriceHistoryChart, detectPriceHistoryChartRequest, fetchPriceHistory, priceHistoryUnavailableReply } from '@/lib/market/priceHistoryChart'
 import { blockedGoal, completedGoal } from '@/lib/ai/cos/goalCompletion'
+import { runCosAgentLoop } from '@/lib/ai/cos/agentLoop/cosAgentLoop'
+import { cosAgentModelTurn, cosAgentToolPolicy, createCosAgentPorts } from '@/lib/ai/cos/agentLoop/cosAgentRuntime'
+import { requiresAgentTools } from '@/lib/ai/cos/agentLoop/agentToolIntent'
 import { resolveSemanticVisualRequest, shouldResolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
 import { publicConciergeIdentityReply, publicConciergeIdentityReplyForIntent } from '@/lib/ai/cos/publicConciergeIdentity'
 import { resolveSemanticPublicIdentity, shouldResolveSemanticPublicIdentity } from '@/lib/ai/cos/publicConciergeIdentityIntent'
@@ -47,6 +50,9 @@ import { runWithTurnDeadline, turnDeadlineRemainingMs } from '@/lib/ai/cos/cosTu
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
+
+// The agent loop's share of the browser turn: tool rounds, sandbox and verification together.
+const AGENT_LOOP_BUDGET_MS = 120_000
 
 // COS is the private reasoning/orchestration layer. This object represents an authenticated owner
 // capability, not a UI-surface capability. Concierge and Assistant are delivery surfaces; neither
@@ -212,10 +218,64 @@ async function executeBrowserTurn(req: NextRequest) {
   const authenticatedOwner = access?.isOwner === true && Boolean(access.userId)
   const routingContext = builderRoutingContextFromBody(body)
 
-  if (browserSurface === 'concierge' && !hasAttachments) {
-    // A chart of a security's price is market data, not an illustration: plot the real daily
-    // closes and cite them, instead of image generation (which would invent the line and spend
-    // the guest visual trial) or a current-quote-only answer.
+  // AGENT TOOL LOOP: a request to chart or compute real data runs the general COS agent loop
+  // (search, fetch, sandboxed Python, governed browser) before image generation or one-pass
+  // answering can take it. The planner below can also request it through the compute capability.
+  const runAgentLoopTurn = async (): Promise<NextResponse | null> => {
+    const startedAt = Date.now()
+    const remaining = turnDeadlineRemainingMs()
+    const policy = cosAgentToolPolicy({ ownerAuthenticated: authenticatedOwner, signedIn: Boolean(access?.userId) })
+    const conversation = messages
+      .slice(0, -1)
+      .filter((message: any) => (message?.role === 'user' || message?.role === 'assistant') && typeof message?.content === 'string')
+      .map((message: any) => ({ role: message.role as 'user' | 'assistant', content: String(message.content) }))
+    const result = await runCosAgentLoop({
+      request: prompt,
+      conversation,
+      language,
+      model: cosAgentModelTurn,
+      ports: createCosAgentPorts(policy),
+      policy,
+      deadlineAt: startedAt + Math.min(AGENT_LOOP_BUDGET_MS, remaining === null ? AGENT_LOOP_BUDGET_MS : Math.max(0, remaining - 10_000)),
+    }).catch(error => {
+      console.warn('[cos-agent-loop] failed', error instanceof Error ? error.message : String(error))
+      return null
+    })
+    console.info('[cos-agent-loop]', JSON.stringify({
+      at: new Date().toISOString(),
+      ok: Boolean(result),
+      ms: Date.now() - startedAt,
+      rounds: result?.rounds ?? null,
+      toolCalls: result?.toolCalls ?? [],
+      pythonRuns: result?.pythonRuns ?? 0,
+      images: result?.images.length ?? 0,
+      verification: result?.verification ?? null,
+      model: result?.model ?? null,
+    }))
+    recordCosLatencyStage(`${browserSurface}:agent_loop`, Date.now() - startedAt)
+    if (!result) return null
+    const image = result.images[0]
+    const dataUrl = image ? `data:image/png;base64,${image.png.toString('base64')}` : ''
+    return publicConciergePresentation(await withSuggestedFollowups(NextResponse.json({
+      reply: result.reply,
+      source: 'cos-agent-tool-loop',
+      ...(image ? { visual: { previewUrl: dataUrl, downloadUrl: dataUrl, filename: image.name.replace(/[^a-z0-9._-]+/gi, '-'), alt: prompt.slice(0, 200) } } : {}),
+      execution_allowed: true,
+      external_action_taken: false,
+      external_ai_invoked: false,
+      local_model_invoked: true,
+      external_retrieval_used: result.sources.length > 0,
+      live_evidence_sources: result.sources,
+      agent_tool_loop: { rounds: result.rounds, tool_calls: result.toolCalls, python_runs: result.pythonRuns, verification: result.verification, model: result.model },
+      goal_completion: completedGoal(image ? ['agent_tools_executed', 'answer_verified', 'visual_delivered_inline'] : ['agent_tools_executed', 'answer_verified']),
+    }), prompt, auditUserId))
+  }
+
+  if (browserSurface === 'concierge' && !hasAttachments && requiresAgentTools(prompt, priorAnswer)) {
+    const agentResponse = await runAgentLoopTurn()
+    if (agentResponse) return agentResponse
+    // Deterministic fallback when the agent loop could not finish: a security's price history is
+    // still plotted from real daily closes, never handed to image generation.
     const priceChart = detectPriceHistoryChartRequest(prompt, userMessages.slice(0, -1).map((message: any) => String(message.content)))
     if (priceChart) {
       const history = await fetchPriceHistory(priceChart)
@@ -556,6 +616,11 @@ async function executeBrowserTurn(req: NextRequest) {
         const annotated = await withAgentDecisionMetadata(specialist, agentDecision)
         return browserSurface === 'concierge' ? publicConciergePresentation(annotated) : annotated
       }
+    }
+
+    if (browserSurface === 'concierge' && !hasAttachments && agentDecision.capabilities.includes('compute')) {
+      const agentResponse = await runAgentLoopTurn()
+      if (agentResponse) return withAgentDecisionMetadata(agentResponse, agentDecision)
     }
 
     routedHeaders.set('x-signalboost-agent-mode', 'orchestrate')

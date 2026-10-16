@@ -49,7 +49,10 @@ const INFORMATION_REQUEST = /\b(?:explain|tell\s+me|what\s+(?:it|this|that)\s+me
 function looksLikeDraftToRecipient(payload: string): boolean {
   const value = String(payload || '').trim()
   if (NAMED_OWN_DRAFT.test(value) || DRAFT_GREETING.test(value)) return true
-  return DRAFT_SIGN_OFF.test(value) && !INFORMATION_REQUEST.test(value)
+  // Only the questions themselves decide: "I will explain the issue tomorrow. Could you send me the
+  // file? Thanks" asks the recipient to act.
+  const questions = value.match(/[^.!?\n]*\?/g) ?? []
+  return DRAFT_SIGN_OFF.test(value) && !questions.some(question => INFORMATION_REQUEST.test(question))
 }
 
 function looksLikeNewQuestion(text: string): boolean {

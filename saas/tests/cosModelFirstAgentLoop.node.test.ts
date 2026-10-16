@@ -94,7 +94,8 @@ test('first semantic decision prefers native function tools and keeps JSON plann
   assert.ok(nativeAt > 0 && compatAt > nativeAt)
 })
 
-test('public Concierge receives only the public-safe live_web native capability', () => {
-  assert.match(decision, /input\.surface === 'concierge'\s*\? \['live_web'\]/)
+test('public Concierge receives only the public-safe live_web and compute native capabilities', () => {
+  // compute runs the governed agent tool loop (search, fetch, sandboxed Python); no private capability.
+  assert.match(decision, /input\.surface === 'concierge'\s*\? \['live_web', 'compute'\]/)
   assert.match(decision, /input\.ownerAuthenticated\s*\? COS_AGENT_CAPABILITIES/)
 })

@@ -46,7 +46,7 @@ test('a native capability plan suppresses redundant semantic classification down
 
 test('public Concierge cannot request owner-private capabilities', () => {
   const catalog = decision.slice(decision.indexOf('function toolCatalog'), decision.indexOf('function turnReasonerLabel'))
-  assert.match(catalog, /input\.surface === 'concierge'\s*\n\s*\? \['live_web'\]/)
+  assert.match(catalog, /input\.surface === 'concierge'\s*\n\s*\? \['live_web', 'compute'\]/)
   assert.match(catalog, /input\.ownerAuthenticated\s*\n\s*\? COS_AGENT_CAPABILITIES/)
 })
 

@@ -12,6 +12,7 @@ import { plannerSearchQueriesFromToolArguments, sanitizePlannerSearchQueries, PL
 
 export const COS_AGENT_CAPABILITIES = [
   'live_web',
+  'compute',
   'conversation_history',
   'internal_context',
   'semantic_memory',
@@ -53,6 +54,7 @@ function isCosAgentCapability(value: string): value is CosAgentCapability {
 
 const CAPABILITY_DESCRIPTIONS: Record<CosAgentCapability, string> = {
   live_web: 'Retrieve current or mutable public-world information before answering. Pass the web searches to run in queries.',
+  compute: 'Run the COS agent tools (web search, URL/API fetch and sandboxed Python) to retrieve data and compute, analyze, tabulate or chart it. Request it whenever the user wants a chart, graph or plot, a calculation over real data, statistics, or a result that requires running code.',
   conversation_history: 'Retrieve this signed-in user\'s past conversation context when it is materially required.',
   internal_context: 'Retrieve private organization/project context available to the authenticated owner.',
   semantic_memory: 'Retrieve meaning-similar durable knowledge, documents, learned material, enterprise/user context, and other authorized semantic memory. This is context retrieval, not permission and not a substitute for live facts.',
@@ -89,10 +91,10 @@ const LIVE_WEB_PLANNING_RULES = [
 
 function toolCatalog(input: { surface: 'assistant' | 'concierge'; ownerAuthenticated: boolean }): readonly LocalModelToolDefinition[] {
   const allowed: readonly CosAgentCapability[] = input.surface === 'concierge'
-    ? ['live_web']
+    ? ['live_web', 'compute']
     : input.ownerAuthenticated
       ? COS_AGENT_CAPABILITIES
-      : ['live_web']
+      : ['live_web', 'compute']
   return Object.freeze(allowed.map(name => Object.freeze({
     type: 'function' as const,
     function: Object.freeze({
@@ -215,6 +217,7 @@ export async function decideCosAgentTurn(input: {
       'Your only job: if information or action outside the model is materially required, call only the minimum function tools needed.',
       'A function call is a capability request, NOT authorization. The host independently checks identity, scope, permissions, safety, and action policy.',
       'Do not call tools merely because a topic is sophisticated. A conceptual software question that stable knowledge can answer needs no tool.',
+      'Request compute when the answer needs a chart, graph or plot, a calculation over real data, statistics, or anything that requires running code; COS then retrieves the data and runs the code itself.',
       'Current/future travel details such as transport, fares, opening hours, prices, availability, schedules, weather, or other mutable facts require live_web.',
       LIVE_WEB_PLANNING_RULES,
       'Request semantic_memory when meaning-similar durable internal context would materially improve the answer beyond stable model knowledge.',

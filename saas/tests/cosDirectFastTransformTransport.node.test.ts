@@ -160,10 +160,14 @@ test('the addressee note and signature below the draft are reference, not the us
   assert.match(String(split.referenceContext), /^See below\. It looks like you need to send them a form\.\n+Sam\n+Samuel Example[\s\S]*From: Reviewer, Alex/)
   // The user's own signature is never moved: it is not the addressee's.
   assert.equal(splitQuotedEmailThread('edit - Hi Sam, see you soon.\n\nThanks,\nLuis\nLuis Example').referenceContext, null)
+  // Codex review on #4498: a name in the opening that is not the greeted recipient is the sender's.
+  assert.equal(splitQuotedEmailThread('edit - Hi Sam, this is Luis. I will send it today.\n\nLuis\nLuis Example').referenceContext, null)
 })
 
 // Codex review on #4495: a closing courtesy must not turn a request for an explanation into an edit.
 test('a sign-off alone does not protect a request for an explanation', () => {
   assert.equal(isFastTextTransform('edit - I received a CAP notice. Can you explain what it means? Thanks'), false)
   assert.equal(isFastTextTransform('edit - Hi Sam, can you explain what the notice means? Thanks'), true)
+  // Codex review on #4498: only the question decides; "explain" in a statement does not.
+  assert.equal(isFastTextTransform('edit - I will explain the issue tomorrow. Could you send me the file? Thanks'), true)
 })

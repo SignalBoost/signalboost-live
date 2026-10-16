@@ -144,6 +144,7 @@ function VideoJsonMessage({ content }: { content: string }) {
         ))}
       </div>
       {block.after ? <AssistantMessage content={block.after} /> : null}
+      <style>{`@media (max-width: 760px) { .cos-history-sidebar { position: absolute; inset-block: 0; inset-inline-start: 0; z-index: 15; width: min(280px, 85vw) !important; } }`}</style>
     </div>
   )
 }
@@ -193,7 +194,7 @@ export default function AssistantPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // History state
-  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(true)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState(false)
   const [conversations, setConversations] = useState<ConvSummary[]>([])
@@ -219,6 +220,10 @@ export default function AssistantPage() {
     const el = threadRef.current
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [messages, loading])
+
+  useEffect(() => {
+    void openHistory()
+  }, [])
 
   // ── File processing ─────────────────────────────────────────────────────────
   async function processFiles(fileList: FileList | File[]) {
@@ -467,7 +472,7 @@ export default function AssistantPage() {
         .map((m: any) => ({ role: m.role, content: m.content }))
       conversationIdRef.current = id
       setMessages(loaded)
-      setHistoryOpen(false)
+      // Keep the history navigation visible so users can switch tasks.
     } catch {
       setHistoryError(true)
     } finally {
@@ -513,7 +518,7 @@ export default function AssistantPage() {
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 112px)', minHeight: 0, maxWidth: 'none', margin: 0, padding: 0, width: '100%', boxSizing: 'border-box', color: 'var(--text-primary)' }}
+      style={{ position: 'relative', display: 'flex', flexDirection: 'row', height: 'calc(100dvh - 112px)', minHeight: 0, maxWidth: 'none', margin: 0, padding: 0, width: '100%', boxSizing: 'border-box', color: 'var(--text-primary)' }}
     >
       {/* ── Drag-over overlay ── */}
       {dragOver && (
@@ -525,8 +530,33 @@ export default function AssistantPage() {
         </div>
       )}
 
+      {/* Saved user conversations are navigation, never an overlay on generated work. */}
+        {historyOpen && (
+          <div className="cos-history-sidebar" aria-label={c(COPY.history, l)} style={{ width: 280, flex: '0 0 280px', minHeight: 0, background: 'linear-gradient(160deg, rgba(10,16,32,.97), rgba(3,7,18,.97))', border: '1px solid rgba(26,240,255,.25)', borderRadius: 0, display: 'flex', flexDirection: 'column', gap: 10, boxShadow: 'none', overflow: 'hidden' }}>
+            <div style={{ position: 'sticky', top: 0, zIndex: 3, background: 'linear-gradient(160deg, rgba(10,16,32,.99), rgba(3,7,18,.99))', padding: '14px 14px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.02em', color: 'rgba(26,240,255,.9)' }}>🕘 {c(COPY.history, l)}</span>
+              <button onClick={() => setHistoryOpen(false)} className="sb-button-secondary" style={{ fontSize: 11, padding: '6px 10px' }}>{c(COPY.close, l)}</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {historyLoading && <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, textAlign: 'center', marginTop: 20 }}>{c(COPY.loadingHistory, l)}</p>}
+              {!historyLoading && historyError && <p style={{ color: 'rgba(255,140,140,.8)', fontSize: 13, textAlign: 'center', marginTop: 20 }}>{c(COPY.historyError, l)}</p>}
+              {!historyLoading && !historyError && conversations.length === 0 && <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, textAlign: 'center', marginTop: 20 }}>{c(COPY.noHistory, l)}</p>}
+              {!historyLoading && conversations.map(conv => (
+                <div key={conv.id} style={{ display: 'flex', alignItems: 'stretch', gap: 6, background: conversationIdRef.current === conv.id ? 'rgba(26,240,255,.1)' : 'rgba(255,255,255,.04)', border: `1px solid ${conversationIdRef.current === conv.id ? 'rgba(26,240,255,.35)' : 'rgba(255,255,255,.1)'}`, borderRadius: 14, padding: '10px 12px' }}>
+                  <button onClick={() => loadConversation(conv.id)} style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'start', color: '#fff' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{conv.title || c(COPY.untitled, l)}</div>
+                    {conv.summary ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{conv.summary}</div> : null}
+                    <div style={{ fontSize: 10, color: 'rgba(26,240,255,.6)', marginTop: 4 }}>{formatDate(conv.updated_at)} · {conv.message_count}</div>
+                  </button>
+                  <button onClick={() => deleteConversation(conv.id)} title={c(COPY.deleteConfirm, l)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,140,140,.7)', fontSize: 14, padding: '0 2px', flexShrink: 0 }}>🗑</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
       {/* ── Unified assistant workspace ── */}
-      <section style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'transparent', border: 'none', borderRadius: 0, boxShadow: 'none' }}>
+      <section style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'transparent', border: 'none', borderRadius: 0, boxShadow: 'none' }}>
         <div style={{ minHeight: 64, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottom: '1px solid rgba(255,255,255,.09)', flexShrink: 0 }}>
           <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
             <span style={{ color: '#facc15', fontSize: 12, fontWeight: 900, letterSpacing: '.08em', textTransform: 'uppercase' }}>✨ {c(COPY.eyebrow, l)}</span>
@@ -630,30 +660,6 @@ export default function AssistantPage() {
           )}
         </div>
 
-        {/* ── History drawer ── */}
-        {historyOpen && (
-          <div style={{ position: 'absolute', top: 0, insetInlineStart: 0, bottom: 0, width: 'min(320px, 88%)', zIndex: 5, background: 'linear-gradient(160deg, rgba(10,16,32,.97), rgba(3,7,18,.97))', border: '1px solid rgba(26,240,255,.25)', borderRadius: 22, display: 'flex', flexDirection: 'column', gap: 10, boxShadow: '0 18px 50px rgba(0,0,0,.55)', overflow: 'hidden' }}>
-            <div style={{ position: 'sticky', top: 0, zIndex: 3, background: 'linear-gradient(160deg, rgba(10,16,32,.99), rgba(3,7,18,.99))', padding: '14px 14px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.07)' }}>
-              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.02em', color: 'rgba(26,240,255,.9)' }}>🕘 {c(COPY.history, l)}</span>
-              <button onClick={() => setHistoryOpen(false)} className="sb-button-secondary" style={{ fontSize: 11, padding: '6px 10px' }}>{c(COPY.close, l)}</button>
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {historyLoading && <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, textAlign: 'center', marginTop: 20 }}>{c(COPY.loadingHistory, l)}</p>}
-              {!historyLoading && historyError && <p style={{ color: 'rgba(255,140,140,.8)', fontSize: 13, textAlign: 'center', marginTop: 20 }}>{c(COPY.historyError, l)}</p>}
-              {!historyLoading && !historyError && conversations.length === 0 && <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, textAlign: 'center', marginTop: 20 }}>{c(COPY.noHistory, l)}</p>}
-              {!historyLoading && conversations.map(conv => (
-                <div key={conv.id} style={{ display: 'flex', alignItems: 'stretch', gap: 6, background: conversationIdRef.current === conv.id ? 'rgba(26,240,255,.1)' : 'rgba(255,255,255,.04)', border: `1px solid ${conversationIdRef.current === conv.id ? 'rgba(26,240,255,.35)' : 'rgba(255,255,255,.1)'}`, borderRadius: 14, padding: '10px 12px' }}>
-                  <button onClick={() => loadConversation(conv.id)} style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'start', color: '#fff' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{conv.title || c(COPY.untitled, l)}</div>
-                    {conv.summary ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{conv.summary}</div> : null}
-                    <div style={{ fontSize: 10, color: 'rgba(26,240,255,.6)', marginTop: 4 }}>{formatDate(conv.updated_at)} · {conv.message_count}</div>
-                  </button>
-                  <button onClick={() => deleteConversation(conv.id)} title={c(COPY.deleteConfirm, l)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,140,140,.7)', fontSize: 14, padding: '0 2px', flexShrink: 0 }}>🗑</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ── Input area ── */}

@@ -10,7 +10,7 @@ import { builderTaskContract } from './task-contract.ts'
  */
 export const BUILDER_V2_MAX_RECEIPTS = 400
 /** Consecutive receipts that neither changed a file nor passed a command. Debugging (failed run, several reads,
- * a missed edit) is normal work; only a long run with no change and no passing run is a stall. */
+ * a missed edit) is normal work; only a long run with no change and no passing run is a stall, which pauses. */
 export const BUILDER_V2_STALL_LIMIT = 20
 const REJECTION_LIMIT = 3
 const REPEAT_LIMIT = 4
@@ -283,7 +283,7 @@ export class BuilderV2Agent {
       if (previous !== undefined) {
         // Nothing changed since this exact action ran, so it would return the same result (stuck-loop detection
         // as in OpenHands): return that result with the instruction to choose a different step.
-        if (++repeats >= REPEAT_LIMIT) return { ok: false, reason: 'builder_v2_no_progress', steps, checkpoint: await snapshot() }
+        if (++repeats >= REPEAT_LIMIT) return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
         lastReceipt = JSON.stringify({ ok: false, error: 'builder_v2_repeated_action',
           message: 'This exact action already ran and no file has changed since; its result is below. Choose a different next step.',
           previous: JSON.parse(previous) }).slice(0, 20_000)
@@ -307,7 +307,9 @@ export class BuilderV2Agent {
         const checkpoint = await snapshot()
         if (checkpoint) await options.onCheckpoint(checkpoint)
       }
-      if (unproductive >= BUILDER_V2_STALL_LIMIT) return { ok: false, reason: 'builder_v2_no_progress', steps, checkpoint: await snapshot() }
+      // A stall pauses with its checkpoint for the bounded continuation controller (#4590): the next slice
+      // resumes with fresh repeat tracking, and the job's slice cap bounds how often that happens.
+      if (unproductive >= BUILDER_V2_STALL_LIMIT) return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
     }
     if (steps.length >= BUILDER_V2_MAX_RECEIPTS) return { ok: false, reason: 'builder_v2_step_budget_exhausted', steps, checkpoint: await snapshot() }
     return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }

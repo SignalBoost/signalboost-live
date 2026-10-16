@@ -9,7 +9,7 @@ import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './contr
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
 import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, requeueBuilderContinuationCycle, readBuilderWorkspaceFingerprint, type BuilderJobRecord } from './job-store.ts'
-import { builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport } from './work-budget.ts'
+import { MAX_WORK_SLICES, builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport } from './work-budget.ts'
 import { builderContractObjective, builderTaskContract, builderTaskProgress } from './task-contract.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { builderNextAction } from './user-guidance.ts'
@@ -20,7 +20,7 @@ import { BuilderToolLoop } from './tool-loop.ts'
 import { BuilderV2Agent } from './agent-v2.ts'
 import { BuilderV2Dispatcher } from './agent-v2-dispatcher.ts'
 import { runBuilderV2JobCycle } from './agent-v2-job-cycle.ts'
-import { createBuilderV2SupabaseLeaseStore } from './agent-v2-supabase-store.ts'
+import { createBuilderV2SupabaseLeaseStore, pauseBuilderV2Job } from './agent-v2-supabase-store.ts'
 import { createBuilderMcpReadPort } from './mcp-read-port.ts'
 import { createBuilderPlaywrightCliPort } from './playwright-cli-port.ts'
 import { VercelSandboxBuilderRunner } from './vercel-sandbox-runner.ts'
@@ -389,21 +389,22 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
       if (cycle.status === 'paused' && cycle.result?.checkpoint) {
         const reply = historyReply('Builder V2 saved its progress and will continue automatically. Verification is not complete.', job.workspaceId, files)
-        const { data, error } = await db.rpc('pause_builder_job_slice', {
-          p_job_id: job.id, p_user_id: job.userId, p_generation: job.claimGeneration,
-          p_checkpoint: cycle.result.checkpoint, p_reply: reply,
-          p_result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, engine: 'v2' },
-        })
-        if (error || data !== true) throw new Error('builder_v2_checkpoint_persist_failed')
-        return
+        if (await pauseBuilderV2Job(db, {
+          jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
+          checkpoint: cycle.result.checkpoint, reply,
+          result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, engine: 'v2' },
+        })) return
+        // Not paused: either the slice cap is reached (finish with that outcome below) or another claim owns the job.
+        if (job.claimGeneration < MAX_WORK_SLICES) return
       }
       const success = cycle.status === 'verified'
+      const reason = cycle.status === 'paused' ? 'builder_continuation_budget_exhausted' : cycle.reason
       const reply = historyReply(success
         ? `Builder V2 verified the workspace with recorded host test execution. ${cycle.result?.summary || ''}`
-        : `Builder V2 could not complete verification: ${cycle.reason}`, job.workspaceId, files)
+        : `Builder V2 could not complete verification: ${reason}`, job.workspaceId, files)
       await finishBuilderJob({
         jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
-        status: success ? 'succeeded' : 'failed', reply, error: success ? null : cycle.reason,
+        status: success ? 'succeeded' : 'failed', reply, error: success ? null : reason,
         result: { jobId: job.id, workspaceId: job.workspaceId, status: success ? 'succeeded' : 'failed',
           reply, files, engine: 'v2', receipts: cycle.result?.steps ?? [] },
       })

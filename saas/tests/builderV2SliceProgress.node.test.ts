@@ -65,7 +65,7 @@ test('ordinary debugging (failed run, reads, a missed edit) is not a stall', asy
   assert.equal(outcome.ok, true, outcome.reason)
 })
 
-test('an identical action with no change since is answered from its receipt, then bounded', async () => {
+test('an identical action with no change since is answered from its receipt, then pauses the slice', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   await workspace.writeFile('r', 'a.js', 'one\n')
   const prompts: string[] = []
@@ -73,20 +73,22 @@ test('an identical action with no change since is answered from its receipt, the
   const agent = new BuilderV2Agent({ async generate(request) { prompts.push(String(request.prompt)); return read } },
     new BuilderV2Dispatcher(workspace, passing), workspace)
   const outcome = await agent.run({ workspaceId: 'r', objective: 'Fix a.js', maxSteps: 30 })
-  assert.equal(outcome.reason, 'builder_v2_no_progress')
+  assert.equal(outcome.reason, 'builder_v2_step_budget')
+  assert.ok(outcome.checkpoint)
   assert.equal(outcome.steps.length, 1, 'the repeated read was not executed again')
   assert.match(prompts[2], /builder_v2_repeated_action/)
   assert.match(prompts[2], /one\\n/)
 })
 
-test('a long run with no change and no passing command still ends as no progress', async () => {
+test('a long run with no change and no passing command pauses the slice with its checkpoint', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   const failing: BuilderRunnerPort = { async run() { return { exitCode: 1, stdout: '', stderr: 'boom', timedOut: false } } }
   const agent = new BuilderV2Agent({ async generate() { return tool({ tool: 'run_tests', command: 'npm test' }) } },
     new BuilderV2Dispatcher(workspace, failing), workspace)
   const outcome = await agent.run({ workspaceId: 's', objective: 'Run npm test.', maxSteps: 60 })
-  assert.equal(outcome.reason, 'builder_v2_no_progress')
+  assert.equal(outcome.reason, 'builder_v2_step_budget')
   assert.equal(outcome.steps.length, BUILDER_V2_STALL_LIMIT)
+  assert.equal(outcome.checkpoint?.unproductive, BUILDER_V2_STALL_LIMIT)
 })
 
 test('a file the model has read can be rewritten; an unseen one cannot be overwritten', async () => {

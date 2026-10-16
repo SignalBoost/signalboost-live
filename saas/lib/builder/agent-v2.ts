@@ -3,6 +3,43 @@ import { checkpointDigest, workspaceDigest } from './checkpoint.ts'
 import { BuilderV2Dispatcher, type BuilderV2Action, type BuilderV2Receipt } from './agent-v2-dispatcher.ts'
 import { builderTaskContract } from './task-contract.ts'
 
+/**
+ * Whole-job receipt bound. `maxSteps` is the per-slice budget; a resumed job gets a fresh slice budget on top of
+ * its saved receipts. Production 2026-10-16: maxSteps 24 was compared against the saved receipt count, so once a
+ * job had 24 receipts every later slice resumed with zero steps and paused again without progress.
+ */
+export const BUILDER_V2_MAX_RECEIPTS = 400
+/** Consecutive receipts that neither changed a file nor passed a command. Debugging (failed run, several reads,
+ * a missed edit) is normal work; only a long run with no change and no passing run is a stall. */
+export const BUILDER_V2_STALL_LIMIT = 20
+const REJECTION_LIMIT = 3
+const REPEAT_LIMIT = 4
+const TAIL = 8
+
+const SYSTEM_PROMPT = [
+  'You are an autonomous software engineering agent. Choose exactly one tool operation per reply.',
+  'Inspect, write or edit, run the required commands, read real failures and repair them. Never claim verification without a real passing run_tests receipt.',
+  'Reply with one JSON object and nothing else. Shapes:',
+  '{"type":"tool","action":{"tool":"list_files"}}',
+  '{"type":"tool","action":{"tool":"read_file","path":"src/a.js"}}',
+  '{"type":"tool","action":{"tool":"search_files","query":"text"}}',
+  '{"type":"tool","action":{"tool":"write_file","path":"src/a.js","content":"full file content"}}',
+  '{"type":"tool","action":{"tool":"edit_file","path":"src/a.js","search":"exact existing text","replace":"new text"}}',
+  '{"type":"tool","action":{"tool":"run_tests","command":"npm test"}}',
+  '{"type":"finish","summary":"what was built and verified"}',
+  'write_file creates a file; to rewrite an existing file, read_file it first. Prefer edit_file for small changes.',
+  'Write every checklist file, then run every checklist command; finish only after all of them pass after your last change.',
+].join('\n')
+
+/** Older receipts keep only what checkpoint validation and acceptance need, so long builds stay small. */
+function compactReceipt(receipt: BuilderV2Receipt): BuilderV2Receipt {
+  const output = receipt.output as Record<string, unknown> | undefined
+  const kept = receipt.tool === 'run_tests'
+    ? output && { exitCode: output.exitCode, timedOut: output.timedOut, requestedCommand: output.requestedCommand, executedCommand: output.executedCommand }
+    : output && typeof output === 'object' && !Array.isArray(output) && typeof output.path === 'string' ? { path: output.path } : undefined
+  return { tool: receipt.tool, ok: receipt.ok, changed: receipt.changed, ...(receipt.error ? { error: receipt.error } : {}), ...(kept ? { output: kept } : {}) }
+}
+
 export type BuilderV2Checkpoint = Readonly<{
   version: 2
   workspaceId: string
@@ -20,7 +57,7 @@ export type BuilderV2Checkpoint = Readonly<{
  * Rebuild them from host receipts; V1 checkpoints have a different version.
  */
 export function validateBuilderV2ReceiptHistory(checkpoint: BuilderV2Checkpoint): boolean {
-  if (!Array.isArray(checkpoint.steps) || checkpoint.steps.length > 120) return false
+  if (!Array.isArray(checkpoint.steps) || checkpoint.steps.length > BUILDER_V2_MAX_RECEIPTS) return false
   let revision = 0
   let verifiedRevision = -1
   let unproductive = 0
@@ -96,7 +133,9 @@ export type BuilderV2Outcome = Readonly<{
  * reasoning block first; one such reply must not end a whole build. Only a complete JSON object is accepted.
  */
 function controlObject(value: string): unknown {
-  const text = value.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/```(?:json)?/gi, '').trim()
+  // Drop only a leading reasoning block. Fences around the object need no stripping: the balanced-object scan
+  // below skips quoted strings, so ``` inside a write_file/edit_file payload reaches the dispatcher unchanged.
+  const text = value.replace(/^\s*<think>[\s\S]*?<\/think>/i, '').trim()
   try { return JSON.parse(text) } catch { /* fall through to the first balanced object */ }
   for (let start = text.indexOf('{'); start >= 0; start = text.indexOf('{', start + 1)) {
     let depth = 0
@@ -159,48 +198,69 @@ export class BuilderV2Agent {
       if (saved.workspaceDigest !== await workspaceDigest(this.workspace, options.workspaceId)) {
         return { ok: false, reason: 'builder_v2_checkpoint_workspace_changed', steps: [] }
       }
-      if (!validateBuilderV2ReceiptHistory(saved) || [saved.revision, saved.verifiedRevision, saved.unproductive].some(n => !Number.isSafeInteger(n) || n < -1 || n > 120)) {
+      if (!validateBuilderV2ReceiptHistory(saved) || [saved.revision, saved.verifiedRevision, saved.unproductive].some(n => !Number.isSafeInteger(n) || n < -1 || n > BUILDER_V2_MAX_RECEIPTS)) {
         return { ok: false, reason: 'builder_v2_checkpoint_invalid', steps: [] }
       }
     }
     const steps: BuilderV2Receipt[] = [...(saved?.steps || [])]
-    const maxSteps = Math.max(1, Math.min(options.maxSteps ?? 60, 120))
+    const maxSteps = Math.max(1, Math.min(options.maxSteps ?? 60, BUILDER_V2_MAX_RECEIPTS))
     let revision = saved?.revision ?? 0
     let verifiedRevision = saved?.verifiedRevision ?? -1
     let unproductive = saved?.unproductive ?? 0
     let lastReceipt = saved?.lastReceipt ?? ''
-    const snapshot = async (): Promise<BuilderV2Checkpoint | undefined> => this.workspace ? {
-      version: 2, workspaceId: options.workspaceId,
-      objectiveDigest: checkpointDigest(options.objective),
-      workspaceDigest: await workspaceDigest(this.workspace, options.workspaceId),
-      steps: [...steps], revision, verifiedRevision, unproductive, lastReceipt,
-    } : undefined
+    const snapshot = async (): Promise<BuilderV2Checkpoint | undefined> => {
+      if (!this.workspace) return undefined
+      const lastChange = steps.findLastIndex(receipt => receipt.changed)
+      return {
+        version: 2, workspaceId: options.workspaceId,
+        objectiveDigest: checkpointDigest(options.objective),
+        workspaceDigest: await workspaceDigest(this.workspace, options.workspaceId),
+        steps: steps.map((receipt, at) => at < lastChange && at < steps.length - TAIL ? compactReceipt(receipt) : receipt),
+        revision, verifiedRevision, unproductive, lastReceipt,
+      }
+    }
     const checklist = builderTaskContract(options.objective)
+    // Feedback that is not a receipt (rejected finish, unparseable reply, repeated action) keeps the build going
+    // with the exact reason, and each kind is bounded so a model that keeps doing it still ends.
     let checklistRejections = 0
-    for (let i = steps.length; i < maxSteps; i++) {
+    let invalidReplies = 0
+    let repeats = 0
+    // Actions taken since the last file change, with their receipts: repeating one cannot produce new information.
+    const sinceChange = new Map<string, string>()
+    // Content the model has observed per path, for the read-before-overwrite rule.
+    const seen = new Map<string, string>()
+    for (let calls = 0; calls < maxSteps && steps.length < BUILDER_V2_MAX_RECEIPTS; calls++) {
       if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
       let raw: string | null
       try {
         raw = await this.ai.generate({
-          systemPrompt: 'You are an autonomous software engineering agent. Choose one tool operation at a time. Inspect, write or edit, run tests, diagnose failures and repair. Never claim verification without a real passing run_tests receipt. Output JSON only: {"type":"tool","action":{"tool":"list_files"}} or {"type":"finish","summary":"..."}; tools: list_files, read_file, search_files, write_file, edit_file, run_tests.',
+          systemPrompt: SYSTEM_PROMPT,
           prompt: JSON.stringify({
             objective: options.objective,
             ...(checklist.files.length || checklist.commands.length || checklist.minimumTests
               ? { checklist: { files: checklist.files, commands: checklist.commands, minimumTests: checklist.minimumTests } } : {}),
             workspaceId: options.workspaceId,
             lastReceipt,
-            tail: steps.slice(-8),
+            tail: steps.slice(-TAIL),
             verified: verifiedRevision === revision && verifiedRevision >= 0,
-            stepsRemaining: maxSteps - i,
+            stepsRemaining: BUILDER_V2_MAX_RECEIPTS - steps.length,
           }),
           maxTokens: 4096,
           signal: options.signal,
         })
       } catch (error) {
-        return { ok: false, reason: error instanceof Error ? error.message : 'builder_v2_model_error', steps }
+        if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
+        // A model timeout or outage is not a build failure: completed work is checkpointed and the next slice resumes.
+        return { ok: false, reason: 'builder_v2_model_unavailable', summary: error instanceof Error ? error.message : 'builder_v2_model_error', steps, checkpoint: await snapshot() }
       }
       const decision = parseDecision(raw)
-      if (!decision) return { ok: false, reason: 'builder_v2_invalid_model_action', steps }
+      if (!decision) {
+        if (++invalidReplies >= REJECTION_LIMIT) return { ok: false, reason: 'builder_v2_invalid_model_action', steps, checkpoint: await snapshot() }
+        lastReceipt = JSON.stringify({ ok: false, error: 'builder_v2_invalid_model_action',
+          expected: 'exactly one JSON object in one of the shapes from the instructions', received: String(raw ?? '').slice(0, 500) })
+        continue
+      }
+      invalidReplies = 0
       if (decision.type === 'finish') {
         const verified = verifiedRevision === revision && verifiedRevision >= 0
         const listed = await this.dispatcher.dispatch(options.workspaceId, { tool: 'list_files' })
@@ -211,24 +271,45 @@ export class BuilderV2Agent {
         // checklist and keeps working. Not a receipt, so counters rebuilt from receipts on resume stay valid.
         // Bounded so a model that keeps claiming completion ends with the unmet checklist instead of looping.
         const error = verified ? 'builder_v2_checklist_incomplete' : 'builder_v2_unverified_completion'
-        if (++checklistRejections >= 3) return { ok: false, reason: error, steps, checkpoint: await snapshot() }
+        if (++checklistRejections >= REJECTION_LIMIT) return { ok: false, reason: error, steps, checkpoint: await snapshot() }
         lastReceipt = JSON.stringify({ tool: 'finish', ok: false, error, ...acceptance,
           next: acceptance.missingFiles.length ? ['write_file'] : ['run_tests', 'edit_file'] }).slice(0, 20_000)
         continue
       }
-      const receipt = await this.dispatcher.dispatch(options.workspaceId, decision.action)
+      const action = decision.action
+      const signature = JSON.stringify(action)
+      // Commands always execute: only a host run can prove or revoke verification, never a remembered result.
+      const previous = action.tool === 'run_tests' ? undefined : sinceChange.get(signature)
+      if (previous !== undefined) {
+        // Nothing changed since this exact action ran, so it would return the same result (stuck-loop detection
+        // as in OpenHands): return that result with the instruction to choose a different step.
+        if (++repeats >= REPEAT_LIMIT) return { ok: false, reason: 'builder_v2_no_progress', steps, checkpoint: await snapshot() }
+        lastReceipt = JSON.stringify({ ok: false, error: 'builder_v2_repeated_action',
+          message: 'This exact action already ran and no file has changed since; its result is below. Choose a different next step.',
+          previous: JSON.parse(previous) }).slice(0, 20_000)
+        continue
+      }
+      const receipt = await this.dispatcher.dispatch(options.workspaceId, action,
+        action.tool === 'write_file' ? { seenContent: seen.get(action.path) } : {})
       steps.push(receipt)
       if (receipt.changed) revision++
-      if (decision.action.tool === 'run_tests') verifiedRevision = receipt.ok ? revision : -1
+      if (action.tool === 'run_tests') verifiedRevision = receipt.ok ? revision : -1
       lastReceipt = JSON.stringify(receipt).slice(0, 20_000)
-      if (receipt.changed || decision.action.tool === 'run_tests' && receipt.ok) unproductive = 0
+      const output = receipt.output as { content?: unknown; currentContent?: unknown } | undefined
+      if (action.tool === 'read_file' && receipt.ok && typeof output?.content === 'string') seen.set(action.path, output.content)
+      if (action.tool === 'write_file' && typeof output?.currentContent === 'string') seen.set(action.path, output.currentContent)
+      if (action.tool === 'write_file' && receipt.changed) seen.set(action.path, action.content)
+      if (action.tool === 'edit_file' && receipt.changed) seen.delete(action.path)
+      if (receipt.changed) { sinceChange.clear(); repeats = 0 } else if (action.tool !== 'run_tests') sinceChange.set(signature, lastReceipt)
+      if (receipt.changed || action.tool === 'run_tests' && receipt.ok) unproductive = 0
       else unproductive++
       if (options.onCheckpoint) {
         const checkpoint = await snapshot()
         if (checkpoint) await options.onCheckpoint(checkpoint)
       }
-      if (unproductive >= 6) return { ok: false, reason: 'builder_v2_no_progress', steps, checkpoint: await snapshot() }
+      if (unproductive >= BUILDER_V2_STALL_LIMIT) return { ok: false, reason: 'builder_v2_no_progress', steps, checkpoint: await snapshot() }
     }
+    if (steps.length >= BUILDER_V2_MAX_RECEIPTS) return { ok: false, reason: 'builder_v2_step_budget_exhausted', steps, checkpoint: await snapshot() }
     return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
   }
 }

@@ -44,7 +44,13 @@ export class BuilderV2Dispatcher {
     }
   }
 
-  async dispatch(workspaceId: string, action: BuilderV2Action): Promise<BuilderV2Receipt> {
+  /**
+   * `seenContent` is the file content the agent last observed (a read_file result or a conflict receipt). An
+   * existing file is overwritten only when it still equals that content, the read-before-overwrite rule
+   * established coding agents use: a deliberate rewrite of a file the model has seen lands, a stale proposal
+   * against content it never saw does not.
+   */
+  async dispatch(workspaceId: string, action: BuilderV2Action, options: Readonly<{ seenContent?: string }> = {}): Promise<BuilderV2Receipt> {
     if (!workspaceId.trim()) return { tool: action.tool, ok: false, changed: false, error: 'builder_workspace_required' }
     return this.serialized(workspaceId, async () => {
       try {
@@ -68,7 +74,7 @@ export class BuilderV2Dispatcher {
             output: { path: current.path, alreadyApplied: true }, next: ['run_tests', 'read_file', 'edit_file'],
           }
           // Existing files are never silently overwritten by a stale model proposal.
-          if (current) return {
+          if (current && options.seenContent !== current.content) return {
             tool: action.tool, ok: false, changed: false, error: 'builder_write_content_conflict',
             output: { path: current.path, currentContent: current.content },
             next: ['read_file', 'edit_file', 'run_tests'],

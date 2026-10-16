@@ -1,4 +1,5 @@
 import type { BuilderToolTrace } from './contracts.ts'
+import { opensWithCreationDirective } from './regression-gate.ts'
 
 export type BuilderTaskContract = Readonly<{ files: readonly string[]; commands: readonly string[]; requiresRun: boolean; minimumTests: number }>
 
@@ -154,4 +155,17 @@ export function builderTaskProgress(contract: BuilderTaskContract, paths: readon
     testsSatisfied,
     satisfied: missingFiles.length === 0 && pendingCommands.length === 0 && testsSatisfied && !latestRunFailed && (!contract.requiresRun || hasProof),
   }
+}
+
+const EXTENDS_EXISTING_PROJECT = /\b(?:existing|current)\s+(?:app|application|project|codebase|repo|repository|service|code)\b/i
+
+/**
+ * A complete new-application specification: the first instruction builds/creates something, the request lists
+ * at least two required files, and it does not name an existing application it extends. Such a request creates
+ * source rather than resuming it, so an empty selected workspace is a valid target. A request that extends the
+ * existing application stays a continuation so missing saved source still fails closed.
+ */
+export function isNewApplicationSpecification(objective: string): boolean {
+  return opensWithCreationDirective(objective) && !EXTENDS_EXISTING_PROJECT.test(objective)
+    && builderTaskContract(objective).files.length >= 2
 }

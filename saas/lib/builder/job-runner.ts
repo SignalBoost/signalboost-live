@@ -69,7 +69,7 @@ function capacityDeferrable(job: BuilderJobRecord, error: string | null): error 
 }
 
 async function deferSelfHealingCapacity(job: BuilderJobRecord, error: string | null, trace: readonly unknown[], checkpoint: BuilderLoopCheckpoint | null = null): Promise<boolean> {
-  const standardBusy = job.jobKind === 'standard' && (error === 'builder_runpod_primary_busy' || error === 'builder_model_round_timeout')
+  const standardBusy = job.jobKind === 'standard' && (error === 'builder_runpod_primary_busy' || error === 'builder_model_round_timeout' || error === BUILDER_TURN_TIMEOUT_ERROR)
     && metadataCount(job, 'builderCapacityDeferrals') < MAX_STANDARD_CAPACITY_DEFERRALS
   if (!standardBusy && (!selfHealingCapacityJob(job) || !capacityDeferrable(job, error))) return false
   const deferred = await deferBuilderJobForCapacity({ job, reason: error, checkpoint })
@@ -597,10 +597,10 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
     const trace = publicTrace(result.trace)
     // Model capacity is not work: re-queue with this slice's progress before spending a work slice.
-    if (result.ok === false && (result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout')
+    if (result.ok === false && (result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout' || result.error === BUILDER_TURN_TIMEOUT_ERROR)
       && await deferSelfHealingCapacity(job, result.error, trace, result.checkpoint ?? null)) return
     if (result.ok === false && result.checkpoint && builderMayContinue(job, result.checkpoint,
-      result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout')) {
+      result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout' || result.error === BUILDER_TURN_TIMEOUT_ERROR)) {
       const reply = historyReply(result.checkpoint.verificationPending
         ? 'Files written — verifying changes. Builder will continue automatically.'
         : 'Builder saved its progress and will continue automatically. Verification is not complete yet.', job.workspaceId, files)

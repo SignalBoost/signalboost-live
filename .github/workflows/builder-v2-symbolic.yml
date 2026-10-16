@@ -1,0 +1,36 @@
+name: Builder V2 Symbolic Execution
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/builder/agent-v2-job-cycle.ts'
+      - 'saas/scripts/builder-v2-symbolic-timeout.py'
+      - 'saas/tests/builderV2SymbolicTimeout.node.test.ts'
+      - '.github/workflows/builder-v2-symbolic.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  symbolic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install solver and runtime
+        run: |
+          pip install --disable-pip-version-check z3-solver==4.15.3.0
+          npm install --no-audit --no-fund
+      - name: Symbolically enumerate all timeout transition states
+        run: python scripts/builder-v2-symbolic-timeout.py > "$RUNNER_TEMP/v2-symbolic.json"
+      - name: Execute production decision logic against every Z3 state
+        env:
+          BUILDER_V2_Z3_FILE: ${{ runner.temp }}/v2-symbolic.json
+        run: node --test tests/builderV2SymbolicTimeout.node.test.ts

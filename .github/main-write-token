@@ -1,2 +1,2 @@
-base_sha=5f4254ca9bba53de0430019ae6d71c9fb42388e8
-branch=fix/builder-new-app-not-platform-repair-20261016
+base_sha=364c2ff23979cb569a7b038d9089f6bb6a7d8154
+branch=fix/cos-agent-loop-use-what-you-have-20261016

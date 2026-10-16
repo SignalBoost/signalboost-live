@@ -102,3 +102,19 @@ test('Builder V2 still fails closed on a reply with no complete control object',
   assert.equal(outcome.ok, false)
   assert.equal(outcome.reason, 'builder_v2_invalid_model_action')
 })
+
+test('Codex review on #4588: fence and think markers inside a payload reach the workspace unchanged', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const readme = '# MiniFlow\n\n```json\n{"total": 10}\n```\n\n```bash\nnode index.js\n```\n\nThe <think> tag is literal here.</think>\n'
+  const replies = [
+    '```json\n' + tool({ tool: 'write_file', path: 'README.md', content: readme }) + '\n```',
+    '<think>tighten usage</think>\n```\n' + tool({ tool: 'edit_file', path: 'README.md', search: '```bash\nnode index.js\n```', replace: '```bash\nnpm start\n```' }) + '\n```',
+  ]
+  let at = 0
+  const agent = new BuilderV2Agent({ async generate() { return replies[at++] ?? null } },
+    new BuilderV2Dispatcher(workspace, localRunner), workspace)
+  const outcome = await agent.run({ workspaceId: 'fences', objective, maxSteps: 3 })
+  const edits = outcome.steps.filter(step => step.tool === 'write_file' || step.tool === 'edit_file')
+  assert.deepEqual(edits.map(step => step.ok), [true, true])
+  assert.equal((await workspace.readFile('fences', 'README.md'))!.content, readme.replace('node index.js', 'npm start'))
+})

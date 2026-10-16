@@ -9,7 +9,7 @@ import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './contr
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
 import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, requeueBuilderContinuationCycle, readBuilderWorkspaceFingerprint, type BuilderJobRecord } from './job-store.ts'
-import { builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport } from './work-budget.ts'
+import { MAX_WORK_SLICES, builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport } from './work-budget.ts'
 import { builderContractObjective, builderTaskContract, builderTaskProgress } from './task-contract.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { builderNextAction } from './user-guidance.ts'
@@ -394,16 +394,19 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           p_checkpoint: cycle.result.checkpoint, p_reply: reply,
           p_result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, engine: 'v2' },
         })
-        if (error || data !== true) throw new Error('builder_v2_checkpoint_persist_failed')
-        return
+        if (error) throw new Error(`builder_v2_checkpoint_persist_failed: ${error.message}`)
+        if (data === true) return
+        // Not paused: at the slice cap the job finishes below with that outcome; otherwise another claim owns it.
+        if (job.claimGeneration < MAX_WORK_SLICES) return
       }
       const success = cycle.status === 'verified'
+      const reason = cycle.status === 'paused' ? 'builder_continuation_budget_exhausted' : cycle.reason
       const reply = historyReply(success
         ? `Builder V2 verified the workspace with recorded host test execution. ${cycle.result?.summary || ''}`
-        : `Builder V2 could not complete verification: ${cycle.reason}`, job.workspaceId, files)
+        : `Builder V2 could not complete verification: ${reason}`, job.workspaceId, files)
       await finishBuilderJob({
         jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
-        status: success ? 'succeeded' : 'failed', reply, error: success ? null : cycle.reason,
+        status: success ? 'succeeded' : 'failed', reply, error: success ? null : reason,
         result: { jobId: job.id, workspaceId: job.workspaceId, status: success ? 'succeeded' : 'failed',
           reply, files, engine: 'v2', receipts: cycle.result?.steps ?? [] },
       })

@@ -17,8 +17,7 @@ import {
   type BuilderObjectiveFailureCode,
 } from '@/lib/builder/request-contract'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
-import { opensWithCreationDirective } from '@/lib/builder/regression-gate'
-import { builderTaskContract } from '@/lib/builder/task-contract'
+import { isNewApplicationSpecification } from '@/lib/builder/task-contract'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -332,7 +331,8 @@ export async function POST(request: Request) {
     // builds/creates something and the request lists its required files. Production 2026-10-16: the OrderFlow
     // spec sent with an empty saved workspace selected was refused as if it were a continuation. Such a request
     // creates source rather than resuming it, so neither this route nor the worker requires existing source.
-    const creationSpecification = opensWithCreationDirective(objective) && builderTaskContract(objective).files.length >= 2
+    // A request that extends the existing application stays a continuation (Codex review on #4586).
+    const creationSpecification = isNewApplicationSpecification(objective)
     const continuationWorkspace = !newProjectRequested && !creationSpecification && !repositoryTarget && files.length === 0
       && Boolean(project.workspaceId || requestedWorkspaceId)
     if (continuationWorkspace) {

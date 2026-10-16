@@ -5,6 +5,7 @@ import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
 import type { BuilderFile, BuilderRunnerPort, BuilderRunResult, BuilderWorkspacePort } from './contracts.ts'
 import type { SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
 import { SIGNALBOOST_REPOSITORY_URL } from './repository-repair-target.ts'
+import { applySearchReplace } from './edit-match.ts'
 
 const REPOSITORY_ROOT = '/tmp/cos-signalboost-repair'
 const PROJECT_ROOT = `${REPOSITORY_ROOT}/saas`
@@ -380,10 +381,9 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
     if (!search) throw new Error('builder_edit_search_required')
     const current = await this.readFile(workspaceId, path)
     if (!current) throw new Error('builder_file_not_found')
-    const first = current.content.indexOf(search)
-    if (first < 0) throw new Error('builder_edit_search_not_found')
-    if (current.content.indexOf(search, first + search.length) >= 0) throw new Error('builder_edit_search_not_unique')
-    return this.writeFile(workspaceId, path, `${current.content.slice(0, first)}${String(replaceValue ?? '')}${current.content.slice(first + search.length)}`)
+    const edited = applySearchReplace(current.content, search, String(replaceValue ?? ''))
+    if (edited.ok === false) throw new Error(edited.error === 'builder_edit_target_ambiguous' ? 'builder_edit_search_not_unique' : 'builder_edit_search_not_found')
+    return this.writeFile(workspaceId, path, edited.content)
   }
 
   async run(input: { workspaceId: string; command: string; files: readonly BuilderFile[] }): Promise<BuilderRunResult> {

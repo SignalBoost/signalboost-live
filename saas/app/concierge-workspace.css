@@ -48,15 +48,22 @@ body:has(.sb-ai-app-shell--home) > footer {
   flex: 1 1 auto;
 }
 
-/* ── Conversation history: a toggle in the corner, opening as a drawer
-      over the canvas. It never takes width from the rendering surface. ── */
+/* ── Conversation history: a permanent column on the far left on desktop (the canvas
+      starts after it), a toggle on phones. Plain list — no box around it. ── */
 .concierge-shell > .cos-home-history {
   position: absolute;
-  inset-block-start: 10px;
-  inset-inline-start: var(--cos-gutter);
+  inset-block: 0;
+  inset-inline-start: 0;
   z-index: 12;
-  width: min(300px, calc(100% - 2 * var(--cos-gutter)));
+  width: auto;
+  padding: 10px 12px;
+  box-sizing: border-box;
   color: #e2e8f0;
+}
+
+.concierge-shell .cos-history-rail {
+  position: sticky;
+  top: var(--cos-nav-h);
 }
 
 .concierge-shell .cos-history-toggle,
@@ -106,14 +113,10 @@ body:has(.sb-ai-app-shell--home) > footer {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-height: min(60vh, 520px);
+  max-height: calc(100svh - var(--cos-nav-h) - 70px);
   margin-top: 6px;
-  padding: 8px;
   overflow-y: auto;
-  border: 1px solid rgba(148, 163, 184, .18);
-  border-radius: 12px;
-  background: rgba(4, 8, 18, .97);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, .45);
+  scrollbar-gutter: stable;
 }
 
 .concierge-shell .cos-history-items p {
@@ -122,11 +125,24 @@ body:has(.sb-ai-app-shell--home) > footer {
   font-size: 12px;
 }
 
-/* The open history panel takes its own column: the conversation starts after it instead of
+/* The open history column reserves its width, so the conversation starts after it instead of
    running underneath it (production 2026-10-16: transcript text was hidden behind the panel). */
 @media (min-width: 901px) {
-  .concierge-shell > .cos-home-history.is-open { inset-inline-start: 12px; width: 238px; }
+  .concierge-shell > .cos-home-history.is-open { width: 250px; border-inline-end: 1px solid rgba(148, 163, 184, .14); }
   .concierge-shell:has(> .cos-home-history.is-open) { padding-inline-start: 262px !important; }
+}
+
+/* Phones: the open list drops down over the canvas, so it gets a solid surface. */
+@media (max-width: 900px) {
+  .concierge-shell > .cos-home-history { inset-block: 0 auto; width: min(300px, calc(100% - 24px)); }
+  .concierge-shell .cos-history-items {
+    max-height: 60vh;
+    padding: 8px;
+    border: 1px solid rgba(148, 163, 184, .18);
+    border-radius: 12px;
+    background: rgba(4, 8, 18, .97);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .45);
+  }
 }
 
 /* ── Empty state: the canvas stays open; a one-line greeting sits above the prompt ── */

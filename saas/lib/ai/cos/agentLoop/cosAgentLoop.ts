@@ -12,7 +12,7 @@
 
 import type { LocalModelChatMessage, LocalModelToolCall, LocalModelToolDefinition, LocalModelTurnResult } from '../../local-inference.ts'
 import { CRITIC_SYSTEM_PROMPT, actionKey, criticMessages, detectStuck, observationIsError, parseCriticVerdict, refinementPrompt, shouldRefine, stuckNudge, type LoopStep } from './openhandsPatterns.ts'
-import { ANSWER_RESERVE_MS, agentToolDefinitions, emptyEvidence, executeAgentTool, searchObservation, type AgentEvidence, type AgentSearchResult, type AgentToolPolicy, type AgentToolPorts } from './cosAgentTools.ts'
+import { agentToolDefinitions, answerReserveMs, emptyEvidence, executeAgentTool, searchObservation, type AgentEvidence, type AgentSearchResult, type AgentToolPolicy, type AgentToolPorts } from './cosAgentTools.ts'
 
 export type AgentModelTurn = (input: {
   systemPrompt: string
@@ -383,7 +383,7 @@ export async function runCosAgentLoop(input: {
       rounds += 1
       // The last round always happens with tools off while the answer reserve remains, so a turn
       // whose tools ran long still answers from what it gathered instead of ending with nothing.
-      const finalRound = forceAnswer || rounds === MAX_ROUNDS || remainingMs() < ANSWER_RESERVE_MS + 5_000
+      const finalRound = forceAnswer || rounds === MAX_ROUNDS || remainingMs() < answerReserveMs(input.policy) + 5_000
       const roundStartedAt = now()
       const turn = await input.model({
         systemPrompt,
@@ -450,7 +450,7 @@ export async function runCosAgentLoop(input: {
       if (!verdict) break
       reviewed = { answer, score: verdict.score }
       if (!best || verdict.score >= best.score) best = reviewed
-      const refine = shouldRefine(verdict, iteration) && remainingMs() > ANSWER_RESERVE_MS + 15_000
+      const refine = shouldRefine(verdict, iteration) && remainingMs() > answerReserveMs(input.policy) + 15_000
       trace.critic.push({ parts: verdict.parts, missing: verdict.missing.length, refined: refine })
       if (!refine) break
       messages.push({ role: 'assistant', content: answer }, { role: 'user', content: refinementPrompt(verdict, iteration + 1) })

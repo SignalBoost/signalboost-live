@@ -630,3 +630,23 @@ test('cos-primary gates, records and bounds agent live-fact answers', () => {
   assert.match(route, /attachFreshEvidenceProvenance\(authoritativeProvenance\(null,\{invoked:false\}\),\{sources:payload\.sources/)
   assert.match(route, /live_evidence_sources:payload\.sources\.map\(source=>\(\{id:source\.id,title:source\.title,url:source\.url\}\)\)/)
 })
+
+// Codex #4574: a 30 s live-fact loop with the 25 s chart reserve could never call a tool.
+test('a short live-fact loop with its own answer reserve still searches', async () => {
+  const choices: unknown[] = []
+  const searched: string[] = []
+  const model: AgentModelTurn = async request => {
+    choices.push(request.toolChoice)
+    return choices.length === 1 ? call('c1', 'web_search', { query: 'Canberra population' }) : answer('Canberra.')
+  }
+  const run = (answerReserveMs?: number) => runCosAgentLoop({ request: 'capital of Australia and its population?', language: 'en', model, ports: ports(fakePython({ stdout: '' }), { search: async query => { searched.push(query); return [] } }), policy: { maxPythonRuns: 1, browserAllowed: false, answerReserveMs }, deadlineAt: Date.now() + 25_000 })
+  await run(8_000)
+  assert.equal(choices[0], 'auto')
+  assert.deepEqual(searched, ['Canberra population'])
+  choices.length = 0
+  searched.length = 0
+  await run(undefined)
+  assert.equal(choices[0], 'none', 'with the default 25 s reserve, a short loop goes straight to the answer')
+  const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  assert.match(route, /turn\.liveFact\?\{\.\.\.basePolicy,answerReserveMs:LIVE_FACT_ANSWER_RESERVE_MS\}:basePolicy/)
+})

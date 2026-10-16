@@ -333,6 +333,9 @@ type AgentComputeTurn={startedAt:number;input:string;language:string;body:any;us
 const LIVE_FACT_LOOP_BUDGET_MS=30_000
 const LIVE_FACT_FALLBACK_RESERVE_MS=15_000
 const LIVE_FACT_MIN_LOOP_MS=10_000
+// The final answer round for a live fact takes 2-7 s in production (2026-10-16 probes); the 25 s
+// chart reserve would leave a 30 s live-fact loop no time for tools (Codex #4574).
+const LIVE_FACT_ANSWER_RESERVE_MS=8_000
 
 function agentChartJson(startedAt:number,input:string,payload:{reply:string;source:string;png?:Buffer;filename?:string;sources:FreshEvidenceSource[];reasonerLabel:string|null;modelInvoked:boolean;loop?:unknown}){
   // Structured evidence records (Codex #4564): provenance introspection and answerEvidenceSources read source objects, not URL strings.
@@ -361,7 +364,8 @@ async function agentComputeResponse(turn:AgentComputeTurn):Promise<NextResponse|
     ? Math.min(LIVE_FACT_LOOP_BUDGET_MS,remaining===null?LIVE_FACT_LOOP_BUDGET_MS:remaining-LIVE_FACT_FALLBACK_RESERVE_MS)
     : Math.min(AGENT_LOOP_BUDGET_MS,remaining===null?AGENT_LOOP_BUDGET_MS:Math.max(0,remaining-10_000))
   if(turn.liveFact&&loopBudgetMs<LIVE_FACT_MIN_LOOP_MS)return null
-  const policy=cosAgentToolPolicy({ownerAuthenticated:turn.ownerAuthenticated,signedIn:Boolean(turn.userId)})
+  const basePolicy=cosAgentToolPolicy({ownerAuthenticated:turn.ownerAuthenticated,signedIn:Boolean(turn.userId)})
+  const policy=turn.liveFact?{...basePolicy,answerReserveMs:LIVE_FACT_ANSWER_RESERVE_MS}:basePolicy
   const history=(Array.isArray(turn.body?.messages)?turn.body.messages:[])
     .filter((message:any)=>(message?.role==='user'||message?.role==='assistant')&&typeof message?.content==='string')
     .slice(0,-1)

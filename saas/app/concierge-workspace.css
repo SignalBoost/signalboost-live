@@ -393,3 +393,35 @@ body:has(.sb-ai-app-shell--home) > footer {
 
 /* Compact suggestions follow the right-anchored prompt without constraining result media. */
 .concierge-shell .welcome-composer .suggestions { justify-content: flex-end !important; }
+
+/*
+ * Shared layout contract:
+ * - Home: borderless Concierge workspace, aligned with its prompt column.
+ * - Canvas: full-viewport tool/dashboard workspaces, never capped to reading width.
+ * - Content: centered informational reading column, never applied to tools.
+ */
+.sb-ai-app-shell--canvas,
+.sb-ai-app-shell--canvas > .sb-ai-workspace {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+.sb-ai-app-shell--content {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  padding-inline: clamp(12px, 2vw, 24px);
+}
+.sb-ai-app-shell--content > .sb-ai-workspace {
+  width: 100% !important;
+  max-width: 1200px !important;
+  min-width: 0 !important;
+  margin-inline: auto !important;
+  box-sizing: border-box;
+}
+@media (max-width: 768px) {
+  .sb-ai-app-shell--content { padding-inline: 12px; }
+  .sb-ai-app-shell--content > .sb-ai-workspace { max-width: 100% !important; }
+}

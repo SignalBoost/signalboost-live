@@ -11,9 +11,13 @@ import { publicLocaleFromPath } from '@/lib/seo/publicLocales'
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isConciergeHome = pathname === '/' || Boolean(publicLocaleFromPath(pathname))
+  // Workspace routes need the entire viewport for tools, results, charts and editors.
+  // Only informational routes use a centered reading column.
+  const isContentPage = /^\/(?:pricing|faq|about|contact|privacy|terms|docs)(?:\/|$)/.test(pathname || '')
+  const layoutMode = isConciergeHome ? 'home' : isContentPage ? 'content' : 'canvas'
 
   return (
-    <div className={isConciergeHome ? 'sb-ai-app-shell sb-ai-app-shell--home' : 'sb-ai-app-shell sb-ai-app-shell--canvas'}>
+    <div className={`sb-ai-app-shell sb-ai-app-shell--${layoutMode}`}>
       <div className="sb-ai-workspace" role="presentation">
         {children}
       </div>

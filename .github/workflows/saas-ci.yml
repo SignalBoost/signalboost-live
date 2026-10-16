@@ -399,3 +399,9 @@ jobs:
         env:
           LAB_Z3_CASES_FILE: /tmp/lab-z3-cases.json
         run: node --test tests/labSymbolicArtifactCallback.node.test.ts
+      - name: Solve all LAB job lifecycle failure paths
+        run: python scripts/lab-symbolic-job-lifecycle.py > /tmp/lab-z3-jobs.json
+      - name: Replay Z3 job paths against customer LAB orchestration
+        env:
+          LAB_Z3_JOBS_FILE: /tmp/lab-z3-jobs.json
+        run: node --test tests/labSymbolicJobLifecycle.node.test.ts

@@ -73,4 +73,5 @@ jobs:
           }
           notice('provenance', JSON.stringify(pick))
           notice('keys', Object.keys(data).join(','))
+          if (p.agent_tool_loop) notice('agent tool loop', JSON.stringify(p.agent_tool_loop).slice(0, 4000))
           NODE

@@ -556,3 +556,12 @@ test('inline commands preserve quoted punctuation and exclude quoted instruction
   assert.deepEqual(builderTaskContract('Run: `npm test`. Report the result.').commands, ['npm test'])
   assert.deepEqual(builderTaskContract('Create app.js that prints "Hello. Run: node other.js.".').commands, [])
 })
+
+
+test('verified completion is evaluated before repeated inspection exhaustion', () => {
+  const source = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
+  const completion = source.indexOf('progress.satisfied && pendingOrder.length === 0 && chunks.size === 0')
+  const guard = source.indexOf('if (!missingBuildDeliverables && deniedInspections >= 4)')
+  assert.ok(completion > 0 && guard > completion, 'completed evidence-backed jobs must not fail on redundant read refusals')
+  assert.match(source, /deniedInspections >= 4/, 'the finite anti-loop stop remains enforced')
+})

@@ -85,8 +85,10 @@ test('the agent loop fetches data, runs code on the staged file and returns a ve
   assert.equal(last[1].tool_calls?.[0].id, 'c1')
   assert.equal(last[2].role, 'tool')
   assert.equal(last[2].tool_call_id, 'c1')
-  // Cited URLs the turn never retrieved are removed; retrieved ones stay.
-  assert.match(result.reply, /\[Yahoo Finance\]\(https:\/\/query1\.finance\.yahoo\.com/)
+  // Cited URLs the turn never retrieved are removed; retrieved ones stay, shown as the public page
+  // for that data rather than the raw API it was fetched from.
+  assert.match(result.reply, /\[Yahoo Finance\]\(https:\/\/finance\.yahoo\.com\/quote\/VNCE\/history\)/)
+  assert.doesNotMatch(result.reply, /query1\.finance\.yahoo\.com/)
   assert.doesNotMatch(result.reply, /invented\.example\.com/)
   assert.equal(result.verification.droppedUrls, 1)
 })

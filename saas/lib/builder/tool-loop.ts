@@ -813,7 +813,7 @@ export class BuilderToolLoop {
         .filter(toolId => !repairMutationRequired || toolId === 'write_file' || toolId === 'edit_file')
         // Once a new application's required file is missing, stop offering stale
         // inspection/runner actions. The next model call must finish the named file.
-        .filter(toolId => !missingBuildDeliverables || deniedInspections < 2 || toolId === 'write_file')
+        .filter(toolId => !missingBuildDeliverables || task.files.length <= 1 || deniedInspections < 2 || toolId === 'write_file')
 
       const promptParts = [
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),

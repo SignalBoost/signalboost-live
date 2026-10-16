@@ -1,2 +1,2 @@
-base_sha=adf171c0101e183c3ba80e72f7b8b2e6db819d2c
-branch=feat/cos-agent-openhands-critic-stuck-20261016
+base_sha=89d5cd3318afea697d3b567ade2c58db7679a48a
+branch=fix/lab-holdout-duplicate-prompts-20261016

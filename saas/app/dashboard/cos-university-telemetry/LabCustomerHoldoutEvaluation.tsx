@@ -22,7 +22,7 @@ export default function LabCustomerHoldoutEvaluation({language,runId,baseModel,t
  const [raw,setRaw]=useState('')
  const [training,setTraining]=useState('')
  const [requested,setRequested]=useState(false)
- const result=useMemo(()=>{if(!requested)return null;try{const leakage=inspectHoldoutLeakage(training,raw); if(!leakage.safeToScore)throw new Error(leakage.overlappingPrompts ? `holdout_training_overlap: ${leakage.overlappingPrompts}` : 'training_and_holdout_prompts_required'); const score=scoreCustomerHoldout(raw); return {score,evidence:customerHoldoutEvidence({runId,baseModel,trainedModel,score,leakage}),error:null}}catch(e){return {score:null,evidence:null,error:e instanceof Error?e.message:'invalid'}}},[raw,training,requested,runId,baseModel,trainedModel])
+ const result=useMemo(()=>{if(!requested)return null;try{const leakage=inspectHoldoutLeakage(training,raw); if(!leakage.safeToScore)throw new Error(leakage.overlappingPrompts ? `holdout_training_overlap: ${leakage.overlappingPrompts}` : leakage.duplicateEvaluationPrompts ? `duplicate_holdout_prompts: ${leakage.duplicateEvaluationPrompts}` : 'training_and_holdout_prompts_required'); const score=scoreCustomerHoldout(raw); return {score,evidence:customerHoldoutEvidence({runId,baseModel,trainedModel,score,leakage}),error:null}}catch(e){return {score:null,evidence:null,error:e instanceof Error?e.message:'invalid'}}},[raw,training,requested,runId,baseModel,trainedModel])
  const percent=(n:number)=>`${(n*100).toFixed(1)}%`
  return <details className="mt-3 rounded border border-white/20 p-3 text-sm">
   <summary className="cursor-pointer font-semibold">{t[0]}</summary>

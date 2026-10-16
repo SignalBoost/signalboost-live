@@ -16,3 +16,11 @@ test('refuses missing or malformed training inputs instead of claiming a clean h
  assert.equal(inspectHoldoutLeakage('{oops',held('q')).safeToScore,false)
  assert.equal(inspectHoldoutLeakage(row('p'),'{oops').safeToScore,false)
 })
+
+
+test('rejects repeated evaluation questions even when case and whitespace differ',()=>{
+ const x=inspectHoldoutLeakage(row('training only'),[held('  Same   question '),held('same question')].join('\n'))
+ assert.equal(x.evaluationPrompts,2)
+ assert.equal(x.duplicateEvaluationPrompts,1)
+ assert.equal(x.safeToScore,false)
+})

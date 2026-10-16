@@ -263,3 +263,14 @@ test('the loop trace records why a turn produced no answer', async () => {
   assert.match(unsupported.steps[0].observation, /^Fetched https:\/\/query1\.finance\.yahoo\.com/)
   assert.equal((await run([call('c1', 'fetch_url', { url: YAHOO_URL }), answer('VNCE closed at $13.33.')])).outcome, 'answered')
 })
+
+// Production 2026-10-16: the agent loop's code-writing round was cut by the 20 s one-pass clamp
+// ("Inference transport deadline exceeded") and every chart fell back. Loop rounds use the loop's bound.
+test('agent-loop model rounds are not clamped to the one-pass interactive timeout', () => {
+  const inference = readFileSync(join(process.cwd(), 'lib/ai/local-inference.ts'), 'utf8')
+  const clamp = inference.slice(inference.indexOf('function interactiveModelTimeoutMs'), inference.indexOf('function modelForRequest'))
+  assert.match(clamp, /if \(agentToolLoopRound\(args\)\) return Math\.min\(configTimeoutMs, 60_000\)/)
+  assert.ok(clamp.indexOf('agentToolLoopRound(args)') < clamp.indexOf('COS_INTERACTIVE_MODEL_TIMEOUT_MS'))
+  const seam = readFileSync(join(process.cwd(), 'lib/ai/cos/cosAgentDecision.ts'), 'utf8')
+  assert.match(seam, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'agent_tool_loop' \}/)
+})

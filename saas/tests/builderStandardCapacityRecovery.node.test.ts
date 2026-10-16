@@ -7,7 +7,7 @@ const sql = readFileSync(new URL('../supabase/migrations/20261013225000_builder_
 
 test('ordinary standard jobs defer busy RunPod with bounded retries before terminal failure', () => {
   assert.match(runner, /MAX_STANDARD_CAPACITY_DEFERRALS = 3/)
-  assert.match(runner, /job\.jobKind === 'standard' && \(error === 'builder_runpod_primary_busy' \|\| error === 'builder_model_round_timeout'\)/)
+  assert.match(runner, /job\.jobKind === 'standard' && \(error === 'builder_runpod_primary_busy' \|\| error === 'builder_model_round_timeout' \|\| error === BUILDER_TURN_TIMEOUT_ERROR\)/)
   assert.match(runner, /metadataCount\(job, 'builderCapacityDeferrals'\) < MAX_STANDARD_CAPACITY_DEFERRALS/)
   // The re-queue carries the slice's current checkpoint, never a stale earlier one.
   assert.match(runner, /result\.error === 'builder_runpod_primary_busy'[\s\S]*await deferSelfHealingCapacity\(job, result\.error, trace, result\.checkpoint \?\? null\)/)

@@ -1,4 +1,7 @@
-/* Homepage Concierge is the product working surface, not a marketing card with chat attached. */
+/* saas/app/concierge-workspace.css */
+/* Homepage COS workspace — the single layout source for the Concierge home.
+   The whole screen is the rendering canvas for the user's requests; the prompt is
+   pinned at the bottom. No centered page box, no side column, no message cards. */
 
 body:has(.sb-ai-app-shell--home) > main {
   display: flex;
@@ -13,451 +16,263 @@ body:has(.sb-ai-app-shell--home) > footer {
 
 .sb-ai-app-shell--home,
 .sb-ai-app-shell--home > .sb-ai-workspace {
-  display: flex !important;
+  display: flex;
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
   flex-direction: column;
 }
 
+/* ── Shell: one rendering canvas with the prompt pinned at the bottom ──── */
 .concierge-shell {
-  width: 100% !important;
-  max-width: none !important;
-  min-width: 0 !important;
-  min-height: calc(100svh - 154px) !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: #030611 !important;
-  box-shadow: none !important;
-  overflow: hidden !important;
+  --cos-nav-h: 60px;
+  --cos-gutter: clamp(16px, 2.4vw, 40px);
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: calc(100svh - var(--cos-nav-h));
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  background: #030611;
+  color: #fff;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  overflow: clip;
 }
 
-.concierge-shell .aurora {
-  inset: -12% !important;
-  opacity: 0.34;
+.concierge-shell > .welcome-card,
+.concierge-shell > .thread-wrap {
+  flex: 1 1 auto;
 }
 
-/* Empty conversation: greeting shares the prompt's right-anchored column. */
+/* ── Conversation history: a toggle in the corner, opening as a drawer
+      over the canvas. It never takes width from the rendering surface. ── */
+.concierge-shell > .cos-home-history {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-start: var(--cos-gutter);
+  z-index: 12;
+  width: min(300px, calc(100% - 2 * var(--cos-gutter)));
+  color: #e2e8f0;
+}
+
+.concierge-shell .cos-history-toggle,
+.concierge-shell .cos-history-entry {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.concierge-shell .cos-history-toggle {
+  width: auto;
+  color: rgba(226, 232, 240, .62);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.concierge-shell .cos-history-entry {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(226, 232, 240, .86);
+}
+
+.concierge-shell .cos-history-entry:first-child {
+  margin-bottom: 6px;
+  border: 1px solid rgba(148, 163, 184, .22);
+  font-weight: 700;
+}
+
+.concierge-shell .cos-history-toggle:hover,
+.concierge-shell .cos-history-entry:hover {
+  background: rgba(255, 255, 255, .06);
+  color: #fff;
+}
+
+.concierge-shell .cos-history-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: min(60vh, 520px);
+  margin-top: 6px;
+  padding: 8px;
+  overflow-y: auto;
+  border: 1px solid rgba(148, 163, 184, .18);
+  border-radius: 12px;
+  background: rgba(4, 8, 18, .97);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .45);
+}
+
+.concierge-shell .cos-history-items p {
+  margin: 4px 10px;
+  color: rgba(226, 232, 240, .5);
+  font-size: 12px;
+}
+
+/* The open history panel takes its own column: the conversation starts after it instead of
+   running underneath it (production 2026-10-16: transcript text was hidden behind the panel). */
+@media (min-width: 901px) {
+  .concierge-shell > .cos-home-history.is-open { inset-inline-start: 12px; width: 238px; }
+  .concierge-shell:has(> .cos-home-history.is-open) { padding-inline-start: 262px !important; }
+}
+
+/* ── Empty state: the canvas stays open; a one-line greeting sits above the prompt ── */
 .concierge-shell .welcome-card {
-  display: flex !important;
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  padding: clamp(54px, 10vh, 112px) 24px 26px !important;
-  align-items: center !important;
-  justify-content: flex-end !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  text-align: end;
-  overflow: visible !important;
-}
-
-.concierge-shell .welcome-copy {
-  width: min(920px, 100%);
-  max-width: 920px !important;
-  margin-inline-start: auto;
-  margin-inline-end: clamp(12px, 2vw, 28px);
-}
-
-.concierge-shell .welcome-card .eyebrow {
-  margin-bottom: 10px !important;
-  opacity: 0.72;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 0;
+  padding: 64px var(--cos-gutter) 12px;
+  text-align: start;
 }
 
 .concierge-shell .welcome-card h1 {
-  max-width: 900px;
-  margin-block: 8px 12px !important;
-  margin-inline-start: auto !important;
-  margin-inline-end: 0 !important;
-  font-size: clamp(34px, 4.3vw, 54px) !important;
-  line-height: 1.08 !important;
-  letter-spacing: -0.04em !important;
+  margin: 12px 0;
+  font-size: clamp(26px, 2.6vw, 38px);
+  line-height: 1.08;
+  letter-spacing: -.04em;
 }
 
 .concierge-shell .welcome-lead {
-  max-width: 700px !important;
-  margin-block: 0 !important;
-  margin-inline-start: auto !important;
-  margin-inline-end: 0 !important;
-  color: rgba(255,255,255,.54) !important;
-  font-size: 14px !important;
+  margin: 0;
+  color: rgba(255, 255, 255, .56);
+  font-size: 15px;
+  line-height: 1.6;
 }
 
-/* Remove the old landing-page CTAs and decorative hero badge completely. */
-.concierge-shell .welcome-actions,
-.concierge-shell .welcome-mark,
-.concierge-shell a[href="/dashboard/assistant"] {
-  display: none !important;
-}
-
-/* Empty-state composer sits under the greeting like a real assistant workspace. */
-.concierge-shell .welcome-composer {
-  position: relative !important;
-  bottom: auto !important;
-  z-index: 3;
-  width: min(920px, calc(100% - 28px));
-  align-self: flex-end;
-  margin-inline-start: auto !important;
-  margin-inline-end: clamp(12px, 2vw, 28px) !important;
-  padding: 0 0 34px !important;
-  border-top: 0 !important;
-  background: transparent !important;
-  backdrop-filter: none !important;
-}
-
-.concierge-shell .welcome-composer .composer {
-  border-radius: 24px !important;
-  padding: 10px !important;
-  background: rgba(8, 14, 29, .96) !important;
-  border-color: rgba(103, 232, 249, .34) !important;
-  box-shadow: 0 18px 70px rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.02) !important;
-}
-
-.concierge-shell .welcome-composer textarea {
-  min-height: 54px;
-  font-size: 15px !important;
-}
-
-.concierge-shell .welcome-composer .suggestions {
-  margin: 12px auto 0 !important;
-}
-
-/* Active conversation: only the workspace controls remain above the thread. */
+/* ── Active conversation ────────────────────────────────────────────────── */
 .concierge-shell .assistant-header {
-  display: flex !important;
-  justify-content: flex-end !important;
-  min-height: 44px;
-  margin: 0 !important;
-  padding: 8px 18px !important;
-  border: 0 !important;
-  border-bottom: 1px solid rgba(255,255,255,.08) !important;
-  border-radius: 0 !important;
-  background: rgba(3, 6, 17, .86) !important;
-}
-
-.concierge-shell .assistant-header .header-copy {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  padding: 0 !important;
-  margin: -1px !important;
-  overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
-  white-space: nowrap !important;
-  border: 0 !important;
-}
-
-.concierge-shell .assistant-header .header-actions a {
-  display: none !important;
-}
-
-.concierge-shell .assistant-header .header-actions {
-  width: 100%;
-  justify-content: flex-end !important;
-}
-
-.concierge-shell .assistant-header .secondary-button {
-  padding: 7px 12px !important;
-  border-color: rgba(255,255,255,.14) !important;
-  background: rgba(255,255,255,.04) !important;
-  color: rgba(255,255,255,.78) !important;
-}
-
-/* Conversation owns vertical scrolling; horizontal overflow is contained locally. */
-.concierge-shell .thread-wrap {
-  position: relative;
   display: flex;
-  flex: 1 1 0 !important;
-  width: 100%;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  overflow: hidden;
+  justify-content: flex-end;
+  padding: 10px var(--cos-gutter);
+}
+
+.concierge-shell .header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.concierge-shell .thread-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .concierge-shell .thread {
-  flex: 1 1 0 !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  height: 100% !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  padding: 24px clamp(12px, 2vw, 28px) 32px !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  scrollbar-gutter: stable;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 32px;
+  padding: 8px var(--cos-gutter) 32px;
+  scroll-behavior: smooth;
+}
+
+.concierge-shell .exchange {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.concierge-shell .message-row {
+  display: block;
+  width: 100%;
+}
+
+.concierge-shell .message {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   box-sizing: border-box;
 }
 
-/* Full-bleed answer surface: assistant output may use the monitor instead of a centered card. */
-.concierge-shell .exchange {
-  width: 100% !important;
-  max-width: none !important;
-  min-width: 0 !important;
-  margin: 0 !important;
-}
-
-.concierge-shell .message {
-  max-width: 100% !important;
-  min-width: 0 !important;
-}
-
+/* The request is marked by a thin gold rule — not a bubble or a card. */
 .concierge-shell .user-message {
-  width: 100% !important;
-  max-width: none !important;
-  padding: 8px 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-.concierge-shell .user-row,
-.concierge-shell .assistant-row {
-  width: 100% !important;
-  justify-content: flex-start !important;
-}
-.concierge-shell .message {
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
-.concierge-shell .thread,
-.concierge-shell .thread-wrap {
-  max-width: none !important;
+  padding-inline-start: 14px;
+  border-inline-start: 3px solid rgba(255, 195, 0, .7);
 }
 
-
-.concierge-shell .assistant-message {
-  width: 100% !important;
-  max-width: none !important;
-  min-width: 0 !important;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-  border: 0 !important;
-  background: transparent !important;
-  overflow: visible;
+.concierge-shell .thread-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 var(--cos-gutter) 10px;
 }
 
-.concierge-shell .assistant-content {
-  width: 100% !important;
-  max-width: none !important;
-  min-width: 0 !important;
+/* Assistant output is content, not a card: media fills the canvas width. */
+.concierge-shell .assistant-content img,
+.concierge-shell .assistant-content svg,
+.concierge-shell .assistant-content canvas,
+.concierge-shell .assistant-content video {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
-/* Generated visuals are content, not cards: no frame, white mat, padding, or artificial square. */
-.concierge-shell [data-concierge-visual-preview="true"] {
-  width: 100% !important;
-  max-width: none !important;
-  aspect-ratio: auto !important;
-  margin: 16px 0 12px !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  overflow: visible !important;
-}
-
-.concierge-shell [data-concierge-visual-preview="true"] img {
-  display: block !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  height: auto !important;
-  border-radius: 0 !important;
-  object-fit: contain !important;
+.concierge-shell .assistant-content figure,
+.concierge-shell .assistant-content .image-container {
+  max-width: 100%;
+  height: auto;
 }
 
 .concierge-shell .assistant-message pre {
   max-width: 100%;
   overflow-x: auto;
   border-radius: 12px;
-  scrollbar-gutter: stable;
 }
 
 .concierge-shell .assistant-message iframe {
-  width: 100% !important;
-  max-width: none !important;
+  width: 100%;
   min-height: 460px;
   max-height: 70vh;
 }
 
-.concierge-shell .assistant-message a[download] {
-  min-height: 34px;
-}
-
-/* Active composer stays pinned to the bottom of the visible workspace. */
-.concierge-shell .composer-area:not(.welcome-composer) {
-  position: sticky !important;
+/* ── Composer: pinned to the bottom of the canvas, full canvas width ───── */
+.concierge-shell .composer-area {
+  position: sticky;
   bottom: 0;
   z-index: 8;
-  flex-shrink: 0;
-  margin-top: 0 !important;
-  padding: 12px 18px 16px;
-  border-top: 1px solid rgba(255,255,255,.08);
-  background: linear-gradient(180deg, rgba(3,6,17,.64), rgba(3,6,17,.98) 28%);
+  padding: 12px var(--cos-gutter) 16px;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  background: linear-gradient(180deg, rgba(3, 6, 17, .7), rgba(3, 6, 17, .98) 30%);
   backdrop-filter: blur(18px);
 }
 
-.concierge-shell .composer-area:not(.welcome-composer) .composer,
-.concierge-shell .composer-area:not(.welcome-composer) .attachments,
-.concierge-shell .composer-area:not(.welcome-composer) .composer-hint {
-  width: min(980px, 100%);
-  margin-inline-start: auto !important;
-  margin-inline-end: 0 !important;
-  box-sizing: border-box;
+.concierge-shell .composer-area.welcome-composer {
+  position: relative;
+  padding-bottom: 20px;
+  border-top: 0;
 }
 
-.concierge-shell .composer {
-  box-sizing: border-box;
-}
-
-.concierge-shell .composer textarea {
-  max-height: 180px;
-  overflow-y: auto;
-}
-
-.concierge-shell .attachments {
-  max-height: 132px;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-}
-
+/* ── Phones and tablets ─────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .concierge-shell {
-    min-height: calc(100svh - 132px) !important;
+    min-height: calc(100svh - 112px);
   }
 
   .concierge-shell .welcome-card {
-    padding: 38px 18px 18px !important;
-  }
-
-  .concierge-shell .welcome-card h1 {
-    font-size: clamp(30px, 9vw, 42px) !important;
-  }
-
-  .concierge-shell .welcome-lead {
-    font-size: 13px !important;
-  }
-
-  .concierge-shell .welcome-composer {
-    width: calc(100% - 20px);
-    margin-inline-end: 10px !important;
-    padding-bottom: 20px !important;
-  }
-
-  .concierge-shell .assistant-header {
-    padding: 7px 10px !important;
+    padding-top: 56px;
   }
 
   .concierge-shell .thread {
-    padding: 18px 10px 24px !important;
+    padding-block: 8px 24px;
   }
-
-  .concierge-shell .message,
-  .concierge-shell .assistant-message {
-    width: 100% !important;
-  }
-
-  .concierge-shell .user-message {
-    width: 92% !important;
-  }
-
-  .concierge-shell .composer-area:not(.welcome-composer) {
-    padding: 9px 9px 11px;
-  }
-}
-
-/* One full-width canvas across routes; no reserved sidebar dock columns. */
-.sb-ai-app-shell--canvas,
-.sb-ai-app-shell--canvas > .sb-ai-workspace {
-  display: block !important;
-  width: 100% !important;
-  max-width: none !important;
-  min-width: 0 !important;
-  padding-right: 0 !important;
-  grid-template-columns: minmax(0, 1fr) !important;
-}
-
-/* Treat the conversation as the single viewport-sized workspace, not a nested image card. */
-.concierge-shell .thread-wrap,
-.concierge-shell .thread,
-.concierge-shell .assistant-row,
-.concierge-shell .assistant-message,
-.concierge-shell .assistant-content {
-  min-width: 0 !important;
-  max-width: none !important;
-}
-.concierge-shell .assistant-content img,
-.concierge-shell .assistant-content svg,
-.concierge-shell .assistant-content canvas,
-.concierge-shell .assistant-content video {
-  display: block;
-  width: auto;
-  max-width: 100% !important;
-  height: auto;
-  object-fit: contain;
-}
-.concierge-shell .assistant-content figure,
-.concierge-shell .assistant-content .image-container {
-  max-width: 100% !important;
-  height: auto !important;
-  overflow: visible !important;
-}
-
-/* Compact suggestions follow the right-anchored prompt without constraining result media. */
-.concierge-shell .welcome-composer .suggestions { justify-content: flex-end !important; }
-
-/* Left task history stays out of the full-width COS rendering surface. */
-.concierge-shell .cos-home-history {
-  position: absolute;
-  inset-block-start: 14px;
-  inset-inline-start: 12px;
-  z-index: 12;
-  width: 238px;
-  max-width: min(238px, 86vw);
-  color: #e2e8f0;
-}
-.concierge-shell .cos-history-toggle,
-.concierge-shell .cos-history-entry {
-  display: block;
-  width: 100%;
-  padding: 10px 12px;
-  text-align: start;
-  background: #101829;
-  color: inherit;
-  border: 1px solid rgba(148,163,184,.22);
-  border-radius: 10px;
-  font-size: 12px;
-  cursor: pointer;
-}
-.concierge-shell .cos-history-items {
-  max-height: min(52vh, 450px);
-  margin-block-start: 6px;
-  overflow-y: auto;
-  display: grid;
-  gap: 5px;
-  padding: 8px;
-  border-radius: 12px;
-  background: rgba(4,8,18,.96);
-}
-.concierge-shell .cos-history-entry {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* The open history panel takes its own column: the conversation starts after it instead of
-   running underneath it (production 2026-10-16: transcript text was hidden behind the panel). */
-@media (min-width: 901px) {
-  .concierge-shell:has(> .cos-home-history.is-open) { padding-inline-start: 262px !important; }
-  .concierge-shell .cos-home-history:not(.is-open) { width: auto; }
-}
-@media (max-width: 900px) {
-  .concierge-shell .cos-home-history { position: relative; inset: auto; margin: 8px 10px 0; width: min(238px, calc(100% - 20px)); }
-  .concierge-shell .cos-history-items { max-height: 35vh; }
 }

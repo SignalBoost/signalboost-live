@@ -1,7 +1,6 @@
 // saas/app/page.tsx
 'use client'
 
-import Link from 'next/link'
 import { DragEvent, FormEvent, useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import AssistantMessage from '@/components/AssistantMessage'
@@ -66,7 +65,7 @@ export default function Home() {
   const [question, setQuestion] = useState('')
   const [turns, setTurns] = useState<ConciergeTranscriptTurn[]>([])
   const [savedChats, setSavedChats] = useState<Array<{ id: string; title: string; updated_at: string }>>([])
-  const [savedChatsOpen, setSavedChatsOpen] = useState(true)
+  const [savedChatsOpen, setSavedChatsOpen] = useState(false)
   const [savedChatsError, setSavedChatsError] = useState(false)
   const [pendingRequest, setPendingRequest] = useState('')
   const [loading, setLoading] = useState(false)
@@ -313,9 +312,9 @@ export default function Home() {
       <nav className={'cos-home-history' + (savedChatsOpen ? ' is-open' : '')} aria-label={copy.chatTitle}>
         <button type="button" className="cos-history-toggle" onClick={() => setSavedChatsOpen(value => !value)} aria-expanded={savedChatsOpen}>☰ {copy.chatTitle}</button>
         {savedChatsOpen ? <div className="cos-history-items">
-          <button type="button" className="cos-history-entry" onClick={startNewChat}>＋ {copy.newChat}</button>
+          <button type="button" className="cos-history-entry" onClick={() => { setSavedChatsOpen(false); startNewChat() }}>＋ {copy.newChat}</button>
           {savedChatsError ? <p role="status">History unavailable</p> : null}
-          {savedChats.map(chat => <button type="button" className="cos-history-entry" key={chat.id} onClick={() => void openSavedChat(chat.id)} title={chat.title}>{chat.title || copy.newChat}</button>)}
+          {savedChats.map(chat => <button type="button" className="cos-history-entry" key={chat.id} onClick={() => { setSavedChatsOpen(false); void openSavedChat(chat.id) }} title={chat.title}>{chat.title || copy.newChat}</button>)}
         </div> : null}
       </nav>
 
@@ -331,26 +330,14 @@ export default function Home() {
       {showWelcome ? (
         <header className="welcome-card">
           <div className="welcome-copy">
-            <p className="eyebrow">✦ {c('eyebrow')}</p>
             <h1>{salutation}<br /><span>{copy.welcomeQuestion}</span></h1>
             <p className="welcome-lead">{copy.chatSubtitle}</p>
-            <div className="welcome-actions">
-              <Link className="primary-link" href="/home">▦ {copy.platformHome} <span aria-hidden="true">→</span></Link>
-              <Link className="secondary-button" href="/dashboard/assistant">↗ {copy.openFullAssistant}</Link>
-            </div>
           </div>
-          <div className="welcome-mark" aria-hidden="true">✦</div>
         </header>
       ) : (
         <header className="assistant-header">
-          <div className="header-copy">
-            <p className="eyebrow">✦ {c('eyebrow')}</p>
-            <h1>{copy.chatTitle}</h1>
-            <p className="subtitle">{copy.chatSubtitle}</p>
-          </div>
+          <h1 className="sr-only">{copy.chatTitle}</h1>
           <div className="header-actions">
-            <Link className="secondary-button" href="/home">▦ {copy.platformHome}</Link>
-            <Link className="secondary-button" href="/dashboard/assistant">↗ {copy.openFullAssistant}</Link>
             <button type="button" className="secondary-button" onClick={startNewChat}>＋ {copy.newChat}</button>
           </div>
         </header>
@@ -374,10 +361,7 @@ export default function Home() {
                 </div>
 
                 <div className="message-row assistant-row">
-                  <article
-                    className="message assistant-message"
-                    style={turn.visualPreviewUrl ? { width: 'min(96%, 1050px)', overflow: 'visible' } : undefined}
-                  >
+                  <article className="message assistant-message">
                     <div className="message-tools assistant-tools">
                       <span>{c('cosLabel')}</span>
                       <button type="button" onClick={() => void copyText(turn.response, `a-${index}`)}>
@@ -551,15 +535,12 @@ export default function Home() {
       <div hidden aria-hidden="true"><PreviewProjects /></div>
 
       <style jsx>{`
-        .concierge-shell{position:relative;isolation:isolate;display:flex;flex-direction:column;min-height:calc(100svh - 165px);max-width:1600px;margin:0 auto;padding:24px 28px 140px;box-sizing:border-box;color:#fff;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:visible}
-        .aurora{position:absolute;inset:-30%;z-index:-1;pointer-events:none;background:radial-gradient(circle at 15% 12%,rgba(31,203,227,.13),transparent 28%),radial-gradient(circle at 75% 20%,rgba(255,195,0,.12),transparent 28%),radial-gradient(circle at 55% 92%,rgba(85,76,255,.14),transparent 34%);filter:blur(24px)}
-        .welcome-card{position:relative;display:flex;justify-content:space-between;gap:24px;min-height:310px;padding:clamp(30px,5vw,64px);border:1px solid rgba(255,255,255,.14);border-radius:30px;background:linear-gradient(145deg,rgba(17,24,39,.9),rgba(4,8,19,.78));box-shadow:0 28px 90px rgba(0,0,0,.34);overflow:hidden}
-        .welcome-copy{position:relative;z-index:1;max-width:900px}.eyebrow{margin:0;color:#ffc300;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.welcome-card h1{margin:20px 0 16px;font-size:clamp(38px,6vw,72px);line-height:1;letter-spacing:-.055em}.welcome-card h1 span{background:linear-gradient(105deg,#fff,#f6c453 62%,#7ee8ef);-webkit-background-clip:text;background-clip:text;color:transparent}.welcome-lead{max-width:760px;margin:0;color:rgba(255,255,255,.65);font-size:clamp(15px,2vw,18px);line-height:1.65}.welcome-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.primary-link{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:11px 17px;border-radius:999px;background:linear-gradient(135deg,#f7ca5c,#d9952c);color:#151008;text-decoration:none;font-size:13px;font-weight:900}.welcome-mark{align-self:center;display:grid;place-items:center;width:170px;height:170px;border:1px solid rgba(103,232,249,.2);border-radius:50%;background:radial-gradient(circle,rgba(103,232,249,.14),rgba(255,195,0,.05) 48%,transparent 70%);color:#f6c453;font-size:54px;box-shadow:0 0 80px rgba(26,240,255,.12)}
-        .assistant-header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-shrink:0;padding:4px 2px 14px;margin-bottom:10px;border:0;border-bottom:1px solid rgba(255,255,255,.08);border-radius:0;background:none}.header-copy{min-width:0}.assistant-header h1{margin:6px 0;font-size:clamp(20px,3.5vw,30px);font-weight:900;letter-spacing:-.04em;line-height:1.1}.subtitle{max-width:760px;margin:0;color:rgba(255,255,255,.55);font-size:13px;line-height:1.6}.header-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0}
+        .aurora{position:absolute;inset:-12%;z-index:-1;pointer-events:none;opacity:.34;background:radial-gradient(circle at 15% 12%,rgba(31,203,227,.13),transparent 28%),radial-gradient(circle at 75% 20%,rgba(255,195,0,.12),transparent 28%),radial-gradient(circle at 55% 92%,rgba(85,76,255,.14),transparent 34%);filter:blur(24px)}
+                .welcome-card h1 span{background:linear-gradient(105deg,#fff,#f6c453 62%,#7ee8ef);-webkit-background-clip:text;background-clip:text;color:transparent}
         .secondary-button{display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(26,240,255,.34);border-radius:999px;padding:9px 14px;background:rgba(26,240,255,.06);color:#dffcff;text-decoration:none;font:inherit;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap}.secondary-button:hover{border-color:#67e8f9;background:rgba(26,240,255,.12);color:#fff}
-        .thread-wrap{position:relative;display:flex;flex-direction:column;flex:1;min-height:0}.thread{flex:1;min-height:0;max-height:none;overflow:visible;padding:0;border:0;border-radius:0;background:none;display:flex;flex-direction:column;gap:30px;scroll-behavior:smooth}.exchange{display:flex;flex-direction:column;gap:12px}.message-row{display:flex;width:100%}.user-row{justify-content:flex-end}.assistant-row{justify-content:flex-start}.message{width:min(88%,950px);border-radius:18px;padding:14px 16px;box-sizing:border-box}.user-message{background:linear-gradient(145deg,rgba(91,71,17,.43),rgba(38,31,12,.7));border:1px solid rgba(255,195,0,.45)}.assistant-row{display:block}.assistant-message{width:100%;max-width:none;padding:0;border:0;border-radius:0;background:none}.message p{margin:8px 0 0;white-space:pre-wrap;line-height:1.65;font-size:14px}.message-tools{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#ffc300;font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.assistant-tools{color:#67e8f9}.message-tools button{border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:6px 9px;background:rgba(255,255,255,.05);color:rgba(255,255,255,.72);font-size:10px;font-weight:800;cursor:pointer;text-transform:none;letter-spacing:0}.assistant-content{margin-top:8px;line-height:1.65;font-size:14px}.thinking{color:#67e8f9}.error{color:#fca5a5}.thread-actions{display:flex;justify-content:flex-end;padding:10px 0 0}.copy-full{border-color:rgba(255,195,0,.55);color:#ffe07a;background:rgba(255,195,0,.06)}
-        .composer-area{position:sticky;bottom:0;z-index:12;flex-shrink:0;margin-top:26px;padding:14px 0 18px;background:linear-gradient(to top,rgba(2,6,16,.97) 62%,rgba(2,6,16,0));backdrop-filter:blur(9px)}.welcome-composer{margin-top:18px}.composer{display:flex;align-items:stretch;gap:8px;padding:8px;border:1px solid rgba(26,240,255,.38);border-radius:20px;background:rgba(2,8,23,.86);box-shadow:0 0 0 5px rgba(26,240,255,.025)}.file-input{display:none}.attach-button{width:46px;border:1px solid rgba(255,255,255,.12);border-radius:13px;background:rgba(255,255,255,.06);color:#fff;font-size:16px;cursor:pointer;display:grid;place-items:center}.voice-button[aria-pressed="true"]{border-color:rgba(248,113,113,.7);background:rgba(239,68,68,.2);color:#fecaca}.composer textarea{min-width:0;flex:1;resize:none;border:0;background:transparent;color:#fff;padding:12px 6px;font:inherit;line-height:1.45;outline:0}.composer textarea::placeholder{color:#74829c}.send-button{min-width:120px;border:0;border-radius:13px;padding:0 18px;background:linear-gradient(135deg,#f7ca5c,#d9952c);color:#151008;font-weight:900;cursor:pointer}.composer button:disabled{opacity:.55;cursor:not-allowed}.composer-hint{margin:7px 8px 0;color:rgba(255,255,255,.38);font-size:10px}.suggestions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:15px}.attachments{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}.attachment{display:flex;align-items:center;gap:7px;max-width:320px;padding:7px 9px;border:1px solid rgba(255,255,255,.13);border-radius:12px;background:rgba(255,255,255,.05);font-size:11px}.attachment img{width:28px;height:28px;border-radius:6px;object-fit:cover}.attachment-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.attachment button{border:0;background:transparent;color:#fff;cursor:pointer}.drop-overlay{position:absolute;z-index:20;inset:16px;display:grid;place-items:center;align-content:center;gap:6px;border:2px dashed #67e8f9;border-radius:24px;background:rgba(3,7,18,.94);color:#fff;text-align:center}.drop-icon{font-size:30px}
-        @media(max-width:760px){.concierge-shell{padding:14px 12px 120px}.welcome-card{min-height:0;padding:30px 22px}.welcome-mark{display:none}.assistant-header{padding:17px;flex-direction:column}.header-actions{justify-content:flex-start}.thread{min-height:0;padding:0;gap:22px}.message{width:96%}.assistant-message{width:100%}.composer{gap:5px}.send-button{min-width:86px;padding:0 10px}.welcome-card h1{font-size:42px}}
+        .message p{margin:8px 0 0;white-space:pre-wrap;line-height:1.65;font-size:15px}.message-tools{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#ffc300;font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.assistant-tools{color:#67e8f9}.message-tools button{border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:6px 9px;background:rgba(255,255,255,.05);color:rgba(255,255,255,.72);font-size:10px;font-weight:800;cursor:pointer;text-transform:none;letter-spacing:0}.assistant-content{margin-top:8px;line-height:1.65;font-size:15px}.error{color:#fca5a5}.copy-full{border-color:rgba(255,195,0,.55);color:#ffe07a;background:rgba(255,195,0,.06)}
+        .composer{display:flex;align-items:stretch;gap:8px;padding:10px;border:1px solid rgba(103,232,249,.34);border-radius:20px;background:rgba(8,14,29,.96);box-shadow:0 18px 70px rgba(0,0,0,.28);box-sizing:border-box}.file-input{display:none}.attach-button{width:46px;border:1px solid rgba(255,255,255,.12);border-radius:13px;background:rgba(255,255,255,.06);color:#fff;font-size:16px;cursor:pointer;display:grid;place-items:center}.voice-button[aria-pressed="true"]{border-color:rgba(248,113,113,.7);background:rgba(239,68,68,.2);color:#fecaca}.composer textarea{min-width:0;flex:1;min-height:54px;max-height:180px;overflow-y:auto;resize:none;border:0;background:transparent;color:#fff;padding:12px 6px;font:inherit;font-size:15px;line-height:1.45;outline:0}.composer textarea::placeholder{color:#74829c}.send-button{min-width:120px;border:0;border-radius:13px;padding:0 18px;background:linear-gradient(135deg,#f7ca5c,#d9952c);color:#151008;font-weight:900;cursor:pointer}.composer button:disabled{opacity:.55;cursor:not-allowed}.composer-hint{margin:7px 8px 0;color:rgba(255,255,255,.38);font-size:10px}.suggestions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-start;margin-top:14px}.attachments{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;max-height:132px;overflow-y:auto}.attachment{display:flex;align-items:center;gap:7px;max-width:320px;padding:7px 9px;border:1px solid rgba(255,255,255,.13);border-radius:12px;background:rgba(255,255,255,.05);font-size:11px}.attachment img{width:28px;height:28px;border-radius:6px;object-fit:cover}.attachment-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.attachment button{border:0;background:transparent;color:#fff;cursor:pointer}.drop-overlay{position:absolute;z-index:20;inset:16px;display:grid;place-items:center;align-content:center;gap:6px;border:2px dashed #67e8f9;border-radius:24px;background:rgba(3,7,18,.94);color:#fff;text-align:center}.drop-icon{font-size:30px}
+        @media(max-width:760px){.composer{gap:5px}.send-button{min-width:86px;padding:0 10px}}
       `}</style>
     </section>
   )

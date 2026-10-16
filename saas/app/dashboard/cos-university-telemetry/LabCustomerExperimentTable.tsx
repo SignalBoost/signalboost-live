@@ -18,11 +18,25 @@ const labels: Record<string, readonly string[]> = {
  ko:['학습 실행 비교','현재 작업 공간의 실행을 비교합니다. 품질 점수는 추정하지 않습니다.','제공업체','상태','기본 모델','결과물','생성일','모든 업체','모든 상태','결과 없음'],
  ar:['مقارنة عمليات التدريب','مقارنة عمليات مساحة العمل الحالية دون افتراض درجات جودة.','المزود','الحالة','النموذج الأساسي','الناتج','تاريخ الإنشاء','كل المزودين','كل الحالات','لا توجد نتائج'],
 }
+const outcomeLabels: Record<string, readonly string[]> = {
+ en:['runs','finished','failed','running','cancelled','artifact records','Observed training outcomes'],
+ es:['ejecuciones','finalizados','fallidos','en curso','cancelados','artefactos','Resultados observados'],
+ pt:['execuções','concluídos','falhos','em andamento','cancelados','artefatos','Resultados observados'],
+ pl:['uruchomienia','ukończone','nieudane','w toku','anulowane','artefakty','Zaobserwowane wyniki'],
+ ru:['запуски','завершено','ошибки','выполняется','отменено','артефакты','Наблюдаемые результаты'],
+ de:['Läufe','abgeschlossen','fehlgeschlagen','laufend','abgebrochen','Artefakte','Beobachtete Ergebnisse'],
+ fr:['exécutions','terminées','échouées','en cours','annulées','artefacts','Résultats observés'],
+ it:['esecuzioni','completati','falliti','in corso','annullati','artefatti','Esiti osservati'],
+ ja:['実行','完了','失敗','実行中','中止','成果物','観測された結果'],
+ ko:['실행','완료','실패','진행 중','취소','결과물','관측된 결과'],
+ ar:['تشغيلات','مكتملة','فاشلة','جارية','ملغاة','آثار نموذجية','نتائج التدريب المرصودة'],
+}
 export default function LabCustomerExperimentTable({ runs, language }: { runs: readonly LabRunForTracking[]; language: string }) {
  const [provider, setProvider] = useState('')
  const [status, setStatus] = useState('')
  const [descending, setDescending] = useState(true)
  const copy = labels[language] ?? labels.en
+ const outcomeCopy = outcomeLabels[language] ?? outcomeLabels.en
  const comparison = useMemo(() => runs.length ? buildLabExperimentComparison(runs.slice(0,100)) : null, [runs])
  const records = comparison?.runs ?? []
  const providerOutcomes = useMemo(() => summarizeLabProviderOutcomes(runs), [runs])
@@ -33,11 +47,11 @@ export default function LabCustomerExperimentTable({ runs, language }: { runs: r
  return <details className="mt-3 rounded border border-white/20 p-3 text-sm">
   <summary className="cursor-pointer font-medium">{copy[0]} ({records.length})</summary>
   <p className="my-2 text-xs opacity-75">{copy[1]}</p>
-  <div className="mb-3 flex flex-wrap gap-2" aria-label="Observed training outcomes">
+  <div className="mb-3 flex flex-wrap gap-2" aria-label={outcomeCopy[6]}>
     {providerOutcomes.map(item => <div key={item.provider} className="rounded border border-white/20 px-3 py-2 text-xs">
       <strong>{item.provider}</strong>
-      <div>{item.total} runs · {item.finished} finished · {item.failed} failed · {item.running} running · {item.cancelled} cancelled</div>
-      <div>{item.artifacts} artifact records</div>
+      <div>{item.total} {outcomeCopy[0]} · {item.finished} {outcomeCopy[1]} · {item.failed} {outcomeCopy[2]} · {item.running} {outcomeCopy[3]} · {item.cancelled} {outcomeCopy[4]}</div>
+      <div>{item.artifacts} {outcomeCopy[5]}</div>
     </div>)}
   </div>
   <div className="mb-3 flex flex-wrap items-center gap-2">

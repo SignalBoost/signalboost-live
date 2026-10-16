@@ -379,3 +379,23 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Verify Issue #205 architecture
         run: npm run verify:issue-205
+
+  lab-symbolic-verification:
+    name: LAB Z3 symbolic artifact paths
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install pinned SMT solver
+        run: python -m pip install 'z3-solver==4.13.4.0'
+      - name: Generate all satisfiable callback conditions with Z3
+        run: python scripts/lab-symbolic-callbacks.py > /tmp/lab-z3-cases.json
+      - name: Replay generated counterexamples against real LAB callbacks
+        env:
+          LAB_Z3_CASES_FILE: /tmp/lab-z3-cases.json
+        run: node --test tests/labSymbolicArtifactCallback.node.test.ts

@@ -1,2 +1,2 @@
-base_sha=1e7a062a0ff3519064e1fc5a34726e14509619bd
-branch=fix/cos-agent-loop-no-credential-urls-20261016
+base_sha=db0cd477b062cff7659924676faaceb7bee57242
+branch=fix/home-history-delete-20261016

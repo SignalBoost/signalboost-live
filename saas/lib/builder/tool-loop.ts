@@ -689,7 +689,7 @@ export class BuilderToolLoop {
         if (!String(item.error || '').startsWith('builder_repeated_tool_call:')) break
         consecutiveRepeatRejections += 1
       }
-      if (consecutiveRepeatRejections >= MAX_CONSECUTIVE_REPEAT_REJECTIONS) {
+      if (!missingBuildDeliverables && consecutiveRepeatRejections >= MAX_CONSECUTIVE_REPEAT_REJECTIONS) {
         return { ok: false, error: passingProofBeforeChange ? 'builder_regression_not_reproduced' : 'builder_stalled_repeated_inspection', trace }
       }
       // A passing targeted proof plus a refused replay is not a reproduced defect.
@@ -811,6 +811,9 @@ export class BuilderToolLoop {
         .filter(toolId => toolId !== blockedTool)
         .filter(toolId => !blockedInspectionTools.has(toolId))
         .filter(toolId => !repairMutationRequired || toolId === 'write_file' || toolId === 'edit_file')
+        // Once a new application's required file is missing, stop offering stale
+        // inspection/runner actions. The next model call must finish the named file.
+        .filter(toolId => !missingBuildDeliverables || deniedInspections < 2 || toolId === 'write_file')
 
       const promptParts = [
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
@@ -819,7 +822,7 @@ export class BuilderToolLoop {
         BUILDER_REASONING_GUIDANCE,
         formatBuilderEngineeringGoal(engineeringGoal),
         saved && !repairObjective
-          ? 'RESUMED WORKSPACE: Inspect existing files first. Never recreate completed files. Preserve the existing scaffold. If the required implementation files and a test exist, run the targeted test command now; use actual failed output to edit only affected files. Otherwise create the next missing test file before documentation. Maintain the original required-file checklist and do not claim completion before every requested command succeeds.'
+          ? 'RESUMED WORKSPACE: Preserve completed files and use the existing workspace manifest. Do not repeat inspections when the next required file is already identified. If the required implementation files and a test exist, run the targeted test command now; use actual failed output to edit only affected files. Otherwise create the next missing test file before documentation. Maintain the original required-file checklist and do not claim completion before every requested command succeeds.'
           : '',
         documentationPaths ? `DOCUMENTATION-ONLY TASK: mutations are restricted to ${JSON.stringify(documentationPaths)}. Inspect relevant code, update the requested documentation, and run the requested verification. Existing error behavior being documented does not require a failing baseline. Do not modify implementation, tests or configuration.` : '',
         verificationOrderGuidance(pendingOrder),

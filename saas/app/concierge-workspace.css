@@ -95,8 +95,9 @@ body:has(.sb-ai-app-shell--home) > footer {
   bottom: auto !important;
   z-index: 3;
   width: min(920px, calc(100% - 28px));
-  align-self: center;
-  margin: 0 auto !important;
+  align-self: flex-end;
+  margin-inline-start: auto !important;
+  margin-inline-end: clamp(12px, 2vw, 28px) !important;
   padding: 0 0 34px !important;
   border-top: 0 !important;
   background: transparent !important;
@@ -283,8 +284,8 @@ body:has(.sb-ai-app-shell--home) > footer {
 .concierge-shell .composer-area:not(.welcome-composer) .attachments,
 .concierge-shell .composer-area:not(.welcome-composer) .composer-hint {
   width: min(980px, 100%);
-  margin-left: auto !important;
-  margin-right: auto !important;
+  margin-inline-start: auto !important;
+  margin-inline-end: 0 !important;
   box-sizing: border-box;
 }
 
@@ -322,6 +323,7 @@ body:has(.sb-ai-app-shell--home) > footer {
 
   .concierge-shell .welcome-composer {
     width: calc(100% - 20px);
+    margin-inline-end: 10px !important;
     padding-bottom: 20px !important;
   }
 
@@ -383,3 +385,6 @@ body:has(.sb-ai-app-shell--home) > footer {
   height: auto !important;
   overflow: visible !important;
 }
+
+/* Compact suggestions follow the right-anchored prompt without constraining result media. */
+.concierge-shell .welcome-composer .suggestions { justify-content: flex-end !important; }

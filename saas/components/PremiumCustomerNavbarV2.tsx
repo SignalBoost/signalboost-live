@@ -423,9 +423,9 @@ export default function PremiumCustomerNavbarV2() {
   return (
     <>
       <style>{`
-        .sbnav { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 14px; padding: 11px 22px; background: rgba(4, 8, 18, .95); border-bottom: 1px solid rgba(167, 139, 250, .35); backdrop-filter: blur(14px); }
+        .sbnav { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding: 11px 22px; background: rgba(4, 8, 18, .95); border-bottom: 1px solid rgba(167, 139, 250, .35); backdrop-filter: blur(14px); }
         .sbnav-brand, .sbnav-trigger, .sbnav-row, .sbnav-mobile-row, .sbnav-compact-platform, .sbnav-compact-logout { color: #f8fafc; text-decoration: none; font: inherit; }
-        .sbnav-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 900; white-space: nowrap; margin-left: auto; }
+        .sbnav-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 900; white-space: nowrap; margin-inline-start: auto; }
         .sbnav-brand-mark { color: ${PURPLE}; font-size: 24px; }
         .sbnav-desktop { display: flex; align-items: center; gap: 5px; min-width: 0; }
         .sbnav-menu { position: relative; }

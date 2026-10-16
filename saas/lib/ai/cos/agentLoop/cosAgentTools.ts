@@ -21,7 +21,16 @@ export type AgentToolPorts = Readonly<{
   browse?: (url: string, budgetMs: number) => Promise<AgentBrowseResult>
 }>
 
-export type AgentToolPolicy = Readonly<{ maxPythonRuns: number; browserAllowed: boolean }>
+export type AgentToolPolicy = Readonly<{
+  maxPythonRuns: number
+  browserAllowed: boolean
+  /** Time held back for the final answer round; defaults to ANSWER_RESERVE_MS (chart/compute turns). */
+  answerReserveMs?: number
+}>
+
+export function answerReserveMs(policy: AgentToolPolicy): number {
+  return policy.answerReserveMs ?? ANSWER_RESERVE_MS
+}
 
 export type AgentEvidence = {
   observations: string[]
@@ -175,7 +184,7 @@ export async function executeAgentTool(input: {
 
   switch (input.name) {
     case 'web_search': {
-      if (input.remainingMs() - ANSWER_RESERVE_MS < 5_000) return 'Error: no time left in this turn for more searches. Answer with what you have.'
+      if (input.remainingMs() - answerReserveMs(input.policy) < 5_000) return 'Error: no time left in this turn for more searches. Answer with what you have.'
       const query = String(args.query || '').trim().slice(0, 300)
       if (!query) return 'Error: query is required.'
       const results = await input.ports.search(query).catch(() => [] as AgentSearchResult[])
@@ -186,7 +195,7 @@ export async function executeAgentTool(input: {
     case 'browse_page': {
       const url = String(args.url || '').trim()
       if (!/^https?:\/\//i.test(url)) return 'Error: an absolute http(s) URL is required.'
-      const fetchBudgetMs = Math.min(FETCH_TIMEOUT_MS, input.remainingMs() - ANSWER_RESERVE_MS)
+      const fetchBudgetMs = Math.min(FETCH_TIMEOUT_MS, input.remainingMs() - answerReserveMs(input.policy))
       if (fetchBudgetMs < 5_000) return 'Error: no time left in this turn for more downloads. Answer with what you have.'
       let body: string
       let finalUrl = url
@@ -235,7 +244,7 @@ export async function executeAgentTool(input: {
 
     case 'run_python': {
       if (evidence.pythonRuns >= input.policy.maxPythonRuns) return 'Error: the Python run limit for this turn is reached. Answer with what you have.'
-      const pythonBudgetMs = Math.min(PYTHON_TIMEOUT_MS, input.remainingMs() - ANSWER_RESERVE_MS)
+      const pythonBudgetMs = Math.min(PYTHON_TIMEOUT_MS, input.remainingMs() - answerReserveMs(input.policy))
       if (pythonBudgetMs < 15_000) return 'Error: not enough time left in this turn to run code. Answer with what you have.'
       const code = String(args.code || '')
       evidence.pythonRuns += 1

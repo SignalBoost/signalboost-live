@@ -12,7 +12,7 @@
 
 import type { LocalModelChatMessage, LocalModelToolCall, LocalModelToolDefinition, LocalModelTurnResult } from '../../local-inference.ts'
 import { CRITIC_SYSTEM_PROMPT, actionKey, criticMessages, detectStuck, observationIsError, parseCriticVerdict, refinementPrompt, shouldRefine, stuckNudge, type LoopStep } from './openhandsPatterns.ts'
-import { ANSWER_RESERVE_MS, agentToolDefinitions, emptyEvidence, executeAgentTool, searchObservation, type AgentEvidence, type AgentSearchResult, type AgentToolPolicy, type AgentToolPorts } from './cosAgentTools.ts'
+import { agentToolDefinitions, answerReserveMs, emptyEvidence, executeAgentTool, searchObservation, type AgentEvidence, type AgentSearchResult, type AgentToolPolicy, type AgentToolPorts } from './cosAgentTools.ts'
 
 export type AgentModelTurn = (input: {
   systemPrompt: string
@@ -252,20 +252,28 @@ export function stripSandboxPaths(answer: string): string {
 // Production 2026-10-16: answers carried the model's working notes ahead of the answer — "The data
 // is verified and the chart is created. Let me present the results.", "The user asked a simple
 // factual question. No data computation or chart is needed. Let me provide the answer directly."
-const PROCESS_NOTE = /\b(?:let me (?!know\b)\w+|the user (?:asked|wants|is asking)|no (?:data computation|computation|chart) is needed|this is a simple (?:factual )?question|i (?:have|now have|found) (?:the|enough|all)\b|the search results (?:clearly )?(?:confirm|show)|multiple sources confirm|(?:the )?data (?:is|has been) (?:verified|confirmed)|(?:the )?chart (?:is|has been) (?:created|generated|saved|ready)|here(?:'s| is| are) (?:the|a) (?:summary|results?)\b)/i
-const ANSWER_HEADING = /^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:final )?answer(?:\*\*)?\s*:?\s*\n+/i
+// A sentence is a note only when it OPENS with process wording; a substantive sentence that merely
+// mentions sources ("The search results show that Canberra is the capital") is kept.
+const PROCESS_NOTE = /^(?:let me (?!know\b)\w+|the user (?:asked|wants|is asking)\b|no (?:data computation|computation|chart)\b[^.!?]*\bneeded\b|this is a simple\b|i (?:have|now have|found|will|'ll)\b|(?:the )?data (?:is|has been) (?:verified|confirmed)\b|(?:the )?chart (?:is|has been) (?:created|generated|saved|ready)\b|here(?:'s| is| are) (?:the|a) (?:summary|results?)\b|multiple sources confirm\b|(?:the )?search results (?:clearly )?(?:confirm|show)(?: the answer| this| it)?\s*[.!:]?$)/i
+const ANSWER_HEADING = /(?:^|\n)[ \t]*(?:#{1,6}[ \t]*)?(?:\*\*)?(?:final )?answer(?:\*\*)?[ \t]*:?[ \t]*(?:\*\*)?[ \t]*\n/gi
+const LIST_LINE = /^\s*(?:[-*•]|\d+[.)]|\[\d+\])\s+/
 
 /**
- * Drops the model's working notes that precede the real answer: everything up to the last paragraph
- * that narrates its own process, when real content follows it. A closing "let me know" is not a note.
+ * Drops the model's working notes from the answer, sentence by sentence and line by line (a note may
+ * be separated by a blank line, a single newline or nothing). An explicit "Answer" heading ends the
+ * preamble. List items and a closing "let me know" are never notes; an answer that would be left
+ * empty is returned unchanged.
  */
 export function stripProcessNarration(answer: string): string {
   const original = String(answer || '').trim()
-  const paragraphs = original.split(/\n{2,}/)
-  let cut = -1
-  for (let index = 0; index < paragraphs.length - 1; index += 1) if (PROCESS_NOTE.test(paragraphs[index])) cut = index
-  if (cut < 0) return original
-  const rest = paragraphs.slice(cut + 1).join('\n\n').replace(ANSWER_HEADING, '').trim()
+  const heading = [...original.matchAll(ANSWER_HEADING)].at(-1)
+  const body = heading ? original.slice(heading.index! + heading[0].length) : original
+  const lines = body.split('\n').map(line => {
+    if (!line.trim() || LIST_LINE.test(line)) return line
+    const sentences = line.trim().split(/(?<=[.!?:])\s+(?=\S)/)
+    return sentences.filter(sentence => !PROCESS_NOTE.test(sentence.trim())).join(' ')
+  })
+  const rest = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim()
   return rest || original
 }
 
@@ -321,6 +329,11 @@ function assistantMessage(turn: LocalModelTurnResult): LocalModelChatMessage {
   return { role: 'assistant', content: turn.content ?? '', tool_calls: turn.toolCalls }
 }
 
+/** The answer text as the user would receive it, before URL verification. */
+function deliverableAnswer(answer: string): string {
+  return stripProcessNarration(keepFinalDraft(stripSandboxPaths(answer)))
+}
+
 export async function runCosAgentLoop(input: {
   request: string
   conversation?: readonly Readonly<{ role: 'user' | 'assistant'; content: string }>[]
@@ -364,14 +377,13 @@ export async function runCosAgentLoop(input: {
   let answer = ''
   let rounds = 0
   let forceAnswer = false
-  let draft = ''
 
   const runRounds = async (): Promise<void> => {
     while (rounds < MAX_ROUNDS && remainingMs() > MIN_ROUND_MS) {
       rounds += 1
       // The last round always happens with tools off while the answer reserve remains, so a turn
       // whose tools ran long still answers from what it gathered instead of ending with nothing.
-      const finalRound = forceAnswer || rounds === MAX_ROUNDS || remainingMs() < ANSWER_RESERVE_MS + 5_000
+      const finalRound = forceAnswer || rounds === MAX_ROUNDS || remainingMs() < answerReserveMs(input.policy) + 5_000
       const roundStartedAt = now()
       const turn = await input.model({
         systemPrompt,
@@ -420,27 +432,32 @@ export async function runCosAgentLoop(input: {
   }
 
   try {
+    // The critic reviews exactly what would be delivered, and the best-scored draft is kept: a
+    // refinement that covers less than the draft it replaced never wins.
+    let best: { answer: string; score: number } | null = null
+    let reviewed: { answer: string; score: number } | null = null
     for (let iteration = 0; ; iteration += 1) {
       await runRounds()
       if (!answer || !input.critic || forceAnswer || remainingMs() < MIN_ROUND_MS + 5_000) break
       const review = await input.critic({
         systemPrompt: CRITIC_SYSTEM_PROMPT,
-        messages: criticMessages(input.request, answer),
+        messages: criticMessages(input.request, deliverableAnswer(answer)),
         tools,
         toolChoice: 'none',
         timeoutMs: Math.min(15_000, remainingMs() - 2_000),
       }).catch(() => null)
       const verdict = parseCriticVerdict(String(review?.content || ''))
       if (!verdict) break
-      const refine = shouldRefine(verdict, iteration) && remainingMs() > ANSWER_RESERVE_MS + 15_000
+      reviewed = { answer, score: verdict.score }
+      if (!best || verdict.score >= best.score) best = reviewed
+      const refine = shouldRefine(verdict, iteration) && remainingMs() > answerReserveMs(input.policy) + 15_000
       trace.critic.push({ parts: verdict.parts, missing: verdict.missing.length, refined: refine })
       if (!refine) break
       messages.push({ role: 'assistant', content: answer }, { role: 'user', content: refinementPrompt(verdict, iteration + 1) })
-      draft = answer
       answer = ''
     }
-    // A refinement round that produced nothing keeps the reviewed draft.
-    if (!answer && draft) answer = draft
+    // A refinement that produced nothing, or covered less, keeps the best-reviewed draft.
+    if (best && (!answer || (reviewed?.answer === answer && reviewed.score < best.score))) answer = best.answer
 
     if (!answer) {
       if (trace.outcome === 'running') trace.outcome = 'no_answer'
@@ -471,7 +488,7 @@ export async function runCosAgentLoop(input: {
     }
     trace.outcome = 'answered'
 
-    const { text, dropped } = stripUnverifiedUrls(stripProcessNarration(keepFinalDraft(stripSandboxPaths(answer))), evidence.sourceUrls)
+    const { text, dropped } = stripUnverifiedUrls(deliverableAnswer(answer), evidence.sourceUrls)
     return {
       reply: text,
       images: evidence.images.slice(0, 3),

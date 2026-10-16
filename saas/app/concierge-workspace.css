@@ -100,7 +100,7 @@ body:has(.sb-ai-app-shell--home) > footer {
   color: rgba(226, 232, 240, .86);
 }
 
-.concierge-shell .cos-history-entry:first-child {
+.concierge-shell .cos-history-items > .cos-history-entry:first-child {
   margin-bottom: 6px;
   border: 1px solid rgba(148, 163, 184, .22);
   font-weight: 700;
@@ -123,6 +123,72 @@ body:has(.sb-ai-app-shell--home) > footer {
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, .35) transparent;
   color-scheme: dark;
+}
+
+.concierge-shell .cos-history-row {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  border-radius: 8px;
+}
+
+.concierge-shell .cos-history-row .cos-history-entry {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.concierge-shell .cos-history-row:hover {
+  background: rgba(255, 255, 255, .06);
+}
+
+.concierge-shell .cos-history-row .cos-history-entry:hover {
+  background: transparent;
+}
+
+/* Delete controls: a trash button per conversation (shown on hover or keyboard focus; always
+   shown on touch screens) and one "delete all" action at the end of the list. */
+.concierge-shell .cos-history-delete {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(252, 165, 165, .85);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.concierge-shell .cos-history-row:hover .cos-history-delete,
+.concierge-shell .cos-history-row:focus-within .cos-history-delete {
+  opacity: 1;
+}
+
+.concierge-shell .cos-history-delete:hover {
+  background: rgba(239, 68, 68, .16);
+}
+
+@media (hover: none) {
+  .concierge-shell .cos-history-delete { opacity: 1; }
+}
+
+.concierge-shell .cos-history-delete-all {
+  flex: 0 0 auto;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(248, 113, 113, .3);
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(252, 165, 165, .9);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: start;
+  cursor: pointer;
+}
+
+.concierge-shell .cos-history-delete-all:hover {
+  background: rgba(239, 68, 68, .12);
 }
 
 .concierge-shell .cos-history-items p {

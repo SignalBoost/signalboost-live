@@ -29,3 +29,16 @@ test('homepage reads only authenticated server history and resumes existing conv
   assert.match(css, /\.concierge-shell \.cos-history-entry \{[^}]*flex: 0 0 auto;/)
   assert.match(css, /\.concierge-shell \.cos-history-items \{[^}]*overflow-y: auto;[^}]*color-scheme: dark;/)
 })
+test('homepage history lets the user delete one conversation or the whole history', () => {
+  const copySource = readFileSync(new URL('../lib/i18n/conciergeTranscriptCopy.ts', import.meta.url), 'utf8')
+  assert.match(home, /className="cos-history-delete"[\s\S]*?deleteSavedChats\(chat\.id\)|deleteSavedChats\(chat\.id\)[\s\S]*?className="cos-history-delete"/)
+  assert.match(home, /className="cos-history-delete-all" onClick=\{\(\) => void deleteSavedChats\(null\)\}/)
+  assert.match(home, /window\.confirm\(id \? copy\.deleteChatConfirm : copy\.deleteAllConfirm\)/)
+  assert.match(home, /\/api\/assistant\/chats\?\$\{id \? `id=\$\{encodeURIComponent\(id\)\}` : 'all=true'\}`, \{ method: 'DELETE' \}/)
+  assert.match(home, /if \(!response\.ok\) throw new Error\('delete_failed'\)/)
+  assert.match(home, /\{copy\.historyUnavailable\}/)
+  assert.doesNotMatch(home, />History unavailable</)
+  for (const key of ['deleteChat', 'deleteChatConfirm', 'deleteAllChats', 'deleteAllConfirm', 'deleteFailed', 'historyUnavailable']) {
+    assert.equal((copySource.match(new RegExp(`\\n    ${key}: `, 'g')) || []).length, 11, key)
+  }
+})

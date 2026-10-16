@@ -67,6 +67,7 @@ export default function Home() {
   const [savedChats, setSavedChats] = useState<Array<{ id: string; title: string; updated_at: string }>>([])
   const [savedChatsOpen, setSavedChatsOpen] = useState(true)
   const [savedChatsError, setSavedChatsError] = useState(false)
+  const [deleteFailed, setDeleteFailed] = useState(false)
   const [pendingRequest, setPendingRequest] = useState('')
   const [loading, setLoading] = useState(false)
   const [activity, setActivity] = useState<AgentProgressEvent | null>(null)
@@ -179,6 +180,21 @@ export default function Home() {
     } catch {
       setSavedChatsError(true)
     }
+  }
+
+  // Users can remove one conversation or their whole history. The API only ever deletes rows
+  // owned by the signed-in user; the list is re-read from the server afterwards.
+  async function deleteSavedChats(id: string | null) {
+    if (!window.confirm(id ? copy.deleteChatConfirm : copy.deleteAllConfirm)) return
+    try {
+      const response = await fetch(`/api/assistant/chats?${id ? `id=${encodeURIComponent(id)}` : 'all=true'}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('delete_failed')
+      setDeleteFailed(false)
+      if (!id || id === conversationIdRef.current) startNewChat()
+    } catch {
+      setDeleteFailed(true)
+    }
+    await refreshSavedChats()
   }
 
   async function openSavedChat(id: string) {
@@ -322,8 +338,15 @@ export default function Home() {
         <button type="button" className="cos-history-toggle" onClick={() => setSavedChatsOpen(value => !value)} aria-expanded={savedChatsOpen}>☰ {copy.chatTitle}</button>
         {savedChatsOpen ? <div className="cos-history-items">
           <button type="button" className="cos-history-entry" onClick={() => { closeHistoryOnPhone(); startNewChat() }}>＋ {copy.newChat}</button>
-          {savedChatsError ? <p role="status">History unavailable</p> : null}
-          {savedChats.map(chat => <button type="button" className="cos-history-entry" key={chat.id} onClick={() => { closeHistoryOnPhone(); void openSavedChat(chat.id) }} title={chat.title}>{chat.title || copy.newChat}</button>)}
+          {savedChatsError ? <p role="status">{copy.historyUnavailable}</p> : null}
+          {deleteFailed ? <p role="status">{copy.deleteFailed}</p> : null}
+          {savedChats.map(chat => (
+            <div className="cos-history-row" key={chat.id}>
+              <button type="button" className="cos-history-entry" onClick={() => { closeHistoryOnPhone(); void openSavedChat(chat.id) }} title={chat.title}>{chat.title || copy.newChat}</button>
+              <button type="button" className="cos-history-delete" onClick={() => void deleteSavedChats(chat.id)} aria-label={`${copy.deleteChat}: ${chat.title || copy.newChat}`} title={copy.deleteChat}>🗑</button>
+            </div>
+          ))}
+          {savedChats.length ? <button type="button" className="cos-history-delete-all" onClick={() => void deleteSavedChats(null)}>{copy.deleteAllChats}</button> : null}
         </div> : null}
         </div>
       </nav>

@@ -1,2 +1,2 @@
-base_sha=6a36c2066bd58fdd5faea427bd833c7517386056
-branch=fix/cos-agent-duplicate-answer-20261016
+base_sha=604712c81f585518dfca0b828dde6daf0f4fa9e9
+branch=fix/lab-holdout-duplicate-prompts-20261016

@@ -153,3 +153,18 @@ test('the migrations save callback token and job name together, keep tokens on r
   assert.match(noPrices, /drop table if exists lab\.training_rate_cards/)
   assert.match(noPrices, /release_customer_job_reservation[\s\S]*job_submission_state is distinct from 'reserved'/)
 })
+
+
+test('customer examples reject malformed and overlong data rather than silently coercing or truncating', () => {
+  const good = Array.from({ length: 20 }, (_, n) => JSON.stringify({ prompt: 'p' + n, response: 'r' + n }))
+  const malformed = [
+    '{"prompt":{},"response":"r"}',
+    '{"prompt":"p","response":null}',
+    JSON.stringify({ prompt: 'p'.repeat(8001), response: 'r' }),
+    JSON.stringify({ prompt: 'p', response: 'r'.repeat(20001) }),
+  ]
+  const result = lab.rowsFromExamples([...good, ...malformed].join('\n'))
+  assert.equal(result.rows.length, 20)
+  assert.equal(result.invalidLines, 4)
+  assert.deepEqual(result.rows.map((r: { prompt: string }) => r.prompt), good.map((_, n) => 'p' + n))
+})

@@ -35,6 +35,13 @@ export type AgentEvidence = {
   failedHosts: Set<string>
 }
 
+/** The web_search tool result text; also used to seed a turn with a search the host already ran. */
+export function searchObservation(query: string, results: readonly AgentSearchResult[], evidence: AgentEvidence): string {
+  if (!results.length) return `No results for "${query}".`
+  for (const result of results) evidence.sourceUrls.add(result.url)
+  return results.slice(0, 8).map((result, index) => `[${index + 1}] ${result.title}\n${result.url}\n${result.snippet}`).join('\n\n')
+}
+
 export function emptyEvidence(userText: string): AgentEvidence {
   return {
     observations: [],
@@ -172,9 +179,7 @@ export async function executeAgentTool(input: {
       const query = String(args.query || '').trim().slice(0, 300)
       if (!query) return 'Error: query is required.'
       const results = await input.ports.search(query).catch(() => [] as AgentSearchResult[])
-      if (!results.length) return record(`No results for "${query}".`)
-      for (const result of results) evidence.sourceUrls.add(result.url)
-      return record(results.slice(0, 8).map((result, index) => `[${index + 1}] ${result.title}\n${result.url}\n${result.snippet}`).join('\n\n'))
+      return record(searchObservation(query, results, evidence))
     }
 
     case 'fetch_url':

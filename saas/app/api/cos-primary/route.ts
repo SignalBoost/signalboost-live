@@ -324,7 +324,7 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
 // response window, and the loop stops launching tools as soon as its deadline is spent.
 const AGENT_LOOP_BUDGET_MS=110_000
 
-type AgentComputeTurn={startedAt:number;input:string;language:string;body:any;userId:string|null;ownerAuthenticated:boolean;precedingAssistant:string|null}
+type AgentComputeTurn={startedAt:number;input:string;language:string;body:any;userId:string|null;ownerAuthenticated:boolean;precedingAssistant:string|null;seedSearch?:{query:string;results:readonly{title:string;url:string;snippet:string}[]}}
 
 function agentChartJson(startedAt:number,input:string,payload:{reply:string;source:string;png?:Buffer;filename?:string;sources:string[];reasonerLabel:string|null;modelInvoked:boolean;loop?:unknown}){
   const executionProvenance=authoritativeProvenance(null,{invoked:false})
@@ -363,6 +363,7 @@ async function agentComputeResponse(turn:AgentComputeTurn):Promise<NextResponse|
     ports:createCosAgentPorts(policy),
     policy,
     deadlineAt:loopStartedAt+Math.min(AGENT_LOOP_BUDGET_MS,remaining===null?AGENT_LOOP_BUDGET_MS:Math.max(0,remaining-10_000)),
+    seedSearch:turn.seedSearch,
   }).catch(error=>{
     trace.outcome='error'
     trace.modelError=redactUrlQueries(error instanceof Error?error.message:String(error)).slice(0,600)
@@ -994,6 +995,12 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     }
 
     if(!requestedAction){
+      // Live facts run in the same agent loop as charts and data: the search COS already ran is the
+      // loop's first observation, and the model searches again for any part of the question it does
+      // not cover (production 2026-10-16: "capital of Australia and its population" answered only the
+      // capital from one search pass). The one-pass synthesis below remains the fallback.
+      const agentAnswered=await agentComputeResponse({startedAt,input,language,body,userId,ownerAuthenticated:access?.isOwner===true&&Boolean(userId),precedingAssistant:precedingAssistant||null,seedSearch:{query:lookupInput,results:freshSources}})
+      if(agentAnswered)return agentAnswered
       freshLocalAttempted=true
       freshLocalModel=localReasonerLabel()
       let localSynthesis=await synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})

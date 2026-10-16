@@ -11,7 +11,7 @@
 //   - cited URLs must be URLs this turn actually searched or fetched.
 
 import type { LocalModelChatMessage, LocalModelToolCall, LocalModelToolDefinition, LocalModelTurnResult } from '../../local-inference.ts'
-import { ANSWER_RESERVE_MS, agentToolDefinitions, emptyEvidence, executeAgentTool, type AgentEvidence, type AgentToolPolicy, type AgentToolPorts } from './cosAgentTools.ts'
+import { ANSWER_RESERVE_MS, agentToolDefinitions, emptyEvidence, executeAgentTool, searchObservation, type AgentEvidence, type AgentSearchResult, type AgentToolPolicy, type AgentToolPorts } from './cosAgentTools.ts'
 
 export type AgentModelTurn = (input: {
   systemPrompt: string
@@ -129,6 +129,7 @@ export function cosAgentSystemPrompt(language: string, today: Date = new Date())
     // periods need the real date.
     `Today is ${today.toISOString().slice(0, 10)} (UTC). Resolve relative periods ("past 6 months", "last 5 years") from this date and request data through today.`,
     'You are COS, an AI agent with tools. Solve the user\'s request completely, the way a careful analyst would: plan, gather real data with tools, compute with code, check the results, then answer.',
+    'Cover every part: when the request asks for several things (for example a capital AND its population), answer each one. If the results you have do not support a part, search or fetch again for that part; if it still cannot be found, say which part is missing instead of dropping it.',
     'Tools: web_search finds sources; fetch_url downloads a page, JSON API or CSV and saves it to data/; run_python runs Python on those files and saves charts to out/; browse_page (when offered) opens a JavaScript page in a real browser and is the last resort.',
     'Data rules: never type data values into code from memory. Every number you plot or report must come from a file you fetched this turn (read it from data/) or from the user\'s own text (data/user_request.txt). If you cannot retrieve the data, say so plainly instead of estimating.',
     'Prefer machine-readable public endpoints over HTML. Well-known keyless endpoints: Yahoo Finance daily prices https://query1.finance.yahoo.com/v8/finance/chart/<TICKER>?range=6mo&interval=1d (also range=1mo,3mo,1y,5y); Stooq daily CSV https://stooq.com/q/d/l/?s=<ticker>.us&i=d; US BLS monthly series (keyless, up to 10 years per call) https://api.bls.gov/publicAPI/v2/timeseries/data/<SERIES>?startyear=<YYYY>&endyear=<YYYY> (e.g. LNS14000000 unemployment rate, CUUR0000SA0 CPI); World Bank annual indicators https://api.worldbank.org/v2/country/<ISO3>/indicator/<CODE>?format=json&per_page=200 (e.g. SL.UEM.TOTL.ZS unemployment, NY.GDP.MKTP.CD GDP, FP.CPI.TOTL.ZG inflation). Use web_search to find others. Never invent API keys or credentials: use only keyless endpoints, and if one fails or times out, try another source.',
@@ -295,6 +296,12 @@ export async function runCosAgentLoop(input: {
   deadlineAt: number
   now?: () => number
   trace?: AgentLoopTrace
+  /**
+   * A web search the host already ran for this request. It enters the conversation as the loop's
+   * first web_search call and result, so the model starts from that evidence instead of repeating it
+   * and can search again for any part of the request the results do not cover.
+   */
+  seedSearch?: Readonly<{ query: string; results: readonly AgentSearchResult[] }>
 }): Promise<CosAgentLoopResult | null> {
   const trace = input.trace ?? newAgentLoopTrace()
   const now = input.now ?? Date.now
@@ -304,6 +311,16 @@ export async function runCosAgentLoop(input: {
   const evidence: AgentEvidence = emptyEvidence(input.request)
   const history = (input.conversation || []).slice(-6).map(message => ({ role: message.role, content: String(message.content || '').slice(0, 4_000) }))
   const messages: LocalModelChatMessage[] = [...history, { role: 'user', content: input.request }]
+  if (input.seedSearch?.results.length) {
+    const query = input.seedSearch.query.slice(0, 300)
+    const observation = searchObservation(query, input.seedSearch.results, evidence)
+    evidence.observations.push(observation)
+    messages.push(
+      { role: 'assistant', content: '', tool_calls: [{ id: 'seed_search', type: 'function', function: { name: 'web_search', arguments: JSON.stringify({ query }) } }] },
+      { role: 'tool', tool_call_id: 'seed_search', content: observation },
+    )
+    trace.steps.push(agentTraceStep('web_search', observation))
+  }
   const toolCalls: string[] = []
   let model = ''
   let answer = ''

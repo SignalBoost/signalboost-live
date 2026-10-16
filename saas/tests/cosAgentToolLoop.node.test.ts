@@ -428,3 +428,48 @@ test('answers start with the result, not the agent narrating its process', () =>
   assert.equal(stripLeadingNarration('Gold fell 3.12%. The chart is attached.'), 'Gold fell 3.12%. The chart is attached.')
   assert.equal(stripLeadingNarration('Let me present the results.'), 'Let me present the results.')
 })
+
+// Production 2026-10-16: "capital of Australia and its population" answered only the capital from
+// one search pass. Live facts now run in the agent loop, seeded with the search COS already ran,
+// and the model searches again for the part those results do not cover.
+test('a seeded search starts the loop and a second search covers the missing part', async () => {
+  const seen: LocalModelChatMessage[][] = []
+  const searched: string[] = []
+  const trace = newAgentLoopTrace()
+  const result = await runCosAgentLoop({
+    trace,
+    request: 'what is the capital of Australia and its population?',
+    language: 'en',
+    model: scriptedModel([
+      call('c1', 'web_search', { query: 'Canberra population' }),
+      answer('The capital of Australia is Canberra, with a population of about 478,000.\n\nSources:\n- [Britannica](https://www.britannica.com/place/Canberra)\n- [ABS](https://www.abs.gov.au/canberra)'),
+    ], seen),
+    ports: ports(fakePython({ stdout: '' }), { search: async query => { searched.push(query); return [{ title: 'Canberra population', url: 'https://www.abs.gov.au/canberra', snippet: 'Canberra population 478,000 (2025)' }] } }),
+    policy: { maxPythonRuns: 1, browserAllowed: false },
+    deadlineAt: Date.now() + 100_000,
+    seedSearch: { query: 'capital of Australia', results: [{ title: 'Canberra', url: 'https://www.britannica.com/place/Canberra', snippet: 'Canberra, capital of Australia' }] },
+  })
+  const first = seen[0]
+  assert.equal(first.at(-2)?.role, 'assistant')
+  assert.equal(first.at(-2)?.tool_calls?.[0]?.function.name, 'web_search')
+  assert.equal(first.at(-1)?.role, 'tool')
+  assert.match(String(first.at(-1)?.content), /britannica\.com\/place\/Canberra/)
+  assert.deepEqual(searched, ['Canberra population'], 'the seeded search is not repeated')
+  assert.ok(result, 'answered')
+  assert.match(result!.reply, /478,000/)
+  assert.match(result!.reply, /britannica\.com/, 'seeded source URLs are verified sources')
+  assert.equal(result!.verification.droppedUrls, 0)
+  assert.deepEqual(trace.steps.map(step => step.tool), ['web_search', 'web_search'])
+})
+
+test('the agent prompt requires every part of a multi-part request', () => {
+  assert.match(cosAgentSystemPrompt('en'), /Cover every part/)
+})
+
+test('cos-primary answers live facts through the seeded agent loop before one-pass synthesis', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  const loop = route.indexOf('const agentAnswered=await agentComputeResponse(')
+  const synthesis = route.indexOf('let localSynthesis=await synthesizeFreshEvidenceLocally(')
+  assert.ok(loop > 0 && synthesis > loop, 'agent loop runs first; one-pass synthesis is the fallback')
+  assert.match(route.slice(loop, synthesis), /seedSearch:\{query:lookupInput,results:freshSources\}/)
+})

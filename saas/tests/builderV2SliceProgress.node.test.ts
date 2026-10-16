@@ -183,3 +183,73 @@ test('a V2 job a person started keeps the model while they chat; only self-heali
   assert.match(v2, /createBuilderCodingAiPort\(\{ yieldToChat: selfHealingCapacityJob\(job\) \}\)/)
   assert.doesNotMatch(runner, /yieldToChat: true/)
 })
+
+test('Codex review on #4595: a read-only slice followed by a model failure is not progress', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('ro', 'a.js', 'one\n')
+  let saves = 0
+  const store: BuilderV2LeaseStore = {
+    async load() { return { workspaceId: 'ro', objective: 'Fix a.js', claimGeneration: 1, checkpoint: null } },
+    async save() { saves++; return true },
+  }
+  let call = 0
+  const ai = { async generate() {
+    if (call++ === 0) return tool({ tool: 'read_file', path: 'a.js' })
+    throw new Error('builder_runpod_primary_busy')
+  } }
+  const cycle = await runBuilderV2JobCycle({ jobId: 'j', claimGeneration: 1, store,
+    agent: new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, passing), workspace), maxSteps: 24 })
+  assert.equal(cycle.status, 'failed')
+  assert.equal(cycle.reason, 'builder_v2_model_unavailable: builder_runpod_primary_busy')
+})
+
+test('Codex review on #4597: rerunning an already-passing command before a model failure is not progress', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const objective = 'Create index.js and run npm test.'
+  const first = scripted([
+    tool({ tool: 'write_file', path: 'index.js', content: 'module.exports = 1\n' }),
+    tool({ tool: 'run_tests', command: 'npm test' }),
+  ])
+  const sliceOne = await new BuilderV2Agent(first.ai, new BuilderV2Dispatcher(workspace, passing), workspace)
+    .run({ workspaceId: 'rr', objective, maxSteps: 2 })
+  assert.equal(sliceOne.checkpoint?.verifiedRevision, 1)
+  let saved: BuilderV2Checkpoint | null = sliceOne.checkpoint!
+  const store: BuilderV2LeaseStore = {
+    async load() { return { workspaceId: 'rr', objective, claimGeneration: 2, checkpoint: saved } },
+    async save(_id, _claim, checkpoint) { saved = checkpoint; return true },
+  }
+  let call = 0
+  const ai = { async generate() {
+    if (call++ === 0) return tool({ tool: 'run_tests', command: 'npm test' })
+    throw new Error('builder_model_deadline_exceeded')
+  } }
+  const cycle = await runBuilderV2JobCycle({ jobId: 'j', claimGeneration: 2, store,
+    agent: new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, passing), workspace), maxSteps: 24 })
+  assert.equal(cycle.status, 'failed')
+  assert.equal(cycle.reason, 'builder_v2_model_unavailable: builder_model_deadline_exceeded')
+})
+
+test('Codex review on #4598: a newly passing required command before a model failure is progress', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const objective = 'Create index.js.\n```bash\nnpm test\nnode index.js\n```'
+  const first = scripted([
+    tool({ tool: 'write_file', path: 'index.js', content: 'module.exports = 1\n' }),
+    tool({ tool: 'run_tests', command: 'npm test' }),
+  ])
+  const sliceOne = await new BuilderV2Agent(first.ai, new BuilderV2Dispatcher(workspace, passing), workspace)
+    .run({ workspaceId: 'nc', objective, maxSteps: 2 })
+  let saved: BuilderV2Checkpoint | null = sliceOne.checkpoint!
+  const store: BuilderV2LeaseStore = {
+    async load() { return { workspaceId: 'nc', objective, claimGeneration: 2, checkpoint: saved } },
+    async save(_id, _claim, checkpoint) { saved = checkpoint; return true },
+  }
+  let call = 0
+  const ai = { async generate() {
+    if (call++ === 0) return tool({ tool: 'run_tests', command: 'node index.js' })
+    throw new Error('builder_model_deadline_exceeded')
+  } }
+  const cycle = await runBuilderV2JobCycle({ jobId: 'j', claimGeneration: 2, store,
+    agent: new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, passing), workspace), maxSteps: 24 })
+  assert.equal(cycle.status, 'paused')
+  assert.equal(saved?.steps.length, 3)
+})

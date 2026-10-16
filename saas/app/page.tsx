@@ -65,7 +65,7 @@ export default function Home() {
   const [question, setQuestion] = useState('')
   const [turns, setTurns] = useState<ConciergeTranscriptTurn[]>([])
   const [savedChats, setSavedChats] = useState<Array<{ id: string; title: string; updated_at: string }>>([])
-  const [savedChatsOpen, setSavedChatsOpen] = useState(false)
+  const [savedChatsOpen, setSavedChatsOpen] = useState(true)
   const [savedChatsError, setSavedChatsError] = useState(false)
   const [pendingRequest, setPendingRequest] = useState('')
   const [loading, setLoading] = useState(false)
@@ -80,6 +80,14 @@ export default function Home() {
   const conversationIdRef = useRef('')
   const chips = ['grow', 'review', 'campaign', 'show']
   const showWelcome = turns.length === 0 && !pendingRequest && !loading
+
+  // History is a permanent left column on desktop; on phones it starts closed so the
+  // conversation gets the whole screen, and closes again after a chat is picked.
+  const isPhoneWidth = () => window.matchMedia('(max-width: 900px)').matches
+  useEffect(() => {
+    if (isPhoneWidth()) setSavedChatsOpen(false)
+  }, [])
+  const closeHistoryOnPhone = () => { if (isPhoneWidth()) setSavedChatsOpen(false) }
 
   useEffect(() => {
     const hour = new Date().getHours()
@@ -310,12 +318,14 @@ export default function Home() {
       <div className="aurora" aria-hidden="true" />
       {/* Saved chats are task navigation, not a second Concierge panel. */}
       <nav className={'cos-home-history' + (savedChatsOpen ? ' is-open' : '')} aria-label={copy.chatTitle}>
+        <div className="cos-history-rail">
         <button type="button" className="cos-history-toggle" onClick={() => setSavedChatsOpen(value => !value)} aria-expanded={savedChatsOpen}>☰ {copy.chatTitle}</button>
         {savedChatsOpen ? <div className="cos-history-items">
-          <button type="button" className="cos-history-entry" onClick={() => { setSavedChatsOpen(false); startNewChat() }}>＋ {copy.newChat}</button>
+          <button type="button" className="cos-history-entry" onClick={() => { closeHistoryOnPhone(); startNewChat() }}>＋ {copy.newChat}</button>
           {savedChatsError ? <p role="status">History unavailable</p> : null}
-          {savedChats.map(chat => <button type="button" className="cos-history-entry" key={chat.id} onClick={() => { setSavedChatsOpen(false); void openSavedChat(chat.id) }} title={chat.title}>{chat.title || copy.newChat}</button>)}
+          {savedChats.map(chat => <button type="button" className="cos-history-entry" key={chat.id} onClick={() => { closeHistoryOnPhone(); void openSavedChat(chat.id) }} title={chat.title}>{chat.title || copy.newChat}</button>)}
         </div> : null}
+        </div>
       </nav>
 
 

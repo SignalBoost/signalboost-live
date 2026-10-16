@@ -13,6 +13,6 @@ test('LAB experiment comparison is interactive, workspace-scoped, and uses real 
 })
 test('comparison contains all 11 supported localizations', () => {
  for (const locale of ['en','es','pt','pl','ru','de','fr','it','ja','ko','ar']) {
-  assert.match(ui, new RegExp('\\\\b'+locale+':\\\\[').source === '' ? /never/ : new RegExp('\\b'+locale+':\\['))
+  assert.ok(ui.includes(' '+locale+':['), locale)
  }
 })

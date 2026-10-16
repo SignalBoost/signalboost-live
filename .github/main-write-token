@@ -1,2 +1,2 @@
-base_sha=b37dc06bf3b5716dc28e9f521de98dfc62adf6f1
-branch=fix/builder-route-directed-question-openings-20261015
+base_sha=7f8b5a8bbb881f279a0274c8823359c45cd4feab
+branch=fix/cos-agent-loop-round-timeout-20261016

@@ -31,6 +31,8 @@ export type AgentEvidence = {
   /** Images withheld because the code that drew them read no staged data file. */
   droppedImages: number
   pythonRuns: number
+  /** Hosts that already timed out or refused this turn; they are not retried. */
+  failedHosts: Set<string>
 }
 
 export function emptyEvidence(userText: string): AgentEvidence {
@@ -41,6 +43,7 @@ export function emptyEvidence(userText: string): AgentEvidence {
     images: [],
     droppedImages: 0,
     pythonRuns: 0,
+    failedHosts: new Set(),
   }
 }
 
@@ -190,6 +193,11 @@ export async function executeAgentTool(input: {
         body = browsed.text
         extension = 'txt'
       } else {
+        let host = ''
+        try { host = new URL(url).hostname.toLowerCase() } catch {}
+        if (host && evidence.failedHosts.has(host)) {
+          return record(`Skipped ${url}: ${host} already failed in this turn. Use the data you already fetched, or a different source.`)
+        }
         try {
           const fetched = await input.ports.fetchPublic(url, fetchBudgetMs)
           if (fetched.status >= 400) return record(`HTTP ${fetched.status} from ${fetched.finalUrl}. Try another source or endpoint.`)
@@ -198,6 +206,7 @@ export async function executeAgentTool(input: {
           body = fetched.text
         } catch (error) {
           const code = error instanceof Error ? error.message : 'fetch_failed'
+          if (host) evidence.failedHosts.add(host)
           return record(`Could not fetch ${url}: ${code}.`)
         }
       }

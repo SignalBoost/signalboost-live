@@ -30,9 +30,13 @@ const SYSTEM_PROMPT = [
   '{"type":"finish","summary":"what was built and verified"}',
   'Batch: write several missing files in one "tools" reply (complete contents, no placeholders, dependencies and package.json first), up to 6 actions and about 12000 characters per reply. Execution stops at the first failed action.',
   'After a change, once every required file exists, the host runs the required commands itself and returns their real output; read it and repair.',
+  'A write or edit receipt with output.syntaxError means that file does not parse: fix it first with edit_file.',
   'write_file creates a file; to rewrite an existing file, read_file it first. Prefer edit_file for small changes.',
   'Write every checklist file, then run every checklist command; finish only after all of them pass after your last change.',
 ].join('\n')
+
+const hasSyntaxError = (receipt: BuilderV2Receipt) =>
+  typeof (receipt.output as { syntaxError?: unknown } | undefined)?.syntaxError === 'string'
 
 /** Older receipts keep only what checkpoint validation and acceptance need, so long builds stay small. */
 function compactReceipt(receipt: BuilderV2Receipt): BuilderV2Receipt {
@@ -299,6 +303,11 @@ export class BuilderV2Agent {
       steps.push(receipt)
       if (receipt.changed && action.tool === 'write_file' && !knownFiles.includes(action.path)) knownFiles.push(action.path)
       if (receipt.changed) revision++
+      if (receipt.changed && (action.tool === 'write_file' || action.tool === 'edit_file')) {
+        const syntaxError = (receipt.output as { syntaxError?: unknown } | undefined)?.syntaxError
+        if (typeof syntaxError === 'string') syntaxErrors.set(action.path, syntaxError)
+        else syntaxErrors.delete(action.path)
+      }
       if (action.tool === 'run_tests') verifiedRevision = receipt.ok ? revision : -1
       lastReceipt = JSON.stringify(receipt).slice(0, 20_000)
       const output = receipt.output as { content?: unknown; currentContent?: unknown } | undefined
@@ -317,8 +326,10 @@ export class BuilderV2Agent {
     }
     // The revision the host last ran the required commands on; each revision is host-verified at most once.
     let hostVerifiedRevision = -1
+    // Files whose latest write left a syntax error; host verification waits until they compile.
+    const syntaxErrors = new Map<string, string>()
     const hostVerificationDue = () => revision > hostVerifiedRevision && checklist.files.length > 0
-      && missingFiles().length === 0 && checklist.commands.length > 0
+      && missingFiles().length === 0 && checklist.commands.length > 0 && syntaxErrors.size === 0
     /** Run every required command in order on the current revision; stop at the first failure. */
     const hostVerify = async (): Promise<BuilderV2Outcome | null> => {
       hostVerifiedRevision = revision
@@ -421,7 +432,8 @@ export class BuilderV2Agent {
         // A stall pauses with its checkpoint for the bounded continuation controller (#4590): the next slice
         // resumes with fresh repeat tracking, and the job's slice cap bounds how often that happens.
         if (unproductive >= BUILDER_V2_STALL_LIMIT) return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
-        if (!receipt.ok) break
+        // A file just written with a syntax error is repaired before anything is built on top of it.
+        if (!receipt.ok || hasSyntaxError(receipt)) break
       }
       // Host verification, as Lovable observes build and test failures itself: after a change, once every required
       // file exists, the host runs the required commands without spending a model call and returns the real output.

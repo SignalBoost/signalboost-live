@@ -1,4 +1,5 @@
 import type { BuilderFile, BuilderRunnerPort, BuilderWorkspacePort } from './contracts.ts'
+import { builderSyntaxError } from './syntax-check.ts'
 
 /**
  * Model-independent tool execution for Builder V2. No model-generated result can
@@ -80,7 +81,9 @@ export class BuilderV2Dispatcher {
             next: ['read_file', 'edit_file', 'run_tests'],
           }
           const created = await this.workspace.writeFile(workspaceId, action.path, action.content)
-          return { tool: action.tool, ok: true, changed: true, output: { path: created.path } }
+          const syntaxError = builderSyntaxError(created.path, action.content)
+          return { tool: action.tool, ok: true, changed: true, output: { path: created.path, ...(syntaxError ? { syntaxError } : {}) },
+            ...(syntaxError ? { next: ['edit_file'] as const } : {}) }
         }
         if (action.tool === 'edit_file') {
           const current = await this.workspace.readFile(workspaceId, action.path)
@@ -90,7 +93,9 @@ export class BuilderV2Dispatcher {
             output: { path: current.path, alreadyApplied: true }, next: ['run_tests', 'read_file'],
           }
           const edited = await this.workspace.editFile(workspaceId, action.path, action.search, action.replace)
-          return { tool: action.tool, ok: true, changed: true, output: { path: edited.path }, next: ['run_tests', 'read_file'] }
+          const syntaxError = builderSyntaxError(edited.path, edited.content)
+          return { tool: action.tool, ok: true, changed: true, output: { path: edited.path, ...(syntaxError ? { syntaxError } : {}) },
+            next: syntaxError ? ['edit_file', 'read_file'] : ['run_tests', 'read_file'] }
         }
         const listed = await this.workspace.listFiles(workspaceId)
         const files = (await Promise.all(listed.map(item => this.workspace.readFile(workspaceId, item.path))))

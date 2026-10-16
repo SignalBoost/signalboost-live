@@ -220,6 +220,8 @@ export class BuilderV2Agent {
       }
     }
     const checklist = builderTaskContract(options.objective)
+    const knownFiles = this.workspace ? (await this.workspace.listFiles(options.workspaceId)).map(file => file.path) : []
+    const missingAtStart = checklist.files.filter(path => !knownFiles.includes(path))
     // Feedback that is not a receipt (rejected finish, unparseable reply, repeated action) keeps the build going
     // with the exact reason, and each kind is bounded so a model that keeps doing it still ends.
     let checklistRejections = 0
@@ -227,6 +229,13 @@ export class BuilderV2Agent {
     let repeats = 0
     // Actions taken since the last file change, with their receipts: repeating one cannot produce new information.
     const sinceChange = new Map<string, string>()
+    // Reconstruct inspection history across claims. Otherwise each continuation repeats list_files
+    // as if the previous slice never happened, consuming all 24 allowed claims.
+    for (const receipt of steps.slice(steps.findLastIndex(item => item.changed) + 1)) {
+      if (receipt.tool === 'list_files' && receipt.ok) {
+        sinceChange.set(JSON.stringify({ tool: 'list_files' }), JSON.stringify(receipt).slice(0, 20_000))
+      }
+    }
     // Content the model has observed per path, for the read-before-overwrite rule.
     const seen = new Map<string, string>()
     for (let calls = 0; calls < maxSteps && steps.length < BUILDER_V2_MAX_RECEIPTS; calls++) {
@@ -240,6 +249,10 @@ export class BuilderV2Agent {
             ...(checklist.files.length || checklist.commands.length || checklist.minimumTests
               ? { checklist: { files: checklist.files, commands: checklist.commands, minimumTests: checklist.minimumTests } } : {}),
             workspaceId: options.workspaceId,
+            workspaceFiles: knownFiles,
+            missingRequiredFiles: missingAtStart,
+            nextRecommendedAction: missingAtStart.length ? { tool: 'write_file', path: missingAtStart[0] } : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },
+            instruction: 'Do not list_files again when workspaceFiles is supplied. Create missingRequiredFiles one at a time; execute commands after files exist.',
             lastReceipt,
             tail: steps.slice(-TAIL),
             verified: verifiedRevision === revision && verifiedRevision >= 0,

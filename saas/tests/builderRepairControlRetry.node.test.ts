@@ -21,7 +21,7 @@ test('new application jobs prioritize missing deliverables over stale inspection
   assert.match(loop, /const missingBuildDeliverables = !repairObjective && builderTaskProgress\(task, workspacePaths, trace\)\.missingFiles\.length > 0/)
   assert.match(loop, /!missingBuildDeliverables && deniedInspections >= 4/)
   assert.match(loop, /!missingBuildDeliverables && consecutiveRepeatRejections >= MAX_CONSECUTIVE_REPEAT_REJECTIONS/)
-  assert.match(loop, /!missingBuildDeliverables \|\| deniedInspections < 2 \|\| toolId === 'write_file'/)
+  assert.match(loop, /!missingBuildDeliverables \|\| task\.files\.length <= 1 \|\| deniedInspections < 2 \|\| toolId === 'write_file'/)
   assert.match(loop, /progress\.missingFiles\[0\]/)
   assert.match(loop, /const verificationCommand =/)
 })

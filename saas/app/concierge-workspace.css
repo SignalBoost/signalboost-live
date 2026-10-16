@@ -145,8 +145,8 @@ body:has(.sb-ai-app-shell--home) > footer {
   background: transparent;
 }
 
-/* Delete controls: a trash button per conversation (shown on hover or keyboard focus; always
-   shown on touch screens) and one "delete all" action at the end of the list. */
+/* Delete controls: a trash button on every conversation (always visible, brighter on hover or
+   keyboard focus) and one "delete all" action at the end of the list. */
 .concierge-shell .cos-history-delete {
   flex: 0 0 auto;
   padding: 6px 8px;
@@ -156,7 +156,7 @@ body:has(.sb-ai-app-shell--home) > footer {
   color: rgba(252, 165, 165, .85);
   font-size: 12px;
   cursor: pointer;
-  opacity: 0;
+  opacity: .55;
 }
 
 .concierge-shell .cos-history-row:hover .cos-history-delete,
@@ -166,10 +166,6 @@ body:has(.sb-ai-app-shell--home) > footer {
 
 .concierge-shell .cos-history-delete:hover {
   background: rgba(239, 68, 68, .16);
-}
-
-@media (hover: none) {
-  .concierge-shell .cos-history-delete { opacity: 1; }
 }
 
 .concierge-shell .cos-history-delete-all {

@@ -221,7 +221,7 @@ export class BuilderV2Agent {
     }
     const checklist = builderTaskContract(options.objective)
     const knownFiles = this.workspace ? (await this.workspace.listFiles(options.workspaceId)).map(file => file.path) : []
-    const missingAtStart = checklist.files.filter(path => !knownFiles.includes(path))
+    const missingFiles = () => checklist.files.filter(path => !knownFiles.includes(path))
     // Feedback that is not a receipt (rejected finish, unparseable reply, repeated action) keeps the build going
     // with the exact reason, and each kind is bounded so a model that keeps doing it still ends.
     let checklistRejections = 0
@@ -250,8 +250,8 @@ export class BuilderV2Agent {
               ? { checklist: { files: checklist.files, commands: checklist.commands, minimumTests: checklist.minimumTests } } : {}),
             workspaceId: options.workspaceId,
             workspaceFiles: knownFiles,
-            missingRequiredFiles: missingAtStart,
-            nextRecommendedAction: missingAtStart.length ? { tool: 'write_file', path: missingAtStart[0] } : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },
+            missingRequiredFiles: missingFiles(),
+            nextRecommendedAction: missingFiles().length ? { tool: 'write_file', path: missingFiles()[0] } : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },
             instruction: 'Do not list_files again when workspaceFiles is supplied. Create missingRequiredFiles one at a time; execute commands after files exist.',
             lastReceipt,
             tail: steps.slice(-TAIL),
@@ -305,6 +305,7 @@ export class BuilderV2Agent {
       const receipt = await this.dispatcher.dispatch(options.workspaceId, action,
         action.tool === 'write_file' ? { seenContent: seen.get(action.path) } : {})
       steps.push(receipt)
+      if (receipt.changed && action.tool === 'write_file' && !knownFiles.includes(action.path)) knownFiles.push(action.path)
       if (receipt.changed) revision++
       if (action.tool === 'run_tests') verifiedRevision = receipt.ok ? revision : -1
       lastReceipt = JSON.stringify(receipt).slice(0, 20_000)

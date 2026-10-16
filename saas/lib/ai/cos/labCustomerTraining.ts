@@ -304,8 +304,15 @@ export function rowsFromExamples(raw: unknown): { rows: TeacherRow[]; invalidLin
     if (!line.trim()) continue
     let item: any
     try { item = JSON.parse(line) } catch { invalidLines++; continue }
-    const prompt = String(item?.prompt ?? '').trim().slice(0, 8000)
-    const response = String(item?.response ?? '').trim().slice(0, 20000)
+    // Match the customer preflight: reject non-string fields rather than coercing objects,
+    // and reject overlong inputs rather than silently training on truncated data.
+    if (!item || typeof item !== 'object' || Array.isArray(item) ||
+        typeof item.prompt !== 'string' || typeof item.response !== 'string' ||
+        item.prompt.trim().length > 8000 || item.response.trim().length > 20000) {
+      invalidLines++; continue
+    }
+    const prompt = item.prompt.trim()
+    const response = item.response.trim()
     if (!prompt || !response) { invalidLines++; continue }
     const text = `<user>\n${prompt}\n\n<assistant>\n${response}`
     const itemHash = sha256(text)

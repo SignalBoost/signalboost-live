@@ -231,7 +231,7 @@ test('Codex review on #4597: rerunning an already-passing command before a model
 
 test('Codex review on #4598: a newly passing required command before a model failure is progress', async () => {
   const workspace = new InMemoryBuilderWorkspace()
-  const objective = 'Create index.js.\n## Mandatory verification\nExecute all two commands:\n```bash\nnpm test\nnode index.js\n```'
+  const objective = 'Build app.\nCreate all 2 files:\n```text\napp/\n├── index.js\n└── README.md\n```\n## Mandatory verification\nExecute all two commands:\n```bash\nnpm test\nnode index.js\n```'
   const first = scripted([
     tool({ tool: 'write_file', path: 'index.js', content: 'module.exports = 1\n' }),
     tool({ tool: 'run_tests', command: 'npm test' }),
@@ -256,7 +256,7 @@ test('Codex review on #4598: a newly passing required command before a model fai
 
 test('Codex review on #4599: an ad-hoc passing command is not progress toward required commands', async () => {
   const workspace = new InMemoryBuilderWorkspace()
-  const objective = 'Create index.js.\n## Mandatory verification\nExecute all two commands:\n```bash\nnpm test\nnode index.js\n```'
+  const objective = 'Build app.\nCreate all 2 files:\n```text\napp/\n├── index.js\n└── README.md\n```\n## Mandatory verification\nExecute all two commands:\n```bash\nnpm test\nnode index.js\n```'
   const first = scripted([
     tool({ tool: 'write_file', path: 'index.js', content: 'module.exports = 1\n' }),
     tool({ tool: 'run_tests', command: 'npm test' }),
@@ -276,4 +276,23 @@ test('Codex review on #4599: an ad-hoc passing command is not progress toward re
   const cycle = await runBuilderV2JobCycle({ jobId: 'j', claimGeneration: 2, store,
     agent: new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, passing), workspace), maxSteps: 24 })
   assert.equal(cycle.status, 'failed')
+})
+
+test('production 2026-10-16: the slice time budget running out pauses even without progress in that slice', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('td', 'index.js', 'module.exports = 1\n')
+  let saved: BuilderV2Checkpoint | null = null
+  const store: BuilderV2LeaseStore = {
+    async load() { return { workspaceId: 'td', objective: 'Fix index.js', claimGeneration: 3, checkpoint: saved } },
+    async save(_id, _claim, checkpoint) { saved = checkpoint; return true },
+  }
+  let call = 0
+  const ai = { async generate() {
+    if (call++ === 0) return tool({ tool: 'read_file', path: 'index.js' })
+    throw new Error('builder_turn_timeout')
+  } }
+  const cycle = await runBuilderV2JobCycle({ jobId: 'j', claimGeneration: 3, store,
+    agent: new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, passing), workspace), maxSteps: 24 })
+  assert.equal(cycle.status, 'paused')
+  assert.equal(saved?.steps.length, 1)
 })

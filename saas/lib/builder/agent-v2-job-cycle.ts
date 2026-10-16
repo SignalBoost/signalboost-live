@@ -1,6 +1,7 @@
 import { BuilderV2Agent, type BuilderV2Checkpoint, type BuilderV2Outcome } from './agent-v2.ts'
 import type { BuilderV2Receipt } from './agent-v2-dispatcher.ts'
 import { builderTaskContract } from './task-contract.ts'
+import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
 
 /**
  * Durable V2 continuation boundary. The store must atomically fence writes using
@@ -82,7 +83,11 @@ export async function runBuilderV2JobCycle(input: {
   const madeProgress = Boolean(after) && (after!.revision > (before?.revision ?? 0) || (required.length
     ? [...passedOnCurrentRevision(after!.steps)].some(command => required.includes(command) && !passedBefore.has(command))
     : after!.verifiedRevision > (before?.verifiedRevision ?? -1)))
-  if (result.reason === 'builder_v2_model_unavailable' && !madeProgress) {
+  // The slice's own time budget running out (builder_turn_timeout) is the normal end of a slice, like the step
+  // budget, not a model outage: production 2026-10-16, OrderFlow wrote all 15 files, then a slice that spent its
+  // time on a failing run and reads ended the job instead of pausing. The slice cap still bounds resumption.
+  const sliceDeadline = result.reason === 'builder_v2_model_unavailable' && result.summary === BUILDER_TURN_TIMEOUT_ERROR
+  if (result.reason === 'builder_v2_model_unavailable' && !madeProgress && !sliceDeadline) {
     return { status: 'failed', result, reason: `builder_v2_model_unavailable: ${result.summary || 'builder_v2_model_error'}` }
   }
   // Slice budget, cancellation (slice deadline) and a model timeout/outage after progress all pause with the

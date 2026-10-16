@@ -1,2 +1,2 @@
-base_sha=f7bf24f677e337969e457be2503aa79efab83e1d
-branch=fix/cos-agent-hide-sandbox-paths-20261016
+base_sha=51d3f7be67428db184981ea5efa354c857a4c7ce
+branch=fix/cos-agent-no-process-narration-20261016

@@ -3,7 +3,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { agentTraceStep, cosAgentSystemPrompt, redactUrlQueries, stripSandboxPaths, newAgentLoopTrace, runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
+import { agentTraceStep, cosAgentSystemPrompt, redactUrlQueries, stripLeadingNarration, stripSandboxPaths, newAgentLoopTrace, runCosAgentLoop, stripUnverifiedUrls, unsupportedAnswerNumbers, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
 import { agentToolDefinitions, htmlToText, imageBackedByStagedData, type AgentToolPorts } from '../lib/ai/cos/agentLoop/cosAgentTools.ts'
 import { optionalPackagesFor, runnerSource, VercelPythonSession, type PythonSession } from '../lib/ai/cos/agentLoop/pythonSandbox.ts'
 import { execFileSync } from 'node:child_process'
@@ -419,4 +419,12 @@ test('answers never expose sandbox file paths', () => {
   assert.equal(stripSandboxPaths('**Sources:**\n- [Yahoo](https://query1.finance.yahoo.com/v8/finance/chart/VNCE)'), '**Sources:**\n- [Yahoo](https://query1.finance.yahoo.com/v8/finance/chart/VNCE)')
   assert.equal(stripSandboxPaths('Revenue grew in the outdoor/data segment.'), 'Revenue grew in the outdoor/data segment.')
   assert.equal(stripSandboxPaths('See https://shop.example.com/checkout/out/page.html for details.'), 'See https://shop.example.com/checkout/out/page.html for details.')
+})
+
+
+test('answers start with the result, not the agent narrating its process', () => {
+  assert.equal(stripLeadingNarration('The data is verified and the chart is created. Let me present the results.\n\nHere\'s the chart of gold.'), 'Here\'s the chart of gold.')
+  assert.equal(stripLeadingNarration('The data is verified and the chart is created. Here\'s the summary:\n\n## VNCE'), '## VNCE')
+  assert.equal(stripLeadingNarration('Gold fell 3.12%. The chart is attached.'), 'Gold fell 3.12%. The chart is attached.')
+  assert.equal(stripLeadingNarration('Let me present the results.'), 'Let me present the results.')
 })

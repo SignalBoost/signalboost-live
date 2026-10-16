@@ -17,6 +17,8 @@ import {
   type BuilderObjectiveFailureCode,
 } from '@/lib/builder/request-contract'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
+import { opensWithCreationDirective } from '@/lib/builder/regression-gate'
+import { builderTaskContract } from '@/lib/builder/task-contract'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -332,7 +334,11 @@ export async function POST(request: Request) {
       }
       try {
         const listed = await workspace.listFiles(workspaceId)
-        if (!project.context && !hasWorkspaceSource(listed.map(file => file.path))) {
+        // An empty workspace can still receive a complete new-application specification: the first instruction
+        // builds/creates something and the request lists its required files. Production 2026-10-16: the OrderFlow
+        // spec sent with an empty saved workspace selected was refused here as if it were a continuation.
+        const creationSpecification = opensWithCreationDirective(objective) && builderTaskContract(objective).files.length >= 2
+        if (!project.context && !creationSpecification && !hasWorkspaceSource(listed.map(file => file.path))) {
           return noStore({
             error: 'Selected workspace is empty. Choose the original project or connect/import the repository. No job was created.',
             execution_allowed: false,

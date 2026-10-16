@@ -183,3 +183,22 @@ test('a V2 job a person started keeps the model while they chat; only self-heali
   assert.match(v2, /createBuilderCodingAiPort\(\{ yieldToChat: selfHealingCapacityJob\(job\) \}\)/)
   assert.doesNotMatch(runner, /yieldToChat: true/)
 })
+
+test('Codex review on #4595: a read-only slice followed by a model failure is not progress', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('ro', 'a.js', 'one\n')
+  let saves = 0
+  const store: BuilderV2LeaseStore = {
+    async load() { return { workspaceId: 'ro', objective: 'Fix a.js', claimGeneration: 1, checkpoint: null } },
+    async save() { saves++; return true },
+  }
+  let call = 0
+  const ai = { async generate() {
+    if (call++ === 0) return tool({ tool: 'read_file', path: 'a.js' })
+    throw new Error('builder_runpod_primary_busy')
+  } }
+  const cycle = await runBuilderV2JobCycle({ jobId: 'j', claimGeneration: 1, store,
+    agent: new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, passing), workspace), maxSteps: 24 })
+  assert.equal(cycle.status, 'failed')
+  assert.equal(cycle.reason, 'builder_v2_model_unavailable: builder_runpod_primary_busy')
+})

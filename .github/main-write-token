@@ -1,2 +1,2 @@
-base_sha=8e47eb7ecd217d6df8ac829ce06b7d95cee848aa
-branch=fix/builder-route-tree-format-builds-20261015
+base_sha=663a52acf06b3162f3c7dbf14069e2365941f745
+branch=fix/production-gate-orderflow-test-regex-20261015

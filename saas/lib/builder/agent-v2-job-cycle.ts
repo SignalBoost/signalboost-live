@@ -1,5 +1,7 @@
 import { BuilderV2Agent, type BuilderV2Checkpoint, type BuilderV2Outcome } from './agent-v2.ts'
 import type { BuilderV2Receipt } from './agent-v2-dispatcher.ts'
+import { builderTaskContract } from './task-contract.ts'
+import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
 
 /**
  * Durable V2 continuation boundary. The store must atomically fence writes using
@@ -69,16 +71,23 @@ export async function runBuilderV2JobCycle(input: {
   // A model failure pauses only after the slice made progress, the rule V1 continuations use. A slice
   // without progress fails with the model's error: production 2026-10-16, an always-refused
   // model paused every slice instantly and spent all 24 slices with only package.json written.
-  // Progress means the slice changed a file, or a command passed on the current revision that had not passed on it
-  // before (a newly verified revision, or another required command). Reads, lists, failed edits and a rerun of an
-  // already-passing command add nothing (Codex reviews on #4595, #4597, #4598), so a slice of only those followed by
-  // a model failure does not earn another slice.
+  // Progress means the slice changed a file, or advanced verification of the current revision: a required command
+  // (the objective's checklist) passed on it for the first time, or, when the objective names no commands, the
+  // revision became verified. Reads, lists, failed edits, reruns of passing commands and ad-hoc commands add nothing
+  // toward completion (Codex reviews on #4595, #4597, #4598, #4599), so a slice of only those followed by a model
+  // failure does not earn another slice.
   const before = job.checkpoint
   const after = result.checkpoint
+  const required = builderTaskContract(job.objective).commands
   const passedBefore = passedOnCurrentRevision(before?.steps ?? [])
-  const madeProgress = Boolean(after) && (after!.revision > (before?.revision ?? 0)
-    || [...passedOnCurrentRevision(after!.steps)].some(command => !passedBefore.has(command)))
-  if (result.reason === 'builder_v2_model_unavailable' && !madeProgress) {
+  const madeProgress = Boolean(after) && (after!.revision > (before?.revision ?? 0) || (required.length
+    ? [...passedOnCurrentRevision(after!.steps)].some(command => required.includes(command) && !passedBefore.has(command))
+    : after!.verifiedRevision > (before?.verifiedRevision ?? -1)))
+  // The slice's own time budget running out (builder_turn_timeout) is the normal end of a slice, like the step
+  // budget, not a model outage: production 2026-10-16, OrderFlow wrote all 15 files, then a slice that spent its
+  // time on a failing run and reads ended the job instead of pausing. The slice cap still bounds resumption.
+  const sliceDeadline = result.reason === 'builder_v2_model_unavailable' && result.summary === BUILDER_TURN_TIMEOUT_ERROR
+  if (result.reason === 'builder_v2_model_unavailable' && !madeProgress && !sliceDeadline) {
     return { status: 'failed', result, reason: `builder_v2_model_unavailable: ${result.summary || 'builder_v2_model_error'}` }
   }
   // Slice budget, cancellation (slice deadline) and a model timeout/outage after progress all pause with the

@@ -209,10 +209,29 @@ body:has(.sb-ai-app-shell--home) > footer {
 }
 
 .concierge-shell .user-message {
-  width: min(78%, 860px) !important;
-  border-color: rgba(255,195,0,.28) !important;
-  background: rgba(72, 57, 12, .38) !important;
+  width: 100% !important;
+  max-width: none !important;
+  padding: 8px 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
+.concierge-shell .user-row,
+.concierge-shell .assistant-row {
+  width: 100% !important;
+  justify-content: flex-start !important;
+}
+.concierge-shell .message {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.concierge-shell .thread,
+.concierge-shell .thread-wrap {
+  max-width: none !important;
+}
+
 
 .concierge-shell .assistant-message {
   width: 100% !important;

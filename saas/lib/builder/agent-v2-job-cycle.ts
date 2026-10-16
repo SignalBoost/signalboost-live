@@ -36,6 +36,18 @@ function passedOnCurrentRevision(steps: readonly BuilderV2Receipt[]): Set<string
   return passed
 }
 
+/** Deterministic timeout state machine; exhaustively tested with Z3-derived paths. */
+export function builderV2TimeoutDisposition(input: {
+  unavailable: boolean
+  madeProgress: boolean
+  deadline: boolean
+  checkpointPresent: boolean
+}): 'continue' | 'pause' | 'fail' {
+  if (!input.unavailable) return 'continue'
+  if (!input.checkpointPresent) return 'fail'
+  return input.madeProgress || input.deadline ? 'pause' : 'fail'
+}
+
 export async function runBuilderV2JobCycle(input: {
   jobId: string
   claimGeneration: number
@@ -87,7 +99,7 @@ export async function runBuilderV2JobCycle(input: {
   // budget, not a model outage: production 2026-10-16, OrderFlow wrote all 15 files, then a slice that spent its
   // time on a failing run and reads ended the job instead of pausing. The slice cap still bounds resumption.
   const sliceDeadline = result.reason === 'builder_v2_model_unavailable' && result.summary === BUILDER_TURN_TIMEOUT_ERROR
-  if (result.reason === 'builder_v2_model_unavailable' && !madeProgress && !sliceDeadline) {
+  if (builderV2TimeoutDisposition({ unavailable: result.reason === 'builder_v2_model_unavailable', madeProgress, deadline: sliceDeadline, checkpointPresent: Boolean(result.checkpoint) }) === 'fail') {
     return { status: 'failed', result, reason: `builder_v2_model_unavailable: ${result.summary || 'builder_v2_model_error'}` }
   }
   // Slice budget, cancellation (slice deadline) and a model timeout/outage after progress all pause with the

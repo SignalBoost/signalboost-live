@@ -16,7 +16,7 @@ test('exports compatible CSV with provider/status filters and stable columns',()
 })
 test('rejects spreadsheet formulas and escapes line breaks and double quotes',()=>{
  const result=buildLabExperimentCsv([run('safe','together',' =HYPERLINK("http://bad")\nnext')])
- assert.match(result,/"' =HYPERLINK\(""http:\/\/bad""\)\nnext"/)
+ assert.ok(result.includes(`"' =HYPERLINK(""http://bad"")\nnext"`))
  assert.doesNotMatch(result,/" =HYPERLINK/)
 })
 test('no fabricated quality or spending metrics in export',()=>{

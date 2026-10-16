@@ -17,7 +17,7 @@ const REPEAT_LIMIT = 4
 const TAIL = 8
 
 const SYSTEM_PROMPT = [
-  'You are an autonomous software engineering agent. Choose exactly one tool operation per reply.',
+  'You are an autonomous software engineering agent. Each reply carries one or more tool operations, executed in order.',
   'Inspect, write or edit, run the required commands, read real failures and repair them. Never claim verification without a real passing run_tests receipt.',
   'Reply with one JSON object and nothing else. Shapes:',
   '{"type":"tool","action":{"tool":"list_files"}}',
@@ -26,7 +26,10 @@ const SYSTEM_PROMPT = [
   '{"type":"tool","action":{"tool":"write_file","path":"src/a.js","content":"full file content"}}',
   '{"type":"tool","action":{"tool":"edit_file","path":"src/a.js","search":"exact existing text","replace":"new text"}}',
   '{"type":"tool","action":{"tool":"run_tests","command":"npm test"}}',
+  '{"type":"tools","actions":[{"tool":"write_file","path":"package.json","content":"..."},{"tool":"write_file","path":"src/a.js","content":"..."}]}',
   '{"type":"finish","summary":"what was built and verified"}',
+  'Batch: write several missing files in one "tools" reply (complete contents, no placeholders, dependencies and package.json first), up to 6 actions and about 12000 characters per reply. Execution stops at the first failed action.',
+  'After a change, once every required file exists, the host runs the required commands itself and returns their real output; read it and repair.',
   'write_file creates a file; to rewrite an existing file, read_file it first. Prefer edit_file for small changes.',
   'Write every checklist file, then run every checklist command; finish only after all of them pass after your last change.',
 ].join('\n')
@@ -119,7 +122,8 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
   }
 }
 
-type Decision = Readonly<{ type: 'tool'; action: BuilderV2Action }> | Readonly<{ type: 'finish'; summary: string }>
+type Decision = Readonly<{ type: 'tool'; actions: readonly BuilderV2Action[] }> | Readonly<{ type: 'finish'; summary: string }>
+const MAX_BATCH = 6
 export type BuilderV2Outcome = Readonly<{
   ok: boolean
   reason: string
@@ -157,21 +161,74 @@ function controlObject(value: string): unknown {
   return null
 }
 
+function parseAction(value: unknown): BuilderV2Action | null {
+  if (!value || typeof value !== 'object') return null
+  const a = value as Record<string, unknown>
+  if (a.tool === 'list_files') return { tool: 'list_files' }
+  if (a.tool === 'read_file' && typeof a.path === 'string') return { tool: 'read_file', path: a.path }
+  if (a.tool === 'search_files' && typeof a.query === 'string') return { tool: 'search_files', query: a.query }
+  if (a.tool === 'write_file' && typeof a.path === 'string' && typeof a.content === 'string') return { tool: 'write_file', path: a.path, content: a.content }
+  if (a.tool === 'edit_file' && typeof a.path === 'string' && typeof a.search === 'string' && typeof a.replace === 'string') return { tool: 'edit_file', path: a.path, search: a.search, replace: a.replace }
+  if (a.tool === 'run_tests' && typeof a.command === 'string') return { tool: 'run_tests', command: a.command }
+  return null
+}
+
+/**
+ * Complete action objects of a "tools" reply that was cut off (model token limit), like a streaming action parser
+ * (Bolt executes each <boltAction> as soon as it closes): every complete action before the cut is kept, the partial
+ * one is dropped, and the receipts tell the model what still has to be written.
+ */
+function salvageActions(value: string): BuilderV2Action[] {
+  const key = value.search(/"actions"\s*:\s*\[/)
+  if (key < 0) return []
+  const actions: BuilderV2Action[] = []
+  let at = value.indexOf('[', key) + 1
+  while (at < value.length && actions.length < MAX_BATCH) {
+    const start = value.indexOf('{', at)
+    if (start < 0) break
+    let depth = 0
+    let quoted = false
+    let end = -1
+    for (let i = start; i < value.length; i++) {
+      const char = value[i]
+      if (quoted) {
+        if (char === '\\') i++
+        else if (char === '"') quoted = false
+        continue
+      }
+      if (char === '"') quoted = true
+      else if (char === '{') depth++
+      else if (char === '}' && --depth === 0) { end = i; break }
+    }
+    if (end < 0) break
+    let parsed: unknown = null
+    try { parsed = JSON.parse(value.slice(start, end + 1)) } catch { break }
+    const action = parseAction(parsed)
+    if (!action) break
+    actions.push(action)
+    at = end + 1
+  }
+  return actions
+}
+
 function parseDecision(value: string | null): Decision | null {
   if (!value) return null
   const object = controlObject(value)
-  if (!object || typeof object !== 'object') return null
-  const v = object as Record<string, unknown>
-  if (v.type === 'finish' && typeof v.summary === 'string') return { type: 'finish', summary: v.summary }
-  if (v.type !== 'tool' || !v.action || typeof v.action !== 'object') return null
-  const a = v.action as Record<string, unknown>
-  if (a.tool === 'list_files') return { type: 'tool', action: { tool: 'list_files' } }
-  if (a.tool === 'read_file' && typeof a.path === 'string') return { type: 'tool', action: { tool: 'read_file', path: a.path } }
-  if (a.tool === 'search_files' && typeof a.query === 'string') return { type: 'tool', action: { tool: 'search_files', query: a.query } }
-  if (a.tool === 'write_file' && typeof a.path === 'string' && typeof a.content === 'string') return { type: 'tool', action: { tool: 'write_file', path: a.path, content: a.content } }
-  if (a.tool === 'edit_file' && typeof a.path === 'string' && typeof a.search === 'string' && typeof a.replace === 'string') return { type: 'tool', action: { tool: 'edit_file', path: a.path, search: a.search, replace: a.replace } }
-  if (a.tool === 'run_tests' && typeof a.command === 'string') return { type: 'tool', action: { tool: 'run_tests', command: a.command } }
-  return null
+  if (object && typeof object === 'object') {
+    const v = object as Record<string, unknown>
+    if (v.type === 'finish' && typeof v.summary === 'string') return { type: 'finish', summary: v.summary }
+    if (v.type === 'tool') {
+      const action = parseAction(v.action)
+      return action ? { type: 'tool', actions: [action] } : null
+    }
+    if (v.type === 'tools' && Array.isArray(v.actions)) {
+      const actions = v.actions.slice(0, MAX_BATCH).map(parseAction)
+      return actions.length && actions.every(Boolean) ? { type: 'tool', actions: actions as BuilderV2Action[] } : null
+    }
+  }
+  // No complete control object (for example a "tools" reply cut off mid-file): keep its complete actions.
+  const salvaged = salvageActions(value.replace(/^\s*<think>[\s\S]*?<\/think>/i, ''))
+  return salvaged.length ? { type: 'tool', actions: salvaged } : null
 }
 
 /**
@@ -238,6 +295,46 @@ export class BuilderV2Agent {
     }
     // Content the model has observed per path, for the read-before-overwrite rule.
     const seen = new Map<string, string>()
+    const record = (action: BuilderV2Action, receipt: BuilderV2Receipt) => {
+      steps.push(receipt)
+      if (receipt.changed && action.tool === 'write_file' && !knownFiles.includes(action.path)) knownFiles.push(action.path)
+      if (receipt.changed) revision++
+      if (action.tool === 'run_tests') verifiedRevision = receipt.ok ? revision : -1
+      lastReceipt = JSON.stringify(receipt).slice(0, 20_000)
+      const output = receipt.output as { content?: unknown; currentContent?: unknown } | undefined
+      if (action.tool === 'read_file' && receipt.ok && typeof output?.content === 'string') seen.set(action.path, output.content)
+      if (action.tool === 'write_file' && typeof output?.currentContent === 'string') seen.set(action.path, output.currentContent)
+      if (action.tool === 'write_file' && receipt.changed) seen.set(action.path, action.content)
+      if (action.tool === 'edit_file' && receipt.changed) seen.delete(action.path)
+      if (receipt.changed) { sinceChange.clear(); repeats = 0 } else if (action.tool !== 'run_tests') sinceChange.set(JSON.stringify(action), lastReceipt)
+      if (receipt.changed || action.tool === 'run_tests' && receipt.ok) unproductive = 0
+      else unproductive++
+    }
+    const persist = async () => {
+      if (!options.onCheckpoint) return
+      const checkpoint = await snapshot()
+      if (checkpoint) await options.onCheckpoint(checkpoint)
+    }
+    // The revision the host last ran the required commands on; each revision is host-verified at most once.
+    let hostVerifiedRevision = -1
+    const hostVerificationDue = () => revision > hostVerifiedRevision && checklist.files.length > 0
+      && missingFiles().length === 0 && checklist.commands.length > 0
+    /** Run every required command in order on the current revision; stop at the first failure. */
+    const hostVerify = async (): Promise<BuilderV2Outcome | null> => {
+      hostVerifiedRevision = revision
+      for (const command of checklist.commands) {
+        if (steps.length >= BUILDER_V2_MAX_RECEIPTS) return null
+        const action: BuilderV2Action = { tool: 'run_tests', command }
+        const receipt = await this.dispatcher.dispatch(options.workspaceId, action)
+        record(action, receipt)
+        await persist()
+        if (!receipt.ok) return null
+      }
+      const acceptance = builderV2Acceptance(options.objective, knownFiles, steps)
+      return acceptance.satisfied && verifiedRevision === revision
+        ? { ok: true, reason: 'verified', summary: 'Every required command passed on the host after the latest source change.', steps, checkpoint: await snapshot() }
+        : null
+    }
     for (let calls = 0; calls < maxSteps && steps.length < BUILDER_V2_MAX_RECEIPTS; calls++) {
       if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
       let raw: string | null
@@ -251,8 +348,14 @@ export class BuilderV2Agent {
             workspaceId: options.workspaceId,
             workspaceFiles: knownFiles,
             missingRequiredFiles: missingFiles(),
+            // Live todo list from host receipts (as Cursor and Windsurf keep a plan the user sees), never from model claims.
+            todo: (() => {
+              const acceptance = builderV2Acceptance(options.objective, knownFiles, steps)
+              return { writeFiles: acceptance.missingFiles, passCommands: acceptance.pendingCommands,
+                tests: { passed: acceptance.testsPassed, required: acceptance.minimumTests } }
+            })(),
             nextRecommendedAction: missingFiles().length ? { tool: 'write_file', path: missingFiles()[0] } : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },
-            instruction: 'Do not list_files again when workspaceFiles is supplied. Create missingRequiredFiles one at a time; execute commands after files exist.',
+            instruction: 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
             lastReceipt,
             tail: steps.slice(-TAIL),
             verified: verifiedRevision === revision && verifiedRevision >= 0,
@@ -266,24 +369,9 @@ export class BuilderV2Agent {
         // A model timeout or outage is not a build failure: completed work is checkpointed and the next slice resumes.
         // All requested files already exist: host-run the mandatory commands even if the model is offline.
         // This is real execution, not a model assertion. Any failing command keeps acceptance FAIL.
-        if (checklist.files.length && missingFiles().length === 0 && checklist.commands.length) {
-          for (const command of checklist.commands) {
-            const receipt = await this.dispatcher.dispatch(options.workspaceId, { tool: 'run_tests', command })
-            steps.push(receipt)
-            verifiedRevision = receipt.ok ? revision : -1
-            lastReceipt = JSON.stringify(receipt).slice(0, 20_000)
-            if (receipt.changed || receipt.ok) unproductive = 0
-            else unproductive++
-            if (options.onCheckpoint) {
-              const checkpoint = await snapshot()
-              if (checkpoint) await options.onCheckpoint(checkpoint)
-            }
-            if (!receipt.ok) break
-          }
-          const acceptance = builderV2Acceptance(options.objective, knownFiles, steps)
-          if (acceptance.satisfied && verifiedRevision === revision) {
-            return { ok: true, reason: 'verified', summary: 'Host commands executed successfully after the latest source change', steps, checkpoint: await snapshot() }
-          }
+        if (hostVerificationDue()) {
+          const verified = await hostVerify()
+          if (verified) return verified
         }
         return { ok: false, reason: 'builder_v2_model_unavailable', summary: error instanceof Error ? error.message : 'builder_v2_model_error', steps, checkpoint: await snapshot() }
       }
@@ -310,41 +398,38 @@ export class BuilderV2Agent {
           next: acceptance.missingFiles.length ? ['write_file'] : ['run_tests', 'edit_file'] }).slice(0, 20_000)
         continue
       }
-      const action = decision.action
-      const signature = JSON.stringify(action)
-      // Commands always execute: only a host run can prove or revoke verification, never a remembered result.
-      const previous = action.tool === 'run_tests' ? undefined : sinceChange.get(signature)
-      if (previous !== undefined) {
-        // Nothing changed since this exact action ran, so it would return the same result (stuck-loop detection
-        // as in OpenHands): return that result with the instruction to choose a different step.
-        if (++repeats >= REPEAT_LIMIT) return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
-        lastReceipt = JSON.stringify({ ok: false, error: 'builder_v2_repeated_action',
-          message: 'This exact action already ran and no file has changed since; its result is below. Choose a different next step.',
-          previous: JSON.parse(previous) }).slice(0, 20_000)
-        continue
+      // Execute the reply's actions in order. The first failed or repeated action ends the batch, so later actions
+      // never run against a state the model did not expect; the receipts so far go back to the model.
+      for (const action of decision.actions) {
+        if (steps.length >= BUILDER_V2_MAX_RECEIPTS) break
+        const signature = JSON.stringify(action)
+        // Commands always execute: only a host run can prove or revoke verification, never a remembered result.
+        const previous = action.tool === 'run_tests' ? undefined : sinceChange.get(signature)
+        if (previous !== undefined) {
+          // Nothing changed since this exact action ran, so it would return the same result (stuck-loop detection
+          // as in OpenHands): return that result with the instruction to choose a different step.
+          if (++repeats >= REPEAT_LIMIT) return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
+          lastReceipt = JSON.stringify({ ok: false, error: 'builder_v2_repeated_action',
+            message: 'This exact action already ran and no file has changed since; its result is below. Choose a different next step.',
+            previous: JSON.parse(previous) }).slice(0, 20_000)
+          break
+        }
+        const receipt = await this.dispatcher.dispatch(options.workspaceId, action,
+          action.tool === 'write_file' ? { seenContent: seen.get(action.path) } : {})
+        record(action, receipt)
+        await persist()
+        // A stall pauses with its checkpoint for the bounded continuation controller (#4590): the next slice
+        // resumes with fresh repeat tracking, and the job's slice cap bounds how often that happens.
+        if (unproductive >= BUILDER_V2_STALL_LIMIT) return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
+        if (!receipt.ok) break
       }
-      const receipt = await this.dispatcher.dispatch(options.workspaceId, action,
-        action.tool === 'write_file' ? { seenContent: seen.get(action.path) } : {})
-      steps.push(receipt)
-      if (receipt.changed && action.tool === 'write_file' && !knownFiles.includes(action.path)) knownFiles.push(action.path)
-      if (receipt.changed) revision++
-      if (action.tool === 'run_tests') verifiedRevision = receipt.ok ? revision : -1
-      lastReceipt = JSON.stringify(receipt).slice(0, 20_000)
-      const output = receipt.output as { content?: unknown; currentContent?: unknown } | undefined
-      if (action.tool === 'read_file' && receipt.ok && typeof output?.content === 'string') seen.set(action.path, output.content)
-      if (action.tool === 'write_file' && typeof output?.currentContent === 'string') seen.set(action.path, output.currentContent)
-      if (action.tool === 'write_file' && receipt.changed) seen.set(action.path, action.content)
-      if (action.tool === 'edit_file' && receipt.changed) seen.delete(action.path)
-      if (receipt.changed) { sinceChange.clear(); repeats = 0 } else if (action.tool !== 'run_tests') sinceChange.set(signature, lastReceipt)
-      if (receipt.changed || action.tool === 'run_tests' && receipt.ok) unproductive = 0
-      else unproductive++
-      if (options.onCheckpoint) {
-        const checkpoint = await snapshot()
-        if (checkpoint) await options.onCheckpoint(checkpoint)
+      // Host verification, as Lovable observes build and test failures itself: after a change, once every required
+      // file exists, the host runs the required commands without spending a model call and returns the real output.
+      if (hostVerificationDue()) {
+        const verified = await hostVerify()
+        if (verified) return verified
+        if (unproductive >= BUILDER_V2_STALL_LIMIT) return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
       }
-      // A stall pauses with its checkpoint for the bounded continuation controller (#4590): the next slice
-      // resumes with fresh repeat tracking, and the job's slice cap bounds how often that happens.
-      if (unproductive >= BUILDER_V2_STALL_LIMIT) return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
     }
     if (steps.length >= BUILDER_V2_MAX_RECEIPTS) return { ok: false, reason: 'builder_v2_step_budget_exhausted', steps, checkpoint: await snapshot() }
     return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }

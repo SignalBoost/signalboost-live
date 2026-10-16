@@ -12,7 +12,7 @@ export function scoreCustomerHoldout(raw: string): HoldoutScore {
   if(!x || typeof x!=='object' || Array.isArray(x)) throw new Error('holdout_row_invalid')
   const row=x as Record<string,unknown>
   if(!['prompt','expected','base','trained'].every(k=>typeof row[k]==='string' && (row[k] as string).trim().length>0 && (row[k] as string).length<=20000))throw new Error('holdout_row_invalid')
-  const prompt=(row.prompt as string).trim()
+  const prompt=(row.prompt as string).trim().replace(/\s+/g,' ').toLowerCase()
   if(seen.has(prompt))throw new Error('holdout_prompt_duplicate')
   seen.add(prompt)
   // Exact-match only: no semantic or quality judgment is asserted.

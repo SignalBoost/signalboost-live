@@ -178,7 +178,7 @@ export async function POST(request: Request) {
     // Owner-scoped fresh jobs can explicitly exercise V2 without converting existing V1 checkpoints.
     // Reject unauthorized V2 requests rather than silently executing the legacy engine.
     const requestedEngine = body?.builderEngine
-    if (requestedEngine !== undefined && requestedEngine !== 'v1' && requestedEngine !== 'v2') {
+    if (requestedEngine !== undefined && requestedEngine !== 'v2') {
       return noStore({ error: 'builder_engine_invalid' }, { status: 400 })
     }
     const newProjectRequested = isNewBuilderProjectObjective(objective)
@@ -397,7 +397,7 @@ export async function POST(request: Request) {
             }
           : { ...(project.context ? { projectContext: project.context } : {}),
               ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
-              ...((requestedEngine === 'v2' || (requestedEngine !== 'v1' && !selectedWorkspaceId && !project.context)) ? { builderEngine: 'v2' } : {}) },
+              builderEngine: 'v2' },
       ownerAuthorized: access.isOwner === true,
       runningReply: reply,
     })

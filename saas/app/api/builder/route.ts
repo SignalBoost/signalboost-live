@@ -17,7 +17,6 @@ import {
   type BuilderObjectiveFailureCode,
 } from '@/lib/builder/request-contract'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
-import { isNewApplicationSpecification } from '@/lib/builder/task-contract'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -183,7 +182,9 @@ export async function POST(request: Request) {
       return noStore({ error: 'builder_engine_invalid' }, { status: 400 })
     }
     const newProjectRequested = isNewBuilderProjectObjective(objective)
-    let workspaceId = newProjectRequested ? crypto.randomUUID() : requestedWorkspaceId || crypto.randomUUID()
+    // A new project never inherits the workspace the browser had selected.
+    const selectedWorkspaceId = newProjectRequested ? '' : requestedWorkspaceId
+    let workspaceId = selectedWorkspaceId || crypto.randomUUID()
 
     let files = cleanFiles(body?.files)
     const repositoryTarget = builderRepositoryTarget(objective, body?.repositoryUrl)
@@ -240,7 +241,7 @@ export async function POST(request: Request) {
     // the user pasted failure evidence into a developer workspace and asked it to debug. Logs are
     // admitted here, and only here; every other objective still faces the strict coding gate.
     const project = await selectBuilderProject({ objective, userId: access.userId, conversationId,
-      requestedWorkspaceId: newProjectRequested ? undefined : requestedWorkspaceId,
+      requestedWorkspaceId: selectedWorkspaceId || undefined,
       hasNewSource: files.length > 0, repositoryImport: Boolean(repositoryTarget),
     }, readBuilderEvidenceJob)
     if (project.blocked === 'busy' && project.activeJobId && project.workspaceId) {
@@ -253,16 +254,16 @@ export async function POST(request: Request) {
       }, { status: 202 })
     }
     if (project.blocked) return noStore({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: 503 })
-    if (requestedEngine === 'v2' && (requestedWorkspaceId || project.context)) {
+    if (requestedEngine === 'v2' && (selectedWorkspaceId || project.context)) {
       return noStore({ error: 'builder_v2_requires_fresh_workspace' }, { status: 409 })
     }
     workspaceId = project.workspaceId || workspaceId
     // A saved workspace may be opened from another browser conversation.
     // Its owner's active claim always wins; never start a competing job
     // against the same files because a new tab generated a different id.
-    if (!newProjectRequested && requestedWorkspaceId) {
+    if (selectedWorkspaceId) {
       const previous = await readLatestBuilderWorkspaceJob({
-        userId: access.userId, workspaceId: requestedWorkspaceId,
+        userId: access.userId, workspaceId: selectedWorkspaceId,
       })
       if (previous && previous.metadata.platformRepair !== true
         && (previous.status === 'queued' || previous.status === 'running' || previous.status === 'paused')) {
@@ -275,12 +276,12 @@ export async function POST(request: Request) {
 
     // An owner repair with no source anywhere goes to the platform repository at the deployed
     // revision instead of an empty workspace that can only answer "attach your source".
-    if (access.isOwner && files.length === 0 && !repositoryTarget && !project.context && !(project.workspaceId || requestedWorkspaceId)) {
-      const selectedWorkspaceId = project.workspaceId || requestedWorkspaceId
-      const sourceWorkspace = selectedWorkspaceId ? createSupabaseBuilderWorkspace(access.userId) : null
+    if (access.isOwner && files.length === 0 && !repositoryTarget && !project.context && !(project.workspaceId || selectedWorkspaceId)) {
+      const sourceWorkspaceId = project.workspaceId || selectedWorkspaceId
+      const sourceWorkspace = sourceWorkspaceId ? createSupabaseBuilderWorkspace(access.userId) : null
       // A storage failure counts as "has files": never reroute a workspace whose contents are unknown.
-      const workspaceHasFiles = selectedWorkspaceId
-        ? !sourceWorkspace || await sourceWorkspace.listFiles(selectedWorkspaceId).then(listed => hasWorkspaceSource(listed.map(file => file.path)), () => true)
+      const workspaceHasFiles = sourceWorkspaceId
+        ? !sourceWorkspace || await sourceWorkspace.listFiles(sourceWorkspaceId).then(listed => hasWorkspaceSource(listed.map(file => file.path)), () => true)
         : false
       const ownerRepairTarget = isOwnerRepairWithoutSource({
         objective, isOwner: true, hasAttachedSource: false, hasRepositoryImport: false,
@@ -327,14 +328,9 @@ export async function POST(request: Request) {
     // prior jobs in this same authenticated conversation prove continuity.
     // Defer a transient empty listing to the claimed worker, where actual
     // source availability is rechecked before any coding tool can run.
-    // An empty workspace can still receive a complete new-application specification: the first instruction
-    // builds/creates something and the request lists its required files. Production 2026-10-16: the OrderFlow
-    // spec sent with an empty saved workspace selected was refused as if it were a continuation. Such a request
-    // creates source rather than resuming it, so neither this route nor the worker requires existing source.
-    // A request that extends the existing application stays a continuation (Codex review on #4586).
-    const creationSpecification = isNewApplicationSpecification(objective)
-    const continuationWorkspace = !newProjectRequested && !creationSpecification && !repositoryTarget && files.length === 0
-      && Boolean(project.workspaceId || requestedWorkspaceId)
+    // A complete new-application specification is a new project (isNewBuilderProjectObjective), never a continuation.
+    const continuationWorkspace = !newProjectRequested && !repositoryTarget && files.length === 0
+      && Boolean(project.workspaceId || selectedWorkspaceId)
     if (continuationWorkspace) {
       // Verify the workspace is owned by this user without creating one.
       // A blank or failed file listing is not proof that the project was deleted.
@@ -401,7 +397,7 @@ export async function POST(request: Request) {
             }
           : { ...(project.context ? { projectContext: project.context } : {}),
               ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
-              ...((requestedEngine === 'v2' || (requestedEngine !== 'v1' && !requestedWorkspaceId && !project.context)) ? { builderEngine: 'v2' } : {}) },
+              ...((requestedEngine === 'v2' || (requestedEngine !== 'v1' && !selectedWorkspaceId && !project.context)) ? { builderEngine: 'v2' } : {}) },
       ownerAuthorized: access.isOwner === true,
       runningReply: reply,
     })

@@ -131,8 +131,9 @@ test('new isolated builds ignore an explicitly retained old workspace ID', async
   assert.deepEqual(await selectBuilderProject(fresh, async () => { assert.fail('new build must not access history'); return null }), {})
   const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
   assert.match(route, /const newProjectRequested = isNewBuilderProjectObjective\(objective\)/)
-  assert.match(route, /let workspaceId = newProjectRequested \? crypto\.randomUUID\(\) : requestedWorkspaceId \|\| crypto\.randomUUID\(\)/)
-  assert.match(route, /requestedWorkspaceId: newProjectRequested \? undefined : requestedWorkspaceId/)
+  assert.match(route, /const selectedWorkspaceId = newProjectRequested \? '' : requestedWorkspaceId/)
+  assert.match(route, /let workspaceId = selectedWorkspaceId \|\| crypto\.randomUUID\(\)/)
+  assert.match(route, /requestedWorkspaceId: selectedWorkspaceId \|\| undefined/)
 })
 
 test('same-conversation continuity is server-resolved without requiring a canned follow-up phrase', async () => {

@@ -19,16 +19,17 @@ test('continuation history may still rescue a transiently empty listing', () => 
   assert.match(route, /if \(repositoryTarget\) \{[\s\S]*?importBuilderRepository\(repositoryTarget\)/)
 })
 
-test('production 2026-10-16: a complete new-application spec builds into an empty selected workspace', async () => {
-  assert.match(route, /const creationSpecification = isNewApplicationSpecification\(objective\)/)
+test('production 2026-10-16: a complete new-application spec is a new project, never a continuation', async () => {
+  // Job e98aa467: a spec that inherited the selected workspace ran over stale files. It now gets a fresh one.
+  assert.match(route, /const continuationWorkspace = !newProjectRequested && /)
   // Codex review on #4585: the worker must not require existing source either, or the job fails asynchronously.
-  assert.match(route, /const continuationWorkspace = !newProjectRequested && !creationSpecification && /)
   const requires = [...route.matchAll(/\.\.\.\(continuationWorkspace \? \{ requiresExistingSource: true \} : \{\}\)/g)]
   assert.equal(requires.length, 2)
-  assert.ok(route.indexOf('const creationSpecification') < route.indexOf('const continuationWorkspace'))
+  const { isNewBuilderProjectObjective } = await import('../lib/builder/project-continuity.ts')
   const { isNewApplicationSpecification: spec } = await import('../lib/builder/task-contract.ts')
   const orderflow = ['# OrderFlow', '## Objective', 'Build a complete, working OrderFlow application using Node.js.', '## Required project structure', 'Create all 3 files:', '```text', 'orderflow/', '├── package.json', '├── index.js', '└── test/', '    └── a.test.js', '```'].join('\n')
   assert.equal(spec(orderflow), true)
+  assert.equal(isNewBuilderProjectObjective(orderflow), true)
   for (const continuation of ['continue', 'fix the failing test in src/cart.js', 'Build it again', 'Run npm test and repair the failures']) {
     assert.equal(spec(continuation), false, continuation)
   }

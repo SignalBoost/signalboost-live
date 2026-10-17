@@ -1,10 +1,18 @@
 import type { EvidenceJob, EvidenceLookup } from './execution-evidence.ts'
+import { isNewApplicationSpecification } from './task-contract.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const NEW_PROJECT = /\b(?:new|another|separate|different|fresh|clean)\s+(?:(?:isolated|fresh|clean|empty|independent)\s+)?(?:project|workspace|app|application|website|repository)\b|\bstart\s+(?:over|fresh)\b|\bfrom\s+scratch\b/i
 
+/**
+ * A request for a new project: an explicit "new/fresh project" phrase, or a complete new-application specification
+ * (opens with a creation directive and lists the files to create). Production 2026-10-16, job e98aa467: the OrderFlow
+ * specification pasted again in the same conversation inherited the previous job's workspace and project context,
+ * so it ran on the legacy engine over stale files and ended builder_regression_evidence_required although its final
+ * files pass all three required commands (28/28 tests).
+ */
 export function isNewBuilderProjectObjective(objective: string): boolean {
-  return NEW_PROJECT.test(objective)
+  return NEW_PROJECT.test(objective) || isNewApplicationSpecification(objective)
 }
 
 export type BuilderProjectContext = {
@@ -31,7 +39,7 @@ export async function selectBuilderProject(input: {
   repositoryImport: boolean
 }, lookup: (target: EvidenceLookup) => Promise<EvidenceJob & { objective?: string } | null>): Promise<BuilderProjectSelection> {
   // Explicit fresh builds and source imports must not borrow another project's history.
-  if (NEW_PROJECT.test(input.objective)) return {}
+  if (isNewBuilderProjectObjective(input.objective)) return {}
   const selected = input.requestedWorkspaceId && UUID.test(input.requestedWorkspaceId)
     ? input.requestedWorkspaceId : undefined
   if (input.hasNewSource || input.repositoryImport) return selected ? { workspaceId: selected } : {}

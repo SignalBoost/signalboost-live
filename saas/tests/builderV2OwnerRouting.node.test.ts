@@ -9,8 +9,8 @@ const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.
 // an explicit v2 request against an existing workspace or project is refused, so V1 checkpoints never move engines.
 test('fresh workspaces default to V2, v1 opts out, and V2 never takes over an existing workspace', () => {
   assert.match(route, /requestedEngine !== undefined && requestedEngine !== 'v1' && requestedEngine !== 'v2'/)
-  assert.match(route, /if \(requestedEngine === 'v2' && \(requestedWorkspaceId \|\| project\.context\)\) \{\s+return noStore\(\{ error: 'builder_v2_requires_fresh_workspace' \}, \{ status: 409 \}\)/)
-  assert.match(route, /\(requestedEngine === 'v2' \|\| \(requestedEngine !== 'v1' && !requestedWorkspaceId && !project\.context\)\) \? \{ builderEngine: 'v2' \}/)
+  assert.match(route, /if \(requestedEngine === 'v2' && \(selectedWorkspaceId \|\| project\.context\)\) \{\s+return noStore\(\{ error: 'builder_v2_requires_fresh_workspace' \}, \{ status: 409 \}\)/)
+  assert.match(route, /\(requestedEngine === 'v2' \|\| \(requestedEngine !== 'v1' && !selectedWorkspaceId && !project\.context\)\) \? \{ builderEngine: 'v2' \}/)
   assert.doesNotMatch(route, /requestedEngine === 'v2' && !access\.isOwner/)
 })
 

@@ -222,7 +222,12 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
         maxEstimatedCostUsd: deepInfraMaxCallUsd('builder'),
       }, 'builder')
       throwIfInferenceAborted(input.signal)
-      if (assigned.attempted) return requireText(assigned.result?.content ?? null, 'assigned builder')
+      // An assigned provider may return an HTTP-successful but empty completion.
+      // Treat it as a failed candidate, not a terminal Builder error: the existing
+      // bounded local-model fallback still has a chance to provide repair actions.
+      // Deliberate cancellation and provider budget limits remain governed upstream.
+      if (assigned.attempted && assigned.result?.content?.trim()) return assigned.result.content
+      if (assigned.attempted) console.warn('[builder-assigned-empty-completion]', { provider: 'assigned builder' })
       if (runpodBusy) throw new Error('builder_runpod_primary_busy')
 
       const config = localInferenceConfigFromEnv()

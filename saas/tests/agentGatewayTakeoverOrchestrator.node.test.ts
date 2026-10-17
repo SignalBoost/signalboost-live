@@ -74,3 +74,41 @@ test('mismatched request and fencing boundaries fail closed', () => {
   const f = fixture(safe, 'accepted')
   assert.throws(() => orchestrateTakeover({ ...f, lease: { ...f.lease, fencingToken: 8 }, candidateOwnerId: 'gw-b', now }), /fencing mismatch/)
 })
+
+
+test('COS recovery state-space: terminal work never replays; plans never execute automatically', () => {
+  const profiles = [safe, external, financial]
+  const states = ['accepted', 'executing', 'completed'] as const
+  const leases = ['expired', 'active'] as const
+  const healthStates = ['abandoned', 'healthy'] as const
+  let cases = 0
+  for (const profile of profiles) for (const state of states) for (const leaseState of leases) for (const healthState of healthStates) {
+    const f = fixture(profile, state)
+    const heartbeat = createReplicaHeartbeat({
+      replicaId: 'gw-a', role: 'gateway', region: 'us-east', version: '1.0.0',
+      queueDepth: 0, activeLeaseCount: 1, restartCount: 0, healthScore: 95,
+    }, healthState === 'healthy' ? now : new Date('2026-07-25T19:58:30.000Z'))
+    const ownerHealth = assessReplicaHealth(heartbeat, 'gw-a', now, 15_000, 45_000)
+    const lease = { ...f.lease, expiresAt: leaseState === 'expired'
+      ? '2026-07-25T19:59:00.000Z' : '2026-07-25T20:01:00.000Z' }
+    const decision = orchestrateTakeover({ ...f, ownerHealth, lease, candidateOwnerId: 'gw-b', now })
+    const description = JSON.stringify({profile:profile.consequenceClass,state,leaseState,healthState})
+    assert.equal(decision.readOnly, true, description)
+    assert.equal(decision.executable, false, description)
+    assert.equal(decision.requestKey, lease.requestKey, description)
+    if (state === 'completed') {
+      assert.equal(decision.disposition, 'terminal-noop', description)
+      assert.equal(decision.nextFencingTokenRequired, false, description)
+    }
+    if (decision.disposition === 'promote-and-resume' || decision.disposition === 'promote-and-verify') {
+      assert.equal(leaseState, 'expired', description)
+      assert.equal(healthState, 'abandoned', description)
+      assert.equal(decision.nextFencingTokenRequired, true, description)
+    }
+    if (profile.consequenceClass === 'financial' && state === 'executing') {
+      assert.notEqual(decision.disposition, 'promote-and-resume', description)
+    }
+    cases++
+  }
+  assert.equal(cases, 36)
+})

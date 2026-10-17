@@ -1,5 +1,6 @@
 import { validBuilderDocumentationScope } from './documentation-intent.ts'
 import { captureBuilderSource } from './source-evidence.ts'
+import { withBuilderExecutionHooks, type BuilderExecutionHook } from './execution-hooks.ts'
 // saas/lib/builder/tool-loop.ts
 import type { BuilderAiPort, BuilderBrowserCliPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderMcpReadPort, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
 import { evaluateRegressionGate, isBuilderTestRunnerCommand, isExecutedBuilderRun, isRepairObjective } from './regression-gate.ts'
@@ -443,10 +444,11 @@ export class BuilderToolLoop {
     runner: BuilderRunnerPort,
     mcp?: BuilderMcpReadPort,
     browserCli?: BuilderBrowserCliPort,
+    executionHooks?: BuilderExecutionHook,
   ) {
     this.ai = ai
     this.workspace = workspace
-    this.runner = runner
+    this.runner = executionHooks ? withBuilderExecutionHooks(runner, executionHooks) : runner
     this.mcp = mcp
     this.browserCli = browserCli
   }

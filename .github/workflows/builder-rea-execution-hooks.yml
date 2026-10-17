@@ -1,0 +1,20 @@
+name: Builder REA execution hooks acceptance
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/builder/execution-hooks.ts'
+      - 'saas/lib/builder/tool-loop.ts'
+      - 'saas/tests/builderExecutionHooks.node.test.ts'
+      - '.github/workflows/builder-rea-execution-hooks.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --experimental-strip-types --test saas/tests/builderExecutionHooks.node.test.ts

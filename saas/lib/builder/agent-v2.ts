@@ -494,12 +494,25 @@ export class BuilderV2Agent {
           if (knownFiles.includes(found[1]) && !targeted.includes(found[1])) targeted.push(found[1])
         }
       }
+      // A failing test should not cost another model turn per source read. Supply the
+      // bounded test and source files directly from the trusted workspace on each
+      // repair turn; the model can edit immediately, with no read-only exploration.
+      if (failure && this.workspace) {
+        for (const testPath of failingTests.slice(0, 3)) {
+          if (!targeted.includes(testPath)) targeted.push(testPath)
+        }
+        // When Node omits a test filename from the diagnostic, include the
+        // small project's known source and test entrypoints as repair context.
+        if (!targeted.length) {
+          targeted.push(...knownFiles.filter(path => /^(?:src|test)\/[A-Za-z0-9_./-]+\.[cm]?js$/.test(path)).slice(0, 10))
+        }
+      }
       const prioritized = builderV2RecoveryPriority({
         failedSuite: Boolean(failure),
         namedTest: targeted[0] ?? null,
         importedModules: targeted.slice(1),
         existingFiles: knownFiles,
-        previouslyOpened: opened,
+        previouslyOpened: failure ? [...targeted, ...opened, ...knownFiles.filter(path => path.startsWith('src/') && path.endsWith('.js')).slice(0, 8)] : opened,
       })
       const openFiles: Record<string, string> = {}
       let used = 0
@@ -610,6 +623,17 @@ export class BuilderV2Agent {
       // never run against a state the model did not expect; the receipts so far go back to the model.
       for (const action of decision.actions) {
         if (steps.length >= BUILDER_V2_MAX_RECEIPTS) break
+        // Stop an expensive repair loop before it can consume the remaining
+        // 24 continuation claims. A failed test permits a few inspections,
+        // but another inspection after four read-only receipts must be an edit.
+        // Count across checkpoints so restarting a slice does not reset the budget.
+        if (failedOnRevision() && (action.tool === 'read_file' || action.tool === 'list_files' || action.tool === 'search_files')) {
+          const afterFailure = steps.slice(steps.findLastIndex(step => step.tool === 'run_tests' && !step.ok) + 1)
+          const readOnly = afterFailure.filter(step => step.tool === 'read_file' || step.tool === 'list_files' || step.tool === 'search_files').length
+          if (readOnly >= 4) {
+            return { ok: false, reason: 'builder_v2_repair_read_limit', summary: 'The test failed and repeated file inspection did not repair the source. Stop instead of spending another continuation.', steps, checkpoint: await snapshot() }
+          }
+        }
         const signature = JSON.stringify(action)
         // A failed required suite is deterministic for an unchanged source revision.
         // Host verification already captured its exit code/output. Do not spend more

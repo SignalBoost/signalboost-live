@@ -35,7 +35,11 @@ export interface BuilderRunnerPort {
 }
 
 export interface BuilderAiPort {
-  generate(input: { systemPrompt: string; prompt: string; maxTokens: number; signal?: AbortSignal }): Promise<string | null>
+  /**
+   * `allowTruncatedText`: a reply cut off at `maxTokens` is returned as far as it got instead of being discarded,
+   * for callers that can use a partial reply (Builder V2 keeps every complete action before the cut).
+   */
+  generate(input: { systemPrompt: string; prompt: string; maxTokens: number; signal?: AbortSignal; allowTruncatedText?: boolean }): Promise<string | null>
 }
 
 export type BuilderMcpReadCapability = Readonly<{

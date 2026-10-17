@@ -28,7 +28,7 @@ const SYSTEM_PROMPT = [
   '{"type":"tool","action":{"tool":"run_tests","command":"npm test"}}',
   '{"type":"tools","actions":[{"tool":"write_file","path":"package.json","content":"..."},{"tool":"write_file","path":"src/a.js","content":"..."}]}',
   '{"type":"finish","summary":"what was built and verified"}',
-  'Batch: write several missing files in one "tools" reply (complete contents, no placeholders, dependencies and package.json first), up to 6 actions and about 12000 characters per reply. Execution stops at the first failed action.',
+  'Batch: write several missing files in one "tools" reply (complete contents, no placeholders, dependencies and package.json first), up to 4 actions and about 8000 characters per reply so it fits the output limit. Execution stops at the first failed action.',
   'After a change, once every required file exists, the host runs the required commands itself and returns their real output; read it and repair.',
   'A write or edit receipt with output.syntaxError means that file does not parse: fix it first with edit_file.',
   'write_file creates a file; to rewrite an existing file, read_file it first. Prefer edit_file for small changes.',
@@ -381,9 +381,18 @@ export class BuilderV2Agent {
           }),
           maxTokens: 4096,
           signal: options.signal,
+          // A reply cut off at the limit still carries every complete action before the cut (salvageActions).
+          allowTruncatedText: true,
         })
       } catch (error) {
         if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
+        // A reply cut off before any complete action is feedback, like an unparseable reply: ask for less per reply.
+        if (error instanceof Error && error.message === 'local_model_output_truncated') {
+          if (++invalidReplies >= REJECTION_LIMIT) return { ok: false, reason: 'builder_v2_invalid_model_action', steps, checkpoint: await snapshot() }
+          lastReceipt = JSON.stringify({ ok: false, error: 'builder_v2_reply_truncated',
+            message: 'Your reply exceeded the output limit and was cut off before any complete action. Send fewer or smaller files per reply.' })
+          continue
+        }
         // A model timeout or outage is not a build failure: completed work is checkpointed and the next slice resumes.
         // All requested files already exist: host-run the mandatory commands even if the model is offline.
         // This is real execution, not a model assertion. Any failing command keeps acceptance FAIL.

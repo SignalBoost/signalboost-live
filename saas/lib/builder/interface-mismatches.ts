@@ -15,10 +15,11 @@ export type BuilderInterfaceMismatch = {
   line: number
   module: string
   name: string
-  kind: 'missing_export' | 'missing_method' | 'wrong_argument_count' | 'method_not_chainable'
+  kind: 'missing_export' | 'missing_method' | 'wrong_argument_count' | 'method_not_chainable' | 'mutates_defensive_copy'
   /**
    * missing_export: what the module exports. missing_method: the class's methods.
    * wrong_argument_count: the declared parameters. method_not_chainable: the method's return statements.
+   * mutates_defensive_copy: the getter's module and line, so the fix can land on either side.
    */
   available: string[]
 }
@@ -41,6 +42,8 @@ export type BuilderModuleInterface = {
   chainable: Record<string, string[]>
   /** The value of `module.exports = Name` when the module exports one binding directly. */
   defaultExport: string | null
+  /** Exported class name -> methods that return a copy (`return { ...stored }`), so callers cannot mutate state through them. */
+  copyReturning: Record<string, Array<{ method: string; line: number }>>
 }
 
 /** Mismatches grouped by the source module that has to change, for a single repair reply. */
@@ -139,7 +142,7 @@ function objectKeys(body: string): string[] {
   return keys
 }
 
-type ClassDetails = { methods: string[]; chainable: string[]; constructor: BuilderSignature | null; methodSignatures: Record<string, BuilderSignature> }
+type ClassDetails = { methods: string[]; chainable: string[]; constructor: BuilderSignature | null; methodSignatures: Record<string, BuilderSignature>; copyReturning: Array<{ method: string; line: number }> }
 
 function classDetails(code: string, name: string): ClassDetails | null {
   const head = new RegExp(`\\bclass\\s+${name}\\b[^{]*\\{`).exec(code)
@@ -151,6 +154,7 @@ function classDetails(code: string, name: string): ClassDetails | null {
   const methods = new Set<string>()
   const chainable = new Set<string>()
   const methodSignatures: Record<string, BuilderSignature> = {}
+  const copyReturning: Array<{ method: string; line: number }> = []
   let constructorSignature: BuilderSignature | null = null
   let depth = 0, offset = 0
   for (const line of body.split('\n')) {
@@ -166,6 +170,10 @@ function classDetails(code: string, name: string): ClassDetails | null {
           methods.add(member[1])
           if (params !== null) methodSignatures[member[1]] = signatureOf(params)
           if (methodBody !== null && /\breturn\s+this\b(?![.\[(])/.test(methodBody)) chainable.add(member[1])
+          // A getter that hands out a copy of stored state: `return { ...product }`, `Object.assign({}, product)`,
+          // `structuredClone(product)`, `JSON.parse(JSON.stringify(product))`.
+          const copy = methodBody === null ? null : /\breturn\s+(?:\{\s*\.\.\.|Object\.assign\(\s*\{\s*\}|structuredClone\(|JSON\.parse\(\s*JSON\.stringify\()/.exec(methodBody)
+          if (copy) copyReturning.push({ method: member[1], line: lineOf(code, bodyStart + 1 + offset) + lineOf(methodBody, copy.index) - 1 })
         }
       }
       const field = new RegExp(`^\\s*(?:static\\s+)?(${IDENT})\\s*=\\s*(?:async\\s*)?(?:\\([^)]*\\)|${IDENT})\\s*=>`).exec(line)
@@ -185,7 +193,7 @@ function classDetails(code: string, name: string): ClassDetails | null {
     for (const [method, signature] of Object.entries(inherited.methodSignatures)) if (!methodSignatures[method]) methodSignatures[method] = signature
     if (!constructorSignature) constructorSignature = inherited.constructor
   }
-  return { methods: [...methods].filter(method => !method.startsWith('#')), chainable: [...chainable], constructor: constructorSignature, methodSignatures }
+  return { methods: [...methods].filter(method => !method.startsWith('#')), chainable: [...chainable], constructor: constructorSignature, methodSignatures, copyReturning }
 }
 
 function classMethods(code: string, name: string): string[] | null {
@@ -218,6 +226,7 @@ export function builderModuleInterface(module: string, code: string): BuilderMod
   if (!exports.size && !single) return null
   const classes: Record<string, string[]> = {}
   const chainable: Record<string, string[]> = {}
+  const copyReturning: Record<string, Array<{ method: string; line: number }>> = {}
   const signatures: Record<string, BuilderSignature> = {}
   for (const name of [...exports, ...(single ? [single] : [])]) {
     const binding = new RegExp(`\\b${name}\\s*:\\s*(${IDENT})`).exec(code)?.[1] ?? name
@@ -225,6 +234,7 @@ export function builderModuleInterface(module: string, code: string): BuilderMod
     if (!details) continue
     classes[name] = details.methods
     if (details.chainable.length) chainable[name] = details.chainable
+    if (details.copyReturning.length) copyReturning[name] = details.copyReturning
     // A class without a constructor accepts any arguments.
     if (details.constructor) signatures[name] = details.constructor
     for (const [method, signature] of Object.entries(details.methodSignatures)) signatures[`${name}.prototype.${method}`] = signature
@@ -242,7 +252,7 @@ export function builderModuleInterface(module: string, code: string): BuilderMod
     const exported = created ? Object.keys(classes).find(key => key === created || new RegExp(`\\b${key}\\s*:\\s*${created}\\b`).test(code)) : undefined
     if (exported) factories[name] = exported
   }
-  return { module, exports: [...exports], classes, factories, exportStatement, signatures, chainable, defaultExport: single }
+  return { module, exports: [...exports], classes, factories, exportStatement, signatures, chainable, defaultExport: single, copyReturning }
 }
 
 /** Resolve `../src/cart` (from test/x.test.js) to a known workspace path. */
@@ -256,6 +266,111 @@ function resolveImport(fromPath: string, spec: string, known: ReadonlySet<string
   const base = parts.join('/')
   for (const candidate of [base, `${base}.js`, `${base}.cjs`, `${base}/index.js`]) if (known.has(candidate)) return candidate
   return null
+}
+
+/** Text from `from` to the end of the innermost enclosing `{...}` block (exclusive of that brace). */
+function enclosingBlock(code: string, from: number): string {
+  let depth = 0
+  for (let i = from; i < code.length; i++) {
+    const ch = code[i]
+    if (ch === '"' || ch === "'" || ch === '`') {
+      for (i++; i < code.length && code[i] !== ch; i++) if (code[i] === '\\') i++
+      continue
+    }
+    if (ch === '{') depth++
+    else if (ch === '}') { if (depth === 0) return code.slice(from, i); depth-- }
+  }
+  return code.slice(from)
+}
+
+/**
+ * For a class, which of its `this.<field>` members hold an instance of a known class: the field is assigned from
+ * a constructor parameter, and a test constructs the class passing `new Known(...)`/`createKnown(...)` (bound through
+ * its requires) at that parameter's position. Evidence from the workspace, not an assumption about the field name.
+ */
+function injectedFieldClasses(
+  className: string, code: string,
+  files: ReadonlyArray<{ path: string; content: string }>, known: ReadonlySet<string>,
+  moduleInterface: (path: string) => BuilderModuleInterface | null,
+): Map<string, { module: string; className: string }> {
+  const result = new Map<string, { module: string; className: string }>()
+  const selfApi = builderModuleInterface('', code)
+  const head = new RegExp(`\\bclass\\s+${className}\\b[^{]*\\{`).exec(code)
+  const body = head ? braceBody(code, head.index + head[0].length - 1) : null
+  const ctor = body ? /\bconstructor\s*\(/.exec(body) : null
+  if (!body || !ctor) return result
+  const params = parenBody(body, ctor.index + ctor[0].length - 1)
+  const ctorBody = params === null ? null : braceBody(body, body.indexOf('{', ctor.index + ctor[0].length + params.length))
+  if (params === null || ctorBody === null) return result
+  const names = splitTopLevel(params).map(param => param.replace(/=.*$/, '').replace(/^\.\.\./, '').trim())
+  // field -> parameter index
+  const fieldParam = new Map<string, number>()
+  for (const found of ctorBody.matchAll(new RegExp(`\\bthis\\.(${IDENT})\\s*=\\s*(${IDENT})\\s*[;\\n]`, 'g'))) {
+    const index = names.indexOf(found[2])
+    if (index >= 0) fieldParam.set(found[1], index)
+  }
+  if (!fieldParam.size) return result
+  // parameter index -> class, from how tests construct this class
+  const paramClass = new Map<number, { module: string; className: string }>()
+  for (const test of files) {
+    if (!TEST_PATH.test(test.path) || !/\.[cm]?js$/.test(test.path)) continue
+    const testCode = test.content.slice(0, MAX_SOURCE)
+    const bindings = new Map<string, { module: string; name: string }>()
+    const requireCall = `require\\(\\s*['"](\\.{1,2}\\/[^'"]+)['"]\\s*\\)`
+    for (const found of testCode.matchAll(new RegExp(`\\b(?:const|let|var)\\s*\\{([^}]*)\\}\\s*=\\s*${requireCall}`, 'g'))) {
+      const module = resolveImport(test.path, found[2], known)
+      if (!module) continue
+      for (const entry of found[1].split(',')) {
+        const parsed = new RegExp(`^\\s*(${IDENT})\\s*(?::\\s*(${IDENT}))?`).exec(entry)
+        if (parsed) bindings.set(parsed[2] ?? parsed[1], { module, name: parsed[1] })
+      }
+    }
+    for (const found of testCode.matchAll(new RegExp(`\\b(?:const|let|var)\\s+(${IDENT})\\s*=\\s*${requireCall}`, 'g'))) {
+      const module = resolveImport(test.path, found[2], known)
+      const api = module ? moduleInterface(module) : null
+      if (module && api?.defaultExport && !api.exports.length) bindings.set(found[1], { module, name: api.defaultExport })
+    }
+    // variable -> class it holds
+    const holds = new Map<string, { module: string; className: string }>()
+    for (const found of testCode.matchAll(new RegExp(`\\b(?:const|let|var)\\s+(${IDENT})\\s*=\\s*(new\\s+)?(${IDENT})\\s*\\(`, 'g'))) {
+      const binding = bindings.get(found[3])
+      const api = binding ? moduleInterface(binding.module) : null
+      const resolved = binding && api ? (found[2] ? (api.classes[binding.name] ? binding.name : undefined) : api.factories[binding.name]) : undefined
+      if (resolved) holds.set(found[1], { module: binding!.module, className: resolved })
+    }
+    // `new Class(a, b)` directly, or through an exported factory of the same module that forwards its parameters
+    // (`function createX(catalog) { return new X(catalog) }`): the factory's parameter order maps to the constructor's.
+    const constructions: Array<{ callee: string; forward: number[] | null }> = [{ callee: className, forward: null }]
+    for (const [factory, target] of Object.entries(selfApi?.factories ?? {})) {
+      if (target !== className) continue
+      const factoryHead = new RegExp(`\\bfunction\\s+${factory}\\s*\\(([^)]*)\\)\\s*\\{`).exec(code)
+      const factoryBody = factoryHead ? braceBody(code, factoryHead.index + factoryHead[0].length - 1) : null
+      const forwarded = factoryBody ? new RegExp(`\\bnew\\s+${className}\\s*\\(([^)]*)\\)`).exec(factoryBody) : null
+      if (!factoryHead || !forwarded) continue
+      const factoryParams = splitTopLevel(factoryHead[1]).map(param => param.replace(/=.*$/, '').trim())
+      // forward[ctorIndex] = factory parameter index that reaches it
+      const forward = splitTopLevel(forwarded[1]).map(arg => factoryParams.indexOf(arg.trim()))
+      constructions.push({ callee: factory, forward })
+    }
+    for (const { callee, forward } of constructions) {
+      const local = [...bindings].find(([, binding]) => binding.name === callee)?.[0] ?? callee
+      for (const found of testCode.matchAll(new RegExp(`(?:\\bnew\\s+|(?<![\\w$.]))${local}\\s*\\(`, 'g'))) {
+        const args = parenBody(testCode, found.index! + found[0].length - 1)
+        if (args === null) continue
+        const given = splitTopLevel(args)
+        const ctorArgs = forward ? forward.map(index => index >= 0 ? given[index] : undefined) : given
+        ctorArgs.forEach((arg, index) => {
+          const held = arg ? holds.get(arg) : undefined
+          if (held && !paramClass.has(index)) paramClass.set(index, held)
+        })
+      }
+    }
+  }
+  for (const [field, index] of fieldParam) {
+    const held = paramClass.get(index)
+    if (held) result.set(field, held)
+  }
+  return result
 }
 
 /**
@@ -402,6 +517,41 @@ export function builderInterfaceMismatches(files: ReadonlyArray<{ path: string; 
         if (!methods.includes(call[1])) {
           add({ test: test.path, line: lineOf(code, call.index!), module: binding.module, name: `${className}.prototype.${call[1]}`, kind: 'missing_method', available: methods })
         }
+      }
+    }
+  }
+  // Sources against sources: a module mutates a field on an object another module's getter returned as a copy,
+  // so the change is lost. Production 2026-10-17: inventory.deduct() did `product.quantity -= n` on the copy
+  // catalog.getProduct() returned; stock never moved and 6 tests failed with "expected 2, actual 5".
+  // The receiver is resolved, never guessed from the method name: `this.<field>` must be assigned from a
+  // constructor parameter, and a test must construct the class passing an instance of a known class (or the
+  // result of its factory) at that parameter's position. A dynamically supplied client stays unattributed.
+  for (const source of files) {
+    if (TEST_PATH.test(source.path) || !/\.[cm]?js$/.test(source.path)) continue
+    const api = moduleInterface(source.path)
+    if (!api) continue
+    const code = source.content.slice(0, MAX_SOURCE)
+    for (const className of Object.keys(api.classes)) {
+      const fields = injectedFieldClasses(className, code, files, known, moduleInterface)
+      if (!fields.size) continue
+      const classHead = new RegExp(`\\bclass\\s+${className}\\b[^{]*\\{`).exec(code)
+      const classBody = classHead ? braceBody(code, classHead.index + classHead[0].length - 1) : null
+      if (!classBody) continue
+      const classStart = classHead!.index + classHead![0].length
+      for (const found of classBody.matchAll(new RegExp(`\\b(?:const|let|var)\\s+(${IDENT})\\s*=\\s*(?:await\\s+)?this\\.(${IDENT})\\.(${IDENT})\\s*\\(`, 'g'))) {
+        const owner = fields.get(found[2])
+        const ownerApi = owner ? moduleInterface(owner.module) : null
+        const getter = ownerApi?.copyReturning[owner!.className]?.find(item => item.method === found[3])
+        if (!owner || !getter || owner.module === source.path) continue
+        // Only the declaration's own block, and only until the name is declared again.
+        const scope = enclosingBlock(classBody, found.index! + found[0].length)
+        const redeclared = new RegExp(`\\b(?:const|let|var)\\s+${found[1]}\\b`).exec(scope)
+        const visible = redeclared ? scope.slice(0, redeclared.index) : scope
+        const mutation = new RegExp(`\\b${found[1]}\\.(${IDENT})\\s*(?:[-+*/%]?=(?!=)|\\+\\+|--)`).exec(visible)
+        if (!mutation) continue
+        add({ test: source.path, line: lineOf(code, classStart + found.index! + found[0].length + mutation.index), module: owner.module, kind: 'mutates_defensive_copy',
+          name: `${owner.className}.prototype.${found[3]} returns a copy (${owner.module}:${getter.line}); ${source.path} mutates ${found[1]}.${mutation[1]} on it`,
+          available: [] })
       }
     }
   }

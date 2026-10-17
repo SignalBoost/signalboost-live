@@ -148,3 +148,16 @@ test('a failing suite cannot override Builder progress admission', () => {
   assert.ok(runner.includes('if (unresolvedSuite && builderMayContinue(job, result.checkpoint!))'))
   assert.ok(!runner.includes('if (unresolvedSuite && job.claimGeneration < 24)'))
 })
+
+test('identical writes do not extend Builder work beyond the free slices', () => {
+  const file = (content: string, updatedAt: number) => ({ path: 'src/orders.js', content, updatedAt })
+  const old = { ...checkpoint([write('src/orders.js')]), workingFiles: [file('original', 1)] } as BuilderLoopCheckpoint
+  const identical = { ...checkpoint([write('src/orders.js'), write('src/orders.js')]),
+    workingFiles: [file('original', 2)] } as BuilderLoopCheckpoint
+  const revised = { ...checkpoint([write('src/orders.js'), write('src/orders.js')]),
+    workingFiles: [file('repaired', 2)] } as BuilderLoopCheckpoint
+  assert.equal(builderSliceMadeProgress(old, identical), false)
+  assert.equal(builderSliceMadeProgress(old, revised), true)
+  assert.equal(builderMayContinue({ claimGeneration: 5, checkpoint: old, metadata: {} }, identical), false)
+  assert.equal(builderMayContinue({ claimGeneration: 5, checkpoint: old, metadata: {} }, revised), true)
+})

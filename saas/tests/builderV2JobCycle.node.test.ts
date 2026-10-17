@@ -52,3 +52,24 @@ test('V2 stale generation cannot claim or persist newer work', async () => {
   const stale = await runBuilderV2JobCycle({ jobId: 'j', claimGeneration: 1, store, agent })
   assert.equal(stale.status, 'lost_lease')
 })
+
+test('Codex review on #4628: a resumed slice with no new receipt does not re-save a key-reordered checkpoint', async () => {
+  const { InMemoryBuilderWorkspace: Ws } = await import('../lib/builder/workspace.ts')
+  const workspace = new Ws()
+  await workspace.writeFile('w', 'a.js', 'module.exports = 1\n')
+  // A checkpoint as it comes back from jsonb: same content, keys in a different order.
+  const first = await new BuilderV2Agent({ async generate() { return null } }, new BuilderV2Dispatcher(workspace, { async run() { throw Error('no run') } }), workspace)
+    .run({ workspaceId: 'w', objective: 'Fix a.js', maxSteps: 1 })
+  const fresh = first.checkpoint!
+  const reordered = Object.fromEntries(Object.entries(fresh).reverse()) as typeof fresh
+  let saves = 0
+  const store: BuilderV2LeaseStore = {
+    async load() { return { workspaceId: 'w', objective: 'Fix a.js', claimGeneration: 2, checkpoint: reordered } },
+    async save() { saves++; return true },
+  }
+  const agent = new BuilderV2Agent({ async generate() { throw new Error('builder_turn_timeout') } },
+    new BuilderV2Dispatcher(workspace, { async run() { throw Error('no run') } }), workspace)
+  const cycle = await runBuilderV2JobCycle({ jobId: 'j', claimGeneration: 2, store, agent, maxSteps: 4 })
+  assert.equal(cycle.status, 'paused')
+  assert.equal(saves, 0)
+})

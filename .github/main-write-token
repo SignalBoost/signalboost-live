@@ -1,2 +1,2 @@
-base_sha=3ef39ad4fe03e0e3bcc47e63e985b40c62de4580
-branch=test/builder-v2-routing-and-save-20261016
+base_sha=1a3f64ea78b51902513d88ffa37f71bd0d5ac166
+branch=fix/builder-v2-canonical-checkpoint-compare-20261016

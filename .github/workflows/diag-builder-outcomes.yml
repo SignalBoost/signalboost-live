@@ -1,0 +1,51 @@
+# .github/workflows/diag-builder-outcomes.yml
+# Temporary, branch-only: summarizes recent Builder job outcomes, encrypted to an operator key. Never merged.
+name: diag-builder-outcomes
+on:
+  push:
+    branches: [diag/builder-outcomes-20261017]
+    paths-ignore: ['diag-out/**']
+permissions:
+  contents: write
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read jobs (encrypted output only)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          cat > pub.pem <<'KEY'
+          -----BEGIN PUBLIC KEY-----
+          MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAvM6pGkdRZBNKl6plyVQU
+          rxULm2wfun+2N+1J9uwgQV4BRtgH5GlTgbg3m4I3ufnWV1WmDIbN4kFpvtEwEu1Y
+          YN8vt1CsnRY26lWx4Fjad8s4h2g7Y9k8s9L3Ath/3sbBVzIae/kLeDzyU0WXkJsQ
+          YBKc17Sl2gjb6FkrvWWQRyllgImXfdG0BY3ErxuBlgVNB+M8lOchs31480f/sUaC
+          UrvmghYjIYcUqept3zz3Lvw9dvNfVOKway6imsfkFa1vrB4XPzxWr0D0n57k2qUJ
+          6h3gDcyiH6nGyvMe3gaGkunczKZu9fCvj6w00khSHclarx7Qm7Ltx0TuXRIGsrPd
+          EAFzBASjULhOgcIG8zw+2dyNCTbFdp0wNz6mrdhyFjN2Jei/ufsVi6s9j03QFvca
+          QuNnF9kNPE06inZbuExA+1Nex8VAbRkSHAm8NeqYVIa5648rqHaxo6bqNa2QLG1X
+          37SDxQ2ZPmv4ePhgWsB5ROd7ZU94Mjxt6pob20PwmtRXAgMBAAE=
+          -----END PUBLIC KEY-----
+          KEY
+          node - <<'JS'
+          const fs = require('fs')
+          const h = { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY }
+          const get = async q => { const r = await fetch(process.env.SUPABASE_URL + '/rest/v1/' + q, { headers: h }); if (!r.ok) throw new Error(r.status + ' ' + await r.text()); return r.json() }
+          ;(async () => {
+            const jobs = await get('builder_jobs?order=created_at.desc&limit=60&select=id,status,error,created_at,finished_at,workspace_id,metadata,result,checkpoint')
+            fs.writeFileSync('dump.json', JSON.stringify(jobs))
+            console.log('rows', jobs.length)
+          })().catch(e => { console.error(e.message); process.exit(1) })
+          JS
+          openssl rand -out k.bin 32
+          openssl enc -aes-256-cbc -pbkdf2 -in dump.json -out dump.enc -pass file:k.bin
+          openssl pkeyutl -encrypt -pubin -inkey pub.pem -in k.bin -out k.enc
+          rm -f dump.json k.bin
+      - name: Commit ciphertext to this branch
+        run: |
+          mkdir -p diag-out && mv dump.enc k.enc diag-out/
+          git config user.name diag && git config user.email diag@users.noreply.github.com
+          git add diag-out && git commit -qm 'diag: encrypted output' && git push -q

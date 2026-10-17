@@ -625,7 +625,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         !events.slice(index + 1).some(next => next.ok &&
           (next.toolId === 'write_file' || next.toolId === 'edit_file' ||
             (next.toolId === 'run' && /(?:npm test|node --test|pnpm test|yarn test)/.test(String(next.input.command || ''))))))
-    if (unresolvedSuite && job.claimGeneration < 24) {
+    if (unresolvedSuite && builderMayContinue(job, result.checkpoint!)) {
       const reply = historyReply('Builder identified failing tests and saved the diagnostic evidence. Automatically continuing focused repair; full-suite verification remains required.', job.workspaceId, files)
       await pauseBuilderJob({ job, checkpoint: result.checkpoint!, reply,
         result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, trace } })

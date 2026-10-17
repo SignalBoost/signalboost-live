@@ -4,10 +4,14 @@ name: diag-builder-job
 on:
   push:
     branches: [diag/builder-job-e98aa467]
+    paths-ignore: ['diag-out/**']
+permissions:
+  contents: write
 jobs:
   dump:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Read job and workspace (encrypted output only)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -42,10 +46,8 @@ jobs:
           openssl enc -aes-256-cbc -pbkdf2 -in dump.json -out dump.enc -pass file:k.bin
           openssl pkeyutl -encrypt -pubin -inkey pub.pem -in k.bin -out k.enc
           rm -f dump.json k.bin
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dump
-          path: |
-            dump.enc
-            k.enc
-          retention-days: 1
+      - name: Commit ciphertext to this branch
+        run: |
+          mkdir -p diag-out && mv dump.enc k.enc diag-out/
+          git config user.name diag && git config user.email diag@users.noreply.github.com
+          git add diag-out && git commit -qm 'diag: encrypted output' && git push -q

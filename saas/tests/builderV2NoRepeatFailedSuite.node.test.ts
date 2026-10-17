@@ -19,7 +19,7 @@ test('after test failure next recommended action is a repair, not another run', 
 test('continuation restores latest failing host test and inspections across slices', () => {
   assert.match(source, /const currentFailure = \(\) =>/)
   assert.match(source, /latestFailedTest: currentFailure\(\)/)
-  assert.match(source, /hostVerifiedRevision = steps\.slice\(steps\.findLastIndex\(step => step\.changed\) \+ 1\)/)
+  assert.match(source, /const currentRevisionRuns = \(\) => steps\.slice\(steps\.findLastIndex\(step => step\.changed\) \+ 1\)/)
   assert.match(source, /receipt\.tool === 'read_file' && receipt\.ok/)
   assert.match(source, /The host has already run the suite on this unchanged revision/)
 })

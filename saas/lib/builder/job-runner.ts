@@ -17,7 +17,7 @@ import { isRepairObjective } from './regression-gate.ts'
 import { formatBuilderExecutionEvidence } from './execution-evidence.ts'
 import { explainInitialBuilderRepair } from './explain-evidence.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
-import { BuilderV2Agent, builderV2ProgressReport, type BuilderV2Checkpoint } from './agent-v2.ts'
+import { BuilderV2Agent, builderV2ProgressReport, builderV2IdleSliceCount, type BuilderV2Checkpoint } from './agent-v2.ts'
 import { BuilderV2Dispatcher } from './agent-v2-dispatcher.ts'
 import { runBuilderV2JobCycle } from './agent-v2-job-cycle.ts'
 import { createBuilderV2SupabaseLeaseStore } from './agent-v2-supabase-store.ts'
@@ -424,9 +424,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       if (cycle.status === 'paused' && cycle.result?.checkpoint) {
         const previous = job.checkpoint as unknown as BuilderV2Checkpoint | null
         const current = cycle.result.checkpoint
-        const unchanged = previous?.version === 2 &&
-          previous.revision === current.revision && previous.steps.length === current.steps.length
-        const idleSlices = unchanged ? Math.min(24, (previous?.idleSlices ?? 0) + 1) : 0
+        const idleSlices = builderV2IdleSliceCount(previous, current)
         // A timeout or empty model turn can pause without a single executed action.
         // After repeated empty continuations, preserve the workspace but terminate
         // rather than re-queueing the same checkpoint indefinitely.

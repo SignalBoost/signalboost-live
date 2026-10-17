@@ -44,6 +44,7 @@ const SYSTEM_PROMPT = [
   '{"type":"tool","action":{"tool":"write_file","path":"src/a.js","content":"full file content"}}',
   '{"type":"tool","action":{"tool":"edit_file","path":"src/a.js","search":"exact existing text","replace":"new text"}}',
   '{"type":"tool","action":{"tool":"run_tests","command":"npm test"}}',
+  '{"type":"tool","action":{"tool":"browser_cli","action":"snapshot","url":"https://itmounts.com"}}',
   '{"type":"tools","actions":[{"tool":"write_file","path":"package.json","content":"..."},{"tool":"write_file","path":"src/a.js","content":"..."}]}',
   '{"type":"finish","summary":"what was built and verified"}',
   'Batch: write several missing files in one "tools" reply (complete contents, no placeholders, dependencies and package.json first), up to 4 actions and about 8000 characters per reply so it fits the output limit. Execution stops at the first failed action.',
@@ -197,6 +198,15 @@ function parseAction(value: unknown): BuilderV2Action | null {
   if (a.tool === 'write_file' && typeof a.path === 'string' && typeof a.content === 'string') return { tool: 'write_file', path: a.path, content: a.content }
   if (a.tool === 'edit_file' && typeof a.path === 'string' && typeof a.search === 'string' && typeof a.replace === 'string') return { tool: 'edit_file', path: a.path, search: a.search, replace: a.replace }
   if (a.tool === 'run_tests' && typeof a.command === 'string') return { tool: 'run_tests', command: a.command }
+  if (a.tool === 'browser_cli' && typeof a.action === 'string'
+      && ['open','goto','snapshot','find','console','requests','close'].includes(a.action)
+      && (a.url === undefined || typeof a.url === 'string')
+      && (a.query === undefined || typeof a.query === 'string'))
+    return {
+      tool:'browser_cli',action:a.action as 'open'|'goto'|'snapshot'|'find'|'console'|'requests'|'close',
+      ...(typeof a.url === 'string' ? {url:a.url} : {}),
+      ...(typeof a.query === 'string' ? {query:a.query} : {}),
+    }
   return null
 }
 

@@ -246,6 +246,18 @@ export default function DeveloperPage() {
     finally { setRunning(false) }
   }
 
+  async function stopCurrentJob() {
+    if (!activeJobId) return
+    try {
+      const response = await fetch(`/api/builder?jobId=${encodeURIComponent(activeJobId)}`, {method:'DELETE'})
+      const data = await response.json().catch(() => ({})) as {stopped?: boolean; error?: string}
+      if (!response.ok) { setError(data.error || 'Unable to stop Builder.'); return }
+      setReply(data.stopped ? 'Builder stopped by user. Saved files remain available.' : 'Builder had already finished.')
+      setRunning(false)
+      try { localStorage.removeItem(BUILDER_LAST_JOB_KEY) } catch { /* ignore */ }
+    } catch { setError('Unable to contact Builder cancellation endpoint.') }
+  }
+
   function reset() { conversationIdRef.current = crypto.randomUUID(); sessionStorage.setItem(BUILDER_CONVERSATION_KEY, conversationIdRef.current); setWorkspaceId(''); setFiles([]); setWorkspaceFiles([]); setReply(''); setTrace([]); setError(''); setObjective('') }
 
   return (
@@ -293,6 +305,7 @@ export default function DeveloperPage() {
           {liveProgress?.lastTest ? <span style={{ color: '#cbd5e1', fontSize: 13 }}>Last test: {liveProgress.lastTest.passed ? 'passed' : 'failed'} · {liveProgress.lastTest.testsPassed ?? 0} passing / {liveProgress.lastTest.testsFailed ?? 0} failing</span> : null}
           {liveProgress?.lastActivityAt ? <span style={{ color: '#94a3b8', fontSize: 12 }}>Last saved activity: {new Date(liveProgress.lastActivityAt).toLocaleTimeString()}</span> : null}
           {activeJobId ? <span style={{ color: '#64748b', fontSize: 12 }}>Job: {activeJobId}</span> : null}
+          {activeJobId ? <button type="button" onClick={() => void stopCurrentJob()} style={{...secondaryButton, borderColor:'#f87171',color:'#fecaca',width:'fit-content'}}>Stop Builder</button> : null}
           <span style={{ color: '#64748b', fontSize: 12 }}>Activity is based on durable status updates. The animated indicator does not imply continuous model execution.</span>
         </section> : null}
         {reply || trace?.length ? <section style={{ border: '1px solid #1e293b', borderRadius: 18, background: '#0f172a', padding: 20, display: 'grid', gap: 14 }}>

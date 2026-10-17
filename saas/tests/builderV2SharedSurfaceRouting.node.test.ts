@@ -2,20 +2,21 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const read=(p:string)=>readFileSync(new URL(p, import.meta.url),'utf8')
-
-test('COS and Concierge fresh standard jobs have V2 durable metadata',()=>{
-  const specialist=read('../lib/ai/cos/softwareSpecialist.ts')
-  assert.match(specialist,/!project\.context && !selectionBody\?\.workspaceId \? \{ builderEngine: 'v2' \}/)
-  assert.match(specialist,/jobKind: debugPlan \? 'debug_file' : 'standard'/)
+test('Software Specialist dispatches only V2 standard jobs',()=>{
+  const s=read('../lib/ai/cos/softwareSpecialist.ts')
+  assert.match(s,/builderEngine: 'v2'/)
+  assert.match(s,/if \(debugPlan\) return NextResponse\.json/)
+  assert.match(s,/if \(project\.context \|\| selectionBody\?\.workspaceId\)/)
 })
-test('Developer surface defaults new standard jobs to V2 but keeps explicit V1 compatibility',()=>{
-  const route=read('../app/api/builder/route.ts')
-  assert.match(route,/requestedEngine !== 'v1' && !selectedWorkspaceId && !project\.context/)
-  assert.match(route,/requestedEngine === 'v2'/)
+test('Developer surface disallows explicit V1 and legacy debug mode',()=>{
+  const s=read('../app/api/builder/route.ts')
+  assert.match(s,/requestedEngine !== undefined && requestedEngine !== 'v2'/)
+  assert.match(s,/builder_v1_debug_mode_retired_use_v2/)
+  assert.match(s,/builderEngine: 'v2'/)
 })
-test('durable V2 job dispatch is not owner-only and old V1 jobs keep legacy loop',()=>{
-  const runner=read('../lib/builder/job-runner.ts')
-  assert.match(runner,/job\.jobKind === 'standard' && job\.metadata\.builderEngine === 'v2'/)
-  assert.doesNotMatch(runner,/job\.ownerAuthorized === true && job\.jobKind === 'standard'\s*&& job\.metadata\.builderEngine === 'v2'/)
-  assert.match(runner,/new BuilderToolLoop/)
+test('worker refuses legacy dispatch without owner bypass',()=>{
+  const s=read('../lib/builder/job-runner.ts')
+  assert.match(s,/job\.jobKind !== 'standard' \|\| job\.metadata\.builderEngine !== 'v2'/)
+  assert.match(s,/terminalFailure\(job, 'builder_v1_retired_use_v2'\)/)
+  assert.doesNotMatch(s,/job\.ownerAuthorized === true && job\.jobKind === 'standard'\s*&& job\.metadata\.builderEngine === 'v2'/)
 })

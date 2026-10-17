@@ -22,6 +22,15 @@ const TAIL = 8
  * reply ("builder coding AI provider returned no text") ended an OrderFlow job at slice 4 with every file written.
  */
 export const BUILDER_V2_MODEL_RETRIES = 3
+/**
+ * Working set, as Aider keeps the files "in the chat" and the test output on every turn (aider/coders/base_coder.py
+ * chat_files, commands.py cmd_test). Production 2026-10-17, job 00dd6e7d: once npm test failed the model read the same
+ * files 16 times over 5 slices and never edited, because each read pushed the failure output and the earlier reads out
+ * of the 8-receipt tail. The prompt now always carries the current failing command output and the current content of
+ * the files the model has opened, within a character budget sized for the 16k-token owned model window.
+ */
+const WORKING_SET_CHARS = 12_000
+const FAILURE_OUTPUT_CHARS = 5_000
 const MODEL_RETRY_BASE_MS = 1_000
 const MODEL_RETRY_MAX_MS = 15_000
 
@@ -307,7 +316,10 @@ export class BuilderV2Agent {
       .findLast(step => step.tool === 'run_tests' && !step.ok)
     const currentFailure = () => {
       const failed = failedOnRevision()
-      return failed ? JSON.stringify(failed).slice(0, 20_000) : ''
+      const out = failed?.output as { requestedCommand?: unknown; exitCode?: unknown; stdout?: unknown; stderr?: unknown } | undefined
+      // Head and tail of the output, as Codex and Cline keep long command output; the only copy in the prompt.
+      return out ? JSON.stringify({ command: out.requestedCommand, exitCode: out.exitCode,
+        output: headAndTail(`${String(out.stdout ?? '')}\n${String(out.stderr ?? '')}`.trim(), FAILURE_OUTPUT_CHARS) }) : ''
     }
     // Reconstruct inspection history across claims. Otherwise each continuation repeats list_files
     // as if the previous slice never happened, consuming all 24 allowed claims.
@@ -372,6 +384,25 @@ export class BuilderV2Agent {
         ? { ok: true, reason: 'verified', summary: 'Every required command passed on the host after the latest source change.', steps, checkpoint: await snapshot() }
         : null
     }
+    /** The failing command since the last change and the files the model has opened, freshly read, newest first. */
+    const workingSet = async () => {
+      const failure = failedOnRevision()
+      const opened = [...new Set(steps.filter(step => (step.tool === 'read_file' || step.tool === 'edit_file') && step.ok)
+        .map(step => (step.output as { path?: unknown } | undefined)?.path).filter((path): path is string => typeof path === 'string').reverse())]
+      const openFiles: Record<string, string> = {}
+      let used = 0
+      for (const path of opened) {
+        const file = this.workspace ? await this.workspace.readFile(options.workspaceId, path) : null
+        if (!file || used + file.content.length > WORKING_SET_CHARS) continue
+        openFiles[path] = file.content
+        used += file.content.length
+      }
+      return {
+        failure,
+        open: new Set(Object.keys(openFiles)),
+        prompt: used ? { openFiles } : {},
+      }
+    }
     for (let calls = 0; calls < maxSteps && steps.length < BUILDER_V2_MAX_RECEIPTS; calls++) {
       if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
       // REA-inspired native harness: the host verifies complete work before asking a model
@@ -381,6 +412,7 @@ export class BuilderV2Agent {
         if (verified) return verified
         // A failed host test is supplied to the model on this same turn for actual repair.
       }
+      const working = await workingSet()
       let raw: string | null
       try {
         raw = await this.generateWithRetry({
@@ -405,9 +437,11 @@ export class BuilderV2Agent {
             instruction: currentFailure()
               ? 'The host has already run the suite on this unchanged revision and recorded the failure in latestFailedTest. Inspect only relevant source if needed, then fix the failure with write_file or edit_file. Do not run the same tests again until an edit changes the revision.'
               : 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
-            lastReceipt,
+            lastReceipt: compactAgainstWorkingSet(lastReceipt, working),
             latestFailedTest: currentFailure(),
-            tail: steps.slice(-TAIL),
+            ...working.prompt,
+            // Content already in openFiles or latestFailedTest is not repeated from older receipts: it only costs context.
+            tail: steps.slice(-TAIL).map(receipt => withoutWorkingSetCopies(receipt, working)),
             verified: verifiedRevision === revision && verifiedRevision >= 0,
             stepsRemaining: BUILDER_V2_MAX_RECEIPTS - steps.length,
           }),
@@ -521,6 +555,32 @@ export class BuilderV2Agent {
       }
     }
   }
+}
+
+type WorkingSet = { failure?: BuilderV2Receipt; open: Set<string> }
+
+/** A receipt whose content the prompt already carries in openFiles or latestFailedTest, with that copy left out. */
+function withoutWorkingSetCopies(receipt: BuilderV2Receipt, working: WorkingSet): BuilderV2Receipt {
+  const output = receipt.output as { path?: unknown } | undefined
+  if (receipt.tool === 'read_file' && working.open.has(String(output?.path))) return { ...receipt, output: { path: output?.path, content: 'see openFiles' } }
+  if (receipt === working.failure) return { ...receipt, output: { ...(receipt.output as object), stdout: 'see latestFailedTest', stderr: '' } }
+  return receipt
+}
+
+/** lastReceipt is the serialized last receipt; when it is a copy of working-set content, send the short form. */
+function compactAgainstWorkingSet(lastReceipt: string, working: WorkingSet): string {
+  let receipt: BuilderV2Receipt
+  try { receipt = JSON.parse(lastReceipt) } catch { return lastReceipt }
+  const failureCopy = working.failure && lastReceipt === JSON.stringify(working.failure).slice(0, 20_000)
+  const compact = withoutWorkingSetCopies(failureCopy ? working.failure! : receipt, working)
+  return compact === receipt || compact === working.failure ? lastReceipt : JSON.stringify(compact)
+}
+
+/** Keep the start and the end of long output, as Codex and Cline do (utils/string/src/truncate.rs; output-limits.ts). */
+function headAndTail(text: string, max: number): string {
+  if (text.length <= max) return text
+  const half = Math.floor(max / 2)
+  return `${text.slice(0, half)}\n… ${text.length - 2 * half} characters omitted …\n${text.slice(-half)}`
 }
 
 /** Resolves after ms, or at once when the job is cancelled (the next model call then sees the aborted signal). */

@@ -4,9 +4,11 @@ import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
 
-test('V2 canary requires explicit owner authorization and engine opt-in', () => {
-  assert.match(source, /job\.ownerAuthorized === true && job\.jobKind === 'standard'/)
-  assert.match(source, /job\.metadata\.builderEngine === 'v2'/)
+// Since f6094f0 V2 is the default for fresh workspaces and open to customers: the runner selects it by the
+// durable job tag alone, for standard jobs; legacy untagged jobs stay on V1.
+test('the runner selects V2 by the durable engine tag on standard jobs', () => {
+  assert.match(source, /if \(job\.jobKind === 'standard' && job\.metadata\.builderEngine === 'v2'\) \{/)
+  assert.doesNotMatch(source, /job\.ownerAuthorized === true && job\.jobKind === 'standard' && job\.metadata\.builderEngine/)
   assert.match(source, /createBuilderV2SupabaseLeaseStore\(db, job\.userId\)/)
   assert.match(source, /runBuilderV2JobCycle/)
 })

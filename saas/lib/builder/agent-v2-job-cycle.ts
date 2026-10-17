@@ -105,7 +105,8 @@ export async function runBuilderV2JobCycle(input: {
   // Slice budget, cancellation (slice deadline) and a model timeout/outage after progress all pause with the
   // checkpoint; the job's slice cap still bounds how often it resumes.
   if (result.reason === 'builder_v2_step_budget' || result.reason === 'builder_v2_cancelled' || result.reason === 'builder_v2_model_unavailable') {
-    if (result.checkpoint && result.checkpoint !== persisted
+    // Compare content, not identity: every snapshot is a new object, so identity re-saved an unchanged checkpoint.
+    if (result.checkpoint && JSON.stringify(result.checkpoint) !== JSON.stringify(persisted)
       && !await input.store.save(input.jobId, input.claimGeneration, result.checkpoint)) {
       return { status: 'lost_lease', result, reason: 'builder_v2_claim_stale' }
     }

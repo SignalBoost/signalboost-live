@@ -35,7 +35,7 @@ jobs:
           const h = { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY }
           const get = async q => { const r = await fetch(process.env.SUPABASE_URL + '/rest/v1/' + q, { headers: h }); if (!r.ok) throw new Error(r.status + ' ' + q.split('?')[0]); return r.json() }
           ;(async () => {
-            const [job] = await get('builder_jobs?id=eq.e98aa467-3d1f-438f-ac59-0d345dd191e1&select=status,error,claim_generation,created_at,finished_at,checkpoint,result,workspace_id')
+            const [job] = await get('builder_jobs?workspace_id=eq.acb20693-b82b-4534-be5b-baa75f0d24a2&order=created_at.desc&limit=1&select=id,status,error,claim_generation,created_at,finished_at,checkpoint,result,workspace_id,metadata')
             const files = await get('builder_workspace_files?workspace_id=eq.' + job.workspace_id + '&select=path,content,updated_at')
             for (const f of files) if (String(f.content).startsWith('base64:')) f.content = Buffer.from(f.content.slice(7), 'base64').toString('utf8')
             fs.writeFileSync('dump.json', JSON.stringify({ job, files }))

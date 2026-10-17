@@ -1,0 +1,23 @@
+name: Builder V2 symbolic proof acceptance
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/builder/agent-v2.ts'
+      - 'verification/builder/v2-proof-symbolic*'
+      - '.github/workflows/builder-v2-symbolic-proof.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  symbolic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install z3-solver==4.13.4.0
+      - run: node --experimental-transform-types --test verification/builder/v2-proof-symbolic.test.mjs

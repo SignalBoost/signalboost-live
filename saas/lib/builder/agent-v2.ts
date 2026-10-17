@@ -631,6 +631,14 @@ export class BuilderV2Agent {
             previous: JSON.parse(previous) }).slice(0, 20_000)
           break
         }
+        // Refuse an overwrite the agent has not inspected on this revision.
+        // Return recovery feedback without burning a host tool receipt.
+        if (action.tool === 'write_file' && knownFiles.includes(action.path) && !seen.has(action.path)) {
+          lastReceipt = JSON.stringify({ ok: false, tool: action.tool,
+            error: 'builder_write_content_conflict', path: action.path,
+            message: 'Read the existing file before overwriting it.' })
+          break
+        }
         const receipt = await this.dispatcher.dispatch(options.workspaceId, action,
           action.tool === 'write_file' ? { seenContent: seen.get(action.path) } : {})
         record(action, receipt)

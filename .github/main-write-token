@@ -1,2 +1,2 @@
-base_sha=636a8f07e2b3cf6e74e38455a533caa520f73b33
-branch=fix/builder-v2-keep-truncated-replies-20261016
+base_sha=66a0847bcf4e6a60eed39c6e7a5188afc5b6e1dd
+branch=fix/builder-graduate-truncated-replies-20261016

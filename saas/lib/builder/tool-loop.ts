@@ -975,6 +975,30 @@ export class BuilderToolLoop {
 
       if (input.shouldPause?.(true)) return pause()
       if (blockedAction) {
+        // Reuse one already-observed read from the unchanged workspace revision.
+        // This is a host-owned evidence replay, not a second filesystem operation.
+        // Limit each path to one replay to prevent endless no-progress loops.
+        if (blockedAction.toolId === 'read_file') {
+          const path = toolPath(blockedAction.input)
+          const workspaceRevisionStart = trace.reduce((last, item, index) => (
+            item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file')
+              && (item.output as { alreadyPresent?: boolean } | undefined)?.alreadyPresent !== true ? index : last
+          ), -1)
+          const revisionTrace = trace.slice(workspaceRevisionStart + 1)
+          const priorRead = [...revisionTrace].reverse().find(item =>
+            item.toolId === 'read_file' && item.ok && toolPath(item.input) === path
+            && !(item.output && typeof item.output === 'object'
+              && (item.output as { evidenceReplay?: boolean }).evidenceReplay))
+          const replayed = revisionTrace.some(item => item.toolId === 'read_file'
+            && toolPath(item.input) === path && item.output && typeof item.output === 'object'
+            && (item.output as { evidenceReplay?: boolean }).evidenceReplay === true)
+          if (path && priorRead && !replayed) {
+            trace.push({ round, toolId: 'read_file', input: { path }, ok: true,
+              output: { ...(typeof priorRead.output === 'object' && priorRead.output !== null ? priorRead.output : {}),
+                evidenceReplay: true } })
+            continue
+          }
+        }
         const repeatedWrite = await reconcileRepeatedWrite(blockedAction, round)
         if (repeatedWrite === 'already_present' || repeatedWrite === 'different') continue
         if (repeatedWrite) return { ok: false, error: repeatedWrite, trace }

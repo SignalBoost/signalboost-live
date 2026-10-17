@@ -314,14 +314,16 @@ test('proposal approval is exact, scoped to unchanged evidence and not reconstru
   assert.notEqual(workspaceFingerprint([{ path: 'cli.js', content: 'original' }, { path: 'new.js', content: '' }]), fingerprint)
 })
 
-test('proposal handoff uses a saved id once and rechecks source before worker execution', () => {
+test('legacy proposal handoff fails closed and requires a fresh Builder V2 job', () => {
   const specialist = readFileSync('lib/ai/cos/softwareSpecialist.ts', 'utf8')
-  const store = readFileSync('lib/builder/job-store.ts', 'utf8')
   const runner = readFileSync('lib/builder/job-runner.ts', 'utf8')
-  assert.match(specialist, /jobId: proposal.id/)
-  assert.match(specialist, /ownerAuthorized: false/)
-  assert.match(store, /eq\('metadata', JSON.stringify\(job.metadata\)\)/)
-  assert.match(runner, /job.claimGeneration === 1/)
+  assert.match(specialist, /job\.status !== 'succeeded' \|\| !proposal \|\| !proposalMatches\(proposal/)
+  assert.match(specialist, /builder-v2-only/)
+  assert.match(specialist, /legacy proposal continuation is unavailable/)
+  assert.match(specialist, /execution_allowed: false, source: 'builder-v2-only' \}, \{ status: 409 \}/)
+  assert.doesNotMatch(specialist, /jobId: proposal\.id/)
+  assert.match(runner, /builder_v1_retired_use_v2/)
+  assert.match(runner, /job\.claimGeneration === 1/)
   assert.ok(runner.indexOf("'builder_proposal_source_changed'") < runner.indexOf('await executeSignalBoostRepositoryRepair('))
 })
 

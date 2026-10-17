@@ -15,10 +15,16 @@ export type BuilderInterfaceMismatch = {
   line: number
   module: string
   name: string
-  kind: 'missing_export' | 'missing_method'
-  /** For missing_export: what the module exports. For missing_method: the class and its methods. */
+  kind: 'missing_export' | 'missing_method' | 'wrong_argument_count' | 'method_not_chainable'
+  /**
+   * missing_export: what the module exports. missing_method: the class's methods.
+   * wrong_argument_count: the declared parameters. method_not_chainable: the method's return statements.
+   */
   available: string[]
 }
+
+/** Declared parameters of a constructor or factory; `required` counts those without a default or rest. */
+export type BuilderSignature = { params: string[]; required: number; rest: boolean }
 
 export type BuilderModuleInterface = {
   module: string
@@ -29,6 +35,12 @@ export type BuilderModuleInterface = {
   factories: Record<string, string>
   /** The exact `module.exports = ...` statement text, so an edit_file search can target it without a read. */
   exportStatement: string | null
+  /** Exported class or factory name -> its constructor/function parameters; `Class.prototype.method` -> the method's. */
+  signatures: Record<string, BuilderSignature>
+  /** Exported class name -> methods whose body returns `this`, so `new X().m()` can be chained. */
+  chainable: Record<string, string[]>
+  /** The value of `module.exports = Name` when the module exports one binding directly. */
+  defaultExport: string | null
 }
 
 /** Mismatches grouped by the source module that has to change, for a single repair reply. */
@@ -46,6 +58,50 @@ const IDENT = '[A-Za-z_$][\\w$]*'
 const TEST_PATH = /(^|\/)(test|tests|__tests__)\/|\.(test|spec)\.[cm]?js$/
 
 const lineOf = (code: string, index: number) => code.slice(0, index).split('\n').length
+
+/** Split a parenthesised list at top-level commas, skipping strings and nested brackets. */
+function splitTopLevel(list: string): string[] {
+  const parts: string[] = []
+  let depth = 0, start = 0
+  for (let i = 0; i < list.length; i++) {
+    const ch = list[i]
+    if (ch === '"' || ch === "'" || ch === '`') {
+      for (i++; i < list.length && list[i] !== ch; i++) if (list[i] === '\\') i++
+      continue
+    }
+    if ('([{'.includes(ch)) depth++
+    else if (')]}'.includes(ch)) depth--
+    else if (ch === ',' && depth === 0) { parts.push(list.slice(start, i)); start = i + 1 }
+  }
+  parts.push(list.slice(start))
+  return parts.map(part => part.trim()).filter(Boolean)
+}
+
+/** The `(...)` that starts at `open`, or null; returns the text between the parentheses. */
+function parenBody(code: string, open: number): string | null {
+  let depth = 0
+  for (let i = open; i < code.length; i++) {
+    const ch = code[i]
+    if (ch === '"' || ch === "'" || ch === '`') {
+      for (i++; i < code.length && code[i] !== ch; i++) if (code[i] === '\\') i++
+      continue
+    }
+    if (ch === '(') depth++
+    else if (ch === ')' && --depth === 0) return code.slice(open + 1, i)
+  }
+  return null
+}
+
+function signatureOf(paramList: string): BuilderSignature {
+  const params = splitTopLevel(paramList)
+  const rest = params.some(param => param.startsWith('...'))
+  let required = 0
+  for (const param of params) {
+    if (param.startsWith('...') || /=/.test(param.replace(/\{[^}]*\}|\[[^\]]*\]/g, ''))) break
+    required++
+  }
+  return { params, required, rest }
+}
 
 /** Body of the balanced `{...}` that starts at `open`, or null. Strings and comments are skipped. */
 function braceBody(code: string, open: number): string | null {
@@ -83,32 +139,57 @@ function objectKeys(body: string): string[] {
   return keys
 }
 
-function classMethods(code: string, name: string): string[] | null {
+type ClassDetails = { methods: string[]; chainable: string[]; constructor: BuilderSignature | null; methodSignatures: Record<string, BuilderSignature> }
+
+function classDetails(code: string, name: string): ClassDetails | null {
   const head = new RegExp(`\\bclass\\s+${name}\\b[^{]*\\{`).exec(code)
   if (!head) return null
-  const body = braceBody(code, head.index + head[0].length - 1)
+  const bodyStart = head.index + head[0].length - 1
+  const body = braceBody(code, bodyStart)
   if (body === null) return null
   // Members at the top level of the class body only.
   const methods = new Set<string>()
-  let depth = 0
+  const chainable = new Set<string>()
+  const methodSignatures: Record<string, BuilderSignature> = {}
+  let constructorSignature: BuilderSignature | null = null
+  let depth = 0, offset = 0
   for (const line of body.split('\n')) {
     if (depth === 0) {
       const member = new RegExp(`^\\s*(?:static\\s+)?(?:async\\s+)?(?:get\\s+|set\\s+)?\\*?\\s*(#?${IDENT})\\s*\\(`).exec(line)
-      if (member && !['if', 'for', 'while', 'switch', 'catch', 'constructor', 'function', 'return'].includes(member[1])) methods.add(member[1])
+      if (member && !['if', 'for', 'while', 'switch', 'catch', 'function', 'return'].includes(member[1])) {
+        const parenAt = offset + member[0].length - 1
+        const params = parenBody(body, parenAt)
+        const braceAt = params === null ? -1 : body.indexOf('{', parenAt + params.length + 2)
+        const methodBody = braceAt < 0 ? null : braceBody(body, braceAt)
+        if (member[1] === 'constructor') constructorSignature = signatureOf(params ?? '')
+        else {
+          methods.add(member[1])
+          if (params !== null) methodSignatures[member[1]] = signatureOf(params)
+          if (methodBody !== null && /\breturn\s+this\b(?![.\[(])/.test(methodBody)) chainable.add(member[1])
+        }
+      }
       const field = new RegExp(`^\\s*(?:static\\s+)?(${IDENT})\\s*=\\s*(?:async\\s*)?(?:\\([^)]*\\)|${IDENT})\\s*=>`).exec(line)
       if (field) methods.add(field[1])
     }
     for (const ch of line.replace(/(["'`])(?:\\.|(?!\1).)*\1/g, '')) depth += ch === '{' ? 1 : ch === '}' ? -1 : 0
+    offset += line.length + 1
   }
   // Inherited methods count as available.
   const parent = new RegExp(`\\bclass\\s+${name}\\s+extends\\s+(${IDENT})`).exec(code)?.[1]
   if (parent && parent !== name) {
     // A parent defined in another file is not visible here: its methods are unknown, so report none missing.
-    const inherited = classMethods(code, parent)
+    const inherited = classDetails(code, parent)
     if (!inherited) return null
-    for (const method of inherited) methods.add(method)
+    for (const method of inherited.methods) methods.add(method)
+    for (const method of inherited.chainable) chainable.add(method)
+    for (const [method, signature] of Object.entries(inherited.methodSignatures)) if (!methodSignatures[method]) methodSignatures[method] = signature
+    if (!constructorSignature) constructorSignature = inherited.constructor
   }
-  return [...methods].filter(method => !method.startsWith('#'))
+  return { methods: [...methods].filter(method => !method.startsWith('#')), chainable: [...chainable], constructor: constructorSignature, methodSignatures }
+}
+
+function classMethods(code: string, name: string): string[] | null {
+  return classDetails(code, name)?.methods ?? null
 }
 
 /** What a CommonJS source module exports, and the methods of the classes it exports. */
@@ -136,24 +217,32 @@ export function builderModuleInterface(module: string, code: string): BuilderMod
   }
   if (!exports.size && !single) return null
   const classes: Record<string, string[]> = {}
+  const chainable: Record<string, string[]> = {}
+  const signatures: Record<string, BuilderSignature> = {}
   for (const name of [...exports, ...(single ? [single] : [])]) {
     const binding = new RegExp(`\\b${name}\\s*:\\s*(${IDENT})`).exec(code)?.[1] ?? name
-    const methods = classMethods(code, binding)
-    if (methods) classes[name] = methods
+    const details = classDetails(code, binding)
+    if (!details) continue
+    classes[name] = details.methods
+    if (details.chainable.length) chainable[name] = details.chainable
+    // A class without a constructor accepts any arguments.
+    if (details.constructor) signatures[name] = details.constructor
+    for (const [method, signature] of Object.entries(details.methodSignatures)) signatures[`${name}.prototype.${method}`] = signature
   }
   const factories: Record<string, string> = {}
   for (const name of exports) {
     if (classes[name]) continue
     const binding = new RegExp(`\\b${name}\\s*:\\s*(${IDENT})`).exec(code)?.[1] ?? name
-    const head = new RegExp(`\\bfunction\\s+${binding}\\s*\\([^)]*\\)\\s*\\{|\\b(?:const|let|var)\\s+${binding}\\s*=\\s*(?:async\\s*)?(?:function\\s*)?\\([^)]*\\)\\s*(?:=>\\s*)?`).exec(code)
+    const head = new RegExp(`\\bfunction\\s+${binding}\\s*\\(([^)]*)\\)\\s*\\{|\\b(?:const|let|var)\\s+${binding}\\s*=\\s*(?:async\\s*)?(?:function\\s*)?\\(([^)]*)\\)\\s*(?:=>\\s*)?`).exec(code)
     if (!head) continue
+    signatures[name] = signatureOf(head[1] ?? head[2] ?? '')
     const rest = code.slice(head.index + head[0].length)
     const body = rest.startsWith('{') ? braceBody(rest, 0) : head[0].endsWith('{') ? braceBody(code, head.index + head[0].length - 1) : rest.split('\n')[0]
     const created = body ? new RegExp(`\\bnew\\s+(${IDENT})\\s*\\(`).exec(body)?.[1] : undefined
     const exported = created ? Object.keys(classes).find(key => key === created || new RegExp(`\\b${key}\\s*:\\s*${created}\\b`).test(code)) : undefined
     if (exported) factories[name] = exported
   }
-  return { module, exports: [...exports], classes, factories, exportStatement }
+  return { module, exports: [...exports], classes, factories, exportStatement, signatures, chainable, defaultExport: single }
 }
 
 /** Resolve `../src/cart` (from test/x.test.js) to a known workspace path. */
@@ -167,6 +256,44 @@ function resolveImport(fromPath: string, spec: string, known: ReadonlySet<string
   const base = parts.join('/')
   for (const candidate of [base, `${base}.js`, `${base}.cjs`, `${base}/index.js`]) if (known.has(candidate)) return candidate
   return null
+}
+
+/**
+ * For an argument starting at `at`, the lower-cased declared parameter name at that position of the enclosing
+ * call, when the callee is a known constructor, factory or `instance.method` of a known class; otherwise null.
+ */
+function parameterNameOf(
+  code: string, at: number,
+  bindings: ReadonlyMap<string, { module: string; name: string }>,
+  moduleInterface: (path: string) => BuilderModuleInterface | null,
+): string | null {
+  // Walk back to the unmatched `(` of the enclosing call, counting top-level commas for the argument index.
+  let depth = 0, index = 0, open = -1
+  for (let i = at - 1; i >= 0; i--) {
+    const ch = code[i]
+    if (ch === ')' || ch === ']' || ch === '}') depth++
+    else if (ch === '(' || ch === '[' || ch === '{') { if (depth === 0) { open = ch === '(' ? i : -1; break } depth-- }
+    else if (ch === ',' && depth === 0) index++
+    else if (ch === '\n' && depth === 0 && /[;{}]\s*$/.test(code.slice(Math.max(0, i - 40), i))) break
+  }
+  if (open < 0) return null
+  const callee = new RegExp(`(?:\\bnew\\s+)?(${IDENT})(?:\\.(${IDENT}))?\\s*$`).exec(code.slice(Math.max(0, open - 200), open))
+  if (!callee) return null
+  let signature: BuilderSignature | undefined
+  if (callee[2]) {
+    // instance.method(...): the instance variable was created from a known class or factory.
+    const created = new RegExp(`\\b(?:const|let|var)\\s+${callee[1]}\\s*=\\s*(?:new\\s+)?(${IDENT})\\s*\\(`).exec(code)
+    const binding = created ? bindings.get(created[1]) : bindings.get(callee[1])
+    const api = binding ? moduleInterface(binding.module) : null
+    const className = binding && api ? (api.classes[binding.name] ? binding.name : api.factories[binding.name]) : undefined
+    signature = className && api ? api.signatures[`${className}.prototype.${callee[2]}`] : undefined
+  } else {
+    const binding = bindings.get(callee[1])
+    const api = binding ? moduleInterface(binding.module) : null
+    signature = binding && api ? api.signatures[binding.name] : undefined
+  }
+  const param = signature?.params[index]
+  return param ? param.replace(/\s*=.*$/, '').replace(/^\.\.\./, '').toLowerCase() : null
 }
 
 /**
@@ -214,10 +341,53 @@ export function builderInterfaceMismatches(files: ReadonlyArray<{ path: string; 
     for (const found of code.matchAll(new RegExp(`\\b(?:const|let|var)\\s+(${IDENT})\\s*=\\s*${requireCall}`, 'g'))) {
       const module = resolveImport(test.path, found[2], known)
       const api = module ? moduleInterface(module) : null
-      if (!module || !api || !api.exports.length) continue
+      if (!module || !api) continue
+      // const Cart = require('../src/cart') with module.exports = Cart: the local name is the class itself.
+      if (api.defaultExport && !api.exports.length) { bindings.set(found[1], { module, name: api.defaultExport }); continue }
+      if (!api.exports.length) continue
       for (const use of code.matchAll(new RegExp(`\\b${found[1]}\\.(${IDENT})\\b`, 'g'))) {
         bindings.set(`${found[1]}.${use[1]}`, { module, name: use[1] })
         if (!api.exports.includes(use[1])) add({ test: test.path, line: lineOf(code, use.index!), module, name: use[1], kind: 'missing_export', available: api.exports })
+      }
+    }
+    // new Cart(a, b) or createCart(a, b): the argument count must fit the declared parameters.
+    for (const found of code.matchAll(new RegExp(`(?:\\bnew\\s+|(?<![\\w$.]))(${IDENT}(?:\\.${IDENT})?)\\s*\\(`, 'g'))) {
+      const binding = bindings.get(found[1])
+      const api = binding ? moduleInterface(binding.module) : null
+      const signature = binding && api ? api.signatures[binding.name] : undefined
+      if (!binding || !signature) continue
+      const args = parenBody(code, found.index! + found[0].length - 1)
+      if (args === null) continue
+      const count = splitTopLevel(args).length
+      const spread = /(^|[,(\s])\.\.\./.test(args)
+      if (!spread && (count < signature.required || (!signature.rest && count > signature.params.length))) {
+        add({ test: test.path, line: lineOf(code, found.index!), module: binding.module, kind: 'wrong_argument_count',
+          name: `${binding.name}(${signature.params.join(', ')}) called with ${count} argument${count === 1 ? '' : 's'}`, available: signature.params })
+      }
+    }
+    // new Cart(...).addItem(...) used as a value: the method must return this.
+    for (const found of code.matchAll(new RegExp(`\\bnew\\s+(${IDENT})\\s*\\(`, 'g'))) {
+      const binding = bindings.get(found[1])
+      const api = binding ? moduleInterface(binding.module) : null
+      if (!binding || !api || !api.classes[binding.name]) continue
+      const args = parenBody(code, found.index! + found[0].length - 1)
+      if (args === null) continue
+      const after = code.slice(found.index! + found[0].length + args.length + 1)
+      const chained = new RegExp(`^\\s*\\.(${IDENT})\\s*\\(`).exec(after)
+      if (!chained) continue
+      const callArgs = parenBody(after, chained[0].length - 1)
+      if (callArgs === null) continue
+      const next = after.slice(chained[0].length + callArgs.length + 1).trimStart()
+      // Evidence that the result must be the instance: another method of the same class is called on it, or it
+      // is passed to a parameter whose declared name is the class (`checkout(cart)` taking `new Cart().addItem()`).
+      // A consumed number or id (`assert.equal(new Cart().total(), 0)`) is a legitimate non-chainable return.
+      const chainedAgain = new RegExp(`^\\.(${IDENT})\\s*\\(`).exec(next)
+      const requiresInstance = chainedAgain ? api.classes[binding.name].includes(chainedAgain[1])
+        : (next.startsWith(',') || next.startsWith(')')) && parameterNameOf(code, found.index!, bindings, moduleInterface) === binding.name.toLowerCase()
+      if (!requiresInstance) continue
+      if (!(api.chainable[binding.name] ?? []).includes(chained[1]) && api.classes[binding.name].includes(chained[1])) {
+        add({ test: test.path, line: lineOf(code, found.index!), module: binding.module, kind: 'method_not_chainable',
+          name: `${binding.name}.prototype.${chained[1]} must return this`, available: api.chainable[binding.name] ?? [] })
       }
     }
     // const cart = new Cart(...) or createCart(...); cart.addItem(...) — only for classes the module really
@@ -284,10 +454,12 @@ export async function builderWorkspaceModuleInterfaces(
   workspace: BuilderWorkspacePort | undefined,
   workspaceId: string,
   knownPaths: readonly string[],
-): Promise<Array<{ module: string; exports: string[]; classes: Record<string, string[]>; factories: Record<string, string> }>> {
+): Promise<Array<{ module: string; exports: string[]; classes: Record<string, string[]>; factories: Record<string, string>; signatures: Record<string, string> }>> {
   if (!workspace) return []
   const files = await readJavaScript(workspace, workspaceId, knownPaths.filter(path => !TEST_PATH.test(path)))
   return files.map(file => builderModuleInterface(file.path, file.content.slice(0, MAX_SOURCE)))
     .filter((api): api is BuilderModuleInterface => Boolean(api))
-    .map(({ module, exports, classes, factories }) => ({ module, exports, classes, factories }))
+    // Signatures as text (`Cart(catalog)`, `Cart.prototype.addItem(productId, quantity = 1)`) so tests written next call the real API.
+    .map(({ module, exports, classes, factories, signatures }) => ({ module, exports, classes, factories,
+      signatures: Object.fromEntries(Object.entries(signatures).map(([name, signature]) => [name, `${name}(${signature.params.join(', ')})`])) }))
 }

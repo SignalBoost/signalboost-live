@@ -44,6 +44,8 @@ const SYSTEM_PROMPT = [
   '{"type":"tool","action":{"tool":"write_file","path":"src/a.js","content":"full file content"}}',
   '{"type":"tool","action":{"tool":"edit_file","path":"src/a.js","search":"exact existing text","replace":"new text"}}',
   '{"type":"tool","action":{"tool":"run_tests","command":"npm test"}}',
+  '{"type":"tool","action":{"tool":"browser_cli","action":"open","url":"https://itmounts.com"}}',
+  '{"type":"tool","action":{"tool":"browser_cli","action":"snapshot"}}',
   '{"type":"tools","actions":[{"tool":"write_file","path":"package.json","content":"..."},{"tool":"write_file","path":"src/a.js","content":"..."}]}',
   '{"type":"finish","summary":"what was built and verified"}',
   'Batch: write several missing files in one "tools" reply (complete contents, no placeholders, dependencies and package.json first), up to 4 actions and about 8000 characters per reply so it fits the output limit. Execution stops at the first failed action.',
@@ -51,6 +53,7 @@ const SYSTEM_PROMPT = [
   'A write or edit receipt with output.syntaxError means that file does not parse: fix it first with edit_file.',
   'write_file creates a file; to rewrite an existing file, read_file it first. Prefer edit_file for small changes.',
   'Write every checklist file, then run every checklist command; finish only after all of them pass after your last change.',
+  'If the task explicitly requires browser verification of a URL, open that exact URL with browser_cli and then call browser_cli snapshot after your last source change, inspect any browser failure, repair it, then retest before finishing.',
 ].join('\n')
 
 const hasSyntaxError = (receipt: BuilderV2Receipt) =>
@@ -61,6 +64,8 @@ function compactReceipt(receipt: BuilderV2Receipt): BuilderV2Receipt {
   const output = receipt.output as Record<string, unknown> | undefined
   const kept = receipt.tool === 'run_tests'
     ? output && { exitCode: output.exitCode, timedOut: output.timedOut, requestedCommand: output.requestedCommand, executedCommand: output.executedCommand }
+    : receipt.tool === 'browser_cli'
+    ? output && { url: output.url, action: output.action, exitCode: output.exitCode, timedOut: output.timedOut }
     : output && typeof output === 'object' && !Array.isArray(output) && typeof output.path === 'string' ? { path: output.path } : undefined
   return { tool: receipt.tool, ok: receipt.ok, changed: receipt.changed, ...(receipt.error ? { error: receipt.error } : {}), ...(kept ? { output: kept } : {}) }
 }
@@ -109,6 +114,7 @@ export type BuilderV2Acceptance = Readonly<{
   pendingCommands: readonly string[]
   minimumTests: number
   testsPassed: number
+  pendingBrowser?: string | null
 }>
 
 /**
@@ -120,17 +126,22 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
   const contract = builderTaskContract(objective)
   const lastChange = steps.findLastIndex(receipt => receipt.changed)
   const runs = steps.slice(lastChange + 1).filter(receipt => receipt.tool === 'run_tests')
-  const passing = runs.filter(receipt => receipt.ok)
+  // A claimed success is not a proving receipt without actual exit status and timeout evidence.
+  const provenRun = (receipt: BuilderV2Receipt) => {
+    const output = receipt.output as { exitCode?: unknown; timedOut?: unknown } | undefined
+    return receipt.ok && output?.exitCode === 0 && output?.timedOut === false
+  }
+  const passing = runs.filter(provenRun)
     .map(receipt => receipt.output as { requestedCommand?: unknown; executedCommand?: unknown; stdout?: unknown } | undefined)
   // A more recent failed execution invalidates prior proof until verification succeeds again.
-  const latestRunPassed = runs.length > 0 && runs[runs.length - 1].ok
+  const latestRunPassed = runs.length > 0 && provenRun(runs[runs.length - 1])
   const missingFiles = contract.files.filter(path => !files.includes(path))
   const pendingCommands = contract.commands.filter(command => {
     const latest = runs.findLast(receipt => {
       const output = receipt.output as { requestedCommand?: unknown; executedCommand?: unknown } | undefined
       return output?.requestedCommand === command || output?.executedCommand === command
     })
-    return !latest?.ok
+    return !latest || !provenRun(latest)
   })
   const testsPassed = Math.max(0, ...passing.map(output => {
     const stdout = typeof output?.stdout === 'string' ? output.stdout : ''
@@ -138,9 +149,33 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
     const fail = /(?:^|\n)\s*(?:#|ℹ)\s+fail\s+(\d+)/.exec(stdout)
     return pass && (!fail || fail[1] === '0') ? Number(pass[1]) : 0
   }))
+  // Browser-dependent tasks require a host browser receipt for the requested URL
+  // after the last source mutation. A green unit suite cannot substitute for UI proof.
+  const browserMatch = /(?:browser|playwright|visual)[^\n]{0,160}?(https:\/\/[^\s),]+)/i.exec(objective)
+  const browserTarget = browserMatch?.[1]?.replace(/[.]+$/, '')
+  const browserRuns = steps.slice(lastChange + 1).filter(receipt => receipt.tool === 'browser_cli')
+  const browserOutput = (receipt: BuilderV2Receipt | undefined) =>
+    receipt?.output as { action?: unknown; url?: unknown; exitCode?: unknown; timedOut?: unknown } | undefined
+  const isProvenBrowserAction = (receipt: BuilderV2Receipt | undefined) =>
+    receipt?.ok === true && browserOutput(receipt)?.exitCode === 0 &&
+    browserOutput(receipt)?.timedOut === false
+  // A snapshot doesn't navigate; it proves a page only after a real successful
+  // open/goto to the exact requested URL, with no intervening navigation.
+  const latestNavigationIndex = browserRuns.findLastIndex(receipt =>
+    browserOutput(receipt)?.action === 'open' || browserOutput(receipt)?.action === 'goto')
+  const navigation = latestNavigationIndex >= 0 ? browserRuns[latestNavigationIndex] : undefined
+  const latestSnapshot = latestNavigationIndex >= 0
+    ? browserRuns.slice(latestNavigationIndex + 1).findLast(receipt => browserOutput(receipt)?.action === 'snapshot')
+    : undefined
+  const browserSatisfied = !browserTarget || (
+    browserOutput(navigation)?.url === browserTarget &&
+    isProvenBrowserAction(navigation) && isProvenBrowserAction(latestSnapshot)
+  )
   return {
-    satisfied: latestRunPassed && missingFiles.length === 0 && pendingCommands.length === 0 && testsPassed >= contract.minimumTests,
+    satisfied: latestRunPassed && browserSatisfied && missingFiles.length === 0
+      && pendingCommands.length === 0 && testsPassed >= contract.minimumTests,
     missingFiles, pendingCommands, minimumTests: contract.minimumTests, testsPassed,
+    pendingBrowser: browserTarget && !browserSatisfied ? browserTarget : null,
   }
 }
 
@@ -192,6 +227,15 @@ function parseAction(value: unknown): BuilderV2Action | null {
   if (a.tool === 'write_file' && typeof a.path === 'string' && typeof a.content === 'string') return { tool: 'write_file', path: a.path, content: a.content }
   if (a.tool === 'edit_file' && typeof a.path === 'string' && typeof a.search === 'string' && typeof a.replace === 'string') return { tool: 'edit_file', path: a.path, search: a.search, replace: a.replace }
   if (a.tool === 'run_tests' && typeof a.command === 'string') return { tool: 'run_tests', command: a.command }
+  if (a.tool === 'browser_cli' && typeof a.action === 'string'
+      && ['open','goto','snapshot','find','console','requests','close'].includes(a.action)
+      && (a.url === undefined || typeof a.url === 'string')
+      && (a.query === undefined || typeof a.query === 'string'))
+    return {
+      tool:'browser_cli',action:a.action as 'open'|'goto'|'snapshot'|'find'|'console'|'requests'|'close',
+      ...(typeof a.url === 'string' ? {url:a.url} : {}),
+      ...(typeof a.query === 'string' ? {query:a.query} : {}),
+    }
   return null
 }
 
@@ -500,7 +544,7 @@ export class BuilderV2Agent {
         const error = verified ? 'builder_v2_checklist_incomplete' : 'builder_v2_unverified_completion'
         if (++checklistRejections >= REJECTION_LIMIT) return { ok: false, reason: error, steps, checkpoint: await snapshot() }
         lastReceipt = JSON.stringify({ tool: 'finish', ok: false, error, ...acceptance,
-          next: acceptance.missingFiles.length ? ['write_file'] : ['run_tests', 'edit_file'] }).slice(0, 20_000)
+          next: acceptance.missingFiles.length ? ['write_file'] : acceptance.pendingBrowser ? ['browser_cli', 'edit_file', 'run_tests'] : ['run_tests', 'edit_file'] }).slice(0, 20_000)
         continue
       }
       // Execute the reply's actions in order. The first failed or repeated action ends the batch, so later actions

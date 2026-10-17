@@ -388,6 +388,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort({ yieldToChat: selfHealingCapacityJob(job) }), {
         deadlineAtMs: Date.now() + 210_000,
       })
+      const browserPortV2 = createBuilderPlaywrightCliPort({ ownerAuthorized: job.ownerAuthorized === true })
       const v2 = new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, new VercelSandboxBuilderRunner(), {
         beforeRun({ workspaceId, command }) {
           if (workspaceId !== job.workspaceId || !command.trim()) throw Error('builder_execution_context_denied')
@@ -402,12 +403,19 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         onError() {
           console.warn('[builder_v2_execution_runtime_error]', { jobId: job.id, claimGeneration: job.claimGeneration })
         },
-      }), workspace)
-      const cycle = await withBuilderSliceDeadline(() => runBuilderV2JobCycle({
-        jobId: job.id, claimGeneration: job.claimGeneration,
-        store: createBuilderV2SupabaseLeaseStore(db, job.userId),
-        agent: v2, maxSteps: 24,
-      }), BUILDER_SLICE_HARD_DEADLINE_MS)
+      }, browserPortV2), workspace)
+      const cycle = await (async () => {
+        try {
+          return await withBuilderSliceDeadline(() => runBuilderV2JobCycle({
+            jobId: job.id, claimGeneration: job.claimGeneration,
+            store: createBuilderV2SupabaseLeaseStore(db, job.userId),
+            agent: v2, maxSteps: 24,
+          }), BUILDER_SLICE_HARD_DEADLINE_MS)
+        } finally {
+          // Every V2 work slice owns its browser sandbox; never leak it across claims.
+          await browserPortV2.close().catch(() => console.warn('[builder_v2_browser_cleanup_failed]', { jobId: job.id }))
+        }
+      })()
       if (cycle.status === 'lost_lease') return
       const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
       // What the build did so far, from host receipts, on every update the person sees.

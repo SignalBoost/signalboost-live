@@ -26,5 +26,9 @@ jobs:
         run: node --experimental-transform-types --test saas/tests/builderProductReadiness.node.test.ts
       - name: Browser validation and automatic repair contracts
         run: node --experimental-transform-types --test saas/tests/builderPlaywrightCli.node.test.ts saas/tests/builderRepairClassification.node.test.ts
+      - name: Builder V2 host-governed browser repair acceptance
+        run: node --experimental-transform-types --test saas/tests/builderV2BrowserRepair.node.test.ts
+      - name: Full V2 real Node build, checkpoint, fail-repair-pass and browser proof
+        run: node --experimental-transform-types --test saas/tests/builderV2FullReaAcceptance.node.test.ts
       - name: Builder V1 and V2 REA host execution boundary
         run: node --experimental-transform-types --test saas/tests/builderExecutionHooks.node.test.ts

@@ -1,4 +1,4 @@
-import type { BuilderFile, BuilderRunnerPort, BuilderWorkspacePort } from './contracts.ts'
+import type { BuilderBrowserCliAction, BuilderBrowserCliPort, BuilderFile, BuilderRunnerPort, BuilderWorkspacePort } from './contracts.ts'
 import { builderSyntaxError } from './syntax-check.ts'
 import { withBuilderExecutionHooks, type BuilderExecutionHook } from './execution-hooks.ts'
 
@@ -14,6 +14,7 @@ export type BuilderV2Action =
   | Readonly<{ tool: 'write_file'; path: string; content: string }>
   | Readonly<{ tool: 'edit_file'; path: string; search: string; replace: string }>
   | Readonly<{ tool: 'run_tests'; command: string }>
+  | Readonly<{ tool: 'browser_cli'; action: BuilderBrowserCliAction; url?: string; query?: string }>
 
 export type BuilderV2Receipt = Readonly<{
   tool: BuilderV2Action['tool']
@@ -30,6 +31,7 @@ export class BuilderV2Dispatcher {
     private readonly workspace: BuilderWorkspacePort,
     runner: BuilderRunnerPort,
     executionHooks?: BuilderExecutionHook,
+    private readonly browserCli?: BuilderBrowserCliPort,
   ) { this.runner = executionHooks ? withBuilderExecutionHooks(runner, executionHooks) : runner }
   private readonly runner: BuilderRunnerPort
 
@@ -99,6 +101,29 @@ export class BuilderV2Dispatcher {
           const syntaxError = builderSyntaxError(edited.path, edited.content)
           return { tool: action.tool, ok: true, changed: true, output: { path: edited.path, ...(syntaxError ? { syntaxError } : {}) },
             next: syntaxError ? ['edit_file', 'read_file'] : ['run_tests', 'read_file'] }
+        }
+        if (action.tool === 'browser_cli') {
+          if (!this.browserCli) return { tool: action.tool, ok: false, changed: false, error: 'builder_browser_unavailable' }
+          const capabilities = await this.browserCli.capabilities()
+          if (!capabilities?.actions.includes(action.action)) return { tool: action.tool, ok: false, changed: false, error: 'builder_browser_action_denied' }
+          if (action.url && action.action !== 'open' && action.action !== 'goto')
+            return { tool: action.tool, ok: false, changed: false, error: 'builder_browser_url_requires_navigation' }
+          if (action.url) {
+            let parsed: URL
+            try { parsed = new URL(action.url) }
+            catch { return { tool: action.tool, ok: false, changed: false, error: 'builder_browser_invalid_url' } }
+            if (parsed.protocol !== 'https:' || !capabilities.allowedOrigins.includes(parsed.origin))
+              return { tool: action.tool, ok: false, changed: false, error: 'builder_browser_origin_denied' }
+          }
+          const observed = await this.browserCli.invoke({
+            action: action.action,
+            ...(action.url ? {url: action.url} : {}),
+            ...(action.query ? {query: action.query} : {}),
+          })
+          return { tool: action.tool, ok: observed.ok, changed: false,
+            output: { action: observed.action, ...(action.url ? {url:action.url} : {}), exitCode: observed.exitCode, stdout: observed.stdout,
+              stderr: observed.stderr, timedOut: observed.timedOut, failureCode: observed.failureCode },
+            ...(observed.ok ? {} : { error: 'builder_browser_verification_failed', next: ['read_file', 'edit_file', 'run_tests'] as const }) }
         }
         const listed = await this.workspace.listFiles(workspaceId)
         const files = (await Promise.all(listed.map(item => this.workspace.readFile(workspaceId, item.path))))

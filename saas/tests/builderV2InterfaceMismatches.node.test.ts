@@ -56,6 +56,37 @@ test('production job-629e2d0e: repairs are grouped per module with the exact exp
   assert.equal(catalog?.missing[0].usedAt, 'test/checkout.test.js:11')
 })
 
+test('production job-d8eff4a9 (after the export fix): the remaining failures are argument counts and chaining, all named', () => {
+  const { files } = fixture['job-d8eff4a9']
+  const run = runOn(files, 'node --test test/*.test.js')
+  assert.notEqual(run.exitCode, 0)
+  const output = `${run.stdout}\n${run.stderr}`
+  // Real failures: constructors called without their catalog, a 3-argument CheckoutService, a non-chainable addItem.
+  assert.match(output, /Cart requires a catalog/)
+  assert.match(output, /InventoryManager requires a catalog/)
+  assert.match(output, /A valid cart is required for checkout/)
+  const mismatches = builderInterfaceMismatches(files)
+  assert.equal(mismatches.filter(m => m.kind === 'missing_export' || m.kind === 'missing_method').length, 0)
+  assert.deepEqual(mismatches.map(m => `${m.kind}:${m.name}@${m.test}:${m.line}`), [
+    'wrong_argument_count:CheckoutService(orderStore, inventory) called with 3 arguments@test/checkout.test.js:16',
+    'wrong_argument_count:Cart(catalog) called with 0 arguments@test/checkout.test.js:40',
+    'wrong_argument_count:InventoryManager(catalog) called with 0 arguments@test/inventory.test.js:7',
+    'wrong_argument_count:CheckoutService(orderStore, inventory) called with 3 arguments@test/orders.test.js:15',
+    'method_not_chainable:Cart.prototype.addItem must return this@test/orders.test.js:39',
+  ])
+})
+
+test('argument counts: defaults, rest and spread are respected; a class without a constructor accepts anything', () => {
+  const files: File[] = [
+    { path: 'src/a.js', content: 'class Store {\n  constructor(catalog, options = {}) { this.c = catalog }\n  add(x) { this.x = x; return this }\n  peek() { return this.x }\n}\nclass Bag {}\nfunction make(...items) { return items }\nmodule.exports = { Store, Bag, make }\n' },
+    { path: 'test/a.test.js', content: "const { Store, Bag, make } = require('../src/a')\nnew Store(1)\nnew Store(1, {})\nnew Store(...args)\nnew Bag(1, 2, 3)\nmake(); make(1, 2, 3)\nconst s = new Store(1).add(2)\nnew Store(1).peek()\nconst bad = new Store()\nnew Store(1, {}, 3)\n" },
+  ]
+  assert.deepEqual(builderInterfaceMismatches(files).map(m => `${m.kind}:${m.name}@${m.line}`), [
+    'wrong_argument_count:Store(catalog, options = {}) called with 0 arguments@9',
+    'wrong_argument_count:Store(catalog, options = {}) called with 3 arguments@10',
+  ])
+})
+
 test('a consistent project reports nothing: exports, aliases, statics, factories, inherited methods', () => {
   const files: File[] = [
     { path: 'src/base.js', content: 'class Base {\n  describe() { return "b" }\n}\nmodule.exports = { Base }\n' },
@@ -108,7 +139,8 @@ test('Builder V2 shows tests the real interface of sources already written', asy
   const agent = new BuilderV2Agent({ async generate(request) { prompts.push(JSON.parse(String(request.prompt))); return null } },
     new BuilderV2Dispatcher(workspace, localRunner), workspace)
   await agent.run({ workspaceId: 'w', objective, maxSteps: 1, retryDelay: async () => undefined })
-  assert.deepEqual(prompts[0].writtenModuleInterfaces, [{ module: 'src/catalog.js', exports: ['Catalog', 'createCatalog'], classes: { Catalog: ['addProduct'] }, factories: { createCatalog: 'Catalog' } }])
+  assert.deepEqual(prompts[0].writtenModuleInterfaces, [{ module: 'src/catalog.js', exports: ['Catalog', 'createCatalog'], classes: { Catalog: ['addProduct'] }, factories: { createCatalog: 'Catalog' },
+    signatures: { 'Catalog.prototype.addProduct': 'Catalog.prototype.addProduct(p)', createCatalog: 'createCatalog()' } }])
   assert.equal(prompts[0].interfaceMismatches, undefined)
 })
 
@@ -150,4 +182,56 @@ test('Builder V2 lists every mismatch at once, and one batched edit from the exa
   assert.equal(prompts.length, 1)
   const lastRun = outcome.steps.findLast(step => step.tool === 'run_tests')
   assert.equal(lastRun?.ok, true)
+})
+
+test('Builder V2 reports argument-count and chaining mismatches in the same list, and one batched edit verifies the build', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('w', 'package.json', '{"name":"minishop","scripts":{"test":"node --test test/*.test.js"}}')
+  await workspace.writeFile('w', 'src/catalog.js', "'use strict'\nclass Rack {\n  constructor(owner) {\n    if (!owner) throw new TypeError('Rack requires an owner')\n    this.owner = owner\n    this.items = []\n  }\n  addProduct(p) { this.items.push(p); return p }\n  listProducts() { return this.items }\n}\nmodule.exports = { Rack }\n")
+  await workspace.writeFile('w', 'test/catalog.test.js', "const test = require('node:test')\nconst assert = require('node:assert')\nconst { Rack } = require('../src/catalog')\ntest('adds', () => { const c = new Rack(); c.addProduct({ id: 'a' }); assert.equal(c.listProducts().length, 1) })\n")
+  await workspace.writeFile('w', 'test/more.test.js', "const test = require('node:test')\nconst assert = require('node:assert')\nconst { Rack } = require('../src/catalog')\ntest('chains', () => { assert.deepEqual(new Rack('me').addProduct({ id: 'b' }).listProducts(), [{ id: 'b' }]) })\n")
+  const prompts: Array<Record<string, any>> = []
+  const agent = new BuilderV2Agent({
+    async generate(request) {
+      const prompt = JSON.parse(String(request.prompt))
+      prompts.push(prompt)
+      if (prompts.length > 1) return JSON.stringify({ type: 'finish', summary: 'done' })
+      return JSON.stringify({ type: 'tools', actions: [
+        { tool: 'edit_file', path: 'src/catalog.js', search: "  constructor(owner) {\n    if (!owner) throw new TypeError('Rack requires an owner')\n", replace: '  constructor(owner = null) {\n' },
+        { tool: 'edit_file', path: 'src/catalog.js', search: 'addProduct(p) { this.items.push(p); return p }', replace: 'addProduct(p) { this.items.push(p); return this }' },
+      ] })
+    },
+  }, new BuilderV2Dispatcher(workspace, localRunner), workspace)
+  const outcome = await agent.run({ workspaceId: 'w', objective, maxSteps: 6, retryDelay: async () => undefined })
+
+  assert.deepEqual(prompts[0].interfaceMismatches?.[0]?.missing, [
+    { name: 'Rack(owner) called with 0 arguments', kind: 'wrong_argument_count', usedAt: 'test/catalog.test.js:4' },
+    { name: 'Rack.prototype.addProduct must return this', kind: 'method_not_chainable', usedAt: 'test/more.test.js:4' },
+  ])
+  assert.equal(outcome.ok, true, outcome.reason)
+  assert.equal(prompts.length, 1)
+  assert.equal(outcome.steps.findLast(step => step.tool === 'run_tests')?.ok, true)
+})
+
+test('chaining needs evidence: a consumed scalar result is not a mismatch, a required instance is', () => {
+  const files: File[] = [
+    { path: 'src/till.js', content: "class Till {\n  constructor() { this.items = [] }\n  add(x) { this.items.push(x); return x }\n  total() { return this.items.length }\n  save() { return 'id-1' }\n}\nclass Desk {\n  ring(till, note) { return till.total() }\n}\nmodule.exports = { Till, Desk }\n" },
+    { path: 'test/till.test.js', content: "const assert = require('node:assert')\nconst { Till, Desk } = require('../src/till')\nassert.equal(new Till().total(), 0)\nconst id = new Till().save()\nconsole.log(id)\nnew Till().add(1)\nconst desk = new Desk()\ndesk.ring(new Till().add(1), 'x')\nnew Till().add(2).total()\n" },
+  ]
+  // Lines 3-6 consume a number/string legitimately. Line 8 passes the result to a parameter named `till`;
+  // line 9 calls another Till method on it. Both need the instance, and add() does not return it.
+  assert.deepEqual(builderInterfaceMismatches(files).map(m => `${m.kind}:${m.name}@${m.line}`), [
+    'method_not_chainable:Till.prototype.add must return this@8',
+  ])
+})
+
+test('a directly exported class (module.exports = Cls) is bound through a plain require and checked', () => {
+  const files: File[] = [
+    { path: 'src/vault.js', content: "class Vault {\n  constructor(key) { if (!key) throw new Error('key') ; this.key = key }\n  open() { return true }\n}\nmodule.exports = Vault\n" },
+    { path: 'test/vault.test.js', content: "const vault = require('../src/vault')\nconst v = new vault()\nv.open()\nv.close()\n" },
+  ]
+  assert.deepEqual(builderInterfaceMismatches(files).map(m => `${m.kind}:${m.name}@${m.line}`), [
+    'wrong_argument_count:Vault(key) called with 0 arguments@2',
+    'missing_method:Vault.prototype.close@4',
+  ])
 })

@@ -398,6 +398,21 @@ export class BuilderV2Agent {
       if (receipt.changed || action.tool === 'run_tests' && receipt.ok) unproductive = 0
       else unproductive++
     }
+    // A failing export/import contract is not a request to browse the entire repository.
+    // Reuse the exact host failure and require a relevant source mutation within a
+    // bounded number of model decisions, across checkpoint resumptions.
+    const repairFailure = () => {
+      const failure = steps.slice(steps.findLastIndex(step => step.changed) + 1)
+        .findLast(step => step.tool === 'run_tests' && !step.ok)
+      const output = failure?.output as { stdout?: unknown; stderr?: unknown } | undefined
+      const diagnostics = [output?.stderr, output?.stdout].filter((value): value is string => typeof value === 'string').join('\n')
+      const match = /(?:TypeError:\s*)?(create[A-Za-z_$][\w$]*) is not a function/.exec(diagnostics)
+      return match ? { symbol: match[1], diagnostic: diagnostics.slice(-FAILURE_OUTPUT_CHARS) } : null
+    }
+    const repairReadsSinceFailure = () => {
+      const at = steps.findLastIndex(step => step.tool === 'run_tests' && !step.ok)
+      return at < 0 ? 0 : steps.slice(at + 1).filter(step => !step.changed && (step.tool === 'read_file' || step.tool === 'list_files' || step.tool === 'search_files')).length
+    }
     const persist = async () => {
       if (!options.onCheckpoint) return
       const checkpoint = await snapshot()
@@ -486,11 +501,14 @@ export class BuilderV2Agent {
               return { writeFiles: acceptance.missingFiles, passCommands: acceptance.pendingCommands,
                 tests: { passed: acceptance.testsPassed, required: acceptance.minimumTests } }
             })(),
+            repairTarget: repairFailure(),
             nextRecommendedAction: missingFiles().length ? { tool: 'write_file', path: missingFiles()[0] }
               : steps.slice(steps.findLastIndex(step => step.changed) + 1).some(step => step.tool === 'run_tests' && !step.ok)
                 ? { tool: 'edit_file', reason: 'Repair the last failing test before rerunning the unchanged revision' }
                 : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },
-            instruction: currentFailure()
+            instruction: repairFailure()
+              ? 'The host test proves a missing function export. Compare the named create* symbol in the source module with test imports. After at most two relevant reads, you MUST edit the responsible source module or end the attempt. Do not inspect unrelated files or rerun unchanged tests.'
+              : currentFailure()
               ? 'The host has already run the suite on this unchanged revision and recorded the failure in latestFailedTest. Inspect only relevant source if needed, then fix the failure with write_file or edit_file. Do not run the same tests again until an edit changes the revision.'
               : 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
             lastReceipt: compactAgainstWorkingSet(lastReceipt, working),
@@ -551,6 +569,18 @@ export class BuilderV2Agent {
       // never run against a state the model did not expect; the receipts so far go back to the model.
       for (const action of decision.actions) {
         if (steps.length >= BUILDER_V2_MAX_RECEIPTS) break
+        const repair = repairFailure()
+        // Fail this attempt instead of allowing 24 slices of unrelated reads.
+        if (repair && repairReadsSinceFailure() >= 2 && ['read_file', 'search_files', 'list_files', 'run_tests'].includes(action.tool)) {
+          return { ok: false, reason: 'builder_v2_targeted_repair_required', summary: 'No source correction followed the host-reported missing export: ' + repair.symbol, steps, checkpoint: await snapshot() }
+        }
+        // Overwriting existing files without a seen baseline is a conflict, not an edit.
+        if (action.tool === 'write_file' && knownFiles.includes(action.path) && !seen.has(action.path)) {
+          lastReceipt = JSON.stringify({ ok: false, error: 'builder_write_content_conflict', path: action.path,
+            message: 'Existing source must be inspected then edited with edit_file; do not repeatedly overwrite it.' })
+          if (++repeats >= REPEAT_LIMIT) return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
+          break
+        }
         const signature = JSON.stringify(action)
         // A failed required suite is deterministic for an unchanged source revision.
         // Host verification already captured its exit code/output. Do not spend more

@@ -55,8 +55,9 @@ test('the failing output and the opened files stay in every prompt, also after r
     .run({ workspaceId: 'w', objective, maxSteps: 10 })
   assert.ok(first.checkpoint, first.reason)
   for (const prompt of prompts) {
-    assert.equal(prompt.failingCommand?.command, 'npm test')
-    assert.match(prompt.failingCommand.output, /createCatalog is not a function/)
+    const failure = JSON.parse(prompt.latestFailedTest)
+    assert.equal(failure.command, 'npm test')
+    assert.match(failure.output, /createCatalog is not a function/)
   }
   const last = prompts.at(-1)!
   assert.deepEqual(Object.keys(last.openFiles).sort(), ['index.js', 'package.json', 'src/catalog.js', 'test/catalog.test.js'])
@@ -69,7 +70,7 @@ test('the failing output and the opened files stay in every prompt, also after r
   const fix = JSON.stringify({ type: 'tool', action: { tool: 'edit_file', path: 'test/catalog.test.js', search: "const { createCatalog } = require('../src/catalog.js')", replace: "const { Catalog } = require('../src/catalog.js')\nconst createCatalog = () => new Catalog()" } })
   const resumed = await new BuilderV2Agent({ async generate(request) { resumedPrompt ??= JSON.parse(String(request.prompt)); return fix } },
     new BuilderV2Dispatcher(workspace, localRunner), workspace).run({ workspaceId: 'w', objective, maxSteps: 2, checkpoint: first.checkpoint })
-  assert.match(resumedPrompt!.failingCommand.output, /createCatalog is not a function/)
+  assert.match(JSON.parse(resumedPrompt!.latestFailedTest).output, /createCatalog is not a function/)
   assert.equal(resumedPrompt!.openFiles['test/catalog.test.js'], files['test/catalog.test.js'])
   assert.equal(resumed.ok, true, resumed.reason)
 })

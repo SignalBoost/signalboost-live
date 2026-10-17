@@ -1,7 +1,17 @@
 ---------------- MODULE BuilderLease ----------------
 EXTENDS Integers, TLC
 
-VARIABLES status, generation, owner, verified, committed
+VARIABLES
+  \* @type: Str;
+  status,
+  \* @type: Int;
+  generation,
+  \* @type: Int;
+  owner,
+  \* @type: Bool;
+  verified,
+  \* @type: Bool;
+  committed
 
 vars == <<status, generation, owner, verified, committed>>
 

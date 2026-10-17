@@ -1,5 +1,5 @@
 // saas/lib/ai/cos/softwareSpecialist.ts
-import { selectBuilderProject, builderProjectBlockedReply } from '@/lib/builder/project-continuity'
+import { selectBuilderProject, builderProjectBlockedReply, isNewBuilderProjectObjective } from '@/lib/builder/project-continuity'
 import { isBuilderProposalApproval, wantsBuilderProposal, readBuilderProposal, proposalMatches } from '@/lib/builder/proposal'
 import { readBuilderWorkspaceFingerprint, saveBuilderProposal } from '@/lib/builder/job-store'
 import { explainBuilderEvidence } from '@/lib/builder/explain-evidence'
@@ -256,9 +256,12 @@ async function tryCosSoftwareSpecialistLegacy(
   try { repositoryTarget = importRequested ? builderRepositoryTarget(objective, input.body?.repositoryUrl) : null }
   catch (error) { return NextResponse.json({ reply: builderRepositoryErrorReply((error as Error).message), execution_allowed: false }, { status: 400 }) }
 
+  // A new project never inherits the workspace the surface had selected (same rule as /api/builder; Codex on #4639).
+  const newProject = isNewBuilderProjectObjective(objective)
+  const selectionBody = newProject ? {} : input.body
   const project = await selectBuilderProject({
     objective, userId: access?.userId || publicAuditUserId(), conversationId: conversationIdFrom(input.body),
-    requestedWorkspaceId: String(input.body?.workspaceId || input.body?.context?.workspaceId || ''),
+    requestedWorkspaceId: String(selectionBody?.workspaceId || selectionBody?.context?.workspaceId || ''),
     hasNewSource: sourceAttached || (Array.isArray(input.body?.files) && input.body.files.length > 0),
     repositoryImport: Boolean(repositoryTarget),
   }, readBuilderEvidenceJob)
@@ -290,7 +293,7 @@ async function tryCosSoftwareSpecialistLegacy(
     }, { status: 503 })
   }
 
-  const workspaceId = project.workspaceId || workspaceIdFrom(input.body)
+  const workspaceId = project.workspaceId || workspaceIdFrom(selectionBody)
   if (signal?.aborted) throw new Error('harness_software_specialist_delegation_aborted')
   await workspace.ensureWorkspace(workspaceId)
   let stagedFiles = extractBuilderSourceFiles([
@@ -336,7 +339,7 @@ async function tryCosSoftwareSpecialistLegacy(
             debugPaths: debugPlan.files,
           }
         : { productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null, ...(project.context ? { projectContext: project.context } : {}),
-            ...(!project.context && !input.body?.workspaceId ? { builderEngine: 'v2' } : {}) },
+            ...(!project.context && !selectionBody?.workspaceId ? { builderEngine: 'v2' } : {}) },
       ownerAuthorized: access?.isOwner === true,
       runningReply: reply,
     })

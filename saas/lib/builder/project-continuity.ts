@@ -1,18 +1,24 @@
 import type { EvidenceJob, EvidenceLookup } from './execution-evidence.ts'
-import { isNewApplicationSpecification } from './task-contract.ts'
+import { builderTaskContract, isNewApplicationSpecification } from './task-contract.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const NEW_PROJECT = /\b(?:new|another|separate|different|fresh|clean)\s+(?:(?:isolated|fresh|clean|empty|independent)\s+)?(?:project|workspace|app|application|website|repository)\b|\bstart\s+(?:over|fresh)\b|\bfrom\s+scratch\b/i
 
+/** A root project manifest: only a whole new project creates one; a feature request lists its own source files. */
+const PROJECT_MANIFEST = /^(?:package\.json|pyproject\.toml|requirements\.txt|go\.mod|Cargo\.toml|pom\.xml|build\.gradle(?:\.kts)?|composer\.json|Gemfile)$/
+
 /**
  * A request for a new project: an explicit "new/fresh project" phrase, or a complete new-application specification
- * (opens with a creation directive and lists the files to create). Production 2026-10-16, job e98aa467: the OrderFlow
- * specification pasted again in the same conversation inherited the previous job's workspace and project context,
- * so it ran on the legacy engine over stale files and ended builder_regression_evidence_required although its final
- * files pass all three required commands (28/28 tests).
+ * (opens with a creation directive and lists the files to create, including the project's root manifest). Production
+ * 2026-10-16, job e98aa467: the OrderFlow specification pasted again in the same conversation inherited the previous
+ * job's workspace and project context, so it ran on the legacy engine over stale files and ended
+ * builder_regression_evidence_required although its final files pass all three required commands (28/28 tests).
+ * The manifest requirement keeps feature requests ("Implement order cancellation. Create all 2 files: src/cancel.js,
+ * test/cancel.test.js") in their current project (Codex review on #4639).
  */
 export function isNewBuilderProjectObjective(objective: string): boolean {
-  return NEW_PROJECT.test(objective) || isNewApplicationSpecification(objective)
+  return NEW_PROJECT.test(objective) || (isNewApplicationSpecification(objective)
+    && builderTaskContract(objective).files.some(path => PROJECT_MANIFEST.test(path)))
 }
 
 export type BuilderProjectContext = {

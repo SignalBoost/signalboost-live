@@ -24,6 +24,9 @@ test('extending an existing application stays a continuation', () => {
     'Add a discounts feature to the existing OrderFlow application. Create src/discounts.js and test/discounts.test.js, then run npm test.',
     'Update src/orders.js so cancelled orders keep their timestamps. Run npm test.',
     'Fix the failing test in test/orders.test.js',
+    // Codex review on #4639: a feature with its own file list is not a new application.
+    'Implement order cancellation.\nCreate all 2 files:\n- src/cancel.js\n- test/cancel.test.js',
+    'Implement order cancellation. Create all 2 files: src/cancel.js and test/cancel.test.js',
   ]) assert.equal(isNewBuilderProjectObjective(objective), false, objective)
 })
 
@@ -50,4 +53,13 @@ test('the route gives a new project a fresh workspace and Builder V2 even when t
   assert.match(route, /\(requestedEngine === 'v2' \|\| \(requestedEngine !== 'v1' && !selectedWorkspaceId && !project\.context\)\) \? \{ builderEngine: 'v2' \}/)
   // The raw browser value is only parsed and validated; every routing decision uses the effective selection.
   assert.equal(route.match(/\brequestedWorkspaceId\b/g)!.length, 5)
+})
+
+test('the shared Software Specialist surface applies the same new-project rule (Codex review on #4639)', () => {
+  const surface = readFileSync(new URL('../lib/ai/cos/softwareSpecialist.ts', import.meta.url), 'utf8')
+  assert.match(surface, /const selectionBody = newProject \? \{\} : input\.body/)
+  assert.match(surface, /requestedWorkspaceId: String\(selectionBody\?\.workspaceId \|\| selectionBody\?\.context\?\.workspaceId \|\| ''\)/)
+  assert.match(surface, /const workspaceId = project\.workspaceId \|\| workspaceIdFrom\(selectionBody\)/)
+  assert.match(surface, /!project\.context && !selectionBody\?\.workspaceId \? \{ builderEngine: 'v2' \}/)
+  assert.doesNotMatch(surface, /workspaceIdFrom\(input\.body\)/)
 })

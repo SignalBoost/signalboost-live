@@ -1,2 +1,2 @@
-base_sha=20d7e48483a52036e0a2435a078598939353fc0e
-branch=fix/builder-postmerge-regression-rea-20261016
+base_sha=a784ee2af48fde9e865e3890528f1e2667cdefec
+branch=fix/builder-v2-empty-assigned-reply-20261017

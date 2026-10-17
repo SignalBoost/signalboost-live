@@ -381,3 +381,19 @@ export async function saveBuilderProposal(input: {
   if (error || !data) throw new Error('builder_proposal_save_failed')
   return proposal
 }
+
+/** Owner-requested cancellation: fence off the running worker and retain all workspace files/checkpoint. */
+export async function stopBuilderJobForUser(jobId: string, userId: string): Promise<'stopped' | 'already_finished' | 'not_found'> {
+  if (!UUID.test(jobId) || !UUID.test(userId)) throw new Error('builder_job_invalid_identity')
+  const db = serviceClient()
+  if (!db) throw new Error('builder_job_storage_unavailable')
+  const { data, error } = await db.from('builder_jobs').select('id,status,claim_generation').eq('id', jobId).eq('user_id',userId).maybeSingle()
+  if (error) throw new Error('builder_job_cancel_read_failed')
+  if (!data) return 'not_found'
+  if (!['queued','paused','running'].includes(data.status)) return 'already_finished'
+  const now = new Date().toISOString()
+  const { data: stopped, error: updateError } = await db.from('builder_jobs').update({status:'failed',error:'builder_cancelled_by_owner',last_error:'builder_cancelled_by_owner',claim_generation:data.claim_generation+1,finished_at:now,last_finished_at:now,updated_at:now})
+    .eq('id',jobId).eq('user_id',userId).eq('claim_generation',data.claim_generation).in('status',['queued','paused','running']).select('id').maybeSingle()
+  if(updateError) throw new Error('builder_job_cancel_write_failed')
+  return stopped ? 'stopped' : 'already_finished'
+}

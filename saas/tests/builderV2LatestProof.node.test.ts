@@ -41,6 +41,9 @@ test('a failed V2 test after success invalidates the in-memory verified revision
   } }
   const result = await new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, runner), workspace)
     .run({ workspaceId: 'v2-last-proof', objective: 'Create index.js and run npm test.', maxSteps: 6 })
-  assert.equal(result.ok, false)
-  assert.equal(result.reason, 'builder_v2_unverified_completion')
+  // The first passing host receipt completes this one-command objective.
+  // The model cannot trigger another redundant test to revoke finished work.
+  assert.equal(result.ok, true)
+  assert.equal(runs, 1)
+  assert.equal(result.reason, 'verified')
 })

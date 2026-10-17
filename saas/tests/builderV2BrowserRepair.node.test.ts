@@ -10,11 +10,11 @@ test('V2 browser inspection delegates to sandbox only after exact origin authori
  let calls=0
  const browser={
   async capabilities(){return caps},
-  async invoke({action}:{action:string}){calls++;return {ok:true,action:'snapshot' as const,exitCode:0,stdout:'page rendered',stderr:'',timedOut:false}},
+  async invoke({action}:{action:string}){calls++;return {ok:true,action:action as 'open'|'snapshot',exitCode:0,stdout:'page rendered',stderr:'',timedOut:false}},
   async close(){}
  }
  const dispatch=new BuilderV2Dispatcher(new InMemoryBuilderWorkspace(),runner,undefined,browser)
- const ok=await dispatch.dispatch('user:x',{tool:'browser_cli',action:'snapshot',url:'https://itmounts.com/'})
+ const ok=await dispatch.dispatch('user:x',{tool:'browser_cli',action:'open',url:'https://itmounts.com/'})
  assert.equal(ok.ok,true);assert.equal(calls,1)
  const bad=await dispatch.dispatch('user:x',{tool:'browser_cli',action:'goto',url:'https://evil.example'})
  assert.equal(bad.error,'builder_browser_origin_denied');assert.equal(calls,1)
@@ -28,7 +28,7 @@ test('browser failures remain failures and guide bounded repair',async()=>{
   async close(){}
  }
  const receipt=await new BuilderV2Dispatcher(new InMemoryBuilderWorkspace(),runner,undefined,browser)
-  .dispatch('user:x',{tool:'browser_cli',action:'snapshot',url:'https://itmounts.com'})
+  .dispatch('user:x',{tool:'browser_cli',action:'open',url:'https://itmounts.com'})
  assert.equal(receipt.ok,false)
  assert.equal(receipt.error,'builder_browser_verification_failed')
  assert.deepEqual(receipt.next,['read_file','edit_file','run_tests'])
@@ -59,14 +59,21 @@ test('explicit browser verification cannot be replaced by passing tests alone',a
  const run={tool:'run_tests' as const,ok:true,changed:false,output:{
    requestedCommand:'node --test app.js',executedCommand:'node --test app.js',
    exitCode:0,timedOut:false,stdout:'ℹ pass 1\nℹ fail 0\n'}}
- const browser=(ok:boolean,url='https://itmounts.com')=>({
+ const nav=(ok:boolean,url='https://itmounts.com')=>({
    tool:'browser_cli' as const,ok,changed:false,
-   output:{url,exitCode:ok?0:1,timedOut:false},
+   output:{action:'goto',url,exitCode:ok?0:1,timedOut:false},
+ })
+ const snapshot=(ok:boolean)=>({
+   tool:'browser_cli' as const,ok,changed:false,
+   output:{action:'snapshot',exitCode:ok?0:1,timedOut:false},
  })
  assert.equal(builderV2Acceptance(objective,['app.js'],[write,run]).satisfied,false)
- assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,browser(false)]).satisfied,false)
- assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,browser(true,'https://other.test')]).satisfied,false)
- assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,browser(true)]).satisfied,true)
- assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,browser(true),browser(false)]).satisfied,false)
- assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,browser(true),write]).satisfied,false)
+ assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,nav(false),snapshot(true)]).satisfied,false)
+ assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,nav(true,'https://other.test'),snapshot(true)]).satisfied,false)
+ assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,snapshot(true)]).satisfied,false)
+ assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,nav(true)]).satisfied,false)
+ assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,nav(true),snapshot(true)]).satisfied,true)
+ assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,nav(true),snapshot(false)]).satisfied,false)
+ assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,nav(true),snapshot(true),nav(true,'https://other.test')]).satisfied,false)
+ assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,nav(true),snapshot(true),write]).satisfied,false)
 })

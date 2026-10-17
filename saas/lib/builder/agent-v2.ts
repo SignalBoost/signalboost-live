@@ -84,6 +84,18 @@ export type BuilderV2Checkpoint = Readonly<{
   idleSlices?: number
 }>
 
+/** Limit repeated resumptions that execute no tools and make no source changes. */
+export function builderV2IdleSliceCount(
+  previous: BuilderV2Checkpoint | null,
+  current: BuilderV2Checkpoint,
+): number {
+  if (!previous || previous.version !== 2) return 0
+  const changed = previous.revision !== current.revision || previous.steps.length !== current.steps.length
+  if (changed) return 0
+  const prior = previous.idleSlices
+  return Math.min(24, (Number.isSafeInteger(prior) && prior! >= 0 ? prior! : 0) + 1)
+}
+
 /**
  * A resumed job must never trust a checkpoint's claimed verification counters.
  * Rebuild them from host receipts; V1 checkpoints have a different version.

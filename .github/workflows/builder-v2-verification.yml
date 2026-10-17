@@ -8,6 +8,8 @@ on:
     paths:
       - 'saas/lib/builder/agent-v2*.ts'
       - 'saas/lib/builder/syntax-check.ts'
+      - 'saas/lib/builder/checkpoint.ts'
+      - 'saas/lib/builder/contracts.ts'
       - 'saas/lib/builder/task-contract.ts'
       - 'saas/lib/builder/edit-match.ts'
       - 'saas/lib/builder/workspace.ts'

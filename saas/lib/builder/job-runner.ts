@@ -17,7 +17,7 @@ import { isRepairObjective } from './regression-gate.ts'
 import { formatBuilderExecutionEvidence } from './execution-evidence.ts'
 import { explainInitialBuilderRepair } from './explain-evidence.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
-import { BuilderV2Agent, builderV2ProgressReport } from './agent-v2.ts'
+import { BuilderV2Agent, builderV2ProgressReport, type BuilderV2Checkpoint } from './agent-v2.ts'
 import { BuilderV2Dispatcher } from './agent-v2-dispatcher.ts'
 import { runBuilderV2JobCycle } from './agent-v2-job-cycle.ts'
 import { createBuilderV2SupabaseLeaseStore } from './agent-v2-supabase-store.ts'
@@ -422,10 +422,30 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       const progress = builderV2ProgressReport(job.objective, files, cycle.result?.steps ?? [],
         { current: job.claimGeneration, max: MAX_WORK_SLICES })
       if (cycle.status === 'paused' && cycle.result?.checkpoint) {
+        const previous = job.checkpoint as unknown as BuilderV2Checkpoint | null
+        const current = cycle.result.checkpoint
+        const unchanged = previous?.version === 2 &&
+          previous.revision === current.revision && previous.steps.length === current.steps.length
+        const idleSlices = unchanged ? Math.min(24, (previous?.idleSlices ?? 0) + 1) : 0
+        // A timeout or empty model turn can pause without a single executed action.
+        // After repeated empty continuations, preserve the workspace but terminate
+        // rather than re-queueing the same checkpoint indefinitely.
+        if (idleSlices >= 3) {
+          const reason = 'builder_v2_continuation_no_progress'
+          const reply = historyReply(`Builder V2 stopped after three consecutive work slices without a new tool receipt or source revision. No verification was completed. The workspace is preserved.\\n\\n${progress}`, job.workspaceId, files)
+          await finishBuilderJob({
+            jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
+            status: 'failed', reply, error: reason,
+            result: { jobId: job.id, workspaceId: job.workspaceId, status: 'failed',
+              reply, files, engine: 'v2', receipts: cycle.result.steps },
+          })
+          return
+        }
+        const checkpoint: BuilderV2Checkpoint = { ...current, idleSlices }
         const reply = historyReply(`Builder V2 saved its progress and will continue automatically. Verification is not complete.\n\n${progress}`, job.workspaceId, files)
         const { data, error } = await db.rpc('pause_builder_job_slice', {
           p_job_id: job.id, p_user_id: job.userId, p_generation: job.claimGeneration,
-          p_checkpoint: cycle.result.checkpoint, p_reply: reply,
+          p_checkpoint: checkpoint, p_reply: reply,
           p_result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, engine: 'v2' },
         })
         if (error) throw new Error(`builder_v2_checkpoint_persist_failed: ${error.message}`)

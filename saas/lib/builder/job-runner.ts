@@ -402,7 +402,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         onError() {
           console.warn('[builder_v2_execution_runtime_error]', { jobId: job.id, claimGeneration: job.claimGeneration })
         },
-      }), workspace)
+      }, createBuilderPlaywrightCliPort({ ownerAuthorized: job.ownerAuthorized === true })), workspace)
       const cycle = await withBuilderSliceDeadline(() => runBuilderV2JobCycle({
         jobId: job.id, claimGeneration: job.claimGeneration,
         store: createBuilderV2SupabaseLeaseStore(db, job.userId),

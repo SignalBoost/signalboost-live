@@ -15,6 +15,13 @@ export const BUILDER_V2_MAX_RECEIPTS = 400
 export const BUILDER_V2_STALL_LIMIT = 20
 const REJECTION_LIMIT = 3
 const REPEAT_LIMIT = 4
+/**
+ * After a failing command, this many inspection actions (read_file, list_files) before an edit is required, as Aider
+ * caps reflections at 3 (aider/coders/base_coder.py max_reflections) and Cline warns at 3 identical calls. Production
+ * job 00dd6e7d read files 16 times after a failing npm test and never edited; the failure and the opened files are in
+ * every prompt since #4647, so further reading adds nothing the model does not already have.
+ */
+export const BUILDER_V2_INSPECTIONS_BEFORE_EDIT = 3
 const TAIL = 8
 /**
  * A failed model call (timeout, outage, empty reply) is retried in place before the slice gives up, as Cline does
@@ -314,6 +321,12 @@ export class BuilderV2Agent {
     // lastReceipt. A repaired source revision invalidates this diagnostic automatically.
     const failedOnRevision = () => steps.slice(steps.findLastIndex(step => step.changed) + 1)
       .findLast(step => step.tool === 'run_tests' && !step.ok)
+    /** Inspection actions since the latest failed command, while no file has changed after it. */
+    const inspectionsSinceFailure = () => {
+      const failedAt = steps.findLastIndex(step => step.tool === 'run_tests' && !step.ok)
+      if (failedAt < 0 || steps.findLastIndex(step => step.changed) > failedAt) return 0
+      return steps.slice(failedAt + 1).filter(step => step.tool === 'read_file' || step.tool === 'list_files').length
+    }
     const currentFailure = () => {
       const failed = failedOnRevision()
       const out = failed?.output as { requestedCommand?: unknown; exitCode?: unknown; stdout?: unknown; stderr?: unknown } | undefined
@@ -505,6 +518,13 @@ export class BuilderV2Agent {
           lastReceipt = JSON.stringify({ ok: false, error: 'builder_v2_unchanged_failed_suite',
             message: 'The command already failed on this source revision. Edit the relevant source before rerunning it.',
             command: action.command }).slice(0, 20_000)
+          break
+        }
+        // Enough reading after a failure: the next step has to change source (BUILDER_V2_INSPECTIONS_BEFORE_EDIT).
+        if ((action.tool === 'read_file' || action.tool === 'list_files') && inspectionsSinceFailure() >= BUILDER_V2_INSPECTIONS_BEFORE_EDIT) {
+          if (++repeats >= REPEAT_LIMIT) return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
+          lastReceipt = JSON.stringify({ ok: false, error: 'builder_v2_edit_required',
+            message: `You have inspected ${BUILDER_V2_INSPECTIONS_BEFORE_EDIT} times since the command failed. The failure is in latestFailedTest and the files you opened are in openFiles. Fix it now with edit_file or write_file.` })
           break
         }
         // Commands execute on new revisions: only host receipts can prove verification.

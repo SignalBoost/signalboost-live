@@ -60,7 +60,9 @@ test('the failing output and the opened files stay in every prompt, also after r
     assert.match(failure.output, /createCatalog is not a function/)
   }
   const last = prompts.at(-1)!
-  assert.deepEqual(Object.keys(last.openFiles).sort(), ['index.js', 'package.json', 'src/catalog.js', 'test/catalog.test.js'])
+  // Three reads run; after that an edit is required (builderV2EditAfterInspection), so the fourth file is never opened.
+  assert.deepEqual(Object.keys(last.openFiles).sort(), ['index.js', 'src/catalog.js', 'test/catalog.test.js'])
+  assert.match(last.lastReceipt, /builder_v2_edit_required/)
   assert.equal(last.openFiles['src/catalog.js'], files['src/catalog.js'])
   // Old read receipts in the tail no longer repeat the content.
   assert.ok(last.tail.every((receipt: any) => receipt.tool !== 'read_file' || receipt.output.content === 'see openFiles'))

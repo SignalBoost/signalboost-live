@@ -1,2 +1,2 @@
-base_sha=1a3f64ea78b51902513d88ffa37f71bd0d5ac166
-branch=fix/builder-v2-canonical-checkpoint-compare-20261016
+base_sha=636a8f07e2b3cf6e74e38455a533caa520f73b33
+branch=fix/builder-v2-keep-truncated-replies-20261016

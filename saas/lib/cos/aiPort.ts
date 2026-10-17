@@ -17,7 +17,7 @@ import { tryAssignedPlatformModelTurn } from '@/lib/ai/modelRuntimeAssignment'
 import { builderGraduateAllowed, builderGraduateMode, builderGraduateTimeoutMs, recordBuilderGraduateResult } from '../builder/builderGraduateGate.ts'
 
 export interface CosAiPort {
-  generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider; signal?: AbortSignal }): Promise<string>
+  generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider; signal?: AbortSignal; allowTruncatedText?: boolean }): Promise<string>
 }
 
 export type ExternalTeacherProvider = Exclude<ModelProvider, 'local'>
@@ -185,6 +185,9 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
             // model already answers Builder in no-thinking mode; this skips the wasted first call.
             // Set BUILDER_RUNPOD_THINKING=on to restore thinking (the empty-truncation retry still applies).
             disableThinking: builderRunpodThinkingDisabled(),
+            // Production 2026-10-16: a Builder V2 batch reply hit maxTokens and the whole reply was discarded
+            // (local_model_output_truncated); the caller keeps the complete actions of a cut-off reply.
+            allowTruncatedText: input.allowTruncatedText === true,
             usageContext: { feature: 'builder_runpod_primary', purpose: 'coding_harness' },
           }, 'builder').catch(error => {
             // Never swallow deliberate user/worker cancellation; only the shorter
@@ -229,6 +232,7 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
         frequencyPenalty: 0,
         presencePenalty: 0,
         jsonObject: true,
+        allowTruncatedText: input.allowTruncatedText === true,
         usageContext: {
           feature: 'builder',
           purpose: ownedAttempted ? 'coding_harness_fallback_from_owned' : 'coding_harness',

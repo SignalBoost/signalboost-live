@@ -381,7 +381,21 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort({ yieldToChat: selfHealingCapacityJob(job) }), {
         deadlineAtMs: Date.now() + 210_000,
       })
-      const v2 = new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, new VercelSandboxBuilderRunner()), workspace)
+      const v2 = new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, new VercelSandboxBuilderRunner(), {
+        beforeRun({ workspaceId, command }) {
+          if (workspaceId !== job.workspaceId || !command.trim()) throw Error('builder_execution_context_denied')
+        },
+        afterRun({ result }) {
+          // Privacy-safe operational evidence: no command arguments, output or customer files.
+          console.info('[builder_v2_execution_observed]', {
+            jobId: job.id, claimGeneration: job.claimGeneration,
+            status: result.timedOut ? 'timeout' : result.exitCode === 0 ? 'passed' : 'failed',
+          })
+        },
+        onError() {
+          console.warn('[builder_v2_execution_runtime_error]', { jobId: job.id, claimGeneration: job.claimGeneration })
+        },
+      }), workspace)
       const cycle = await withBuilderSliceDeadline(() => runBuilderV2JobCycle({
         jobId: job.id, claimGeneration: job.claimGeneration,
         store: createBuilderV2SupabaseLeaseStore(db, job.userId),

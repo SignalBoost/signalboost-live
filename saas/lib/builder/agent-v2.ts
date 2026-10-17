@@ -44,7 +44,8 @@ const SYSTEM_PROMPT = [
   '{"type":"tool","action":{"tool":"write_file","path":"src/a.js","content":"full file content"}}',
   '{"type":"tool","action":{"tool":"edit_file","path":"src/a.js","search":"exact existing text","replace":"new text"}}',
   '{"type":"tool","action":{"tool":"run_tests","command":"npm test"}}',
-  '{"type":"tool","action":{"tool":"browser_cli","action":"snapshot","url":"https://itmounts.com"}}',
+  '{"type":"tool","action":{"tool":"browser_cli","action":"open","url":"https://itmounts.com"}}',
+  '{"type":"tool","action":{"tool":"browser_cli","action":"snapshot"}}',
   '{"type":"tools","actions":[{"tool":"write_file","path":"package.json","content":"..."},{"tool":"write_file","path":"src/a.js","content":"..."}]}',
   '{"type":"finish","summary":"what was built and verified"}',
   'Batch: write several missing files in one "tools" reply (complete contents, no placeholders, dependencies and package.json first), up to 4 actions and about 8000 characters per reply so it fits the output limit. Execution stops at the first failed action.',
@@ -52,7 +53,7 @@ const SYSTEM_PROMPT = [
   'A write or edit receipt with output.syntaxError means that file does not parse: fix it first with edit_file.',
   'write_file creates a file; to rewrite an existing file, read_file it first. Prefer edit_file for small changes.',
   'Write every checklist file, then run every checklist command; finish only after all of them pass after your last change.',
-  'If the task explicitly requires browser verification of a URL, use browser_cli with that exact URL after your last source change, inspect any browser failure, repair it, then retest before finishing.',
+  'If the task explicitly requires browser verification of a URL, open that exact URL with browser_cli and then call browser_cli snapshot after your last source change, inspect any browser failure, repair it, then retest before finishing.',
 ].join('\n')
 
 const hasSyntaxError = (receipt: BuilderV2Receipt) =>
@@ -153,16 +154,22 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
   const browserMatch = /(?:browser|playwright|visual)[^\n]{0,160}?(https:\/\/[^\s),]+)/i.exec(objective)
   const browserTarget = browserMatch?.[1]?.replace(/[.]+$/, '')
   const browserRuns = steps.slice(lastChange + 1).filter(receipt => receipt.tool === 'browser_cli')
-  const latestBrowser = browserTarget ? browserRuns.findLast(receipt => {
-    const output = receipt.output as { url?: unknown } | undefined
-    return output?.url === browserTarget
-  }) : undefined
+  const browserOutput = (receipt: BuilderV2Receipt | undefined) =>
+    receipt?.output as { action?: unknown; url?: unknown; exitCode?: unknown; timedOut?: unknown } | undefined
+  const isProvenBrowserAction = (receipt: BuilderV2Receipt | undefined) =>
+    receipt?.ok === true && browserOutput(receipt)?.exitCode === 0 &&
+    browserOutput(receipt)?.timedOut === false
+  // A snapshot doesn't navigate; it proves a page only after a real successful
+  // open/goto to the exact requested URL, with no intervening navigation.
+  const latestNavigationIndex = browserRuns.findLastIndex(receipt =>
+    browserOutput(receipt)?.action === 'open' || browserOutput(receipt)?.action === 'goto')
+  const navigation = latestNavigationIndex >= 0 ? browserRuns[latestNavigationIndex] : undefined
+  const latestSnapshot = latestNavigationIndex >= 0
+    ? browserRuns.slice(latestNavigationIndex + 1).findLast(receipt => browserOutput(receipt)?.action === 'snapshot')
+    : undefined
   const browserSatisfied = !browserTarget || (
-    latestBrowser?.ok === true && (
-      latestBrowser.output as { exitCode?: unknown; timedOut?: unknown } | undefined
-    )?.exitCode === 0 && (
-      latestBrowser.output as { exitCode?: unknown; timedOut?: unknown } | undefined
-    )?.timedOut === false
+    browserOutput(navigation)?.url === browserTarget &&
+    isProvenBrowserAction(navigation) && isProvenBrowserAction(latestSnapshot)
   )
   return {
     satisfied: latestRunPassed && browserSatisfied && missingFiles.length === 0

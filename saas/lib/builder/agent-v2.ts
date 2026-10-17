@@ -409,10 +409,14 @@ export class BuilderV2Agent {
       const match = /(?:TypeError:\s*)?(create[A-Za-z_$][\w$]*) is not a function/.exec(diagnostics)
       return match ? { symbol: match[1], diagnostic: diagnostics.slice(-FAILURE_OUTPUT_CHARS) } : null
     }
-    const repairReadsSinceFailure = () => {
+    // Counterexample from bounded model checking: reads were limited but
+    // repeated write conflicts still consumed slices without changing code.
+    // Count every persisted no-change receipt after the latest failed suite.
+    const repairObservationsSinceFailure = () => {
       const at = steps.findLastIndex(step => step.tool === 'run_tests' && !step.ok)
-      return at < 0 ? 0 : steps.slice(at + 1).filter(step => !step.changed && (step.tool === 'read_file' || step.tool === 'list_files' || step.tool === 'search_files')).length
+      return at < 0 ? 0 : steps.slice(at + 1).filter(step => !step.changed).length
     }
+    const MAX_REPAIR_OBSERVATIONS = 4
     const persist = async () => {
       if (!options.onCheckpoint) return
       const checkpoint = await snapshot()
@@ -507,7 +511,7 @@ export class BuilderV2Agent {
                 ? { tool: 'edit_file', reason: 'Repair the last failing test before rerunning the unchanged revision' }
                 : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },
             instruction: repairFailure()
-              ? 'The host test proves a missing function export. Compare the named create* symbol in the source module with test imports. After at most two relevant reads, you MUST edit the responsible source module or end the attempt. Do not inspect unrelated files or rerun unchanged tests.'
+              ? 'The host test proves a missing function export. Compare the named create* symbol in the source module with test imports. After at most four nonproductive observations (including rejected writes), you MUST edit the responsible source module or end the attempt. Do not inspect unrelated files or rerun unchanged tests.'
               : currentFailure()
               ? 'The host has already run the suite on this unchanged revision and recorded the failure in latestFailedTest. Inspect only relevant source if needed, then fix the failure with write_file or edit_file. Do not run the same tests again until an edit changes the revision.'
               : 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
@@ -571,7 +575,7 @@ export class BuilderV2Agent {
         if (steps.length >= BUILDER_V2_MAX_RECEIPTS) break
         const repair = repairFailure()
         // Fail this attempt instead of allowing 24 slices of unrelated reads.
-        if (repair && repairReadsSinceFailure() >= 2 && ['read_file', 'search_files', 'list_files', 'run_tests'].includes(action.tool)) {
+        if (repair && repairObservationsSinceFailure() >= MAX_REPAIR_OBSERVATIONS && action.tool !== 'edit_file') {
           return { ok: false, reason: 'builder_v2_targeted_repair_required', summary: 'No source correction followed the host-reported missing export: ' + repair.symbol, steps, checkpoint: await snapshot() }
         }
         // Overwriting existing files without a seen baseline is a conflict, not an edit.

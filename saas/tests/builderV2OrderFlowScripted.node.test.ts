@@ -96,6 +96,16 @@ test('Builder V2 builds a drawn-tree spec end to end: fenced replies, checklist 
   assert.match(String((runs[1].output as { stdout: string }).stdout), /# pass 2|ℹ pass 2/)
   assert.match(String((runs[2].output as { stdout: string }).stdout), /Order total: 10/)
   assert.match((await workspace.readFile('mini', 'src/cart.js'))!.content, /item\.price \* item\.qty/)
+  // Complete checkpoints terminate without another paid model call or rerun.
+  assert.ok(outcome.checkpoint)
+  let unnecessaryCalls = 0
+  const recoveredAgent = new BuilderV2Agent({ async generate() { unnecessaryCalls++; throw new Error('offline') } },
+    new BuilderV2Dispatcher(workspace, localRunner), workspace)
+  const recovered = await recoveredAgent.run({ workspaceId: 'mini', objective, checkpoint: outcome.checkpoint, maxSteps: 1 })
+  assert.equal(recovered.ok, true, recovered.reason)
+  assert.equal(unnecessaryCalls, 0)
+  assert.equal(recovered.steps.filter(step => step.tool === 'run_tests').length, runs.length)
+
 })
 
 test('Builder V2 still fails closed on a reply with no complete control object', async () => {

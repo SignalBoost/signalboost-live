@@ -1,0 +1,25 @@
+name: Builder V2 repair path model
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/builder/agent-v2.ts'
+      - 'saas/tests/builderV2FailureTargeting.node.test.ts'
+      - 'verification/builder/v2-repair-paths*'
+      - '.github/workflows/builder-v2-repair-symbolic.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  model:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install z3-solver==4.13.4.0
+      - run: node --experimental-transform-types --test saas/tests/builderV2FailureTargeting.node.test.ts
+      - run: node --test verification/builder/v2-repair-paths.test.mjs

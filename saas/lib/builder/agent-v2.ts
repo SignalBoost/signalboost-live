@@ -301,11 +301,23 @@ export class BuilderV2Agent {
     let repeats = 0
     // Actions taken since the last file change, with their receipts: repeating one cannot produce new information.
     const sinceChange = new Map<string, string>()
+    // Reconstruct the most recent failed host command even when subsequent reads obscured
+    // lastReceipt. A repaired source revision invalidates this diagnostic automatically.
+    const failedOnRevision = () => steps.slice(steps.findLastIndex(step => step.changed) + 1)
+      .findLast(step => step.tool === 'run_tests' && !step.ok)
+    const currentFailure = () => {
+      const failed = failedOnRevision()
+      return failed ? JSON.stringify(failed).slice(0, 20_000) : ''
+    }
     // Reconstruct inspection history across claims. Otherwise each continuation repeats list_files
     // as if the previous slice never happened, consuming all 24 allowed claims.
     for (const receipt of steps.slice(steps.findLastIndex(item => item.changed) + 1)) {
       if (receipt.tool === 'list_files' && receipt.ok) {
         sinceChange.set(JSON.stringify({ tool: 'list_files' }), JSON.stringify(receipt).slice(0, 20_000))
+      }
+      // Preserve observed reads across slices to prevent redundant inspect/read loops.
+      if (receipt.tool === 'read_file' && receipt.ok && typeof receipt.path === 'string') {
+        sinceChange.set(JSON.stringify({ tool: 'read_file', path: receipt.path }), JSON.stringify(receipt).slice(0, 20_000))
       }
     }
     // Content the model has observed per path, for the read-before-overwrite rule.
@@ -336,7 +348,10 @@ export class BuilderV2Agent {
       if (checkpoint) await options.onCheckpoint(checkpoint)
     }
     // The revision the host last ran the required commands on; each revision is host-verified at most once.
-    let hostVerifiedRevision = -1
+    // Do not rerun a failed command just because another execution slice claimed this job.
+    // Every host receipt is revision-bound by the latest changed file.
+    let hostVerifiedRevision = steps.some(step => step.tool === 'run_tests')
+      ? revision : -1
     // Files whose latest write left a syntax error; host verification waits until they compile.
     const syntaxErrors = new Map<string, string>()
     const hostVerificationDue = () => revision > hostVerifiedRevision && checklist.files.length > 0
@@ -387,8 +402,11 @@ export class BuilderV2Agent {
               : steps.slice(steps.findLastIndex(step => step.changed) + 1).some(step => step.tool === 'run_tests' && !step.ok)
                 ? { tool: 'edit_file', reason: 'Repair the last failing test before rerunning the unchanged revision' }
                 : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },
-            instruction: 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
+            instruction: currentFailure()
+              ? 'The host has already run the suite on this unchanged revision and recorded the failure in latestFailedTest. Inspect only relevant source if needed, then fix the failure with write_file or edit_file. Do not run the same tests again until an edit changes the revision.'
+              : 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
             lastReceipt,
+            latestFailedTest: currentFailure(),
             tail: steps.slice(-TAIL),
             verified: verifiedRevision === revision && verifiedRevision >= 0,
             stepsRemaining: BUILDER_V2_MAX_RECEIPTS - steps.length,

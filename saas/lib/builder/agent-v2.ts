@@ -528,6 +528,28 @@ export class BuilderV2Agent {
         prompt: used ? { openFiles } : {},
       }
     }
+    // Derive repair targets from the actual failing test imports, never from
+    // filename conventions. This remains available on every continuation slice.
+    const activeRepair = async () => {
+      const failure = failedOnRevision()
+      if (!failure || !this.workspace) return null
+      const output = failure.output as { stdout?: unknown; stderr?: unknown } | undefined
+      const diagnostic = String(output?.stdout ?? '') + '\n' + String(output?.stderr ?? '')
+      const namedTests = [...new Set([...diagnostic.matchAll(/(?:^|[\\s(])((?:test|tests)\\/[A-Za-z0-9_./-]+\\.(?:test|spec)\\.[cm]?js)\\b/gm)]
+        .map(match => match[1]).filter(path => knownFiles.includes(path)))]
+      const targets: Array<{ test: string; sources: string[] }> = []
+      for (const testPath of namedTests.slice(0, 4)) {
+        const file = await this.workspace.readFile(options.workspaceId, testPath)
+        if (!file) continue
+        const sources = [...file.content.matchAll(/(?:require\\(\\s*['"]|from\\s*['"])(\\.\\.\\/src\\/[A-Za-z0-9_./-]+)(?:['"])/g)]
+          .map(match => match[1].replace(/^\\.\\.\\//, ''))
+          .map(path => /\\.[cm]?js$/.test(path) ? path : path + '.js')
+          .filter(path => knownFiles.includes(path))
+        targets.push({ test: testPath, sources: [...new Set(sources)] })
+      }
+      const error = /(?:TypeError|ReferenceError|SyntaxError):[^\\n]*/.exec(diagnostic)?.[0] ?? diagnostic.slice(0, 280)
+      return { error, targets, instruction: 'Use the actual test import and source export to diagnose the failure. Prefer a targeted edit_file operation; avoid repeating read_file calls. Do not change tests merely to silence failures. Host verification runs after edits.' }
+    }
     for (let calls = 0; calls < maxSteps && steps.length < BUILDER_V2_MAX_RECEIPTS; calls++) {
       if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
       const completed = await verifiedNow()
@@ -566,6 +588,7 @@ export class BuilderV2Agent {
               : 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
             lastReceipt: compactAgainstWorkingSet(lastReceipt, working),
             latestFailedTest: currentFailure(),
+            ...(currentFailure() ? { activeRepair: await activeRepair() } : {}),
             ...(currentFailure() ? { crossFileContractHints: await builderCrossFileContractHints(this.workspace, options.workspaceId, knownFiles).catch(() => []), contractHintPolicy: 'These are approximate source-derived API hints, NOT acceptance evidence. Preserve the objective, inspect source and tests, repair production code first, and verify with actual host tests.' } : {}),
             ...working.prompt,
             // Content already in openFiles or latestFailedTest is not repeated from older receipts: it only costs context.

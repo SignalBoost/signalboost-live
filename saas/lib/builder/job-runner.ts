@@ -373,13 +373,6 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
 
     // V2 is selected by durable job metadata for all surfaces. Existing V1
     // checkpoint jobs remain V1 because their engine tag is absent.
-    // V1 has been retired. Never silently route untagged or legacy debug jobs
-    // to the old execution harness (including resumed checkpoint claims).
-    // Terminal failure is intentionally safer than replaying a V1 job as V2.
-    if (job.jobKind !== 'standard' || job.metadata.builderEngine !== 'v2') {
-      await terminalFailure(job, 'builder_v1_retired_use_v2')
-      return
-    }
     if (job.jobKind === 'standard' && job.metadata.builderEngine === 'v2') {
       const workspace = createSupabaseBuilderWorkspace(job.userId)
       if (!workspace) { await terminalFailure(job, 'builder_v2_workspace_unavailable'); return }
@@ -546,6 +539,17 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         const repositoryCompleted = payload.merge_taken === true && typeof payload.merge_commit_sha === 'string'
         
       }
+      return
+    }
+
+    // V1 has been retired. Never silently route untagged or legacy debug jobs
+    // to the old execution harness (including resumed checkpoint claims).
+    // Terminal failure is intentionally safer than replaying a V1 job as V2.
+    // The fence sits after the Platform Engineer lane: owner self-healing repair jobs
+    // (platformRepair, Vercel-log targets) are repository work with their own harness, not the
+    // retired tool loop. Production 2026-10-17: 46 repair jobs in six hours died here untouched.
+    if (job.jobKind !== 'standard' || job.metadata.builderEngine !== 'v2') {
+      await terminalFailure(job, 'builder_v1_retired_use_v2')
       return
     }
 

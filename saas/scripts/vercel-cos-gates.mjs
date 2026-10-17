@@ -15,6 +15,10 @@ if (bypassAudit.status !== 0) process.exit(bypassAudit.status ?? 1)
 
 
 const tests = [
+  // Builder V2 repair and interface reconciliation regression coverage.
+  'tests/builderV2InterfaceMismatches.node.test.ts',
+  'tests/builderV2RepairReadCeiling.node.test.ts',
+  'tests/builderPlatformRepairNotFenced.node.test.ts',
   'tests/labCustomerTraining.node.test.ts',
   'tests/labExperimentComparison.node.test.ts',
   'tests/labExperimentCsv.node.test.ts',
@@ -813,7 +817,7 @@ const tests = [
 
 
 
-const result = spawnSync(process.execPath, ['--test', ...tests], {
+const result = spawnSync(process.execPath, ['--experimental-transform-types', '--test', ...tests], {
 
   cwd: process.cwd(),
 

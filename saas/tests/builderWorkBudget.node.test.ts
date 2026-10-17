@@ -145,6 +145,6 @@ test('verification pending cannot bypass the no-progress guard', () => {
 
 test('a failing suite cannot override Builder progress admission', () => {
   const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
-  assert.match(runner, /if \\(unresolvedSuite && builderMayContinue\\(job, result\\.checkpoint!\\)\\)/)
-  assert.doesNotMatch(runner, /if \\(unresolvedSuite && job\\.claimGeneration < 24\\)/)
+  assert.ok(runner.includes('if (unresolvedSuite && builderMayContinue(job, result.checkpoint!))'))
+  assert.ok(!runner.includes('if (unresolvedSuite && job.claimGeneration < 24)'))
 })

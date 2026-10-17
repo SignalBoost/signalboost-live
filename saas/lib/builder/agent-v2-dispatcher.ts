@@ -106,6 +106,8 @@ export class BuilderV2Dispatcher {
           if (!this.browserCli) return { tool: action.tool, ok: false, changed: false, error: 'builder_browser_unavailable' }
           const capabilities = await this.browserCli.capabilities()
           if (!capabilities?.actions.includes(action.action)) return { tool: action.tool, ok: false, changed: false, error: 'builder_browser_action_denied' }
+          if (action.url && action.action !== 'open' && action.action !== 'goto')
+            return { tool: action.tool, ok: false, changed: false, error: 'builder_browser_url_requires_navigation' }
           if (action.url) {
             let parsed: URL
             try { parsed = new URL(action.url) }

@@ -1,2 +1,2 @@
-base_sha=5df6c01e565c65f9b7b276f3876f0d5b1e90611b
-branch=fix/builder-repair-lane-unfenced-20261017
+base_sha=dc34d4d5d82005858fadee12b060441e79ec1074
+branch=fix/builder-v2-interface-reconcile-20261017

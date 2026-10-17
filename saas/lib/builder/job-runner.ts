@@ -17,7 +17,7 @@ import { isRepairObjective } from './regression-gate.ts'
 import { formatBuilderExecutionEvidence } from './execution-evidence.ts'
 import { explainInitialBuilderRepair } from './explain-evidence.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
-import { BuilderV2Agent } from './agent-v2.ts'
+import { BuilderV2Agent, builderV2ProgressReport } from './agent-v2.ts'
 import { BuilderV2Dispatcher } from './agent-v2-dispatcher.ts'
 import { runBuilderV2JobCycle } from './agent-v2-job-cycle.ts'
 import { createBuilderV2SupabaseLeaseStore } from './agent-v2-supabase-store.ts'
@@ -389,8 +389,11 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       }), BUILDER_SLICE_HARD_DEADLINE_MS)
       if (cycle.status === 'lost_lease') return
       const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
+      // What the build did so far, from host receipts, on every update the person sees.
+      const progress = builderV2ProgressReport(job.objective, files, cycle.result?.steps ?? [],
+        { current: job.claimGeneration, max: MAX_WORK_SLICES })
       if (cycle.status === 'paused' && cycle.result?.checkpoint) {
-        const reply = historyReply('Builder V2 saved its progress and will continue automatically. Verification is not complete.', job.workspaceId, files)
+        const reply = historyReply(`Builder V2 saved its progress and will continue automatically. Verification is not complete.\n\n${progress}`, job.workspaceId, files)
         const { data, error } = await db.rpc('pause_builder_job_slice', {
           p_job_id: job.id, p_user_id: job.userId, p_generation: job.claimGeneration,
           p_checkpoint: cycle.result.checkpoint, p_reply: reply,
@@ -405,7 +408,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       const reason = cycle.status === 'paused' ? 'builder_continuation_budget_exhausted' : cycle.reason
       const reply = historyReply(success
         ? `Builder V2 verified the workspace with recorded host test execution. ${cycle.result?.summary || ''}`
-        : `Builder V2 could not complete verification: ${reason}`, job.workspaceId, files)
+        : `Builder V2 could not complete verification: ${reason}\n\n${progress}`, job.workspaceId, files)
       await finishBuilderJob({
         jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
         status: success ? 'succeeded' : 'failed', reply, error: success ? null : reason,

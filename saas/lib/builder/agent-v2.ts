@@ -316,8 +316,8 @@ export class BuilderV2Agent {
         sinceChange.set(JSON.stringify({ tool: 'list_files' }), JSON.stringify(receipt).slice(0, 20_000))
       }
       // Preserve observed reads across slices to prevent redundant inspect/read loops.
-      if (receipt.tool === 'read_file' && receipt.ok && typeof receipt.path === 'string') {
-        sinceChange.set(JSON.stringify({ tool: 'read_file', path: receipt.path }), JSON.stringify(receipt).slice(0, 20_000))
+      if (receipt.tool === 'read_file' && receipt.ok && typeof (receipt.output as { path?: unknown } | undefined)?.path === 'string') {
+        sinceChange.set(JSON.stringify({ tool: 'read_file', path: (receipt.output as { path: string }).path }), JSON.stringify(receipt).slice(0, 20_000))
       }
     }
     // Content the model has observed per path, for the read-before-overwrite rule.
@@ -350,8 +350,8 @@ export class BuilderV2Agent {
     // The revision the host last ran the required commands on; each revision is host-verified at most once.
     // Do not rerun a failed command just because another execution slice claimed this job.
     // Every host receipt is revision-bound by the latest changed file.
-    let hostVerifiedRevision = steps.some(step => step.tool === 'run_tests')
-      ? revision : -1
+    let hostVerifiedRevision = steps.slice(steps.findLastIndex(step => step.changed) + 1)
+      .some(step => step.tool === 'run_tests') ? revision : -1
     // Files whose latest write left a syntax error; host verification waits until they compile.
     const syntaxErrors = new Map<string, string>()
     const hostVerificationDue = () => revision > hostVerifiedRevision && checklist.files.length > 0

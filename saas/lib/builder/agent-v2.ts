@@ -297,6 +297,20 @@ function parseDecision(value: string | null): Decision | null {
   return salvaged.length ? { type: 'tool', actions: salvaged } : null
 }
 
+/** Pure recovery ordering for bounded symbolic execution and tests. */
+export function builderV2RecoveryPriority(input: {
+  failedSuite: boolean
+  namedTest: string | null
+  importedModules: readonly string[]
+  existingFiles: readonly string[]
+  previouslyOpened: readonly string[]
+}): string[] {
+  const targets = input.failedSuite && input.namedTest && input.existingFiles.includes(input.namedTest)
+    ? [input.namedTest, ...input.importedModules.filter(path => input.existingFiles.includes(path))]
+    : []
+  return [...new Set([...targets, ...input.previouslyOpened])]
+}
+
 /**
  * Minimal Cursor-style model/tool/feedback loop.
  * Only host-executed, successful verification after the most recent edit
@@ -457,7 +471,13 @@ export class BuilderV2Agent {
           if (knownFiles.includes(found[1]) && !targeted.includes(found[1])) targeted.push(found[1])
         }
       }
-      const prioritized = [...new Set([...targeted, ...opened])]
+      const prioritized = builderV2RecoveryPriority({
+        failedSuite: Boolean(failure),
+        namedTest: targeted[0] ?? null,
+        importedModules: targeted.slice(1),
+        existingFiles: knownFiles,
+        previouslyOpened: opened,
+      })
       const openFiles: Record<string, string> = {}
       let used = 0
       for (const path of prioritized) {

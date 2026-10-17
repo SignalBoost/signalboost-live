@@ -27,7 +27,7 @@ type GraduateAttempt = Readonly<{ text: string | null; attempted: boolean }>
 /** Independently promoted active graduates remain the highest-priority iTMounts-owned workers. */
 async function tryActiveGraduate(
   role: 'primary' | 'coder',
-  input: { prompt: string; systemPrompt?: string; maxTokens?: number; signal?: AbortSignal },
+  input: { prompt: string; systemPrompt?: string; maxTokens?: number; signal?: AbortSignal; allowTruncatedText?: boolean },
   options: { coding?: boolean } = {},
 ): Promise<GraduateAttempt> {
   throwIfInferenceAborted(input.signal)
@@ -53,6 +53,8 @@ async function tryActiveGraduate(
       signal: callSignal,
       systemPrompt: input.systemPrompt,
       maxTokens: input.maxTokens,
+      // A coder graduate's cut-off reply is kept like the RunPod and fallback replies (Codex on #4632).
+      allowTruncatedText: input.allowTruncatedText === true,
       ...(options.coding ? { frequencyPenalty: 0, presencePenalty: 0, jsonObject: true } : {}),
       usageContext: {
         feature: options.coding ? 'builder_graduate' : 'platform_graduate',

@@ -50,6 +50,10 @@ test('the Builder model client passes allowTruncatedText to the RunPod primary a
   const port = readFileSync(new URL('../lib/cos/aiPort.ts', import.meta.url), 'utf8')
   const coding = port.slice(port.indexOf('export function createBuilderCodingAiPort'))
   assert.equal(coding.match(/allowTruncatedText: input\.allowTruncatedText === true/g)?.length, 2)
+  // The coder-graduate path (BUILDER_GRADUATE_MODE=serve) keeps cut-off replies too (Codex on #4632).
+  const graduate = port.slice(port.indexOf('async function tryActiveGraduate'), port.indexOf('export function createBuilderCodingAiPort'))
+  assert.match(graduate, /allowTruncatedText\?: boolean/)
+  assert.match(graduate, /allowTruncatedText: input\.allowTruncatedText === true/)
   // The prompt budget now fits the 4096-token output limit.
   const agent = readFileSync(new URL('../lib/builder/agent-v2.ts', import.meta.url), 'utf8')
   assert.match(agent, /up to 4 actions and about 8000 characters per reply/)

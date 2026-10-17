@@ -1,0 +1,23 @@
+name: Cursor Cloud Agent Adapter
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/builder/cursor-cloud-agent.ts'
+      - 'saas/tests/cursorCloudAgent.node.test.ts'
+      - '.github/workflows/cursor-cloud-agent-adapter.yml'
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install TypeScript runner
+        working-directory: saas
+        run: npm install --no-audit --no-fund
+      - name: Replay real API contract with stubbed HTTP
+        working-directory: saas
+        run: npx tsx --test tests/cursorCloudAgent.node.test.ts

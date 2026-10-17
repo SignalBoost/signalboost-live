@@ -1,2 +1,2 @@
-base_sha=6bc9234312a83c2c88463816bf7918753df0a6b7
-branch=fix/builder-v2-only-no-legacy-fallback-20261017
+base_sha=b9891fd31b995f406ae94d240b612bd821738273
+branch=fix/builder-v2-targeted-repair-controller-20261017

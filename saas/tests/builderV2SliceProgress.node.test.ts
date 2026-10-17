@@ -105,8 +105,10 @@ test('a file the model has read can be rewritten; an unseen one cannot be overwr
   ])
   const outcome = await new BuilderV2Agent(replies.ai, new BuilderV2Dispatcher(workspace, passing), workspace)
     .run({ workspaceId: 'o', objective: 'Rewrite src/cart.js', maxSteps: 3 })
+  // V2 now rejects an unseen overwrite *before* dispatching it. This keeps
+  // the workspace safe and avoids wasting a tool receipt on a known conflict.
   assert.deepEqual(outcome.steps.map(step => [step.tool, step.ok, step.changed]),
-    [['write_file', false, false], ['read_file', true, false], ['write_file', true, true]])
+    [['read_file', true, false], ['write_file', true, true]])
   assert.equal((await workspace.readFile('o', 'src/other.js'))!.content, 'keep\n')
   assert.equal((await workspace.readFile('o', 'src/cart.js'))!.content, 'new\n')
 })

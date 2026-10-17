@@ -42,10 +42,12 @@ export function builderMayContinue(
   if (job.claimGeneration >= MAX_WORK_SLICES) return false
   const capacityRequeues = Number(job.metadata?.builderCapacityDeferrals)
   const workSlices = job.claimGeneration - (Number.isInteger(capacityRequeues) && capacityRequeues > 0 ? capacityRequeues : 0)
-  // Verification can require inspection or diagnosing a failing test before the next write.
-  // Do not classify such a slice as stalled while a saved verification checkpoint remains.
-  // The hard generation ceiling still bounds this continuation.
-  return workSlices < BASE_WORK_SLICES || endedWaitingForModel || checkpoint.verificationPending === true
+  // VerificationPending is a state marker, not evidence of progress. Treating it as
+  // unconditional progress kept OrderFlow jobs cycling through repeated reads and
+  // failed commands for dozens of minutes without making a verified change.
+  // Preserve the initial diagnostic allowance and genuine write/test improvements;
+  // bounded model waits remain independently resumable.
+  return workSlices < BASE_WORK_SLICES || endedWaitingForModel
     || builderSliceMadeProgress(job.checkpoint, checkpoint)
 }
 

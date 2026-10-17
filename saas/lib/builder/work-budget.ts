@@ -23,7 +23,18 @@ export function builderSliceMadeProgress(previous: BuilderLoopCheckpoint | null 
   const before = previous?.trace.length ?? 0
   const earlier = current.trace.slice(0, before)
   const fresh = current.trace.slice(before)
-  if (fresh.some(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))) return true
+  const successfulEdit = fresh.some(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
+  if (successfulEdit) {
+    // An identical rewrite is not progress. Compare persisted content, not timestamps,
+    // since an unchanged write may still update its timestamp and spend work slices.
+    if (previous?.workingFiles && current.workingFiles) {
+      const oldContents = new Map(previous.workingFiles.map(file => [file.path, file.content]))
+      if (current.workingFiles.some(file => oldContents.get(file.path) !== file.content)) return true
+    } else {
+      // Legacy checkpoints without file snapshots retain their existing behavior.
+      return true
+    }
+  }
   return Math.max(0, ...fresh.map(passCount)) > Math.max(0, ...earlier.map(passCount))
 }
 

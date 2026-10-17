@@ -19,6 +19,10 @@ test('the production OrderFlow specification is a new project', () => {
   assert.equal(isNewBuilderProjectObjective(spec), true)
 })
 
+test('a whole project without a package manifest is a new project too (Codex review on #4642)', () => {
+  assert.equal(isNewBuilderProjectObjective('# Portfolio\nBuild a complete responsive portfolio website.\nCreate all 3 files:\n- index.html\n- styles.css\n- script.js'), true)
+})
+
 test('extending an existing application stays a continuation', () => {
   for (const objective of [
     'Add a discounts feature to the existing OrderFlow application. Create src/discounts.js and test/discounts.test.js, then run npm test.',
@@ -27,6 +31,8 @@ test('extending an existing application stays a continuation', () => {
     // Codex review on #4639: a feature with its own file list is not a new application.
     'Implement order cancellation.\nCreate all 2 files:\n- src/cancel.js\n- test/cancel.test.js',
     'Implement order cancellation. Create all 2 files: src/cancel.js and test/cancel.test.js',
+    'Create a settings page for our app.\nCreate all 2 files:\n- src/settings.js\n- test/settings.test.js',
+    'Build a reports feature.\nCreate all 2 files:\n- src/reports.js\n- test/reports.test.js',
   ]) assert.equal(isNewBuilderProjectObjective(objective), false, objective)
 })
 

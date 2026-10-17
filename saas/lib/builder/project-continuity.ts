@@ -1,24 +1,30 @@
 import type { EvidenceJob, EvidenceLookup } from './execution-evidence.ts'
-import { builderTaskContract, isNewApplicationSpecification } from './task-contract.ts'
+import { isNewApplicationSpecification } from './task-contract.ts'
+import { openingDirective } from './regression-gate.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const NEW_PROJECT = /\b(?:new|another|separate|different|fresh|clean)\s+(?:(?:isolated|fresh|clean|empty|independent)\s+)?(?:project|workspace|app|application|website|repository)\b|\bstart\s+(?:over|fresh)\b|\bfrom\s+scratch\b/i
 
-/** A root project manifest: only a whole new project creates one; a feature request lists its own source files. */
-const PROJECT_MANIFEST = /^(?:package\.json|pyproject\.toml|requirements\.txt|go\.mod|Cargo\.toml|pom\.xml|build\.gradle(?:\.kts)?|composer\.json|Gemfile)$/
+/**
+ * The opening instruction creates a whole thing ("Build a complete, working OrderFlow application", "Create a responsive
+ * portfolio website"), not a part of the current one ("Implement order cancellation", "Create a settings page for our
+ * app"): an indefinite article, then up to five describing words that are not a preposition or possessive, then a
+ * whole-project noun.
+ */
+const CREATES_WHOLE_PROJECT = /\b(?:build|create|write|implement|generate|scaffold|produce|make|design|develop)\s+(?:a|an)\s+(?:(?!(?:for|to|in|into|of|on|inside|within|our|my|your|the|this|that|existing|current)\b)[\w-]+\s+){0,5}(?:app|application|website|web\s+app|site|project|service|game|tool|cli|api|system|program|platform|dashboard)\b/i
 
 /**
  * A request for a new project: an explicit "new/fresh project" phrase, or a complete new-application specification
- * (opens with a creation directive and lists the files to create, including the project's root manifest). Production
- * 2026-10-16, job e98aa467: the OrderFlow specification pasted again in the same conversation inherited the previous
- * job's workspace and project context, so it ran on the legacy engine over stale files and ended
+ * (opens with an instruction to create a whole application and lists the files to create). Production 2026-10-16,
+ * job e98aa467: the OrderFlow specification pasted again in the same conversation inherited the previous job's
+ * workspace and project context, so it ran on the legacy engine over stale files and ended
  * builder_regression_evidence_required although its final files pass all three required commands (28/28 tests).
- * The manifest requirement keeps feature requests ("Implement order cancellation. Create all 2 files: src/cancel.js,
- * test/cancel.test.js") in their current project (Codex review on #4639).
+ * Codex review on #4639/#4642: a feature with its own file list stays in its project, and a whole project needs no
+ * particular package manifest (a static website has none).
  */
 export function isNewBuilderProjectObjective(objective: string): boolean {
   return NEW_PROJECT.test(objective) || (isNewApplicationSpecification(objective)
-    && builderTaskContract(objective).files.some(path => PROJECT_MANIFEST.test(path)))
+    && CREATES_WHOLE_PROJECT.test(openingDirective(objective).replace(/[*_`,]/g, ' ').replace(/\s+/g, ' ')))
 }
 
 export type BuilderProjectContext = {

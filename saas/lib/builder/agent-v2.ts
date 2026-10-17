@@ -443,9 +443,24 @@ export class BuilderV2Agent {
       const failure = failedOnRevision()
       const opened = [...new Set(steps.filter(step => (step.tool === 'read_file' || step.tool === 'edit_file') && step.ok)
         .map(step => (step.output as { path?: unknown } | undefined)?.path).filter((path): path is string => typeof path === 'string').reverse())]
+      // Put files named by real failing test diagnostics ahead of incidental reads.
+      const details = failure?.output as { stdout?: unknown; stderr?: unknown } | undefined
+      const diagnostic = String(details?.stdout ?? '') + '\n' + String(details?.stderr ?? '')
+      const failingTests = [...diagnostic.matchAll(/(?:^|[\s(])((?:test|tests)\/[A-Za-z0-9_./-]+\.(?:test|spec)\.[cm]?js)\b/gm)]
+        .map(match => match[1]).filter(path => knownFiles.includes(path))
+      const targeted: string[] = []
+      for (const testPath of failingTests.slice(0, 3)) {
+        if (!targeted.includes(testPath)) targeted.push(testPath)
+        const testFile = await this.workspace?.readFile(options.workspaceId, testPath)
+        if (!testFile) continue
+        for (const found of testFile.content.matchAll(/require\(['"](?:\.\.\/)+(src\/[A-Za-z0-9_./-]+\.[cm]?js)['"]\)/g)) {
+          if (knownFiles.includes(found[1]) && !targeted.includes(found[1])) targeted.push(found[1])
+        }
+      }
+      const prioritized = [...new Set([...targeted, ...opened])]
       const openFiles: Record<string, string> = {}
       let used = 0
-      for (const path of opened) {
+      for (const path of prioritized) {
         const file = this.workspace ? await this.workspace.readFile(options.workspaceId, path) : null
         if (!file || used + file.content.length > WORKING_SET_CHARS) continue
         openFiles[path] = file.content
@@ -491,7 +506,7 @@ export class BuilderV2Agent {
                 ? { tool: 'edit_file', reason: 'Repair the last failing test before rerunning the unchanged revision' }
                 : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },
             instruction: currentFailure()
-              ? 'The host has already run the suite on this unchanged revision and recorded the failure in latestFailedTest. Inspect only relevant source if needed, then fix the failure with write_file or edit_file. Do not run the same tests again until an edit changes the revision.'
+              ? 'The host has already run the suite on this unchanged revision and recorded the failure in latestFailedTest. The named failing test and its imported module are in openFiles when available. Edit the relevant module to fix the assertion; do not rewrite unrelated manifests.  Do not run the same tests again until an edit changes the revision.'
               : 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
             lastReceipt: compactAgainstWorkingSet(lastReceipt, working),
             latestFailedTest: currentFailure(),

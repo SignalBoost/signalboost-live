@@ -373,7 +373,13 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
 
     // V2 is selected by durable job metadata for all surfaces. Existing V1
     // checkpoint jobs remain V1 because their engine tag is absent.
-    if (job.jobKind === 'standard' && job.metadata.builderEngine === 'v2') {
+    // Every standard Builder job runs V2. Legacy V1 checkpoints cannot be
+    // safely deserialized as V2; reject explicitly rather than silently replaying.
+    if (job.jobKind === 'standard' && job.metadata.builderEngine !== 'v2' && job.checkpoint) {
+      await terminalFailure(job, 'builder_v1_checkpoint_requires_fresh_v2_job')
+      return
+    }
+    if (job.jobKind === 'standard') {
       const workspace = createSupabaseBuilderWorkspace(job.userId)
       if (!workspace) { await terminalFailure(job, 'builder_v2_workspace_unavailable'); return }
       // Same priority rule as V1: only background self-healing work yields the model to chat. Production

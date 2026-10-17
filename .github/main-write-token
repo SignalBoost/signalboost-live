@@ -1,2 +1,2 @@
-base_sha=b30756b224cdf59c6a54b713aaddaddcc4178ef2
-branch=fix/builder-v2-repair-proof-regression-20261017
+base_sha=481e783b2d3674685df5ed12d597b6691e705a21
+branch=fix/builder-v2-regex-parse-20261017

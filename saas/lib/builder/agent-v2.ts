@@ -535,19 +535,19 @@ export class BuilderV2Agent {
       if (!failure || !this.workspace) return null
       const output = failure.output as { stdout?: unknown; stderr?: unknown } | undefined
       const diagnostic = String(output?.stdout ?? '') + '\n' + String(output?.stderr ?? '')
-      const namedTests = [...new Set([...diagnostic.matchAll(/(?:^|[\\s(])((?:test|tests)\\/[A-Za-z0-9_./-]+\\.(?:test|spec)\\.[cm]?js)\\b/gm)]
+      const namedTests = [...new Set([...diagnostic.matchAll(/(?:^|[\s(])((?:test|tests)\/[A-Za-z0-9_./-]+\.(?:test|spec)\.[cm]?js)\b/gm)]
         .map(match => match[1]).filter(path => knownFiles.includes(path)))]
       const targets: Array<{ test: string; sources: string[] }> = []
       for (const testPath of namedTests.slice(0, 4)) {
         const file = await this.workspace.readFile(options.workspaceId, testPath)
         if (!file) continue
-        const sources = [...file.content.matchAll(/(?:require\\(\\s*['"]|from\\s*['"])(\\.\\.\\/src\\/[A-Za-z0-9_./-]+)(?:['"])/g)]
-          .map(match => match[1].replace(/^\\.\\.\\//, ''))
-          .map(path => /\\.[cm]?js$/.test(path) ? path : path + '.js')
+        const sources = [...file.content.matchAll(/(?:require\(\s*['"]|from\s*['"])(\.\.\/src\/[A-Za-z0-9_./-]+)(?:['"])/g)]
+          .map(match => match[1].replace(/^\.\.\//, ''))
+          .map(path => /\.[cm]?js$/.test(path) ? path : path + '.js')
           .filter(path => knownFiles.includes(path))
         targets.push({ test: testPath, sources: [...new Set(sources)] })
       }
-      const error = /(?:TypeError|ReferenceError|SyntaxError):[^\\n]*/.exec(diagnostic)?.[0] ?? diagnostic.slice(0, 280)
+      const error = /(?:TypeError|ReferenceError|SyntaxError):[^\n]*/.exec(diagnostic)?.[0] ?? diagnostic.slice(0, 280)
       return { error, targets, instruction: 'Use the actual test import and source export to diagnose the failure. Prefer a targeted edit_file operation; avoid repeating read_file calls. Do not change tests merely to silence failures. Host verification runs after edits.' }
     }
     for (let calls = 0; calls < maxSteps && steps.length < BUILDER_V2_MAX_RECEIPTS; calls++) {

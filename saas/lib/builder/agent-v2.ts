@@ -347,19 +347,31 @@ export class BuilderV2Agent {
       const checkpoint = await snapshot()
       if (checkpoint) await options.onCheckpoint(checkpoint)
     }
-    // The revision the host last ran the required commands on; each revision is host-verified at most once.
-    // Do not rerun a failed command just because another execution slice claimed this job.
-    // Every host receipt is revision-bound by the latest changed file.
-    let hostVerifiedRevision = steps.slice(steps.findLastIndex(step => step.changed) + 1)
-      .some(step => step.tool === 'run_tests') ? revision : -1
-    // Files whose latest write left a syntax error; host verification waits until they compile.
+    // Codex/SWE-agent pattern: host owns verification and receipts, not the model.
+    // Restore command proof across claims; a successful command never needs a second
+    // sandbox call unless files changed. A failed command requires a source repair.
     const syntaxErrors = new Map<string, string>()
-    const hostVerificationDue = () => revision > hostVerifiedRevision && checklist.files.length > 0
+    const currentRevisionRuns = () => steps.slice(steps.findLastIndex(step => step.changed) + 1)
+      .filter(step => step.tool === 'run_tests')
+    const latestCommandRun = (command: string) => currentRevisionRuns().findLast(step => {
+      const output = step.output as { requestedCommand?: unknown; executedCommand?: unknown } | undefined
+      return output?.requestedCommand === command || output?.executedCommand === command
+    })
+    const verifiedNow = async (): Promise<BuilderV2Outcome | null> => {
+      const acceptance = builderV2Acceptance(options.objective, knownFiles, steps)
+      return acceptance.satisfied && missingFiles().length === 0
+        ? { ok: true, reason: 'verified', summary: 'Every required command passed on the host after the latest source change.', steps, checkpoint: await snapshot() }
+        : null
+    }
+    const hostVerificationDue = () => checklist.files.length > 0
       && missingFiles().length === 0 && checklist.commands.length > 0 && syntaxErrors.size === 0
-    /** Run every required command in order on the current revision; stop at the first failure. */
+      && checklist.commands.some(command => !latestCommandRun(command))
+      && !currentRevisionRuns().some(step => !step.ok)
+    /** Run only outstanding required commands, in order, on the current revision. */
     const hostVerify = async (): Promise<BuilderV2Outcome | null> => {
-      hostVerifiedRevision = revision
       for (const command of checklist.commands) {
+        if (latestCommandRun(command)?.ok) continue
+        if (latestCommandRun(command) && !latestCommandRun(command)?.ok) return null
         if (steps.length >= BUILDER_V2_MAX_RECEIPTS) return null
         const action: BuilderV2Action = { tool: 'run_tests', command }
         const receipt = await this.dispatcher.dispatch(options.workspaceId, action)
@@ -367,13 +379,14 @@ export class BuilderV2Agent {
         await persist()
         if (!receipt.ok) return null
       }
-      const acceptance = builderV2Acceptance(options.objective, knownFiles, steps)
-      return acceptance.satisfied && verifiedRevision === revision
-        ? { ok: true, reason: 'verified', summary: 'Every required command passed on the host after the latest source change.', steps, checkpoint: await snapshot() }
-        : null
+      return verifiedNow()
     }
     for (let calls = 0; calls < maxSteps && steps.length < BUILDER_V2_MAX_RECEIPTS; calls++) {
       if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
+      // A resumed checkpoint may already contain a complete host proof. End without
+      // a paid model call, a repeated test run, or waiting for the provider.
+      const completed = await verifiedNow()
+      if (completed) return completed
       // REA-inspired native harness: the host verifies complete work before asking a model
       // for another action. Avoids an entire provider round-trip and timeout per command.
       if (hostVerificationDue()) {

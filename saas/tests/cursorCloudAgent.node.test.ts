@@ -28,7 +28,7 @@ test('Cursor cloud resumes only after terminal run',async()=>{
   const api=new CursorCloudAgent('key',async(url,init)=>{
     requests.push({url,init})
     if(init.method==='GET')return {ok:true,status:200,json:async()=>({status:'FINISHED'})}
-    return {ok:true,status:200,json:async()=>({id:'run-next'})}
+    return {ok:true,status:200,json:async()=>({run:{id:'run-next',status:'CREATING'}})}
   })
   const out=await api.repair({agentId:'bc-abc',runId:'run-abc',url:'https://cursor.com/agents/bc-abc'},'npm test exit 1')
   assert.equal(out.runId,'run-next')
@@ -37,4 +37,12 @@ test('Cursor cloud resumes only after terminal run',async()=>{
 test('Cursor cloud blocks follow-up while run is active',async()=>{
   const api=new CursorCloudAgent('key',async()=>({ok:true,status:200,json:async()=>({status:'RUNNING'})}))
   await assert.rejects(api.repair({agentId:'bc-abc',runId:'run-abc',url:'x'},'failed'),/cursor_agent_still_running/)
+})
+
+test('Cursor terminal states include ERROR and EXPIRED', async()=>{
+ for(const state of ['FINISHED','ERROR','CANCELLED','EXPIRED']) {
+  const api=new CursorCloudAgent('key',async()=>({ok:true,status:200,json:async()=>({status:state})}))
+  const result=await api.status({agentId:'bc-abc',runId:'run-abc',url:'x'})
+  assert.equal(result.terminal,true)
+ }
 })

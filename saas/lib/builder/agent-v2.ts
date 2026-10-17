@@ -631,7 +631,17 @@ export class BuilderV2Agent {
           const afterFailure = steps.slice(steps.findLastIndex(step => step.tool === 'run_tests' && !step.ok) + 1)
           const readOnly = afterFailure.filter(step => step.tool === 'read_file' || step.tool === 'list_files' || step.tool === 'search_files').length
           if (readOnly >= 4) {
-            return { ok: false, reason: 'builder_v2_repair_read_limit', summary: 'The test failed and repeated file inspection did not repair the source. Stop instead of spending another continuation.', steps, checkpoint: await snapshot() }
+            // The host already supplies the failing test and relevant source through openFiles.
+            // Give the model a bounded opportunity to edit instead of killing an otherwise
+            // recoverable job at its first redundant read. No more read receipts are executed.
+            if (++repeats >= REPEAT_LIMIT) {
+              return { ok: false, reason: 'builder_v2_repair_read_limit', summary: 'Repeated read-only repair attempts after host-supplied test/source context.', steps, checkpoint: await snapshot() }
+            }
+            lastReceipt = JSON.stringify({
+              ok: false, error: 'builder_v2_repair_requires_edit',
+              message: 'The failing test and source are already in openFiles. Do not read or rerun tests on this revision. Use edit_file to repair the named implementation; otherwise the job will stop.',
+            })
+            break
           }
         }
         const signature = JSON.stringify(action)

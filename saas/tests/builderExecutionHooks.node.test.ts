@@ -32,3 +32,40 @@ test('delegated runtime failure is preserved',async()=>{
  const runner=withBuilderExecutionHooks({async run(){throw Error('sandbox_failure')}},{})
  await assert.rejects(runner.run(input),/sandbox_failure/)
 })
+
+test('failed commands retain true exit status while emitting post-run evidence',async()=>{
+ const events=[]
+ const failure={exitCode:1,stdout:'',stderr:'AssertionError',timedOut:false}
+ const runner=withBuilderExecutionHooks({async run(){events.push('run');return failure}},{
+  beforeRun(){events.push('before')},
+  afterRun({result}){events.push('after');assert.equal(result.exitCode,1)}
+ })
+ assert.equal((await runner.run(input)).exitCode,1)
+ assert.deepEqual(events,['before','run','after'])
+})
+test('runtime exception emits an error hook without replacing original failure',async()=>{
+ const events=[]
+ const failure=new Error('sandbox_crashed')
+ const runner=withBuilderExecutionHooks({async run(){throw failure}},{
+  onError({error}){events.push(error)}
+ })
+ await assert.rejects(runner.run(input),err=>err===failure)
+ assert.deepEqual(events,['sandbox_crashed'])
+})
+test('broken error hook does not suppress original sandbox failure',async()=>{
+ const old=console.error;console.error=()=>{}
+ try{
+  const runner=withBuilderExecutionHooks({async run(){throw Error('actual_error')}},{
+   onError(){throw Error('telemetry_error')}
+  })
+  await assert.rejects(runner.run(input),/actual_error/)
+ }finally{console.error=old}
+})
+test('asynchronous host veto prevents execution',async()=>{
+ let executions=0
+ const runner=withBuilderExecutionHooks({async run(){executions++;return success}},{
+  async beforeRun(){await Promise.resolve();throw Error('policy_denied')}
+ })
+ await assert.rejects(runner.run(input),/policy_denied/)
+ assert.equal(executions,0)
+})

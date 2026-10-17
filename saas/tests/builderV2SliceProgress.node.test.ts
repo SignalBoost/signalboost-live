@@ -182,7 +182,7 @@ test('production 2026-10-16: a model refused before any step fails at once inste
 test('a V2 job a person started keeps the model while they chat; only self-healing work yields', async () => {
   const { readFileSync } = await import('node:fs')
   const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
-  const v2 = runner.slice(runner.indexOf("job.metadata.builderEngine === 'v2'"), runner.indexOf('runBuilderV2JobCycle({'))
+  const v2 = runner.slice(runner.indexOf("if (job.jobKind === 'standard')"), runner.indexOf('runBuilderV2JobCycle({'))
   assert.match(v2, /createBuilderCodingAiPort\(\{ yieldToChat: selfHealingCapacityJob\(job\) \}\)/)
   assert.doesNotMatch(runner, /yieldToChat: true/)
 })

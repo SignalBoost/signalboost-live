@@ -80,6 +80,8 @@ export type BuilderV2Checkpoint = Readonly<{
   verifiedRevision: number
   unproductive: number
   lastReceipt: string
+  /** Consecutive resumed work slices without a new host receipt or source revision. */
+  idleSlices?: number
 }>
 
 /**
@@ -356,6 +358,7 @@ export class BuilderV2Agent {
         workspaceDigest: await workspaceDigest(this.workspace, options.workspaceId),
         steps: steps.map((receipt, at) => at < lastChange && at < steps.length - TAIL ? compactReceipt(receipt) : receipt),
         revision, verifiedRevision, unproductive, lastReceipt,
+        idleSlices: saved?.idleSlices ?? 0,
       }
     }
     const checklist = builderTaskContract(options.objective)

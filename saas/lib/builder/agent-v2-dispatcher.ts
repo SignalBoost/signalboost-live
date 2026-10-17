@@ -1,5 +1,6 @@
 import type { BuilderBrowserCliAction, BuilderBrowserCliPort, BuilderFile, BuilderRunnerPort, BuilderWorkspacePort } from './contracts.ts'
 import { builderSyntaxError } from './syntax-check.ts'
+import { applySearchReplace } from './edit-match.ts'
 import { withBuilderExecutionHooks, type BuilderExecutionHook } from './execution-hooks.ts'
 
 /**
@@ -97,6 +98,15 @@ export class BuilderV2Dispatcher {
             tool: action.tool, ok: true, changed: false,
             output: { path: current.path, alreadyApplied: true }, next: ['run_tests', 'read_file'],
           }
+          // Decide the match here so a refused edit reports where the search did (or nearly did) match; the
+          // workspace applies the same contract and persists.
+          const match = applySearchReplace(current.content, action.search, action.replace)
+          if (match.ok === false) return { tool: action.tool, ok: false, changed: false, error: match.error,
+            output: { path: current.path, matches: match.locations.length, locations: match.locations,
+              hint: match.error === 'builder_edit_target_ambiguous'
+                ? 'The search text occurs at each listed line. Include a neighbouring line in the search so it matches only the one you mean.'
+                : 'The search text is not in the file as written. Copy the exact current text from openFiles; the listed lines match its first line.' },
+            next: ['edit_file', 'read_file'] }
           const edited = await this.workspace.editFile(workspaceId, action.path, action.search, action.replace)
           const syntaxError = builderSyntaxError(edited.path, edited.content)
           return { tool: action.tool, ok: true, changed: true, output: { path: edited.path, ...(syntaxError ? { syntaxError } : {}) },

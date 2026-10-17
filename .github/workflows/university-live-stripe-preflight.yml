@@ -1,0 +1,19 @@
+name: University live Stripe evidence preflight
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/billing/universityLivePaymentPreflight.mjs'
+      - 'saas/tests/universityLivePaymentPreflight.node.test.mjs'
+      - '.github/workflows/university-live-stripe-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test saas/tests/universityLivePaymentPreflight.node.test.mjs

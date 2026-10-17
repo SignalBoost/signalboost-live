@@ -18,7 +18,7 @@ jobs:
         run: |
           set -euo pipefail
           work="$(mktemp -d)"
-          trap 'rm -rf "$work"' EXIT
+          trap 'docker run --rm -v "$work:/var/apalache" --entrypoint /bin/sh ghcr.io/apalache-mc/apalache:main -c "rm -rf /var/apalache/_apalache-out /var/apalache/tmp" >/dev/null 2>&1 || true; rm -rf "$work" || true' EXIT
           cp verification/builder/BuilderLease.tla "$work/"
           chmod 777 "$work"
           docker run --rm -v "$work:/var/apalache" ghcr.io/apalache-mc/apalache:main check --init=Init --next=Next --inv=Safety --length=8 BuilderLease.tla

@@ -2,6 +2,7 @@ import type { BuilderAiPort, BuilderWorkspacePort } from './contracts.ts'
 import { checkpointDigest, workspaceDigest } from './checkpoint.ts'
 import { BuilderV2Dispatcher, type BuilderV2Action, type BuilderV2Receipt } from './agent-v2-dispatcher.ts'
 import { builderTaskContract } from './task-contract.ts'
+import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
 
 /**
  * Whole-job receipt bound. `maxSteps` is the per-slice budget; a resumed job gets a fresh slice budget on top of
@@ -15,6 +16,14 @@ export const BUILDER_V2_STALL_LIMIT = 20
 const REJECTION_LIMIT = 3
 const REPEAT_LIMIT = 4
 const TAIL = 8
+/**
+ * A failed model call (timeout, outage, empty reply) is retried in place before the slice gives up, as Cline does
+ * (sdk/packages/agents/src/agent-runtime.ts: 3 retries, 1s doubling, capped at 15s). Production 2026-10-17: one empty
+ * reply ("builder coding AI provider returned no text") ended an OrderFlow job at slice 4 with every file written.
+ */
+export const BUILDER_V2_MODEL_RETRIES = 3
+const MODEL_RETRY_BASE_MS = 1_000
+const MODEL_RETRY_MAX_MS = 15_000
 
 const SYSTEM_PROMPT = [
   'You are an autonomous software engineering agent. Each reply carries one or more tool operations, executed in order.',
@@ -250,6 +259,8 @@ export class BuilderV2Agent {
     signal?: AbortSignal
     checkpoint?: BuilderV2Checkpoint
     onCheckpoint?: (checkpoint: BuilderV2Checkpoint) => Promise<void>
+    /** Wait between model retries; tests pass an instant one. */
+    retryDelay?: (ms: number, signal?: AbortSignal) => Promise<void>
   }): Promise<BuilderV2Outcome> {
     const saved = options.checkpoint
     if (saved) {
@@ -357,7 +368,7 @@ export class BuilderV2Agent {
       }
       let raw: string | null
       try {
-        raw = await this.ai.generate({
+        raw = await this.generateWithRetry({
           systemPrompt: SYSTEM_PROMPT,
           prompt: JSON.stringify({
             objective: options.objective,
@@ -383,7 +394,7 @@ export class BuilderV2Agent {
           signal: options.signal,
           // A reply cut off at the limit still carries every complete action before the cut (salvageActions).
           allowTruncatedText: true,
-        })
+        }, options.retryDelay ?? abortableDelay)
       } catch (error) {
         if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
         // A reply cut off before any complete action is feedback, like an unparseable reply: ask for less per reply.
@@ -462,6 +473,31 @@ export class BuilderV2Agent {
     if (steps.length >= BUILDER_V2_MAX_RECEIPTS) return { ok: false, reason: 'builder_v2_step_budget_exhausted', steps, checkpoint: await snapshot() }
     return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
   }
+
+  /**
+   * One model call, retried with backoff on failure. Never retried: a cancellation, a cut-off reply (handled as
+   * feedback), or the slice's own time budget running out (the job cycle pauses and the next slice resumes).
+   */
+  private async generateWithRetry(request: Parameters<BuilderAiPort['generate']>[0], retryDelay: (ms: number, signal?: AbortSignal) => Promise<void>): Promise<string | null> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.ai.generate(request)
+      } catch (error) {
+        if (request.signal?.aborted || attempt >= BUILDER_V2_MODEL_RETRIES
+          || (error instanceof Error && (error.message === 'local_model_output_truncated' || error.message === BUILDER_TURN_TIMEOUT_ERROR))) throw error
+        await retryDelay(Math.min(MODEL_RETRY_MAX_MS, MODEL_RETRY_BASE_MS * 2 ** attempt), request.signal)
+      }
+    }
+  }
+}
+
+/** Resolves after ms, or at once when the job is cancelled (the next model call then sees the aborted signal). */
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise(resolve => {
+    if (signal?.aborted) return resolve()
+    const timer = setTimeout(resolve, ms)
+    signal?.addEventListener('abort', () => { clearTimeout(timer); resolve() }, { once: true })
+  })
 }
 
 function describeStep(receipt: BuilderV2Receipt): string {

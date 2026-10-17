@@ -21,7 +21,7 @@ test('failed host test preloads source and stops repeated read-only repair loops
     if(value.latestFailedTest) observedContext = Boolean(value.openFiles?.['src/cart.js'] && value.openFiles?.['test/cart.test.js'])
     return JSON.stringify({type:'tool',action:{tool:'read_file',path:readPaths[Math.min(nextRead++,readPaths.length-1)]}})
   } }
-  const objective = 'Create these files:\\nsrc/cart.js\\ntest/cart.test.js\\n\\nRun:\\nnpm test'
+  const objective = 'Create these files:\nsrc/cart.js\ntest/cart.test.js\n\nRun:\nnpm test'
   const result = await new BuilderV2Agent(ai,dispatcher,workspace).run({workspaceId:'w',objective,maxSteps:20})
   assert.equal(observedContext,true)
   assert.equal(result.reason,'builder_v2_repair_read_limit')

@@ -1,0 +1,153 @@
+// saas/tests/builderV2InterfaceMismatches.node.test.ts
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { builderInterfaceMismatches, builderInterfaceRepairs, builderModuleInterface } from '../lib/builder/interface-mismatches.ts'
+import { BuilderV2Agent } from '../lib/builder/agent-v2.ts'
+import { BuilderV2Dispatcher } from '../lib/builder/agent-v2-dispatcher.ts'
+import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
+import type { BuilderRunnerPort } from '../lib/builder/contracts.ts'
+
+type File = { path: string; content: string }
+const fixture = JSON.parse(readFileSync(new URL('./fixtures/builder-v2-interface-production-workspaces.json', import.meta.url), 'utf8')) as
+  Record<string, { workspaceId: string; files: File[] }>
+
+/** Run a command over files in a fresh directory, as the sandbox runner does. */
+function runOn(files: readonly File[], command: string) {
+  const dir = mkdtempSync(join(tmpdir(), 'builder-v2-iface-'))
+  try {
+    for (const file of files) {
+      mkdirSync(dirname(join(dir, file.path)), { recursive: true })
+      writeFileSync(join(dir, file.path), file.content)
+    }
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'NODE_TEST_CONTEXT'))
+    const result = spawnSync('sh', ['-c', command], { cwd: dir, encoding: 'utf8', timeout: 60_000, env })
+    return { exitCode: result.status ?? 1, stdout: result.stdout, stderr: result.stderr, timedOut: false }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+const localRunner: BuilderRunnerPort = { async run({ command, files }) { return runOn(files, command) } }
+
+for (const job of ['job-7c1f354e', 'job-629e2d0e']) {
+  test(`production ${job}: the check names every "is not a function/constructor" failure the real test run hits`, () => {
+    const { files } = fixture[job]
+    const run = runOn(files, 'node --test test/*.test.js')
+    assert.notEqual(run.exitCode, 0)
+    const failures = [...new Set([...`${run.stdout}\n${run.stderr}`.matchAll(/^\s+error: '([\w$.]+) is not a (?:function|constructor)'/gm)].map(m => m[1]))]
+    assert.ok(failures.length > 0)
+    const named = new Set(builderInterfaceMismatches(files).map(m => m.kind === 'missing_export' ? m.name : m.name.split('.prototype.')[1]))
+    for (const failure of failures) assert.ok(named.has(failure.split('.').pop()!), `${failure} not named; named: ${[...named].join(', ')}`)
+  })
+}
+
+test('production job-629e2d0e: repairs are grouped per module with the exact export statement to edit', () => {
+  const { files } = fixture['job-629e2d0e']
+  const repairs = builderInterfaceRepairs(builderInterfaceMismatches(files), files)
+  const cart = repairs.find(repair => repair.module === 'src/cart.js')
+  assert.deepEqual(cart?.missing.map(item => item.name), ['createCart'])
+  const exportText = cart!.exportStatement!
+  assert.ok(files.find(file => file.path === 'src/cart.js')!.content.includes(exportText), 'exportStatement is exact source text')
+  const catalog = repairs.find(repair => repair.module === 'src/catalog.js')
+  assert.deepEqual(catalog?.missing.map(item => item.name), ['Catalog.prototype.addProduct'])
+  assert.equal(catalog?.missing[0].usedAt, 'test/checkout.test.js:11')
+})
+
+test('a consistent project reports nothing: exports, aliases, statics, factories, inherited methods', () => {
+  const files: File[] = [
+    { path: 'src/base.js', content: 'class Base {\n  describe() { return "b" }\n}\nmodule.exports = { Base }\n' },
+    { path: 'src/shop.js', content: "const { Base } = require('./base')\nclass Shop extends Base {\n  constructor() { super(); this.items = [] }\n  add(item) { this.items.push(item) }\n  get size() { return this.items.length }\n  total = () => 0\n}\nfunction createShop() { return new Shop() }\nconst helper = (x) => x\nmodule.exports = { Shop, createShop, helperAlias: helper, 'quoted': 1 }\n" },
+    { path: 'src/single.js', content: 'class Solo { static make() { return new Solo() } }\nSolo.VERSION = 1\nmodule.exports = Solo\n' },
+    { path: 'src/props.js', content: 'exports.one = 1\nmodule.exports.two = 2\n' },
+    { path: 'test/shop.test.js', content: "const { Shop, createShop, helperAlias: h, quoted } = require('../src/shop')\nconst solo = require('../src/single.js')\nconst props = require('../src/props')\nconst s = new Shop()\ns.add(1); s.describe(); s.total()\nconst f = createShop()\nf.add(2)\nsolo.make(); solo.VERSION; props.one; props.two\n" },
+  ]
+  assert.deepEqual(builderInterfaceMismatches(files), [])
+  // Shop extends a class from another file, so its methods are unknown here and no method is reported missing.
+  assert.equal(builderModuleInterface('src/shop.js', files[1].content)?.classes.Shop, undefined)
+})
+
+test('a missing export, a missing property import and a missing method are each reported once', () => {
+  const files: File[] = [
+    { path: 'src/cart.js', content: 'class Cart {\n  add(id) { return id }\n}\nmodule.exports = { Cart }\n' },
+    { path: 'test/cart.test.js', content: "const { Cart, createCart } = require('../src/cart')\nconst cartModule = require('../src/cart.js')\nconst c = new Cart()\nc.add(1)\nc.addItem(1)\nc.addItem(2)\ncartModule.totals()\n" },
+  ]
+  assert.deepEqual(builderInterfaceMismatches(files).map(m => `${m.kind}:${m.name}@${m.line}`), [
+    'missing_export:createCart@1',
+    'missing_export:totals@7',
+    'missing_method:Cart.prototype.addItem@5',
+  ])
+})
+
+const objective = [
+  '# MiniShop',
+  'Create all 4 files:',
+  '```text',
+  'minishop/',
+  '├── package.json',
+  '├── src',
+  '│   └── catalog.js',
+  '└── test',
+  '    ├── catalog.test.js',
+  '    └── more.test.js',
+  '```',
+  '## Mandatory verification',
+  'Execute all one commands:',
+  '```bash',
+  'node --test test/*.test.js',
+  '```',
+].join('\n')
+
+test('Builder V2 shows tests the real interface of sources already written', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('w', 'package.json', '{"name":"minishop","scripts":{"test":"node --test test/*.test.js"}}')
+  await workspace.writeFile('w', 'src/catalog.js', 'class Catalog {\n  addProduct(p) { return p }\n}\nfunction createCatalog() { return new Catalog() }\nmodule.exports = { Catalog, createCatalog }\n')
+  const prompts: Array<Record<string, unknown>> = []
+  const agent = new BuilderV2Agent({ async generate(request) { prompts.push(JSON.parse(String(request.prompt))); return null } },
+    new BuilderV2Dispatcher(workspace, localRunner), workspace)
+  await agent.run({ workspaceId: 'w', objective, maxSteps: 1, retryDelay: async () => undefined })
+  assert.deepEqual(prompts[0].writtenModuleInterfaces, [{ module: 'src/catalog.js', exports: ['Catalog', 'createCatalog'], classes: { Catalog: ['addProduct'] }, factories: { createCatalog: 'Catalog' } }])
+  assert.equal(prompts[0].interfaceMismatches, undefined)
+})
+
+test('Builder V2 lists every mismatch at once, and one batched edit from the exact export statement verifies the build', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('w', 'package.json', '{"name":"minishop","scripts":{"test":"node --test test/*.test.js"}}')
+  await workspace.writeFile('w', 'src/catalog.js', "'use strict'\nclass Shelf {\n  constructor() { this.items = new Map() }\n  createProduct(p) { this.items.set(p.id, p); return p }\n  getProduct(id) { return this.items.get(id) }\n}\nmodule.exports = { Shelf }\n")
+  await workspace.writeFile('w', 'test/catalog.test.js', "const test = require('node:test')\nconst assert = require('node:assert')\nconst { createShelf } = require('../src/catalog')\ntest('creates', () => { const c = createShelf(); c.addProduct({ id: 'a' }); assert.equal(c.getProduct('a').id, 'a') })\n")
+  await workspace.writeFile('w', 'test/more.test.js', "const test = require('node:test')\nconst assert = require('node:assert')\nconst { Shelf } = require('../src/catalog')\ntest('lists', () => { const c = new Shelf(); c.addProduct({ id: 'b' }); assert.deepEqual(c.listProducts(), [{ id: 'b' }]) })\n")
+  const prompts: Array<Record<string, any>> = []
+  const agent = new BuilderV2Agent({
+    async generate(request) {
+      const prompt = JSON.parse(String(request.prompt))
+      prompts.push(prompt)
+      if (prompts.length > 1) return JSON.stringify({ type: 'finish', summary: 'done' })
+      const repair = prompt.interfaceMismatches?.[0]
+      return JSON.stringify({ type: 'tools', actions: [{ tool: 'edit_file', path: repair.module, search: repair.exportStatement,
+        replace: 'Shelf.prototype.addProduct = Shelf.prototype.createProduct\nShelf.prototype.listProducts = function () { return [...this.items.values()] }\nfunction createShelf() { return new Shelf() }\nmodule.exports = { Shelf, createShelf }' }] })
+    },
+  }, new BuilderV2Dispatcher(workspace, localRunner), workspace)
+  const outcome = await agent.run({ workspaceId: 'w', objective, maxSteps: 6, retryDelay: async () => undefined })
+
+  const first = prompts[0]
+  // The host ran the suite first (real failure), and the same turn carried every mismatch from both tests.
+  assert.equal(first.latestFailedTest !== undefined && first.latestFailedTest !== '', true)
+  assert.deepEqual(first.interfaceMismatches, [{
+    module: 'src/catalog.js', exportStatement: 'module.exports = { Shelf }', exports: ['Shelf'],
+    missing: [
+      { name: 'createShelf', kind: 'missing_export', usedAt: 'test/catalog.test.js:3' },
+      { name: 'Shelf.prototype.addProduct', kind: 'missing_method', usedAt: 'test/more.test.js:4' },
+      { name: 'Shelf.prototype.listProducts', kind: 'missing_method', usedAt: 'test/more.test.js:4' },
+    ],
+  }])
+  assert.deepEqual(first.nextRecommendedAction.actions, [{ tool: 'edit_file', path: 'src/catalog.js' }])
+  assert.ok(Object.keys(first.openFiles).includes('src/catalog.js'))
+  assert.equal(outcome.ok, true, outcome.reason)
+  assert.equal(outcome.reason, 'verified')
+  // One model reply repaired everything; the host's own run after it is the proof.
+  assert.equal(prompts.length, 1)
+  const lastRun = outcome.steps.findLast(step => step.tool === 'run_tests')
+  assert.equal(lastRun?.ok, true)
+})

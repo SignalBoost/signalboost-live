@@ -2,7 +2,7 @@ import type { BuilderAiPort, BuilderWorkspacePort } from './contracts.ts'
 import { checkpointDigest, workspaceDigest } from './checkpoint.ts'
 import { BuilderV2Dispatcher, type BuilderV2Action, type BuilderV2Receipt } from './agent-v2-dispatcher.ts'
 import { builderTaskContract } from './task-contract.ts'
-import { builderCrossFileContractHints } from './cross-file-contract-hints.ts'
+import { builderWorkspaceInterfaceRepairs, builderWorkspaceModuleInterfaces, type BuilderInterfaceRepair } from './interface-mismatches.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
 
 /**
@@ -476,7 +476,7 @@ export class BuilderV2Agent {
       return verifiedNow()
     }
     /** The failing command since the last change and the files the model has opened, freshly read, newest first. */
-    const workingSet = async () => {
+    const workingSet = async (interfaceFiles: readonly string[] = []) => {
       const failure = failedOnRevision()
       const opened = [...new Set(steps.filter(step => (step.tool === 'read_file' || step.tool === 'edit_file') && step.ok)
         .map(step => (step.output as { path?: unknown } | undefined)?.path).filter((path): path is string => typeof path === 'string').reverse())]
@@ -512,7 +512,8 @@ export class BuilderV2Agent {
         namedTest: targeted[0] ?? null,
         importedModules: targeted.slice(1),
         existingFiles: knownFiles,
-        previouslyOpened: failure ? [...targeted, ...opened, ...knownFiles.filter(path => path.startsWith('src/') && path.endsWith('.js')).slice(0, 8)] : opened,
+        // Modules named by the interface check come first: each needs an edit this turn.
+        previouslyOpened: [...interfaceFiles, ...(failure ? [...targeted, ...opened, ...knownFiles.filter(path => path.startsWith('src/') && path.endsWith('.js')).slice(0, 8)] : opened)],
       })
       const openFiles: Record<string, string> = {}
       let used = 0
@@ -561,7 +562,11 @@ export class BuilderV2Agent {
         if (verified) return verified
         // A failed host test is supplied to the model on this same turn for actual repair.
       }
-      const working = await workingSet()
+      // Every test usage of a name its source module lacks, read from the files themselves. One host test run
+      // shows these one stack trace at a time; listing them all lets one reply reconcile every module.
+      const interfaceRepairs: BuilderInterfaceRepair[] = missingFiles().length ? []
+        : await builderWorkspaceInterfaceRepairs(this.workspace, options.workspaceId, knownFiles).catch(() => [])
+      const working = await workingSet(interfaceRepairs.map(repair => repair.module))
       let raw: string | null
       try {
         raw = await this.generateWithRetry({
@@ -580,16 +585,24 @@ export class BuilderV2Agent {
                 tests: { passed: acceptance.testsPassed, required: acceptance.minimumTests } }
             })(),
             nextRecommendedAction: missingFiles().length ? { tool: 'tools', actions: missingFiles().slice(0, 4).map(path => ({ tool: 'write_file', path })), instruction: 'Generate these files together in one complete tools reply, respecting the output limit; include full contents for each action.' }
+              // interfaceRepairs is only computed once every required file exists.
+              : interfaceRepairs.length ? { tool: 'tools', actions: interfaceRepairs.slice(0, 4).map(repair => ({ tool: 'edit_file', path: repair.module })),
+                instruction: 'Reconcile every entry in interfaceMismatches: one edit_file per module in one tools reply.' }
               : steps.slice(steps.findLastIndex(step => step.changed) + 1).some(step => step.tool === 'run_tests' && !step.ok)
                 ? { tool: 'edit_file', reason: 'Repair the last failing test before rerunning the unchanged revision' }
                 : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },
-            instruction: currentFailure()
+            instruction: interfaceRepairs.length
+              ? 'interfaceMismatches lists every place a test uses a name its source module does not export or a method its class does not define, found by reading the files. Fix all of them in this reply, one edit_file per module: add the missing export (keep the existing ones) or the missing method to the source; change a test import only if the objective names the API the source already has. Each exportStatement is the exact current text, usable as the edit_file search. Host verification runs after your edits.'
+              : currentFailure()
               ? 'The host has already run the suite on this unchanged revision and recorded the failure in latestFailedTest. The named failing test and its imported module are in openFiles when available. Edit the relevant module to fix the assertion; do not rewrite unrelated manifests.  Do not run the same tests again until an edit changes the revision.'
               : 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
             lastReceipt: compactAgainstWorkingSet(lastReceipt, working),
             latestFailedTest: currentFailure(),
             ...(currentFailure() ? { activeRepair: await activeRepair() } : {}),
-            ...(currentFailure() ? { crossFileContractHints: await builderCrossFileContractHints(this.workspace, options.workspaceId, knownFiles).catch(() => []), contractHintPolicy: 'These are approximate source-derived API hints, NOT acceptance evidence. Preserve the objective, inspect source and tests, repair production code first, and verify with actual host tests.' } : {}),
+            ...(interfaceRepairs.length ? { interfaceMismatches: interfaceRepairs } : {}),
+            // While files are still being written, the real interface of the sources written so far, so later
+            // files (usually the tests) import names that exist instead of inventing them.
+            ...(missingFiles().length && knownFiles.length ? { writtenModuleInterfaces: await builderWorkspaceModuleInterfaces(this.workspace, options.workspaceId, knownFiles).catch(() => []) } : {}),
             ...working.prompt,
             // Content already in openFiles or latestFailedTest is not repeated from older receipts: it only costs context.
             tail: steps.slice(-TAIL).map(receipt => withoutWorkingSetCopies(receipt, working)),

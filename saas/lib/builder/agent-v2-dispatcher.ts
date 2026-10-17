@@ -119,7 +119,7 @@ export class BuilderV2Dispatcher {
             ...(action.query ? {query: action.query} : {}),
           })
           return { tool: action.tool, ok: observed.ok, changed: false,
-            output: { action: observed.action, exitCode: observed.exitCode, stdout: observed.stdout,
+            output: { action: observed.action, ...(action.url ? {url:action.url} : {}), exitCode: observed.exitCode, stdout: observed.stdout,
               stderr: observed.stderr, timedOut: observed.timedOut, failureCode: observed.failureCode },
             ...(observed.ok ? {} : { error: 'builder_browser_verification_failed', next: ['read_file', 'edit_file', 'run_tests'] as const }) }
         }

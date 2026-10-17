@@ -120,17 +120,22 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
   const contract = builderTaskContract(objective)
   const lastChange = steps.findLastIndex(receipt => receipt.changed)
   const runs = steps.slice(lastChange + 1).filter(receipt => receipt.tool === 'run_tests')
-  const passing = runs.filter(receipt => receipt.ok)
+  // A claimed success is not a proving receipt without actual exit status and timeout evidence.
+  const provenRun = (receipt: BuilderV2Receipt) => {
+    const output = receipt.output as { exitCode?: unknown; timedOut?: unknown } | undefined
+    return receipt.ok && output?.exitCode === 0 && output?.timedOut === false
+  }
+  const passing = runs.filter(provenRun)
     .map(receipt => receipt.output as { requestedCommand?: unknown; executedCommand?: unknown; stdout?: unknown } | undefined)
   // A more recent failed execution invalidates prior proof until verification succeeds again.
-  const latestRunPassed = runs.length > 0 && runs[runs.length - 1].ok
+  const latestRunPassed = runs.length > 0 && provenRun(runs[runs.length - 1])
   const missingFiles = contract.files.filter(path => !files.includes(path))
   const pendingCommands = contract.commands.filter(command => {
     const latest = runs.findLast(receipt => {
       const output = receipt.output as { requestedCommand?: unknown; executedCommand?: unknown } | undefined
       return output?.requestedCommand === command || output?.executedCommand === command
     })
-    return !latest?.ok
+    return !latest || !provenRun(latest)
   })
   const testsPassed = Math.max(0, ...passing.map(output => {
     const stdout = typeof output?.stdout === 'string' ? output.stdout : ''

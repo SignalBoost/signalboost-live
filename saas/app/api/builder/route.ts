@@ -7,7 +7,7 @@ import { isOperationalLogEvidence, isPastedOperationalLog } from '@/lib/ai/cos/p
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
-import { builderPollMayResume, builderSoleResumableJob, enqueueBuilderJob, getBuilderJobForUser, readBuilderEvidenceJob, readLatestBuilderWorkspaceJob } from '@/lib/builder/job-store'
+import { builderPollMayResume, builderSoleResumableJob, stopBuilderJobForUser, enqueueBuilderJob, getBuilderJobForUser, readBuilderEvidenceJob, readLatestBuilderWorkspaceJob } from '@/lib/builder/job-store'
 import { runBuilderJob, selfHealingCapacityJob } from '@/lib/builder/job-runner'
 import { hasWorkspaceSource, isOwnerRepairWithoutSource, parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
@@ -440,4 +440,17 @@ export async function POST(request: Request) {
     await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
     return noStore({ error: message, reply }, { status })
   }
+}
+
+/** A hard browser refresh cannot cancel a server-side job; this owner-scoped action can. */
+export async function DELETE(request: Request) {
+  const access = await getAccess().catch(() => null)
+  if (!access?.userId) return noStore({error:'Sign in to stop Builder.'},{status:401})
+  const jobId = new URL(request.url).searchParams.get('jobId') || ''
+  if (!UUID.test(jobId)) return noStore({error:'Invalid job id.'},{status:400})
+  try {
+    const outcome = await stopBuilderJobForUser(jobId,access.userId)
+    if (outcome === 'not_found') return noStore({error:'Job not found.'},{status:404})
+    return noStore({jobId, stopped:outcome==='stopped', status:outcome==='stopped'?'failed':'already_finished', reason:outcome==='stopped'?'builder_cancelled_by_owner':null})
+  } catch {return noStore({error:'Builder stop failed; check job status before retrying.'},{status:503})}
 }

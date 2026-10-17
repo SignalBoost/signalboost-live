@@ -56,7 +56,7 @@ test('the route gives a new project a fresh workspace and Builder V2 even when t
   assert.match(route, /const selectedWorkspaceId = newProjectRequested \? '' : requestedWorkspaceId/)
   assert.match(route, /let workspaceId = selectedWorkspaceId \|\| crypto\.randomUUID\(\)/)
   assert.match(route, /requestedWorkspaceId: selectedWorkspaceId \|\| undefined,/)
-  assert.match(route, /\(requestedEngine === 'v2' \|\| \(requestedEngine !== 'v1' && !selectedWorkspaceId && !project\.context\)\) \? \{ builderEngine: 'v2' \}/)
+  assert.match(route, /builderEngine: 'v2'/)
   // The raw browser value is only parsed and validated; every routing decision uses the effective selection.
   assert.equal(route.match(/\brequestedWorkspaceId\b/g)!.length, 5)
 })
@@ -66,6 +66,6 @@ test('the shared Software Specialist surface applies the same new-project rule (
   assert.match(surface, /const selectionBody = newProject \? \{\} : input\.body/)
   assert.match(surface, /requestedWorkspaceId: String\(selectionBody\?\.workspaceId \|\| selectionBody\?\.context\?\.workspaceId \|\| ''\)/)
   assert.match(surface, /const workspaceId = project\.workspaceId \|\| workspaceIdFrom\(selectionBody\)/)
-  assert.match(surface, /!project\.context && !selectionBody\?\.workspaceId \? \{ builderEngine: 'v2' \}/)
+  assert.match(surface, /builderEngine: 'v2'/)
   assert.doesNotMatch(surface, /workspaceIdFrom\(input\.body\)/)
 })

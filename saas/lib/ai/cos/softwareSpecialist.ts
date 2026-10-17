@@ -180,18 +180,7 @@ async function tryCosSoftwareSpecialistLegacy(
           if (job.status !== 'succeeded' || !proposal || !proposalMatches(proposal, {
             sourceJobId: job.id, fingerprint: await readBuilderWorkspaceFingerprint(userId, job.workspaceId), priorAnswer, now: Date.now(),
           })) return NextResponse.json({ reply: 'There is no current, unchanged Builder proposal to apply. Ask me to suggest the next improvement for this project.', execution_allowed: false })
-          if (signal?.aborted) throw new Error('harness_software_specialist_delegation_aborted')
-          const queued = await enqueueBuilderJob({ jobId: proposal.id, userId, conversationId, workspaceId: job.workspaceId,
-            objective: proposal.objective, jobKind: 'standard', ownerAuthorized: false,
-            metadata: { approvedProposalFingerprint: proposal.fingerprint, proposalSourceJobId: job.id,
-              productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null,
-              projectContext: { previousJobId: job.id, previousObjective: job.objective, previousStatus: job.status, previousCommands: [] } },
-            runningReply: runningReply(proposal.id),
-          })
-          if (signal?.aborted) throw new Error('harness_software_specialist_delegation_aborted')
-          after(async () => { await runBuilderJob(queued.jobId, userId) })
-          return NextResponse.json({ ...queued, workspaceId: job.workspaceId, status: 'queued', source: 'cos-builder',
-            ...softwareSpecialistFields('software.build') }, { status: 202 })
+          return NextResponse.json({ reply: 'Builder V2 requires a fresh workspace; legacy proposal continuation is unavailable. Start a new V2 task.', execution_allowed: false, source: 'builder-v2-only' }, { status: 409 })
         }
       } catch {
         return NextResponse.json({ reply: 'I could not safely start that saved proposal. It may already be running or the project may have changed. Check the project status before retrying.', execution_allowed: false }, { status: 409 })
@@ -268,6 +257,7 @@ async function tryCosSoftwareSpecialistLegacy(
   if (project.blocked) return NextResponse.json({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: project.blocked === 'busy' ? 409 : 503 })
 
   if (mediaAttached || !(roleMatched || designMatched || repositoryTarget || project.context)) return null
+  if (project.context || selectionBody?.workspaceId) return NextResponse.json({ reply: 'Builder V2 requires a fresh workspace; legacy workspace continuation is disabled.', execution_allowed: false, source: 'builder-v2-only' }, { status: 409 })
 
   // Public Concierge intentionally receives guest access under public-delivery scope. Its server-
   // captured audit identity may own an isolated workspace, but it never gains owner repository authority.
@@ -318,6 +308,7 @@ async function tryCosSoftwareSpecialistLegacy(
   const conversationId = conversationIdFrom(input.body) || crypto.randomUUID()
   const jobId = crypto.randomUUID()
   const debugPlan = repositoryTarget ? null : planDebugFileJob(objective, stagedFiles)
+  if (debugPlan) return NextResponse.json({ reply: 'Legacy Builder debug mode is retired. Use a fresh Builder V2 request.', execution_allowed: false, source: 'builder-v2-only' }, { status: 409 })
   const reply = runningReply(jobId)
   const specialistSkill = debugPlan ? 'software.repair' : 'software.build'
 
@@ -339,7 +330,7 @@ async function tryCosSoftwareSpecialistLegacy(
             debugPaths: debugPlan.files,
           }
         : { productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null, ...(project.context ? { projectContext: project.context } : {}),
-            ...(!project.context && !selectionBody?.workspaceId ? { builderEngine: 'v2' } : {}) },
+            builderEngine: 'v2' },
       ownerAuthorized: access?.isOwner === true,
       runningReply: reply,
     })

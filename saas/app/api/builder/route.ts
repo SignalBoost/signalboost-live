@@ -178,7 +178,7 @@ export async function POST(request: Request) {
     // Owner-scoped fresh jobs can explicitly exercise V2 without converting existing V1 checkpoints.
     // Reject unauthorized V2 requests rather than silently executing the legacy engine.
     const requestedEngine = body?.builderEngine
-    if (requestedEngine !== undefined && requestedEngine !== 'v1' && requestedEngine !== 'v2') {
+    if (requestedEngine !== undefined && requestedEngine !== 'v2') {
       return noStore({ error: 'builder_engine_invalid' }, { status: 400 })
     }
     const newProjectRequested = isNewBuilderProjectObjective(objective)
@@ -189,6 +189,7 @@ export async function POST(request: Request) {
     let files = cleanFiles(body?.files)
     const repositoryTarget = builderRepositoryTarget(objective, body?.repositoryUrl)
     const debugPlan = planDebugFileJob(objective, files)
+    if (debugPlan) return noStore({ error: 'builder_v1_debug_mode_retired_use_v2', execution_allowed: false }, { status: 409 })
     const ownerDeveloperLogSubmission = access.isOwner
       && isOperationalLogEvidence(objective)
       && SIGNALBOOST_OPERATIONAL_TARGET.test(objective)
@@ -254,7 +255,7 @@ export async function POST(request: Request) {
       }, { status: 202 })
     }
     if (project.blocked) return noStore({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: 503 })
-    if (requestedEngine === 'v2' && (selectedWorkspaceId || project.context)) {
+    if (selectedWorkspaceId || project.context) {
       return noStore({ error: 'builder_v2_requires_fresh_workspace' }, { status: 409 })
     }
     workspaceId = project.workspaceId || workspaceId
@@ -394,10 +395,11 @@ export async function POST(request: Request) {
               passiveLogEvidence,
               repositoryAuthority: false,
               ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
+              builderEngine: 'v2',
             }
           : { ...(project.context ? { projectContext: project.context } : {}),
               ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
-              ...((requestedEngine === 'v2' || (requestedEngine !== 'v1' && !selectedWorkspaceId && !project.context)) ? { builderEngine: 'v2' } : {}) },
+              builderEngine: 'v2' },
       ownerAuthorized: access.isOwner === true,
       runningReply: reply,
     })

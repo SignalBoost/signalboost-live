@@ -373,6 +373,13 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
 
     // V2 is selected by durable job metadata for all surfaces. Existing V1
     // checkpoint jobs remain V1 because their engine tag is absent.
+    // V1 has been retired. Never silently route untagged or legacy debug jobs
+    // to the old execution harness (including resumed checkpoint claims).
+    // Terminal failure is intentionally safer than replaying a V1 job as V2.
+    if (job.jobKind !== 'standard' || job.metadata.builderEngine !== 'v2') {
+      await terminalFailure(job, 'builder_v1_retired_use_v2')
+      return
+    }
     if (job.jobKind === 'standard' && job.metadata.builderEngine === 'v2') {
       const workspace = createSupabaseBuilderWorkspace(job.userId)
       if (!workspace) { await terminalFailure(job, 'builder_v2_workspace_unavailable'); return }

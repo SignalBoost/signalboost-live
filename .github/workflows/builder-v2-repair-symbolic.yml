@@ -22,4 +22,4 @@ jobs:
           python-version: '3.12'
       - run: pip install z3-solver==4.13.4.0
       - run: node --experimental-transform-types --test saas/tests/builderV2FailureTargeting.node.test.ts
-      - run: node --test verification/builder/v2-repair-paths.test.mjs
+      - run: node --experimental-transform-types --test verification/builder/v2-repair-paths.test.mjs

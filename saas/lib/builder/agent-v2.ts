@@ -80,7 +80,28 @@ export type BuilderV2Checkpoint = Readonly<{
   verifiedRevision: number
   unproductive: number
   lastReceipt: string
+  /** Consecutive resumed work slices without a new host receipt or source revision. */
+  idleSlices?: number
 }>
+
+/** Limit repeated resumptions that execute no tools and make no source changes. */
+export function builderV2IdleSliceCount(
+  previous: BuilderV2Checkpoint | null,
+  current: BuilderV2Checkpoint,
+): number {
+  if (!previous || previous.version !== 2) return 0
+  // Read-only inspection, repeated list/search calls, and failed host runs
+  // cannot buy unlimited new work slices. A genuine source edit or a successful
+  // host verification is productive; partial writing stays protected by revision.
+  if (current.revision > previous.revision) return 0
+  const recent = current.steps.slice(previous.steps.length)
+  if (recent.some(receipt => receipt.changed ||
+    (receipt.tool === 'run_tests' && receipt.ok &&
+      (receipt.output as { exitCode?: unknown; timedOut?: unknown } | undefined)?.exitCode === 0 &&
+      (receipt.output as { timedOut?: unknown } | undefined)?.timedOut === false))) return 0
+  const prior = previous.idleSlices
+  return Math.min(24, (Number.isSafeInteger(prior) && prior! >= 0 ? prior! : 0) + 1)
+}
 
 /**
  * A resumed job must never trust a checkpoint's claimed verification counters.
@@ -356,6 +377,7 @@ export class BuilderV2Agent {
         workspaceDigest: await workspaceDigest(this.workspace, options.workspaceId),
         steps: steps.map((receipt, at) => at < lastChange && at < steps.length - TAIL ? compactReceipt(receipt) : receipt),
         revision, verifiedRevision, unproductive, lastReceipt,
+        idleSlices: saved?.idleSlices ?? 0,
       }
     }
     const checklist = builderTaskContract(options.objective)
@@ -607,6 +629,14 @@ export class BuilderV2Agent {
           lastReceipt = JSON.stringify({ ok: false, error: 'builder_v2_repeated_action',
             message: 'This exact action already ran and no file has changed since; its result is below. Choose a different next step.',
             previous: JSON.parse(previous) }).slice(0, 20_000)
+          break
+        }
+        // Refuse an overwrite the agent has not inspected on this revision.
+        // Return recovery feedback without burning a host tool receipt.
+        if (action.tool === 'write_file' && knownFiles.includes(action.path) && !seen.has(action.path)) {
+          lastReceipt = JSON.stringify({ ok: false, tool: action.tool,
+            error: 'builder_write_content_conflict', path: action.path,
+            message: 'Read the existing file before overwriting it.' })
           break
         }
         const receipt = await this.dispatcher.dispatch(options.workspaceId, action,

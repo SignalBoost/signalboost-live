@@ -348,6 +348,13 @@ export class BuilderV2Agent {
     }
     for (let calls = 0; calls < maxSteps && steps.length < BUILDER_V2_MAX_RECEIPTS; calls++) {
       if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
+      // REA-inspired native harness: the host verifies complete work before asking a model
+      // for another action. Avoids an entire provider round-trip and timeout per command.
+      if (hostVerificationDue()) {
+        const verified = await hostVerify()
+        if (verified) return verified
+        // A failed host test is supplied to the model on this same turn for actual repair.
+      }
       let raw: string | null
       try {
         raw = await this.ai.generate({

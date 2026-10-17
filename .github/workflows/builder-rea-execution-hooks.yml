@@ -17,4 +17,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: node --experimental-strip-types --test saas/tests/builderExecutionHooks.node.test.ts
+      - run: node --experimental-transform-types --test saas/tests/builderExecutionHooks.node.test.ts

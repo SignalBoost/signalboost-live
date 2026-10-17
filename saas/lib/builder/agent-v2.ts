@@ -383,7 +383,10 @@ export class BuilderV2Agent {
               return { writeFiles: acceptance.missingFiles, passCommands: acceptance.pendingCommands,
                 tests: { passed: acceptance.testsPassed, required: acceptance.minimumTests } }
             })(),
-            nextRecommendedAction: missingFiles().length ? { tool: 'write_file', path: missingFiles()[0] } : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },
+            nextRecommendedAction: missingFiles().length ? { tool: 'write_file', path: missingFiles()[0] }
+              : steps.slice(steps.findLastIndex(step => step.changed) + 1).some(step => step.tool === 'run_tests' && !step.ok)
+                ? { tool: 'edit_file', reason: 'Repair the last failing test before rerunning the unchanged revision' }
+                : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },
             instruction: 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
             lastReceipt,
             tail: steps.slice(-TAIL),
@@ -441,7 +444,18 @@ export class BuilderV2Agent {
       for (const action of decision.actions) {
         if (steps.length >= BUILDER_V2_MAX_RECEIPTS) break
         const signature = JSON.stringify(action)
-        // Commands always execute: only a host run can prove or revoke verification, never a remembered result.
+        // A failed required suite is deterministic for an unchanged source revision.
+        // Host verification already captured its exit code/output. Do not spend more
+        // sandbox calls repeating the same failure; require an edit before rerun.
+        if (action.tool === 'run_tests' && steps.slice(steps.findLastIndex(step => step.changed) + 1)
+          .some(step => step.tool === 'run_tests' && !step.ok && (step.output as { requestedCommand?: unknown } | undefined)?.requestedCommand === action.command)) {
+          if (++repeats >= REPEAT_LIMIT) return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }
+          lastReceipt = JSON.stringify({ ok: false, error: 'builder_v2_unchanged_failed_suite',
+            message: 'The command already failed on this source revision. Edit the relevant source before rerunning it.',
+            command: action.command }).slice(0, 20_000)
+          break
+        }
+        // Commands execute on new revisions: only host receipts can prove verification.
         const previous = action.tool === 'run_tests' ? undefined : sinceChange.get(signature)
         if (previous !== undefined) {
           // Nothing changed since this exact action ran, so it would return the same result (stuck-loop detection

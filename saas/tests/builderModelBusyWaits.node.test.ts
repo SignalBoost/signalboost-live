@@ -182,7 +182,7 @@ test('unfinished suite retains exact diagnostics and yields a durable continuati
   assert.match(loop, /const targetedFailureGuidance = latestFailedVerification/)
   assert.match(loop, /failingTestNames/)
   assert.match(loop, /targetedFailureGuidance,\s+currentStep/)
-  assert.match(runner, /if \(unresolvedSuite && job\.claimGeneration < 24\)/)
+  assert.ok(runner.includes('if (unresolvedSuite && builderMayContinue(job, result.checkpoint!))'))
   assert.match(runner, /await pauseBuilderJob\(\{ job, checkpoint: result\.checkpoint!, reply/)
 })
 

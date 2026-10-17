@@ -11,8 +11,8 @@ import { BuilderV2Dispatcher } from '../lib/builder/agent-v2-dispatcher.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 
 test('no reply sequence produces a false pass, an invalid checkpoint, a rejected resume, a blind overwrite or a crash', async () => {
-  const { runs, violations } = await explore(3)
-  assert.ok(runs > 8000, `explored ${runs} runs`)
+  const { runs, violations } = await explore(4)
+  assert.ok(runs > 100000, `explored ${runs} runs`)
   assert.deepEqual(violations.slice(0, 5), [])
 })
 

@@ -25,3 +25,22 @@ No third-party source code has been copied. This is **behavioral source-level ad
 The test `saas/tests/builderV2OrderFlowScripted.node.test.ts` runs a real Node application and asserts a failed test → targeted edit → full passing host commands. The extended test also reopens a verified checkpoint with a deliberately unavailable provider; it must finish with zero further model calls and zero duplicate test runs.
 
 This regression establishes properties of the controlled scripted reference workflow, **not** that unmodified live frontier coding models can complete arbitrary customer applications. The previously stopped production OrderFlow jobs must remain stopped. Product-ready acceptance still requires a separate new, explicitly authorized real-LLM OrderFlow run under a cost/time ceiling with real user-facing artifacts.
+
+## Direct source audit (not marketing feature comparison)
+
+Sources inspected in upstream source trees:
+
+1. SWE-agent `sweagent/agent/agents.py` — `DefaultAgent.step` calls `forward_with_handling`, appends an action/observation to both history and a persisted trajectory. `RetryAgent.run` loops on real `step_output.done`, saves trajectory after every step, and has a separate review submission/retry loop. See https://github.com/SWE-agent/SWE-agent/blob/main/sweagent/agent/agents.py
+2. Aider `aider/coders/base_coder.py` — `run_one` sends a message and uses bounded `reflected_message` repairs under `max_reflections`; `auto_commit` commits edited files with context. See https://github.com/Aider-AI/aider/blob/main/aider/coders/base_coder.py
+3. Codex CLI `codex-rs/core/src/session/turn.rs` — `run_turn` owns the model/tool follow-up loop; tool calls produce results for subsequent sampling, whereas an ordinary assistant message may end the turn. `tasks/regular.rs` owns cancellation and the regular task lifecycle; `unified_exec/mod.rs` separates sandbox policy and execution. See https://github.com/openai/codex/tree/main/codex-rs/core/src
+4. Cline — implementation layout and task/tool flow require additional exact-revision source verification before claiming full REA. No Cline source port is claimed.
+
+### Concrete architecture gaps in iTMounts
+
+- **Persistent trajectory versus receipts**: V2 stores receipts but no independent reviewer judging repair quality; latest error context and revised command proof are now reconstructed, but reviewer integration is unimplemented.
+- **Bounded reflection and strategy switch**: Aider caps reflections and SWE-agent has a reviewer/retry strategy; V2 caps attempts and tool receipts, but no independent debugger strategy switch is demonstrated.
+- **Lifecycle control**: Codex documents explicit interrupt, cancellation and terminal task state; iTMounts has durable job status but lacked user-visible stop control, as shown when stopping the two OrderFlow jobs required direct database intervention.
+- **Host execution**: iTMounts has execution evidence and sandbox tools. Actual completed proofs should terminate without further model calls; this PR modifies that boundary.
+- **Live acceptance**: Scripted agent tests are insufficient to establish live autonomous correction of a wrong `createCatalog` export. This remains an unresolved acceptance gate.
+
+This is a **source audit with identified implementation gaps**, not a claim of an end-to-end reverse engineering of Codex/Cline/SWE-agent or a production-ready Builder.

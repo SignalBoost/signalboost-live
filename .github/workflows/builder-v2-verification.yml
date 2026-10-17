@@ -1,0 +1,35 @@
+# .github/workflows/builder-v2-verification.yml
+# Builder V2 behaviour suites, including bounded model checking of the agent loop (builderV2ModelCheck).
+# CanaryRouting, JobCycle and OwnerRouting still assert the pre-#4589 opt-in routing and are not listed until updated;
+# SymbolicTimeout runs in builder-v2-symbolic.yml with its Z3 input.
+name: Builder V2 Verification
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/builder/agent-v2*.ts'
+      - 'saas/lib/builder/syntax-check.ts'
+      - 'saas/lib/builder/task-contract.ts'
+      - 'saas/lib/builder/edit-match.ts'
+      - 'saas/lib/builder/workspace.ts'
+      - 'saas/lib/builder/job-runner.ts'
+      - 'saas/tests/builderV2*'
+      - '.github/workflows/builder-v2-verification.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install runtime
+        run: npm install --no-audit --no-fund
+      - name: Builder V2 suites and bounded model check
+        run: node --experimental-transform-types --test tests/builderV2Acceptance.node.test.ts tests/builderV2BatchedActions.node.test.ts tests/builderV2Dispatcher.node.test.ts tests/builderV2InspectionLoop.node.test.ts tests/builderV2LatestProof.node.test.ts tests/builderV2ModelCheck.node.test.ts tests/builderV2OrderFlowScripted.node.test.ts tests/builderV2ProgressReport.node.test.ts tests/builderV2ResumeBudget.node.test.ts tests/builderV2SharedSurfaceRouting.node.test.ts tests/builderV2SliceProgress.node.test.ts tests/builderV2SupabaseStore.node.test.ts tests/builderV2SyntaxCheck.node.test.ts tests/builderV2TimeoutHostVerify.node.test.ts 

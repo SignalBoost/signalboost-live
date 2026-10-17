@@ -37,7 +37,7 @@ for (const job of ['job-7c1f354e', 'job-629e2d0e']) {
     const { files } = fixture[job]
     const run = runOn(files, 'node --test test/*.test.js')
     assert.notEqual(run.exitCode, 0)
-    const failures = [...new Set([...`${run.stdout}\n${run.stderr}`.matchAll(/^\s+error: '([\w$.]+) is not a (?:function|constructor)'/gm)].map(m => m[1]))]
+    const failures = [...new Set([...`${run.stdout}\n${run.stderr}`.matchAll(/^\s*(?:error: '|TypeError(?: \[Error\])?: )([\w$.]+) is not a (?:function|constructor)'?/gm)].map(m => m[1]))]
     assert.ok(failures.length > 0)
     const named = new Set(builderInterfaceMismatches(files).map(m => m.kind === 'missing_export' ? m.name : m.name.split('.prototype.')[1]))
     for (const failure of failures) assert.ok(named.has(failure.split('.').pop()!), `${failure} not named; named: ${[...named].join(', ')}`)

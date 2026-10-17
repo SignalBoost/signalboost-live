@@ -1,0 +1,30 @@
+name: Builder REA integrated acceptance
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/builder/**'
+      - 'saas/tests/builderExecutionHooks.node.test.ts'
+      - '.github/workflows/builder-rea-end-to-end-acceptance.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integrated-builder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install test runtime
+        working-directory: saas
+        run: npm install --no-audit --no-fund
+      - name: Checkpoint, full application checklist and recovery
+        run: node --experimental-transform-types --test saas/tests/builderV2Acceptance.node.test.ts saas/tests/builderV2JobCycle.node.test.ts
+      - name: Sandboxed build, real local Node failure-repair-pass, checkpoint
+        run: node --experimental-transform-types --test saas/tests/builderProductReadiness.node.test.ts
+      - name: Browser validation and automatic repair contracts
+        run: node --experimental-transform-types --test saas/tests/builderPlaywrightCli.node.test.ts saas/tests/builderRepairClassification.node.test.ts
+      - name: Builder V1 and V2 REA host execution boundary
+        run: node --experimental-transform-types --test saas/tests/builderExecutionHooks.node.test.ts

@@ -1,5 +1,6 @@
 import type { BuilderFile, BuilderRunnerPort, BuilderWorkspacePort } from './contracts.ts'
 import { builderSyntaxError } from './syntax-check.ts'
+import { withBuilderExecutionHooks, type BuilderExecutionHook } from './execution-hooks.ts'
 
 /**
  * Model-independent tool execution for Builder V2. No model-generated result can
@@ -27,8 +28,10 @@ export class BuilderV2Dispatcher {
   private readonly locks = new Map<string, Promise<void>>()
   constructor(
     private readonly workspace: BuilderWorkspacePort,
-    private readonly runner: BuilderRunnerPort,
-  ) {}
+    runner: BuilderRunnerPort,
+    executionHooks?: BuilderExecutionHook,
+  ) { this.runner = executionHooks ? withBuilderExecutionHooks(runner, executionHooks) : runner }
+  private readonly runner: BuilderRunnerPort
 
   // Serialize every tool operation per workspace, so two overlapping jobs cannot
   // compare and write the same file against different uncommitted versions.

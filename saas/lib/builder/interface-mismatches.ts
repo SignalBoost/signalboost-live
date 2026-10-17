@@ -15,10 +15,11 @@ export type BuilderInterfaceMismatch = {
   line: number
   module: string
   name: string
-  kind: 'missing_export' | 'missing_method' | 'wrong_argument_count' | 'method_not_chainable'
+  kind: 'missing_export' | 'missing_method' | 'wrong_argument_count' | 'method_not_chainable' | 'mutates_defensive_copy'
   /**
    * missing_export: what the module exports. missing_method: the class's methods.
    * wrong_argument_count: the declared parameters. method_not_chainable: the method's return statements.
+   * mutates_defensive_copy: the getter's module and line, so the fix can land on either side.
    */
   available: string[]
 }
@@ -41,6 +42,8 @@ export type BuilderModuleInterface = {
   chainable: Record<string, string[]>
   /** The value of `module.exports = Name` when the module exports one binding directly. */
   defaultExport: string | null
+  /** Exported class name -> methods that return a copy (`return { ...stored }`), so callers cannot mutate state through them. */
+  copyReturning: Record<string, Array<{ method: string; line: number }>>
 }
 
 /** Mismatches grouped by the source module that has to change, for a single repair reply. */
@@ -139,7 +142,7 @@ function objectKeys(body: string): string[] {
   return keys
 }
 
-type ClassDetails = { methods: string[]; chainable: string[]; constructor: BuilderSignature | null; methodSignatures: Record<string, BuilderSignature> }
+type ClassDetails = { methods: string[]; chainable: string[]; constructor: BuilderSignature | null; methodSignatures: Record<string, BuilderSignature>; copyReturning: Array<{ method: string; line: number }> }
 
 function classDetails(code: string, name: string): ClassDetails | null {
   const head = new RegExp(`\\bclass\\s+${name}\\b[^{]*\\{`).exec(code)
@@ -151,6 +154,7 @@ function classDetails(code: string, name: string): ClassDetails | null {
   const methods = new Set<string>()
   const chainable = new Set<string>()
   const methodSignatures: Record<string, BuilderSignature> = {}
+  const copyReturning: Array<{ method: string; line: number }> = []
   let constructorSignature: BuilderSignature | null = null
   let depth = 0, offset = 0
   for (const line of body.split('\n')) {
@@ -166,6 +170,10 @@ function classDetails(code: string, name: string): ClassDetails | null {
           methods.add(member[1])
           if (params !== null) methodSignatures[member[1]] = signatureOf(params)
           if (methodBody !== null && /\breturn\s+this\b(?![.\[(])/.test(methodBody)) chainable.add(member[1])
+          // A getter that hands out a copy of stored state: `return { ...product }`, `Object.assign({}, product)`,
+          // `structuredClone(product)`, `JSON.parse(JSON.stringify(product))`.
+          const copy = methodBody === null ? null : /\breturn\s+(?:\{\s*\.\.\.|Object\.assign\(\s*\{\s*\}|structuredClone\(|JSON\.parse\(\s*JSON\.stringify\()/.exec(methodBody)
+          if (copy) copyReturning.push({ method: member[1], line: lineOf(code, bodyStart + 1 + offset) + lineOf(methodBody, copy.index) - 1 })
         }
       }
       const field = new RegExp(`^\\s*(?:static\\s+)?(${IDENT})\\s*=\\s*(?:async\\s*)?(?:\\([^)]*\\)|${IDENT})\\s*=>`).exec(line)
@@ -185,7 +193,7 @@ function classDetails(code: string, name: string): ClassDetails | null {
     for (const [method, signature] of Object.entries(inherited.methodSignatures)) if (!methodSignatures[method]) methodSignatures[method] = signature
     if (!constructorSignature) constructorSignature = inherited.constructor
   }
-  return { methods: [...methods].filter(method => !method.startsWith('#')), chainable: [...chainable], constructor: constructorSignature, methodSignatures }
+  return { methods: [...methods].filter(method => !method.startsWith('#')), chainable: [...chainable], constructor: constructorSignature, methodSignatures, copyReturning }
 }
 
 function classMethods(code: string, name: string): string[] | null {
@@ -218,6 +226,7 @@ export function builderModuleInterface(module: string, code: string): BuilderMod
   if (!exports.size && !single) return null
   const classes: Record<string, string[]> = {}
   const chainable: Record<string, string[]> = {}
+  const copyReturning: Record<string, Array<{ method: string; line: number }>> = {}
   const signatures: Record<string, BuilderSignature> = {}
   for (const name of [...exports, ...(single ? [single] : [])]) {
     const binding = new RegExp(`\\b${name}\\s*:\\s*(${IDENT})`).exec(code)?.[1] ?? name
@@ -225,6 +234,7 @@ export function builderModuleInterface(module: string, code: string): BuilderMod
     if (!details) continue
     classes[name] = details.methods
     if (details.chainable.length) chainable[name] = details.chainable
+    if (details.copyReturning.length) copyReturning[name] = details.copyReturning
     // A class without a constructor accepts any arguments.
     if (details.constructor) signatures[name] = details.constructor
     for (const [method, signature] of Object.entries(details.methodSignatures)) signatures[`${name}.prototype.${method}`] = signature
@@ -242,7 +252,7 @@ export function builderModuleInterface(module: string, code: string): BuilderMod
     const exported = created ? Object.keys(classes).find(key => key === created || new RegExp(`\\b${key}\\s*:\\s*${created}\\b`).test(code)) : undefined
     if (exported) factories[name] = exported
   }
-  return { module, exports: [...exports], classes, factories, exportStatement, signatures, chainable, defaultExport: single }
+  return { module, exports: [...exports], classes, factories, exportStatement, signatures, chainable, defaultExport: single, copyReturning }
 }
 
 /** Resolve `../src/cart` (from test/x.test.js) to a known workspace path. */
@@ -403,6 +413,34 @@ export function builderInterfaceMismatches(files: ReadonlyArray<{ path: string; 
           add({ test: test.path, line: lineOf(code, call.index!), module: binding.module, name: `${className}.prototype.${call[1]}`, kind: 'missing_method', available: methods })
         }
       }
+    }
+  }
+  // Sources against sources: a module mutates a field on an object another module's getter returned as a copy,
+  // so the change is lost. Production 2026-10-17: inventory.deduct() did `product.quantity -= n` on the copy
+  // catalog.getProduct() returned; stock never moved and 6 tests failed with "expected 2, actual 5".
+  const copyGetters = new Map<string, Array<{ module: string; className: string; line: number }>>()
+  for (const source of files) {
+    if (TEST_PATH.test(source.path) || !/\.[cm]?js$/.test(source.path)) continue
+    const api = moduleInterface(source.path)
+    if (!api) continue
+    for (const [className, getters] of Object.entries(api.copyReturning)) {
+      for (const getter of getters) copyGetters.set(getter.method, [...(copyGetters.get(getter.method) ?? []), { module: source.path, className, line: getter.line }])
+    }
+  }
+  for (const source of files) {
+    if (TEST_PATH.test(source.path) || !/\.[cm]?js$/.test(source.path) || !copyGetters.size) continue
+    const code = source.content.slice(0, MAX_SOURCE)
+    for (const found of code.matchAll(new RegExp(`\\b(?:const|let|var)\\s+(${IDENT})\\s*=\\s*(?:await\\s+)?[\\w$.]+\\.(${IDENT})\\s*\\(`, 'g'))) {
+      const getters = copyGetters.get(found[2])
+      // Only when exactly one class in the workspace defines a copy-returning method of that name.
+      if (!getters || getters.length !== 1 || getters[0].module === source.path) continue
+      const scope = code.slice(found.index!, found.index! + 2_500)
+      const mutation = new RegExp(`\\b${found[1]}\\.(${IDENT})\\s*(?:[-+*/%]?=(?!=)|\\+\\+|--)`).exec(scope)
+      if (!mutation) continue
+      const getter = getters[0]
+      add({ test: source.path, line: lineOf(code, found.index! + mutation.index), module: getter.module, kind: 'mutates_defensive_copy',
+        name: `${getter.className}.prototype.${found[2]} returns a copy (${getter.module}:${getter.line}); ${source.path} mutates ${found[1]}.${mutation[1]} on it`,
+        available: [] })
     }
   }
   return mismatches

@@ -52,8 +52,13 @@ test('production job-629e2d0e: repairs are grouped per module with the exact exp
   const exportText = cart!.exportStatement!
   assert.ok(files.find(file => file.path === 'src/cart.js')!.content.includes(exportText), 'exportStatement is exact source text')
   const catalog = repairs.find(repair => repair.module === 'src/catalog.js')
-  assert.deepEqual(catalog?.missing.map(item => item.name), ['Catalog.prototype.addProduct'])
+  assert.deepEqual(catalog?.missing.map(item => item.name), [
+    'Catalog.prototype.addProduct',
+    // The same latent lost-update bug as job cfd64119, present before that run ever reached it.
+    'Catalog.prototype.getProduct returns a copy (src/catalog.js:46); src/inventory.js mutates product.inventory on it',
+  ])
   assert.equal(catalog?.missing[0].usedAt, 'test/checkout.test.js:11')
+  assert.equal(catalog?.missing[1].usedAt, 'src/inventory.js:29')
 })
 
 test('production job-d8eff4a9 (after the export fix): the remaining failures are argument counts and chaining, all named', () => {
@@ -234,4 +239,34 @@ test('a directly exported class (module.exports = Cls) is bound through a plain 
     'wrong_argument_count:Vault(key) called with 0 arguments@2',
     'missing_method:Vault.prototype.close@4',
   ])
+})
+
+test('production job-cfd64119: the lost-update bug is reported as a copy mutation with both sides named', () => {
+  const { files } = fixture['job-cfd64119']
+  const run = runOn(files, 'node --test test/*.test.js')
+  assert.notEqual(run.exitCode, 0)
+  // Stock never moves: deduct() mutated the copy getProduct() returned.
+  assert.match(`${run.stdout}\n${run.stderr}`, /expected: 2\n\s+actual: 5|actual: 5/)
+  assert.deepEqual(builderInterfaceMismatches(files).map(m => `${m.kind}:${m.name}@${m.test}:${m.line}`), [
+    'mutates_defensive_copy:Catalog.prototype.getProduct returns a copy (src/catalog.js:54); src/inventory.js mutates product.quantity on it@src/inventory.js:31',
+  ])
+  // The one-line repair the finding points at makes those deductions stick.
+  const repaired = files.map(file => file.path !== 'src/catalog.js' ? file : { ...file, content: file.content.replace("    return { ...product };\n  }\n\n  listProducts", '    return product;\n  }\n\n  listProducts') })
+  assert.notEqual(repaired.find(file => file.path === 'src/catalog.js')!.content, files.find(file => file.path === 'src/catalog.js')!.content)
+  const before = [...`${run.stdout}`.matchAll(/^# pass (\d+)/gm)].map(m => Number(m[1]))[0]
+  const after = [...runOn(repaired, 'node --test test/*.test.js').stdout.matchAll(/^# pass (\d+)/gm)].map(m => Number(m[1]))[0]
+  assert.ok(after > before, `${before} -> ${after}`)
+  assert.deepEqual(builderInterfaceMismatches(repaired), [])
+})
+
+test('copy mutation: not reported for a stored-object getter, a same-module mutation, or an ambiguous method name', () => {
+  const stored: File[] = [
+    { path: 'src/store.js', content: 'class Depot {\n  constructor() { this.items = new Map() }\n  get(id) { return this.items.get(id) }\n  snapshot(id) { return { ...this.items.get(id) } }\n  bump(id) { const item = this.snapshot(id); item.n += 1; return item }\n}\nmodule.exports = { Depot }\n' },
+    { path: 'src/user.js', content: "const { Depot } = require('./store')\nclass User {\n  constructor(store) { this.store = store }\n  inc(id) { const item = this.store.get(id); item.n += 1 }\n  read(id) { const copy = this.store.snapshot(id); return copy.n }\n}\nmodule.exports = { User }\n" },
+  ]
+  assert.deepEqual(builderInterfaceMismatches(stored), [])
+  const mutated = stored.map(file => file.path !== 'src/user.js' ? file : { ...file, content: file.content.replace('const copy = this.store.snapshot(id); return copy.n', 'const copy = this.store.snapshot(id); copy.n -= 1; return copy.n') })
+  assert.deepEqual(builderInterfaceMismatches(mutated).map(m => `${m.kind}@${m.test}:${m.line}`), ['mutates_defensive_copy@src/user.js:5'])
+  const ambiguous: File[] = [...mutated, { path: 'src/annex.js', content: 'class Annex {\n  snapshot() { return { ...this.x }\n  }\n}\nmodule.exports = { Annex }\n' }]
+  assert.deepEqual(builderInterfaceMismatches(ambiguous), [])
 })

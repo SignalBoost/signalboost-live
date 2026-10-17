@@ -1,2 +1,2 @@
-base_sha=481e783b2d3674685df5ed12d597b6691e705a21
-branch=fix/builder-v2-regex-parse-20261017
+base_sha=5df6c01e565c65f9b7b276f3876f0d5b1e90611b
+branch=fix/builder-repair-lane-unfenced-20261017

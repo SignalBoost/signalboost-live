@@ -51,3 +51,22 @@ test('V2 parses browser action and records a real browser receipt',async()=>{
  assert.equal(calls,1)
  assert.equal(outcome.steps.some(x=>x.tool==='browser_cli'&&x.ok),true)
 })
+
+test('explicit browser verification cannot be replaced by passing tests alone',async()=>{
+ const {builderV2Acceptance}=await import('../lib/builder/agent-v2.ts')
+ const objective='Create these files:\n- app.js\n\nRun:\nnode --test app.js\n\nWrite at least 1 tests.\nBrowser verify https://itmounts.com.'
+ const write={tool:'write_file' as const,ok:true,changed:true}
+ const run={tool:'run_tests' as const,ok:true,changed:false,output:{
+   requestedCommand:'node --test app.js',executedCommand:'node --test app.js',
+   exitCode:0,timedOut:false,stdout:'ℹ pass 1\nℹ fail 0\n'}}
+ const browser=(ok:boolean,url='https://itmounts.com')=>({
+   tool:'browser_cli' as const,ok,changed:false,
+   output:{url,exitCode:ok?0:1,timedOut:false},
+ })
+ assert.equal(builderV2Acceptance(objective,['app.js'],[write,run]).satisfied,false)
+ assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,browser(false)]).satisfied,false)
+ assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,browser(true,'https://other.test')]).satisfied,false)
+ assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,browser(true)]).satisfied,true)
+ assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,browser(true),browser(false)]).satisfied,false)
+ assert.equal(builderV2Acceptance(objective,['app.js'],[write,run,browser(true),write]).satisfied,false)
+})

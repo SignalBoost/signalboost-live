@@ -146,7 +146,7 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
   }))
   // Browser-dependent tasks require a host browser receipt for the requested URL
   // after the last source mutation. A green unit suite cannot substitute for UI proof.
-  const browserMatch = /(?:browser|playwright|visual)[^\\n]{0,160}?(https:\\/\\/[^\\s),]+)/i.exec(objective)
+  const browserMatch = /(?:browser|playwright|visual)[^\n]{0,160}?(https:\/\/[^\s),]+)/i.exec(objective)
   const browserTarget = browserMatch?.[1]?.replace(/[.]+$/, '')
   const browserRuns = steps.slice(lastChange + 1).filter(receipt => receipt.tool === 'browser_cli')
   const latestBrowser = browserTarget ? browserRuns.findLast(receipt => {

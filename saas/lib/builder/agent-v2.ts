@@ -2,6 +2,7 @@ import type { BuilderAiPort, BuilderWorkspacePort } from './contracts.ts'
 import { checkpointDigest, workspaceDigest } from './checkpoint.ts'
 import { BuilderV2Dispatcher, type BuilderV2Action, type BuilderV2Receipt } from './agent-v2-dispatcher.ts'
 import { builderTaskContract } from './task-contract.ts'
+import { builderCrossFileContractHints } from './cross-file-contract-hints.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
 
 /**
@@ -552,6 +553,7 @@ export class BuilderV2Agent {
               : 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
             lastReceipt: compactAgainstWorkingSet(lastReceipt, working),
             latestFailedTest: currentFailure(),
+            ...(currentFailure() ? { crossFileContractHints: await builderCrossFileContractHints(this.workspace, options.workspaceId, knownFiles).catch(() => []), contractHintPolicy: 'These are approximate source-derived API hints, NOT acceptance evidence. Preserve the objective, inspect source and tests, repair production code first, and verify with actual host tests.' } : {}),
             ...working.prompt,
             // Content already in openFiles or latestFailedTest is not repeated from older receipts: it only costs context.
             tail: steps.slice(-TAIL).map(receipt => withoutWorkingSetCopies(receipt, working)),

@@ -1,2 +1,2 @@
-base_sha=5fe3d2a63115cbf2e68091bdbd4e69bf6730df68
-branch=test/cos-recovery-state-space-20261017
+base_sha=66071af9f19ab6868572794fb62bf07777d5bc04
+branch=fix/builder-v2-durable-agent-loop-20261017

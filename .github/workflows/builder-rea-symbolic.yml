@@ -1,0 +1,23 @@
+name: Builder REA symbolic classifier verification
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'verification/builder/failure-classifier-smt*'
+      - 'saas/lib/builder/rea-failure-classifier.ts'
+      - '.github/workflows/builder-rea-symbolic.yml'
+permissions:
+  contents: read
+jobs:
+  symbolic-classifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python -m pip install z3-solver==4.13.4.0
+      - run: node --experimental-strip-types --test verification/builder/failure-classifier-smt.test.mjs

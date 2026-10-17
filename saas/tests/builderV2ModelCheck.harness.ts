@@ -50,7 +50,8 @@ function blindOverwrite(outcome: BuilderV2Outcome, prefilled: boolean): string |
     const out = r.output as { path?: unknown; currentContent?: unknown } | undefined
     if (r.tool === 'read_file' && r.ok && out?.path === 'src/a.js') seen = true
     if (r.tool === 'write_file' && typeof out?.currentContent === 'string' && out.path === 'src/a.js') seen = true
-    if (r.tool === 'edit_file' && r.changed && out?.path === 'src/a.js') return null
+    // The agent forgets observed content after an edit, so a later full write needs a fresh read (Codex on #4625).
+    if (r.tool === 'edit_file' && r.changed && out?.path === 'src/a.js') seen = false
     if (r.tool === 'write_file' && r.changed && out?.path === 'src/a.js' && !seen) return JSON.stringify(r)
   }
   return null

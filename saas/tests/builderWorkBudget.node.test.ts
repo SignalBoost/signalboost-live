@@ -5,6 +5,7 @@
 // its first 4 slices and earns more, up to 12, only while each slice makes progress; a "continue" keeps the original
 // checklist; and a stop reports how many required files exist and which are missing.
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import type { BuilderLoopCheckpoint } from '../lib/builder/checkpoint.ts'
@@ -179,4 +180,15 @@ test('symbolic policy witnesses match the real Builder continuation gate', () =>
         `${scenario.label} cannot restart at claim ${claim} without progress`)
     }
   }
+})
+
+test('symbolic state explorer executes in the Builder regression suite', () => {
+  const script = new URL('../scripts/builder-v2-symbolic-orchestration.py', import.meta.url)
+  const process = spawnSync('python3', [script.pathname], { encoding: 'utf8', timeout: 15_000 })
+  assert.equal(process.status, 0, process.stderr || process.error?.message)
+  const report = JSON.parse(process.stdout)
+  assert.equal(report.states, 256)
+  assert.equal(report.assertions, 'passed')
+  assert.ok(report.witnesses.write_conflict)
+  assert.ok(report.witnesses.exhausted_failed_tests)
 })

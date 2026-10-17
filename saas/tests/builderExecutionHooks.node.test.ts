@@ -69,3 +69,20 @@ test('asynchronous host veto prevents execution',async()=>{
  await assert.rejects(runner.run(input),/policy_denied/)
  assert.equal(executions,0)
 })
+
+test('BuilderToolLoop delegates real run actions through trusted host hooks',async()=>{
+ const {BuilderToolLoop}=await import('../lib/builder/tool-loop.ts')
+ const {InMemoryBuilderWorkspace}=await import('../lib/builder/workspace.ts')
+ const events=[]
+ let replies=[JSON.stringify({type:'tool',toolId:'run',input:{command:'node app.js'}})]
+ const loop=new BuilderToolLoop(
+  {async generate(){return replies.shift()??null}},
+  new InMemoryBuilderWorkspace(),
+  {async run(){events.push('execute');return success}},
+  undefined,undefined,
+  {beforeRun({command}){assert.equal(command,'node app.js');events.push('before')},
+   afterRun({result}){assert.equal(result.exitCode,0);events.push('after')}}
+ )
+ await loop.run({objective:'Run app.js and inspect its output.',workspaceId:'rea:hooks:integration',maxRounds:1})
+ assert.deepEqual(events,['before','execute','after'])
+})

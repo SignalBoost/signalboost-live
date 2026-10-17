@@ -45,7 +45,7 @@ test('V2 parses browser action and records a real browser receipt',async()=>{
   async close(){}
  }
  let calls=0
- const agent=new BuilderV2Agent({async generate(){calls++;return JSON.stringify({type:'tool',action:{tool:'browser_cli',action:'snapshot',url:'https://itmounts.com'}})}},
+ const agent=new BuilderV2Agent({async generate(){calls++;return JSON.stringify({type:'tool',action:{tool:'browser_cli',action:'open',url:'https://itmounts.com'}})}},
   new BuilderV2Dispatcher(new InMemoryBuilderWorkspace(),runner,undefined,browser))
  const outcome=await agent.run({workspaceId:'u',objective:'Inspect the current application in the browser.',maxSteps:1})
  assert.equal(calls,1)

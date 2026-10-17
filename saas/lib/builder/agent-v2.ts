@@ -90,8 +90,15 @@ export function builderV2IdleSliceCount(
   current: BuilderV2Checkpoint,
 ): number {
   if (!previous || previous.version !== 2) return 0
-  const changed = previous.revision !== current.revision || previous.steps.length !== current.steps.length
-  if (changed) return 0
+  // Read-only inspection, repeated list/search calls, and failed host runs
+  // cannot buy unlimited new work slices. A genuine source edit or a successful
+  // host verification is productive; partial writing stays protected by revision.
+  if (current.revision > previous.revision) return 0
+  const recent = current.steps.slice(previous.steps.length)
+  if (recent.some(receipt => receipt.changed ||
+    (receipt.tool === 'run_tests' && receipt.ok &&
+      (receipt.output as { exitCode?: unknown; timedOut?: unknown } | undefined)?.exitCode === 0 &&
+      (receipt.output as { timedOut?: unknown } | undefined)?.timedOut === false))) return 0
   const prior = previous.idleSlices
   return Math.min(24, (Number.isSafeInteger(prior) && prior! >= 0 ? prior! : 0) + 1)
 }

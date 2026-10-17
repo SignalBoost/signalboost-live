@@ -6,8 +6,8 @@ const src = readFileSync(new URL('../lib/builder/agent-v2.ts', import.meta.url),
 
 test('a model timeout after all files exist dispatches each mandatory real host command', () => {
   // Shared with host verification after each change (builderV2BatchedActions covers the behaviour).
-  assert.match(src, /const hostVerificationDue = \\(\\) => checklist\\.files\\.length > 0/)
-  assert.match(src, /checklist\\.commands\\.some\\(command => !latestCommandRun\\(command\\)\\)/)
+  assert.ok(src.includes('const hostVerificationDue = () => checklist.files.length > 0'))
+  assert.ok(src.includes('checklist.commands.some(command => !latestCommandRun(command))'))
   assert.match(src, /const action: BuilderV2Action = \{ tool: 'run_tests', command \}\s+const receipt = await this\.dispatcher\.dispatch\(options\.workspaceId, action\)/)
   assert.match(src, /if \(!receipt\.ok\) return null/)
 })

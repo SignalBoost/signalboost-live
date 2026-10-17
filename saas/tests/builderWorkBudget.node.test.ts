@@ -120,19 +120,31 @@ test('work limit never instructs the customer to type continue', () => {
   assert.match(source, /resume an eligible checkpoint automatically/)
 })
 
-// Bounded state exploration: verification-only slices must not be treated as terminal stalls.
-test('verification pending survives nonproductive slices but never bypasses the hard claim ceiling', () => {
+// State-space regression from production OrderFlow: 15 files existed, but
+// verificationPending stayed true during repeated reads and failed commands.
+// Exhaustive small-state check: pending verification alone cannot renew a stalled job.
+test('verification pending cannot bypass the no-progress guard', () => {
   const previous = checkpoint([write('a.js'), run(19, 2)])
   const verifying = { ...checkpoint([write('a.js'), run(19, 2), failedRead('a.js')]), verificationPending: true } as BuilderLoopCheckpoint
-  const stalled = { ...verifying, verificationPending: false } as BuilderLoopCheckpoint
+  const progressed = { ...checkpoint([write('a.js'), run(19, 2), write('b.js')]), verificationPending: true } as BuilderLoopCheckpoint
+  const timeoutReasons = [false, true]
   for (let claim = 1; claim <= MAX_WORK_SLICES + 2; claim++) {
     for (let deferrals = 0; deferrals <= 3; deferrals++) {
-      const job = { claimGeneration: claim, checkpoint: previous, metadata: { builderCapacityDeferrals: deferrals } }
-      assert.equal(builderMayContinue(job, verifying), claim < MAX_WORK_SLICES,
-        `verification state: claim=${claim} deferrals=${deferrals}`)
-      if (claim - deferrals >= BASE_WORK_SLICES && claim < MAX_WORK_SLICES) {
-        assert.equal(builderMayContinue(job, stalled), false, `actual stall: claim=${claim} deferrals=${deferrals}`)
+      for (const endedWaitingForModel of timeoutReasons) {
+        const job = { claimGeneration: claim, checkpoint: previous, metadata: { builderCapacityDeferrals: deferrals } }
+        const expected = claim < MAX_WORK_SLICES &&
+          (claim - deferrals < BASE_WORK_SLICES || endedWaitingForModel)
+        assert.equal(builderMayContinue(job, verifying, endedWaitingForModel), expected,
+          `stalled verification: claim=${claim} deferrals=${deferrals} modelWait=${endedWaitingForModel}`)
+        assert.equal(builderMayContinue(job, progressed, endedWaitingForModel), claim < MAX_WORK_SLICES,
+          `productive verification: claim=${claim} deferrals=${deferrals}`)
       }
     }
   }
+})
+
+test('a failing suite cannot override Builder progress admission', () => {
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  assert.match(runner, /if \\(unresolvedSuite && builderMayContinue\\(job, result\\.checkpoint!\\)\\)/)
+  assert.doesNotMatch(runner, /if \\(unresolvedSuite && job\\.claimGeneration < 24\\)/)
 })

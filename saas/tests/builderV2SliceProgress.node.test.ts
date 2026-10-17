@@ -32,7 +32,7 @@ test('a resumed job gets a fresh slice budget instead of pausing forever once it
   ])
   const sliceTwo = await new BuilderV2Agent(second.ai, new BuilderV2Dispatcher(workspace, passing), workspace)
     .run({ workspaceId: 'w', objective, maxSteps: 24, checkpoint: sliceOne.checkpoint })
-  assert.equal(second.calls(), 3)
+  assert.equal(second.calls(), 2) // host verifies after the missing file is written; no model finish needed
   assert.equal(sliceTwo.ok, true, sliceTwo.reason)
 })
 
@@ -228,8 +228,10 @@ test('Codex review on #4597: rerunning an already-passing command before a model
   } }
   const cycle = await runBuilderV2JobCycle({ jobId: 'j', claimGeneration: 2, store,
     agent: new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, passing), workspace), maxSteps: 24 })
-  assert.equal(cycle.status, 'failed')
-  assert.equal(cycle.reason, 'builder_v2_model_unavailable: builder_model_deadline_exceeded')
+  // The earlier passing host proof already completes the task; no repeat
+  // model call or test can be required for an unchanged completed revision.
+  assert.equal(cycle.status, 'verified')
+  assert.equal(call, 0)
 })
 
 test('Codex review on #4598: a newly passing required command before a model failure is progress', async () => {

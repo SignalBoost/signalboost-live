@@ -1,2 +1,2 @@
-base_sha=a784ee2af48fde9e865e3890528f1e2667cdefec
-branch=fix/builder-v2-empty-assigned-reply-20261017
+base_sha=f8385a1de64a731d96c5405219b1f34c1df7fed8
+branch=fix/builder-assigned-fallback-gate-20261017

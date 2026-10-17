@@ -43,7 +43,7 @@ export class CursorCloudAgent {
     if (!/^bc-[A-Za-z0-9-]+$/.test(handle.agentId) || !/^run-[A-Za-z0-9-]+$/.test(handle.runId))
       throw new Error('cursor_invalid_handle')
     const data = await this.request('/agents/'+handle.agentId+'/runs/'+handle.runId,'GET')
-    return {status:String(data?.status ?? 'UNKNOWN'),terminal:['FINISHED','FAILED','CANCELLED'].includes(data?.status),raw:data}
+    return {status:String(data?.status ?? 'UNKNOWN'),terminal:['FINISHED','ERROR','CANCELLED','EXPIRED'].includes(data?.status),raw:data}
   }
   async repair(handle: CursorRunHandle, failedCommandEvidence: string): Promise<{runId:string}> {
     if (failedCommandEvidence.length > 20_000) throw new Error('cursor_repair_evidence_too_large')
@@ -52,7 +52,7 @@ export class CursorCloudAgent {
     const data = await this.request('/agents/'+handle.agentId+'/runs','POST',{
       prompt:{text:'Repair the following actual host test failures. Do not report success until commands pass.\n'+failedCommandEvidence},mode:'agent'
     })
-    if (!/^run-/.test(data?.id ?? '')) throw new Error('cursor_invalid_run_response')
-    return {runId:data.id}
+    if (!/^run-/.test(data?.run?.id ?? '')) throw new Error('cursor_invalid_run_response')
+    return {runId:data.run.id}
   }
 }

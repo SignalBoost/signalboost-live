@@ -17,4 +17,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm -v "$PWD/verification/builder:/model:ro" ghcr.io/apalache-mc/apalache:main check --init=Init --next=Next --inv=Safety --length=8 /model/BuilderLease.tla
+          docker run --rm -v "$PWD/verification/builder:/var/apalache" ghcr.io/apalache-mc/apalache:main check --init=Init --next=Next --inv=Safety --length=8 BuilderLease.tla

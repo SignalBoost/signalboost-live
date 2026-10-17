@@ -163,3 +163,25 @@ test('resumed V2 checkpoint rejects success without a passing host exit code', a
   const result = await new BuilderV2Agent(ai, dispatcher, workspace).run({ workspaceId: 'w', objective, checkpoint: forged })
   assert.equal(result.reason, 'builder_v2_checkpoint_invalid')
 })
+
+test('a refused edit tells the model where the search matched instead of a bare error', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const dispatcher = new BuilderV2Dispatcher(workspace, { async run() { return { exitCode: 0, stdout: '', stderr: '', timedOut: false } } })
+  await workspace.writeFile('test', 'src/stock.js', 'function a() {\n  return count;\n}\nfunction b() {\n  return count;\n}\n')
+  const ambiguous = await dispatcher.dispatch('test', { tool: 'edit_file', path: 'src/stock.js', search: '  return count;', replace: '  return count - 1;' })
+  assert.equal(ambiguous.ok, false)
+  assert.equal(ambiguous.error, 'builder_edit_target_ambiguous')
+  assert.deepEqual(ambiguous.output, {
+    path: 'src/stock.js', matches: 2,
+    locations: [{ line: 2, text: '  return count;' }, { line: 5, text: '  return count;' }],
+    hint: 'The search text occurs at each listed line. Include a neighbouring line in the search so it matches only the one you mean.',
+  })
+  assert.deepEqual(ambiguous.next, ['edit_file', 'read_file'])
+  const missing = await dispatcher.dispatch('test', { tool: 'edit_file', path: 'src/stock.js', search: 'return count;\n  }', replace: 'x' })
+  assert.equal(missing.error, 'builder_edit_target_not_found')
+  assert.deepEqual((missing.output as { locations: unknown }).locations, [{ line: 2, text: '  return count;' }, { line: 5, text: '  return count;' }])
+  // Widened with the function line, the edit lands once and the file changes.
+  const landed = await dispatcher.dispatch('test', { tool: 'edit_file', path: 'src/stock.js', search: 'function b() {\n  return count;', replace: 'function b() {\n  return count - 1;' })
+  assert.equal(landed.changed, true)
+  assert.match((await workspace.readFile('test', 'src/stock.js'))!.content, /function b\(\) \{\n  return count - 1;/)
+})

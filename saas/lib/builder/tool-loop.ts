@@ -7,6 +7,7 @@ import { formatVerifiedLessonsForPrompt } from './verified-lessons.ts'
 import { formatBuilderCognitiveGuidance } from './cognitive-application.ts'
 import { discoverBuilderProjectContext, formatBuilderProjectContext, normalizeBuilderSandboxCommand } from './project-context.ts'
 import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
+import { classifyBuilderFailure } from './rea-failure-classifier.ts'
 import { builderContractObjective, builderTaskContract, builderTaskProgress } from './task-contract.ts'
 import { builderEngineeringGoal, formatBuilderEngineeringGoal } from './engineering-control-plane.ts'
 import { formatBuilderWorkingFiles } from './working-context.ts'
@@ -785,7 +786,7 @@ export class BuilderToolLoop {
       const failingTestNames = [...failingTestOutput.matchAll(/^\s*[✖×]\s+(.+)$/gm)]
         .map(match => match[1].trim()).filter(name => name && !name.startsWith('failing tests:'))
       const targetedFailureGuidance = latestFailedVerification
-        ? `UNRESOLVED FULL-SUITE FAILURE: The previous required test command exited nonzero. A passing smoke run is not proof. Failing test names: ${JSON.stringify([...new Set(failingTestNames)].slice(0, 12))}. Failure assertions and stack traces: ${failingTestOutput.slice(-9000)}. Inspect the implicated implementation and tests, edit the minimal source needed, run a focused test, then rerun the original full suite after the edit. Do not re-run unchanged failing tests or claim completion.`
+        ? `UNRESOLVED FULL-SUITE FAILURE: The previous required test command exited nonzero. A passing smoke run is not proof. Failing test names: ${JSON.stringify([...new Set(failingTestNames)].slice(0, 12))}. Failure classification: ${classifyBuilderFailure(failingTestOutput).kind}. Recommended bounded repair: ${classifyBuilderFailure(failingTestOutput).action}. Failure assertions and stack traces: ${failingTestOutput.slice(-9000)}. Inspect the implicated implementation and tests, edit the minimal source needed, run a focused test, then rerun the original full suite after the edit. Do not re-run unchanged failing tests or claim completion.`
         : ''
       const blockedInspectionTools = new Set(trace
         .slice(lastWorkspaceChange + 1)

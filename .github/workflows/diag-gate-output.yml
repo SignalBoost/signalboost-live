@@ -1,0 +1,50 @@
+# .github/workflows/diag-gate-output.yml
+# Temporary, branch-only: runs the Vercel COS gate in CI and returns its failing output, encrypted. Never merged.
+name: diag-gate-output
+on:
+  push:
+    branches: [diag/gate-output]
+    paths-ignore: ['diag-out/**']
+permissions:
+  contents: write
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        working-directory: saas
+        run: npm install --no-audit --no-fund
+      - name: Run the gate, keep output
+        working-directory: saas
+        run: |
+          set +e
+          node scripts/vercel-cos-gates.mjs > ../gate.log 2>&1
+          echo "exit=$?" >> ../gate.log
+          nproc >> ../gate.log; free -m >> ../gate.log
+      - name: Encrypt and commit
+        run: |
+          cat > pub.pem <<'KEY'
+          -----BEGIN PUBLIC KEY-----
+          MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAvM6pGkdRZBNKl6plyVQU
+          rxULm2wfun+2N+1J9uwgQV4BRtgH5GlTgbg3m4I3ufnWV1WmDIbN4kFpvtEwEu1Y
+          YN8vt1CsnRY26lWx4Fjad8s4h2g7Y9k8s9L3Ath/3sbBVzIae/kLeDzyU0WXkJsQ
+          YBKc17Sl2gjb6FkrvWWQRyllgImXfdG0BY3ErxuBlgVNB+M8lOchs31480f/sUaC
+          UrvmghYjIYcUqept3zz3Lvw9dvNfVOKway6imsfkFa1vrB4XPzxWr0D0n57k2qUJ
+          6h3gDcyiH6nGyvMe3gaGkunczKZu9fCvj6w00khSHclarx7Qm7Ltx0TuXRIGsrPd
+          EAFzBASjULhOgcIG8zw+2dyNCTbFdp0wNz6mrdhyFjN2Jei/ufsVi6s9j03QFvca
+          QuNnF9kNPE06inZbuExA+1Nex8VAbRkSHAm8NeqYVIa5648rqHaxo6bqNa2QLG1X
+          37SDxQ2ZPmv4ePhgWsB5ROd7ZU94Mjxt6pob20PwmtRXAgMBAAE=
+          -----END PUBLIC KEY-----
+          KEY
+          { grep -nE "not ok|^# (tests|pass|fail)|exit=|error|Error|ENOMEM|killed|timeout|duration_ms" gate.log | head -400; echo ---TAIL---; tail -120 gate.log; } > dump.json
+          openssl rand -out k.bin 32
+          openssl enc -aes-256-cbc -pbkdf2 -in dump.json -out dump.enc -pass file:k.bin
+          openssl pkeyutl -encrypt -pubin -inkey pub.pem -in k.bin -out k.enc
+          rm -f dump.json k.bin gate.log pub.pem
+          mkdir -p diag-out && mv dump.enc k.enc diag-out/
+          git config user.name diag && git config user.email diag@users.noreply.github.com
+          git add diag-out && git commit -qm 'diag: encrypted output' && git push -q

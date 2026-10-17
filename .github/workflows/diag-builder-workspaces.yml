@@ -1,0 +1,60 @@
+# .github/workflows/diag-builder-workspaces.yml
+# Temporary, branch-only: reads Builder workspaces for failing jobs, encrypted to an operator key. Never merged.
+name: diag-builder-workspaces
+on:
+  push:
+    branches: [diag/builder-workspaces-20261017]
+    paths-ignore: ['diag-out/**']
+permissions:
+  contents: write
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read workspaces (encrypted output only)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          cat > pub.pem <<'KEY'
+          -----BEGIN PUBLIC KEY-----
+          MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAvM6pGkdRZBNKl6plyVQU
+          rxULm2wfun+2N+1J9uwgQV4BRtgH5GlTgbg3m4I3ufnWV1WmDIbN4kFpvtEwEu1Y
+          YN8vt1CsnRY26lWx4Fjad8s4h2g7Y9k8s9L3Ath/3sbBVzIae/kLeDzyU0WXkJsQ
+          YBKc17Sl2gjb6FkrvWWQRyllgImXfdG0BY3ErxuBlgVNB+M8lOchs31480f/sUaC
+          UrvmghYjIYcUqept3zz3Lvw9dvNfVOKway6imsfkFa1vrB4XPzxWr0D0n57k2qUJ
+          6h3gDcyiH6nGyvMe3gaGkunczKZu9fCvj6w00khSHclarx7Qm7Ltx0TuXRIGsrPd
+          EAFzBASjULhOgcIG8zw+2dyNCTbFdp0wNz6mrdhyFjN2Jei/ufsVi6s9j03QFvca
+          QuNnF9kNPE06inZbuExA+1Nex8VAbRkSHAm8NeqYVIa5648rqHaxo6bqNa2QLG1X
+          37SDxQ2ZPmv4ePhgWsB5ROd7ZU94Mjxt6pob20PwmtRXAgMBAAE=
+          -----END PUBLIC KEY-----
+          KEY
+          node - <<'JS'
+          const fs = require('fs')
+          const h = { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY }
+          const get = async q => { const r = await fetch(process.env.SUPABASE_URL + '/rest/v1/' + q, { headers: h }); if (!r.ok) throw new Error(r.status + ' ' + await r.text()); return r.json() }
+          ;(async () => {
+            const out = {}
+            const jobs = await get('builder_jobs?or=(id.eq.629e2d0e-c21f-4012-872e-56227656bf6e,workspace_id.eq.e0a41559-9d3d-421d-9537-a0c566572b55,workspace_id.eq.076e4743-0000-0000-0000-000000000000)&select=id,status,error,workspace_id,checkpoint,result,metadata,created_at,finished_at')
+            const wsIds = new Set(jobs.map(j => j.workspace_id))
+            const recent = await get('builder_jobs?metadata->>builderEngine=eq.v2&order=created_at.desc&limit=12&select=id,workspace_id,status,error')
+            for (const j of recent) wsIds.add(j.workspace_id)
+            for (const ws of wsIds) {
+              const files = await get('builder_workspace_files?workspace_id=eq.' + ws + '&select=path,content,updated_at')
+              for (const f of files) if (String(f.content).startsWith('base64:')) f.content = Buffer.from(f.content.slice(7), 'base64').toString('utf8')
+              out[ws] = files
+            }
+            fs.writeFileSync('dump.json', JSON.stringify({ jobs, recent, workspaces: out }))
+            console.log('workspaces', Object.keys(out).length)
+          })().catch(e => { console.error(e.message); process.exit(1) })
+          JS
+          openssl rand -out k.bin 32
+          openssl enc -aes-256-cbc -pbkdf2 -in dump.json -out dump.enc -pass file:k.bin
+          openssl pkeyutl -encrypt -pubin -inkey pub.pem -in k.bin -out k.enc
+          rm -f dump.json k.bin
+      - name: Commit ciphertext to this branch
+        run: |
+          mkdir -p diag-out && mv dump.enc k.enc diag-out/
+          git config user.name diag && git config user.email diag@users.noreply.github.com
+          git add diag-out && git commit -qm 'diag: encrypted output' && git push -q

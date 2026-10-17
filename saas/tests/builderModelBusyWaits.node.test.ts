@@ -126,7 +126,7 @@ test('RunPod busy attempts assigned fallback before durable queueing', () => {
   const assignedIndex = port.indexOf('await tryAssignedPlatformModelTurn(', busyIndex)
   const queueIndex = port.indexOf("if (runpodBusy) throw new Error('builder_runpod_primary_busy')", assignedIndex)
   assert.ok(busyIndex >= 0 && assignedIndex > busyIndex && queueIndex > assignedIndex)
-  assert.match(port.slice(assignedIndex, queueIndex), /if \(assigned\.attempted\) return requireText/)
+  assert.match(port.slice(assignedIndex, queueIndex), /if \(assigned\.attempted && assigned\.result\?\.content\?\.trim\(\)\) return assigned\.result\.content/)
   assert.doesNotMatch(port.slice(busyIndex, assignedIndex), /throw new Error\('builder_runpod_primary_busy'\)/)
 })
 // end of saas/tests/builderModelBusyWaits.node.test.ts (if this line is missing, the paste was cut short)

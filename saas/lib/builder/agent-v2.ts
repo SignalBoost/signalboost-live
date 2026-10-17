@@ -544,7 +544,7 @@ export class BuilderV2Agent {
               return { writeFiles: acceptance.missingFiles, passCommands: acceptance.pendingCommands,
                 tests: { passed: acceptance.testsPassed, required: acceptance.minimumTests } }
             })(),
-            nextRecommendedAction: missingFiles().length ? { tool: 'write_file', path: missingFiles()[0] }
+            nextRecommendedAction: missingFiles().length ? { tool: 'tools', actions: missingFiles().slice(0, 4).map(path => ({ tool: 'write_file', path })), instruction: 'Generate these files together in one complete tools reply, respecting the output limit; include full contents for each action.' }
               : steps.slice(steps.findLastIndex(step => step.changed) + 1).some(step => step.tool === 'run_tests' && !step.ok)
                 ? { tool: 'edit_file', reason: 'Repair the last failing test before rerunning the unchanged revision' }
                 : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },

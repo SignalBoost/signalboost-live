@@ -339,7 +339,7 @@ async function tryCosSoftwareSpecialistLegacy(
             debugPaths: debugPlan.files,
           }
         : { productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null, ...(project.context ? { projectContext: project.context } : {}),
-            ...(!project.context && !selectionBody?.workspaceId ? { builderEngine: 'v2' } : {}) },
+            builderEngine: 'v2' },
       ownerAuthorized: access?.isOwner === true,
       runningReply: reply,
     })

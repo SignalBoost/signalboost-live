@@ -5,7 +5,7 @@ const read=(p:string)=>readFileSync(new URL(p, import.meta.url),'utf8')
 
 test('COS and Concierge fresh standard jobs have V2 durable metadata',()=>{
   const specialist=read('../lib/ai/cos/softwareSpecialist.ts')
-  assert.match(specialist,/!project\.context && !input\.body\?\.workspaceId \? \{ builderEngine: 'v2' \}/)
+  assert.match(specialist,/!project\.context && !selectionBody\?\.workspaceId \? \{ builderEngine: 'v2' \}/)
   assert.match(specialist,/jobKind: debugPlan \? 'debug_file' : 'standard'/)
 })
 test('Developer surface defaults new standard jobs to V2 but keeps explicit V1 compatibility',()=>{

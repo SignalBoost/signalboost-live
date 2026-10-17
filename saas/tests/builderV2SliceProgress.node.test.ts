@@ -87,8 +87,11 @@ test('a long run with no change and no passing command pauses the slice with its
     new BuilderV2Dispatcher(workspace, failing), workspace)
   const outcome = await agent.run({ workspaceId: 's', objective: 'Run npm test.', maxSteps: 60 })
   assert.equal(outcome.reason, 'builder_v2_step_budget')
-  assert.equal(outcome.steps.length, BUILDER_V2_STALL_LIMIT)
-  assert.equal(outcome.checkpoint?.unproductive, BUILDER_V2_STALL_LIMIT)
+  // Since #4643 a failed command is not rerun on an unchanged revision: it runs once, the repeats are refused, and the
+  // slice pauses with its checkpoint well before the stall limit.
+  assert.equal(outcome.steps.length, 1)
+  assert.ok(outcome.steps.length < BUILDER_V2_STALL_LIMIT)
+  assert.equal(outcome.checkpoint?.unproductive, 1)
 })
 
 test('a file the model has read can be rewritten; an unseen one cannot be overwritten', async () => {

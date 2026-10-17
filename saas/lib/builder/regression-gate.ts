@@ -29,7 +29,7 @@ const SUPPLIED_FAILURE_EVIDENCE = /(?:^|\n)\s*(?:[A-Z][A-Za-z]*Error\b|Traceback
 // errors and failing tests turned a new build into a repair with no source.
 const TITLE_OR_DIVIDER = /^\s*(?:#{1,6}(?:\s|$)|(?:[-*_=]\s*){3,}$)/
 
-function openingDirective(objective: string): string {
+export function openingDirective(objective: string): string {
   const line = String(objective || '').split(/\r?\n/).find(item => item.trim().length > 0 && !TITLE_OR_DIVIDER.test(item))
   return line ? line.trim() : ''
 }

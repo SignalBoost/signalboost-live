@@ -89,10 +89,12 @@ test('Builder V2 builds a drawn-tree spec end to end: fenced replies, checklist 
   assert.match(prompts[4], /index\.js/)
   // Real failing run, tolerant edit, real passing runs.
   const runs = outcome.steps.filter(step => step.tool === 'run_tests')
-  // Host run after the last file (fails), the model's own run (fails), then host verification after the repair.
-  assert.deepEqual(runs.map(step => step.ok), [false, false, true, true])
-  assert.match(String((runs[2].output as { stdout: string }).stdout), /# pass 2|ℹ pass 2/)
-  assert.match(String((runs[3].output as { stdout: string }).stdout), /Order total: 10/)
+  // Host run after the last file (fails); the model's rerun of that failed command on the unchanged revision is
+  // refused (#4643) instead of executed; then host verification after the repair.
+  assert.deepEqual(runs.map(step => step.ok), [false, true, true])
+  assert.match(prompts[6], /builder_v2_unchanged_failed_suite/)
+  assert.match(String((runs[1].output as { stdout: string }).stdout), /# pass 2|ℹ pass 2/)
+  assert.match(String((runs[2].output as { stdout: string }).stdout), /Order total: 10/)
   assert.match((await workspace.readFile('mini', 'src/cart.js'))!.content, /item\.price \* item\.qty/)
 })
 

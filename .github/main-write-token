@@ -1,2 +1,2 @@
-base_sha=b9891fd31b995f406ae94d240b612bd821738273
-branch=fix/builder-v2-targeted-repair-controller-20261017
+base_sha=b30756b224cdf59c6a54b713aaddaddcc4178ef2
+branch=fix/builder-v2-repair-proof-regression-20261017

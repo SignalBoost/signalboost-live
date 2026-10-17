@@ -2,6 +2,7 @@ import { BuilderV2Agent, type BuilderV2Checkpoint, type BuilderV2Outcome } from 
 import type { BuilderV2Receipt } from './agent-v2-dispatcher.ts'
 import { builderTaskContract } from './task-contract.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
+import { canonicalJson } from '../supervisor/kernel/canonical-json.ts'
 
 /**
  * Durable V2 continuation boundary. The store must atomically fence writes using
@@ -106,7 +107,8 @@ export async function runBuilderV2JobCycle(input: {
   // checkpoint; the job's slice cap still bounds how often it resumes.
   if (result.reason === 'builder_v2_step_budget' || result.reason === 'builder_v2_cancelled' || result.reason === 'builder_v2_model_unavailable') {
     // Compare content, not identity: every snapshot is a new object, so identity re-saved an unchanged checkpoint.
-    if (result.checkpoint && JSON.stringify(result.checkpoint) !== JSON.stringify(persisted)
+    // Key order is ignored: a checkpoint read back from the jsonb column does not keep it (Codex on #4628).
+    if (result.checkpoint && canonicalJson(result.checkpoint) !== canonicalJson(persisted)
       && !await input.store.save(input.jobId, input.claimGeneration, result.checkpoint)) {
       return { status: 'lost_lease', result, reason: 'builder_v2_claim_stale' }
     }

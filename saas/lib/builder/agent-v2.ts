@@ -52,6 +52,7 @@ const SYSTEM_PROMPT = [
   'A write or edit receipt with output.syntaxError means that file does not parse: fix it first with edit_file.',
   'write_file creates a file; to rewrite an existing file, read_file it first. Prefer edit_file for small changes.',
   'Write every checklist file, then run every checklist command; finish only after all of them pass after your last change.',
+  'If the task explicitly requires browser verification of a URL, use browser_cli with that exact URL after your last source change, inspect any browser failure, repair it, then retest before finishing.',
 ].join('\n')
 
 const hasSyntaxError = (receipt: BuilderV2Receipt) =>
@@ -62,6 +63,8 @@ function compactReceipt(receipt: BuilderV2Receipt): BuilderV2Receipt {
   const output = receipt.output as Record<string, unknown> | undefined
   const kept = receipt.tool === 'run_tests'
     ? output && { exitCode: output.exitCode, timedOut: output.timedOut, requestedCommand: output.requestedCommand, executedCommand: output.executedCommand }
+    : receipt.tool === 'browser_cli'
+    ? output && { url: output.url, action: output.action, exitCode: output.exitCode, timedOut: output.timedOut }
     : output && typeof output === 'object' && !Array.isArray(output) && typeof output.path === 'string' ? { path: output.path } : undefined
   return { tool: receipt.tool, ok: receipt.ok, changed: receipt.changed, ...(receipt.error ? { error: receipt.error } : {}), ...(kept ? { output: kept } : {}) }
 }
@@ -110,6 +113,7 @@ export type BuilderV2Acceptance = Readonly<{
   pendingCommands: readonly string[]
   minimumTests: number
   testsPassed: number
+  pendingBrowser?: string | null
 }>
 
 /**
@@ -164,6 +168,7 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
     satisfied: latestRunPassed && browserSatisfied && missingFiles.length === 0
       && pendingCommands.length === 0 && testsPassed >= contract.minimumTests,
     missingFiles, pendingCommands, minimumTests: contract.minimumTests, testsPassed,
+    pendingBrowser: browserTarget && !browserSatisfied ? browserTarget : null,
   }
 }
 
@@ -532,7 +537,7 @@ export class BuilderV2Agent {
         const error = verified ? 'builder_v2_checklist_incomplete' : 'builder_v2_unverified_completion'
         if (++checklistRejections >= REJECTION_LIMIT) return { ok: false, reason: error, steps, checkpoint: await snapshot() }
         lastReceipt = JSON.stringify({ tool: 'finish', ok: false, error, ...acceptance,
-          next: acceptance.missingFiles.length ? ['write_file'] : ['run_tests', 'edit_file'] }).slice(0, 20_000)
+          next: acceptance.missingFiles.length ? ['write_file'] : acceptance.pendingBrowser ? ['browser_cli', 'edit_file', 'run_tests'] : ['run_tests', 'edit_file'] }).slice(0, 20_000)
         continue
       }
       // Execute the reply's actions in order. The first failed or repeated action ends the batch, so later actions

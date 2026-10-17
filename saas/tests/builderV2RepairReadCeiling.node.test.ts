@@ -28,3 +28,44 @@ test('failed host test preloads source and stops repeated read-only repair loops
   assert.ok(result.steps.filter(step=>step.tool==='read_file').length<=4)
   assert.equal((await workspace.readFile('w','src/cart.js'))?.content,'module.exports = { calculateTotals() { return 0 } }')
 })
+
+test('failed inventory import is targeted for repair and verified by the host', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('w', 'src/inventory.js', 'module.exports = {}')
+  await workspace.writeFile('w', 'test/inventory.test.js',
+    "const { createInventory } = require('../src/inventory.js')\n")
+  let runs = 0
+  const dispatcher = new BuilderV2Dispatcher(workspace, {
+    async run() {
+      runs++
+      const file = await workspace.readFile('w', 'src/inventory.js')
+      const fixed = file?.content.includes('createInventory')
+      return { exitCode: fixed ? 0 : 1,
+        stdout: fixed ? '# tests 1\n# pass 1\n# fail 0' :
+          'test/inventory.test.js:10:1\nTypeError: createInventory is not a function',
+        stderr: '', timedOut: false }
+    },
+  })
+  let sawTarget = false
+  const ai = { async generate({prompt}: {prompt: string}) {
+    const value = JSON.parse(prompt) as {
+      activeRepair?: { targets?: Array<{test: string; sources: string[]}> }
+      latestFailedTest?: string
+    }
+    if (value.latestFailedTest) {
+      sawTarget = value.activeRepair?.targets?.some(target =>
+        target.test === 'test/inventory.test.js' && target.sources.includes('src/inventory.js')) ?? false
+    }
+    return JSON.stringify({type: 'tool', action: {tool: 'edit_file', path: 'src/inventory.js',
+      search: 'module.exports = {}',
+      replace: 'module.exports = { createInventory() { return {} } }'}})
+  } }
+  const objective = 'Create these files:\nsrc/inventory.js\ntest/inventory.test.js\n\nRun:\nnpm test'
+  const result = await new BuilderV2Agent(ai, dispatcher, workspace).run({
+    workspaceId: 'w', objective, maxSteps: 8,
+  })
+  assert.equal(sawTarget, true)
+  assert.equal(result.ok, true)
+  assert.equal(result.reason, 'verified')
+  assert.equal(runs, 2)
+})

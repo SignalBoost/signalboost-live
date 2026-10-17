@@ -192,8 +192,13 @@ async function generateWithRetry(ai: BuilderAiPort, input: Parameters<BuilderAiP
       if (modelAttempt === MAX_MODEL_ROUND_ATTEMPTS) throw error
       if (error instanceof Error && error.message === 'builder_model_output_limit') {
         request = { ...request, maxTokens: Math.min(8_192, request.maxTokens * 2) }
-      // A timed-out round is not retried unchanged here: the identical request times out again. The loop retries it
-      // once with a bounded-output instruction instead (TIME LIMIT RECOVERY).
+      } else if (error instanceof Error && error.message === 'builder_model_round_timeout') {
+        // Retry once with a strictly smaller output budget. Never replay the identical
+        // expensive request after the provider has exceeded the model-round deadline.
+        request = {
+          ...request,
+          maxTokens: Math.max(512, Math.min(4_096, Math.floor(request.maxTokens / 2))),
+        }
       } else throw error
     }
   }

@@ -10,7 +10,7 @@ test('COS and Concierge fresh standard jobs have V2 durable metadata',()=>{
 })
 test('Developer surface defaults new standard jobs to V2 but keeps explicit V1 compatibility',()=>{
   const route=read('../app/api/builder/route.ts')
-  assert.match(route,/requestedEngine !== 'v1' && !requestedWorkspaceId && !project\.context/)
+  assert.match(route,/requestedEngine !== 'v1' && !selectedWorkspaceId && !project\.context/)
   assert.match(route,/requestedEngine === 'v2'/)
 })
 test('durable V2 job dispatch is not owner-only and old V1 jobs keep legacy loop',()=>{

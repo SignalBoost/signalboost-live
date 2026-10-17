@@ -26,5 +26,6 @@ test('failed host test preloads source and stops repeated read-only repair loops
   assert.equal(observedContext,true)
   assert.equal(result.reason,'builder_v2_repair_read_limit')
   assert.ok(result.steps.filter(step=>step.tool==='read_file').length<=4)
+  assert.ok(nextRead > 4, 'agent gets feedback and additional chances to edit before the bounded stop')
   assert.equal((await workspace.readFile('w','src/cart.js'))?.content,'module.exports = { calculateTotals() { return 0 } }')
 })

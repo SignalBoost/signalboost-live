@@ -144,8 +144,25 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
     const fail = /(?:^|\n)\s*(?:#|ℹ)\s+fail\s+(\d+)/.exec(stdout)
     return pass && (!fail || fail[1] === '0') ? Number(pass[1]) : 0
   }))
+  // Browser-dependent tasks require a host browser receipt for the requested URL
+  // after the last source mutation. A green unit suite cannot substitute for UI proof.
+  const browserMatch = /(?:browser|playwright|visual)[^\\n]{0,160}?(https:\\/\\/[^\\s),]+)/i.exec(objective)
+  const browserTarget = browserMatch?.[1]?.replace(/[.]+$/, '')
+  const browserRuns = steps.slice(lastChange + 1).filter(receipt => receipt.tool === 'browser_cli')
+  const latestBrowser = browserTarget ? browserRuns.findLast(receipt => {
+    const output = receipt.output as { url?: unknown } | undefined
+    return output?.url === browserTarget
+  }) : undefined
+  const browserSatisfied = !browserTarget || (
+    latestBrowser?.ok === true && (
+      latestBrowser.output as { exitCode?: unknown; timedOut?: unknown } | undefined
+    )?.exitCode === 0 && (
+      latestBrowser.output as { exitCode?: unknown; timedOut?: unknown } | undefined
+    )?.timedOut === false
+  )
   return {
-    satisfied: latestRunPassed && missingFiles.length === 0 && pendingCommands.length === 0 && testsPassed >= contract.minimumTests,
+    satisfied: latestRunPassed && browserSatisfied && missingFiles.length === 0
+      && pendingCommands.length === 0 && testsPassed >= contract.minimumTests,
     missingFiles, pendingCommands, minimumTests: contract.minimumTests, testsPassed,
   }
 }

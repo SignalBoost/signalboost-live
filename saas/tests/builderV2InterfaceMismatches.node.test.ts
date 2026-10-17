@@ -54,6 +54,10 @@ test('production job-629e2d0e: repairs are grouped per module with the exact exp
   const catalog = repairs.find(repair => repair.module === 'src/catalog.js')
   assert.deepEqual(catalog?.missing.map(item => item.name), ['Catalog.prototype.addProduct'])
   assert.equal(catalog?.missing[0].usedAt, 'test/checkout.test.js:11')
+  // This workspace has the same latent lost-update bug as job cfd64119, but its tests build the inventory through
+  // `createInventory(catalog)`, which the module does not export yet (reported above), so the receiver of
+  // `this.catalog.getProduct()` cannot be resolved from evidence and no copy mutation is attributed until it can.
+  assert.equal(repairs.flatMap(repair => repair.missing).some(item => item.kind === 'mutates_defensive_copy'), false)
 })
 
 test('production job-d8eff4a9 (after the export fix): the remaining failures are argument counts and chaining, all named', () => {
@@ -234,4 +238,46 @@ test('a directly exported class (module.exports = Cls) is bound through a plain 
     'wrong_argument_count:Vault(key) called with 0 arguments@2',
     'missing_method:Vault.prototype.close@4',
   ])
+})
+
+test('production job-cfd64119: the lost-update bug is reported as a copy mutation with both sides named', () => {
+  const { files } = fixture['job-cfd64119']
+  const run = runOn(files, 'node --test test/*.test.js')
+  assert.notEqual(run.exitCode, 0)
+  // Stock never moves: deduct() mutated the copy getProduct() returned.
+  assert.match(`${run.stdout}\n${run.stderr}`, /expected: 2\n\s+actual: 5|actual: 5/)
+  assert.deepEqual(builderInterfaceMismatches(files).map(m => `${m.kind}:${m.name}@${m.test}:${m.line}`), [
+    'mutates_defensive_copy:Catalog.prototype.getProduct returns a copy (src/catalog.js:54); src/inventory.js mutates product.quantity on it@src/inventory.js:31',
+  ])
+  // The one-line repair the finding points at makes those deductions stick.
+  const repaired = files.map(file => file.path !== 'src/catalog.js' ? file : { ...file, content: file.content.replace("    return { ...product };\n  }\n\n  listProducts", '    return product;\n  }\n\n  listProducts') })
+  assert.notEqual(repaired.find(file => file.path === 'src/catalog.js')!.content, files.find(file => file.path === 'src/catalog.js')!.content)
+  // Node's default reporter is TAP (`# pass N`) on Node 22 and spec (`ℹ pass N`) on Node 24.
+  const passCount = (output: string) => Number(/(?:^#|ℹ) pass (\d+)/m.exec(output)?.[1])
+  const before = passCount(`${run.stdout}\n${run.stderr}`)
+  const afterRun = runOn(repaired, 'node --test test/*.test.js')
+  const after = passCount(`${afterRun.stdout}\n${afterRun.stderr}`)
+  assert.ok(Number.isInteger(before) && Number.isInteger(after), `pass counts: ${before} -> ${after}`)
+  assert.ok(after > before, `${before} -> ${after}`)
+  assert.deepEqual(builderInterfaceMismatches(repaired), [])
+})
+
+test('copy mutation: reported only with a resolved receiver, inside the declaring block, never by method name alone', () => {
+  const depot = "class Depot {\n  constructor() { this.items = new Map() }\n  get(id) { return this.items.get(id) }\n  snapshot(id) { return { ...this.items.get(id) } }\n  bump(id) { const item = this.snapshot(id); item.n += 1; return item }\n}\nmodule.exports = { Depot }\n"
+  const wiring = "const { Depot } = require('../src/depot')\nconst { Clerk } = require('../src/clerk')\nconst depot = new Depot()\nconst clerk = new Clerk(depot, { snapshot() { return {} } })\nclerk.read(1)\n"
+  const base = (clerkBody: string): File[] => [
+    { path: 'src/depot.js', content: depot },
+    { path: 'src/clerk.js', content: `class Clerk {\n  constructor(depot, remote) { this.depot = depot; this.remote = remote }\n${clerkBody}}\nmodule.exports = { Clerk }\n` },
+    { path: 'test/clerk.test.js', content: wiring },
+  ]
+  // Stored-object getter, read-only copy, and a copy mutated inside its own module: nothing to report.
+  assert.deepEqual(builderInterfaceMismatches(base('  inc(id) { const item = this.depot.get(id); item.n += 1 }\n  read(id) { const copy = this.depot.snapshot(id); return copy.n }\n')), [])
+  // The copy from the resolved Depot is mutated in the declaring method: reported, with the mutation line.
+  assert.deepEqual(builderInterfaceMismatches(base('  read(id) { const copy = this.depot.snapshot(id); copy.n -= 1; return copy.n }\n')).map(m => `${m.kind}@${m.test}:${m.line}`), ['mutates_defensive_copy@src/clerk.js:3'])
+  // Codex P1: the receiver is a dynamically supplied client with the same method name — not attributed to Depot.
+  assert.deepEqual(builderInterfaceMismatches(base('  read(id) { const copy = this.remote.snapshot(id); copy.n -= 1; return copy.n }\n')), [])
+  // Codex P1: a later method reusing the variable name is a different binding — not reported.
+  assert.deepEqual(builderInterfaceMismatches(base('  read(id) { const copy = this.depot.snapshot(id); return copy }\n  write(copy) { copy.n = 4 }\n')), [])
+  // A redeclaration inside the same block ends the first binding's visibility.
+  assert.deepEqual(builderInterfaceMismatches(base('  read(id) { const copy = this.depot.snapshot(id); { const copy = {}; copy.n = 1 } return copy }\n')), [])
 })

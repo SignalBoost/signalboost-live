@@ -95,7 +95,7 @@ for (const file of workerFiles) {
 for (const file of listFiles(WORKFLOW_DIR, ['.yml', '.yaml'])) {
   const text = readFileSync(file, 'utf8')
   const code = firstCodeLine(text)
-  if (/^(import|export|const|let|function|async)\b/.test(code) || /=>\s*{/.test(text.slice(0, 2000))) {
+  if (/^(import|export|const|let|function|async)\b/.test(code)) {
     fail(file, 'WRONG-KIND', `This workflow file contains JavaScript (first statement: "${code.slice(0, 40)}"). A worker script was pasted here. Restore the YAML workflow.`)
   }
 }

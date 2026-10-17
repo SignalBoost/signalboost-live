@@ -161,3 +161,22 @@ test('identical writes do not extend Builder work beyond the free slices', () =>
   assert.equal(builderMayContinue({ claimGeneration: 5, checkpoint: old, metadata: {} }, identical), false)
   assert.equal(builderMayContinue({ claimGeneration: 5, checkpoint: old, metadata: {} }, revised), true)
 })
+
+test('symbolic policy witnesses match the real Builder continuation gate', () => {
+  const base = checkpoint([write('src/orders.js')])
+  const conflict = checkpoint([...base.trace, { round: 2, toolId: 'write_file', input: { path: 'package.json' }, ok: false, error: 'builder_write_content_conflict' }])
+  const failure = checkpoint([...base.trace, run(0, 20)])
+  const repeat = checkpoint([...base.trace, failedRead('src/orders.js')])
+  const cases = [
+    { label: 'write conflict', next: conflict, progress: false },
+    { label: 'failed suite', next: failure, progress: false },
+    { label: 'repeated read', next: repeat, progress: false },
+  ]
+  for (const scenario of cases) {
+    assert.equal(builderSliceMadeProgress(base, scenario.next), scenario.progress, scenario.label)
+    for (const claim of [4, 5, 23, 24]) {
+      assert.equal(builderMayContinue({ claimGeneration: claim, checkpoint: base, metadata: {} }, scenario.next), false,
+        `${scenario.label} cannot restart at claim ${claim} without progress`)
+    }
+  }
+})

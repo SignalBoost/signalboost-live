@@ -9,7 +9,7 @@ import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './contr
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
 import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, requeueBuilderContinuationCycle, readBuilderWorkspaceFingerprint, type BuilderJobRecord } from './job-store.ts'
-import { MAX_WORK_SLICES, builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport } from './work-budget.ts'
+import { MAX_WORK_SLICES, builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport, builderJobOverTotalDeadline } from './work-budget.ts'
 import { builderContractObjective, builderTaskContract, builderTaskProgress } from './task-contract.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { builderNextAction } from './user-guidance.ts'
@@ -374,6 +374,10 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     // V2 is selected by durable job metadata for all surfaces. Existing V1
     // checkpoint jobs remain V1 because their engine tag is absent.
     if (job.jobKind === 'standard' && job.metadata.builderEngine === 'v2') {
+      if (builderJobOverTotalDeadline(job.createdAt, Date.now())) {
+        await terminalFailure(job, 'builder_v2_total_deadline_exceeded')
+        return
+      }
       const workspace = createSupabaseBuilderWorkspace(job.userId)
       if (!workspace) { await terminalFailure(job, 'builder_v2_workspace_unavailable'); return }
       // Same priority rule as V1: only background self-healing work yields the model to chat. Production

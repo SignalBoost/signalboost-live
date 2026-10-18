@@ -495,7 +495,12 @@ export class BuilderV2Agent {
       // or rerun passing suites just to rediscover the same runtime failure.
       const failedCommand = (steps.findLast(step => step.tool === 'run_tests' && !step.ok)?.output as
         { requestedCommand?: string } | undefined)?.requestedCommand
-      const commands = checklist.commands.includes(failedCommand ?? '')
+      // Preserve explicit setup/build ordering. Only move a failure ahead of
+      // test-only predecessors, never ahead of install/generate/build steps.
+      const failedIndex = checklist.commands.indexOf(failedCommand ?? '')
+      const testOnlyPrefix = failedIndex >= 0 && checklist.commands.slice(0, failedIndex)
+        .every(command => /^(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test(?:\s|$)|node\s+--test(?:\s|$))/.test(command))
+      const commands = testOnlyPrefix
         ? [failedCommand!, ...checklist.commands.filter(command => command !== failedCommand)] : checklist.commands
       for (const command of commands) {
         if (latestCommandRun(command)?.ok) continue

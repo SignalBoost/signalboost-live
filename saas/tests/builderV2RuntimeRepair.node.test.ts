@@ -101,6 +101,18 @@ test('unchanged runtime failure cannot become verified or buy another model call
   assert.deepEqual(commands, ['npm test', 'node cli.js', 'node cli.js'])
 })
 
+test('runtime prioritization preserves explicit setup and build command ordering', async () => {
+  const workspace = await setup()
+  const commands: string[] = []
+  const withSetup = objective.replace('npm test\nnode cli.js', 'npm run build\nnpm test\nnode cli.js')
+  const result = await new BuilderV2Agent({ async generate() {
+    return JSON.stringify({ type: 'tool', action: { tool: 'edit_file', path: 'cli.js', search: 'create().total.', replace: 'create().totals.total.' } })
+  } }, new BuilderV2Dispatcher(workspace, runner(commands)), workspace)
+    .run({ workspaceId: 'w', objective: withSetup, modelCallBudget: 1 })
+  assert.equal(result.ok, true, result.reason)
+  assert.deepEqual(commands, ['npm run build', 'npm test', 'node cli.js', 'npm run build', 'npm test', 'node cli.js'])
+})
+
 test('runtime repair reaches real passing Node execution through the V2 dispatcher', async () => {
   const workspace = await setup()
   await workspace.writeFile('w', 'test/service.test.js', "const test = require('node:test'); const assert = require('node:assert/strict'); const { create } = require('../src/service'); test('total', () => assert.equal(create().totals.total, 1250));")

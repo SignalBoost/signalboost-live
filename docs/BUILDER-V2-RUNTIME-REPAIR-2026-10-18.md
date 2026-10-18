@@ -22,7 +22,8 @@ kept only the last 12 output lines, which could discard the actual exception.
 - Reconstruct runtime targets from host receipts on every turn and resumed
   checkpoint. Prompt guidance refers to the failing command and caller API,
   including runtime failures after passing tests.
-- After a source change, retry the last failing required command first. Once
+- After a source change, retry the last failing required command ahead of
+  test-only predecessors, preserving explicit setup/build ordering. Once
   it passes, every other required command must still pass on that same revision.
 - Preserve the head and tail of bounded failure output in user progress.
 - Preserve model-budget exhaustion as its own terminal reason if it occurs
@@ -36,13 +37,13 @@ are unchanged. No generated OrderFlow source or customer data is included.
 
 Three runtime-targeting/progress regressions fail against main
 `db5de54a072e8893f42142b31aab342c4893bbbb` and pass with the repair.
-Six new tests cover one-call runtime repair, checkpoint continuation, exception
+Seven new tests cover one-call runtime repair, checkpoint continuation, exception
 visibility, path isolation/Windows stacks, unchanged-failure budget exhaustion,
-and real Node subprocess failure-to-pass through the V2 dispatcher.
+setup/build ordering and real Node subprocess failure-to-pass through the V2 dispatcher.
 The model responses in these tests are scripted: they verify orchestration,
 not the production model's competence. The new suite is a Vercel release gate.
 
-59 targeted V2 tests pass locally with Node 24 and
+60 targeted V2 tests pass locally with Node 24 and
 `--experimental-transform-types`; the release-gate script passes `node --check`.
 Exact-head CI, deployment, and a live model-driven Builder job remain separate
 verification steps. Do not infer autonomous production completion from this test run.

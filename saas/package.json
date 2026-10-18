@@ -3,6 +3,7 @@
   "name": "signalboost-clean",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "scripts": {
     "prebuild": "npm run validate:strip-safe && npm run validate:i18n-platform",
     "build": "next build",

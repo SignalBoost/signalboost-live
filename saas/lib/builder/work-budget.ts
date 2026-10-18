@@ -11,6 +11,14 @@ import { builderContractObjective, builderTaskContract } from './task-contract.t
 export const BASE_WORK_SLICES = 4
 export const MAX_WORK_SLICES = 24
 
+// Hard whole-job safety bounds; resumed claims retain the original createdAt.
+export const BUILDER_JOB_TOTAL_DEADLINE_MS = 60 * 60 * 1000
+export const BUILDER_JOB_MODEL_CALL_BUDGET = 60
+export function builderJobOverTotalDeadline(createdAt: string, now: number, deadlineMs = BUILDER_JOB_TOTAL_DEADLINE_MS): boolean {
+  const created = Date.parse(createdAt)
+  return !Number.isFinite(created) || now - created >= deadlineMs
+}
+
 const passCount = (item: { toolId?: string; output?: unknown }): number => {
   if (item.toolId !== 'run') return 0
   const stdout = String((item.output as { stdout?: unknown } | undefined)?.stdout || '')

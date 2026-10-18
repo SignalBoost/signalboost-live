@@ -19,6 +19,7 @@ const tests = [
   'tests/builderV2InterfaceMismatches.node.test.ts',
   'tests/builderV2RepairReadCeiling.node.test.ts',
   'tests/builderPlatformRepairNotFenced.node.test.ts',
+  'tests/builderV2OperationalLimits.node.test.ts',
   'tests/labCustomerTraining.node.test.ts',
   'tests/labExperimentComparison.node.test.ts',
   'tests/labExperimentCsv.node.test.ts',

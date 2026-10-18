@@ -203,7 +203,8 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
     return false
   }
 
-  const plainReply = `Builder completed the repository repair. PR #${input.pullRequestNumber} ${input.mergeEvidence === 'observed_github' ? 'was observed merged on GitHub into' : 'passed the governed merge gates and was merged into'} ${input.baseBranch} as ${input.mergeCommitSha}.${input.detail ? ` ${String(input.detail).trim()}` : ''}`
+  const mergeDescription = input.mergeEvidence === 'observed_github' ? 'was observed on GitHub as' : 'passed the governed merge gates and was'
+  const plainReply = `Builder completed the repository repair. PR #${input.pullRequestNumber} ${mergeDescription} merged into ${input.baseBranch} as ${input.mergeCommitSha}.${input.detail ? ` ${String(input.detail).trim()}` : ''}`
   let artifactFiles = files(record(row.result).files)
   try {
     artifactFiles = await persistResultArtifact({ userId: String(row.user_id), workspaceId: String(row.workspace_id) }, plainReply)

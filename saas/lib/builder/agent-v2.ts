@@ -52,6 +52,7 @@ const SYSTEM_PROMPT = [
   '{"type":"finish","summary":"what was built and verified"}',
   'Batch: write several missing files in one "tools" reply (complete contents, no placeholders, dependencies and package.json first), up to 4 actions and about 8000 characters per reply so it fits the output limit. Execution stops at the first failed action.',
   'After a change, once every required file exists, the host runs the required commands itself and returns their real output; read it and repair.',
+  'Avoid rereading any file already shown in openFiles or just edited. Use the current source and latestFailedTest to make a targeted edit_file. Re-read only if the host explicitly reports a changed revision, a stale search match, or missing content.',
   'A write or edit receipt with output.syntaxError means that file does not parse: fix it first with edit_file.',
   'write_file creates a file; to rewrite an existing file, read_file it first. Prefer edit_file for small changes.',
   'Write every checklist file, then run every checklist command; finish only after all of them pass after your last change.',

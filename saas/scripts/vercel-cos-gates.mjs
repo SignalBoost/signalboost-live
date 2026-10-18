@@ -388,6 +388,7 @@ const tests = [
 
   'tests/builderControlAdapter.node.test.ts',
   'tests/builderCodingCancellation.node.test.ts',
+  'tests/builderCodingCooldown.node.test.ts',
   'tests/localInferenceCancellation.node.test.ts',
   'tests/interactiveHealthSupervisorReview.node.test.ts',
   'tests/cosWorkingDistillationBundle.node.test.ts',

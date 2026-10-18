@@ -66,8 +66,8 @@ test('failed inventory import is targeted for repair and verified by the host', 
   const result = await new BuilderV2Agent(ai, dispatcher, workspace).run({
     workspaceId: 'w', objective, maxSteps: 8,
   })
-  // For this import-only fixture the host can repair the export before any model call.
-  assert.equal(sawTarget, false)
+  // Host stub writes the export, and the model still receives targeted repair evidence.
+  assert.equal(sawTarget, true)
   assert.match((await workspace.readFile('w', 'src/inventory.js'))?.content ?? '', /builder_stub_not_implemented: createInventory/)
   assert.equal(result.ok, true)
   assert.equal(result.reason, 'verified')

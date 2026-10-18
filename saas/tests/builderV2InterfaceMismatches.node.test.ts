@@ -170,14 +170,13 @@ test('Builder V2 lists every mismatch at once, and one batched edit from the exa
   const first = prompts[0]
   // The host ran the suite first (real failure), and the same turn carried every mismatch from both tests.
   assert.equal(first.latestFailedTest !== undefined && first.latestFailedTest !== '', true)
-  assert.deepEqual(first.interfaceMismatches, [{
-    module: 'src/catalog.js', exportStatement: 'module.exports = { Shelf }', exports: ['Shelf'],
-    missing: [
-      { name: 'createShelf', kind: 'missing_export', usedAt: 'test/catalog.test.js:3' },
-      { name: 'Shelf.prototype.addProduct', kind: 'missing_method', usedAt: 'test/more.test.js:4' },
-      { name: 'Shelf.prototype.listProducts', kind: 'missing_method', usedAt: 'test/more.test.js:4' },
-    ],
-  }])
+  // The host now inserts a throwing placeholder before the model's repair turn.
+  assert.match(first.interfaceMismatches?.[0]?.exportStatement ?? '', /builder_stub_not_implemented: createShelf/)
+  assert.deepEqual(first.interfaceMismatches?.[0]?.exports, ['Shelf', 'createShelf'])
+  assert.deepEqual(first.interfaceMismatches?.[0]?.missing, [
+    { name: 'Shelf.prototype.addProduct', kind: 'missing_method', usedAt: 'test/more.test.js:4' },
+    { name: 'Shelf.prototype.listProducts', kind: 'missing_method', usedAt: 'test/more.test.js:4' },
+  ])
   assert.deepEqual(first.nextRecommendedAction.actions, [{ tool: 'edit_file', path: 'src/catalog.js' }])
   assert.ok(Object.keys(first.openFiles).includes('src/catalog.js'))
   assert.equal(outcome.ok, true, outcome.reason)

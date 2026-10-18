@@ -1,3 +1,2 @@
-base_sha=db5de54a072e8893f42142b31aab342c4893bbbb
-branch=fix/builder-v2-runtime-repair-context-20261018
-
+base_sha=cde2ff1fbeccbd5da9d55fe91f5787099a528c63
+branch=fix/builder-cooldown-reasoner-reentry-20261018

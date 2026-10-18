@@ -248,7 +248,9 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
       }, {
         ...config,
         model: builderCodingModelFromEnv(),
-        fallbackFromOwned: ownedAttempted,
+        // A shared timeout cooldown is already an owned-runtime health decision.
+        // Keep the generic local router from retrying the RunPod reasoner here.
+        fallbackFromOwned: ownedAttempted || primaryInCooldown,
       }), 'builder coding')
     },
   }
@@ -315,3 +317,4 @@ export function createPlatformImagePort(): CosImagePort {
     },
   }
 }
+

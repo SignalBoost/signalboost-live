@@ -32,7 +32,8 @@ export const BUILDER_V2_MODEL_RETRIES = 3
  * the files the model has opened, within a character budget sized for the 16k-token owned model window.
  */
 const WORKING_SET_CHARS = 12_000
-const FAILURE_OUTPUT_CHARS = 5_000
+// Preserve more of failing assertions and stack traces without expanding the 12K source working set.
+const FAILURE_OUTPUT_CHARS = 8_000
 const MODEL_RETRY_BASE_MS = 1_000
 const MODEL_RETRY_MAX_MS = 15_000
 

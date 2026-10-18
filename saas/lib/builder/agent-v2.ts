@@ -4,6 +4,7 @@ import { BuilderV2Dispatcher, type BuilderV2Action, type BuilderV2Receipt } from
 import { builderTaskContract } from './task-contract.ts'
 import { builderWorkspaceInterfaceRepairs, builderWorkspaceModuleInterfaces, type BuilderInterfaceRepair } from './interface-mismatches.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
+import { BUILDER_JOB_MODEL_CALL_BUDGET } from './work-budget.ts'
 
 /**
  * Whole-job receipt bound. `maxSteps` is the per-slice budget; a resumed job gets a fresh slice budget on top of
@@ -83,6 +84,7 @@ export type BuilderV2Checkpoint = Readonly<{
   lastReceipt: string
   /** Consecutive resumed work slices without a new host receipt or source revision. */
   idleSlices?: number
+  modelCalls?: number
 }>
 
 /** Limit repeated resumptions that execute no tools and make no source changes. */
@@ -339,6 +341,8 @@ export function builderV2RecoveryPriority(input: {
  * allows completion. A no-op write cannot mint progress indefinitely.
  */
 export class BuilderV2Agent {
+  private modelCalls = 0
+  private modelCallBudget = BUILDER_JOB_MODEL_CALL_BUDGET
   constructor(private readonly ai: BuilderAiPort, private readonly dispatcher: BuilderV2Dispatcher, private readonly workspace?: BuilderWorkspacePort) {}
 
   async run(options: {
@@ -350,6 +354,7 @@ export class BuilderV2Agent {
     onCheckpoint?: (checkpoint: BuilderV2Checkpoint) => Promise<void>
     /** Wait between model retries; tests pass an instant one. */
     retryDelay?: (ms: number, signal?: AbortSignal) => Promise<void>
+    modelCallBudget?: number
   }): Promise<BuilderV2Outcome> {
     const saved = options.checkpoint
     if (saved) {
@@ -369,6 +374,8 @@ export class BuilderV2Agent {
     let verifiedRevision = saved?.verifiedRevision ?? -1
     let unproductive = saved?.unproductive ?? 0
     let lastReceipt = saved?.lastReceipt ?? ''
+    this.modelCalls = Number.isSafeInteger(saved?.modelCalls) && (saved?.modelCalls ?? 0) >= 0 ? saved!.modelCalls! : 0
+    this.modelCallBudget = options.modelCallBudget ?? BUILDER_JOB_MODEL_CALL_BUDGET
     const snapshot = async (): Promise<BuilderV2Checkpoint | undefined> => {
       if (!this.workspace) return undefined
       const lastChange = steps.findLastIndex(receipt => receipt.changed)
@@ -379,6 +386,7 @@ export class BuilderV2Agent {
         steps: steps.map((receipt, at) => at < lastChange && at < steps.length - TAIL ? compactReceipt(receipt) : receipt),
         revision, verifiedRevision, unproductive, lastReceipt,
         idleSlices: saved?.idleSlices ?? 0,
+        modelCalls: this.modelCalls,
       }
     }
     const checklist = builderTaskContract(options.objective)
@@ -567,6 +575,9 @@ export class BuilderV2Agent {
       const interfaceRepairs: BuilderInterfaceRepair[] = missingFiles().length ? []
         : await builderWorkspaceInterfaceRepairs(this.workspace, options.workspaceId, knownFiles).catch(() => [])
       const working = await workingSet(interfaceRepairs.map(repair => repair.module))
+      if (this.modelCalls >= this.modelCallBudget) {
+        return { ok: false, reason: 'builder_v2_model_call_budget_exhausted', summary: 'Whole-job model-call budget reached.', steps, checkpoint: await snapshot() }
+      }
       let raw: string | null
       try {
         raw = await this.generateWithRetry({
@@ -740,9 +751,11 @@ export class BuilderV2Agent {
   private async generateWithRetry(request: Parameters<BuilderAiPort['generate']>[0], retryDelay: (ms: number, signal?: AbortSignal) => Promise<void>): Promise<string | null> {
     for (let attempt = 0; ; attempt++) {
       try {
+        if (this.modelCalls >= this.modelCallBudget) throw new Error('builder_v2_model_call_budget_exhausted')
+        this.modelCalls++ // Count attempted requests, including failed requests and retries.
         return await this.ai.generate(request)
       } catch (error) {
-        if (request.signal?.aborted || attempt >= BUILDER_V2_MODEL_RETRIES
+        if (request.signal?.aborted || (error instanceof Error && error.message === 'builder_v2_model_call_budget_exhausted') || attempt >= BUILDER_V2_MODEL_RETRIES
           || (error instanceof Error && (error.message === 'local_model_output_truncated' || error.message === BUILDER_TURN_TIMEOUT_ERROR))) throw error
         await retryDelay(Math.min(MODEL_RETRY_MAX_MS, MODEL_RETRY_BASE_MS * 2 ** attempt), request.signal)
       }

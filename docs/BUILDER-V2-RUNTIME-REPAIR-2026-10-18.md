@@ -43,7 +43,14 @@ setup/build ordering and real Node subprocess failure-to-pass through the V2 dis
 The model responses in these tests are scripted: they verify orchestration,
 not the production model's competence. The new suite is a Vercel release gate.
 
-60 targeted V2 tests pass locally with Node 24 and
+62 targeted V2 tests pass locally with Node 24 and
 `--experimental-transform-types`; the release-gate script passes `node --check`.
 Exact-head CI, deployment, and a live model-driven Builder job remain separate
 verification steps. Do not infer autonomous production completion from this test run.
+
+CI also exposed two working-set fixture failures reproduced on unmodified main:
+the fixture expected a missing-export error and unchanged source, but the newer
+host interface repair intentionally inserts a throwing export stub. The fixture
+now uses an existing exported factory with a real functional failure and repairs
+the implementation on resume. Exact source, retained error, unchanged tests,
+bounded working set, and real passing host verification remain asserted.

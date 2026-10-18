@@ -5,6 +5,7 @@ import { builderTaskContract } from './task-contract.ts'
 import { builderWorkspaceInterfaceRepairs, builderWorkspaceModuleInterfaces, type BuilderInterfaceRepair } from './interface-mismatches.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
 import { BUILDER_JOB_MODEL_CALL_BUDGET } from './work-budget.ts'
+import { builderFailurePaths, builderFailureImports } from './failure-context.ts'
 
 /**
  * Whole-job receipt bound. `maxSteps` is the per-slice budget; a resumed job gets a fresh slice budget on top of
@@ -489,7 +490,14 @@ export class BuilderV2Agent {
       && checklist.commands.some(command => !latestCommandRun(command))
       && !currentRevisionRuns().some(step => !step.ok)
     const hostVerify = async (): Promise<BuilderV2Outcome | null> => {
-      for (const command of checklist.commands) {
+      // Reproduce the last failing command first after an edit, then prove every
+      // other required command on this revision. Never buy another model call
+      // or rerun passing suites just to rediscover the same runtime failure.
+      const failedCommand = (steps.findLast(step => step.tool === 'run_tests' && !step.ok)?.output as
+        { requestedCommand?: string } | undefined)?.requestedCommand
+      const commands = checklist.commands.includes(failedCommand ?? '')
+        ? [failedCommand!, ...checklist.commands.filter(command => command !== failedCommand)] : checklist.commands
+      for (const command of commands) {
         if (latestCommandRun(command)?.ok) continue
         if (latestCommandRun(command) && !latestCommandRun(command)?.ok) return null
         if (steps.length >= BUILDER_V2_MAX_RECEIPTS) return null
@@ -507,11 +515,13 @@ export class BuilderV2Agent {
       const opened = [...new Set(steps.filter(step => (step.tool === 'read_file' || step.tool === 'edit_file') && step.ok)
         .map(step => (step.output as { path?: unknown } | undefined)?.path).filter((path): path is string => typeof path === 'string').reverse())]
       // Put files named by real failing test diagnostics ahead of incidental reads.
-      const details = failure?.output as { stdout?: unknown; stderr?: unknown } | undefined
+      const details = failure?.output as { requestedCommand?: unknown; stdout?: unknown; stderr?: unknown } | undefined
       const diagnostic = String(details?.stdout ?? '') + '\n' + String(details?.stderr ?? '')
+      const failurePaths = builderFailurePaths(String(details?.requestedCommand ?? ''), diagnostic, knownFiles)
+      const failureImports = await builderFailureImports(this.workspace, options.workspaceId, failurePaths, knownFiles)
       const failingTests = [...diagnostic.matchAll(/(?:^|[\s(])((?:test|tests)\/[A-Za-z0-9_./-]+\.(?:test|spec)\.[cm]?js)\b/gm)]
         .map(match => match[1]).filter(path => knownFiles.includes(path))
-      const targeted: string[] = []
+      const targeted: string[] = [...new Set([...failurePaths, ...failureImports])]
       for (const testPath of failingTests.slice(0, 3)) {
         if (!targeted.includes(testPath)) targeted.push(testPath)
         const testFile = await this.workspace?.readFile(options.workspaceId, testPath)
@@ -560,8 +570,10 @@ export class BuilderV2Agent {
     const activeRepair = async () => {
       const failure = failedOnRevision()
       if (!failure || !this.workspace) return null
-      const output = failure.output as { stdout?: unknown; stderr?: unknown } | undefined
+      const output = failure.output as { requestedCommand?: unknown; stdout?: unknown; stderr?: unknown } | undefined
       const diagnostic = String(output?.stdout ?? '') + '\n' + String(output?.stderr ?? '')
+      const paths = builderFailurePaths(String(output?.requestedCommand ?? ''), diagnostic, knownFiles)
+      const runtimeTargets = paths.filter(path => !/^(?:test|tests)\//.test(path))
       const namedTests = [...new Set([...diagnostic.matchAll(/(?:^|[\s(])((?:test|tests)\/[A-Za-z0-9_./-]+\.(?:test|spec)\.[cm]?js)\b/gm)]
         .map(match => match[1]).filter(path => knownFiles.includes(path)))]
       const targets: Array<{ test: string; sources: string[] }> = []
@@ -575,7 +587,8 @@ export class BuilderV2Agent {
         targets.push({ test: testPath, sources: [...new Set(sources)] })
       }
       const error = /(?:TypeError|ReferenceError|SyntaxError):[^\n]*/.exec(diagnostic)?.[0] ?? diagnostic.slice(0, 280)
-      return { error, targets, instruction: 'Use the actual test import and source export to diagnose the failure. Prefer a targeted edit_file operation; avoid repeating read_file calls. Do not change tests merely to silence failures. Host verification runs after edits.' }
+      return { error, targets, runtimeTargets,
+        instruction: 'Use the actual failing command, caller imports and source API to diagnose the failure. Prefer a targeted edit_file operation; avoid repeating read_file calls. Do not change tests merely to silence failures. Host verification runs after edits.' }
     }
     for (let calls = 0; calls < maxSteps && steps.length < BUILDER_V2_MAX_RECEIPTS; calls++) {
       if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
@@ -649,12 +662,12 @@ export class BuilderV2Agent {
               : interfaceRepairs.length ? { tool: 'tools', actions: interfaceRepairs.slice(0, 4).map(repair => ({ tool: 'edit_file', path: repair.module })),
                 instruction: 'Reconcile every entry in interfaceMismatches: one edit_file per module in one tools reply.' }
               : steps.slice(steps.findLastIndex(step => step.changed) + 1).some(step => step.tool === 'run_tests' && !step.ok)
-                ? { tool: 'edit_file', reason: 'Repair the last failing test before rerunning the unchanged revision' }
+                ? { tool: 'edit_file', reason: 'Repair the last failing command before rerunning the unchanged revision' }
                 : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },
             instruction: interfaceRepairs.length
               ? 'interfaceMismatches lists every place a test disagrees with its source module, found by reading the files: a name the module does not export, a method its class does not define, a constructor or factory called with the wrong number of arguments, a chained method that does not return this, or a module mutating a field on the copy returned by a getter in another module (so the change is lost). Fix all of them in this reply, one edit_file per module: add the missing export (keep the existing ones) or method, give the parameter a default or accept the arguments the tests pass, return this from the chained method, and for a mutated copy either return the stored object from the getter or make the caller use the update method of the owning module; change a test only if the objective names the API the source already has. Each exportStatement is the exact current text, usable as the edit_file search. Host verification runs after your edits.'
               : currentFailure()
-              ? 'The host has already run the suite on this unchanged revision and recorded the failure in latestFailedTest. The named failing test and its imported module are in openFiles when available. Edit the relevant module to fix the assertion; do not rewrite unrelated manifests.  Do not run the same tests again until an edit changes the revision.'
+              ? 'The host has already run the command on this unchanged revision and recorded the failure in latestFailedTest. The failing caller and its imported modules are in openFiles when available. Reconcile the actual caller with the implementation; do not rewrite unrelated manifests or weaken tests. Do not run the same command again until an edit changes the revision.'
               : 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
             lastReceipt: compactAgainstWorkingSet(lastReceipt, working),
             latestFailedTest: currentFailure(),
@@ -676,6 +689,9 @@ export class BuilderV2Agent {
         }, options.retryDelay ?? abortableDelay)
       } catch (error) {
         if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
+        if (error instanceof Error && error.message === 'builder_v2_model_call_budget_exhausted') {
+          return { ok: false, reason: 'builder_v2_model_call_budget_exhausted', summary: 'Whole-job model-call budget reached.', steps, checkpoint: await snapshot() }
+        }
         // A reply cut off before any complete action is feedback, like an unparseable reply: ask for less per reply.
         if (error instanceof Error && error.message === 'local_model_output_truncated') {
           if (++invalidReplies >= REJECTION_LIMIT) return { ok: false, reason: 'builder_v2_invalid_model_action', steps, checkpoint: await snapshot() }
@@ -892,7 +908,8 @@ export function builderV2ProgressReport(objective: string, files: readonly strin
   if (failed && failedAt > lastChange) {
     const output = failed.output as { stderr?: unknown; stdout?: unknown } | undefined
     const text = [output?.stderr, output?.stdout].filter((part): part is string => typeof part === 'string' && part.trim().length > 0).join('\n')
-    if (text) lines.push(`- Latest failure output:\n\`\`\`text\n${text.trim().split('\n').slice(-12).join('\n').slice(-1200)}\n\`\`\``)
+    if (text) lines.push(`- Latest failure output:\n\`\`\`text\n${headAndTail(text.trim(), 1200)}\n\`\`\``)
   }
   return lines.join('\n')
 }
+

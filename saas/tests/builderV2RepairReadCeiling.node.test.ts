@@ -27,7 +27,8 @@ test('failed host test preloads source and stops repeated read-only repair loops
   assert.equal(result.reason,'builder_v2_repair_read_limit')
   assert.ok(result.steps.filter(step=>step.tool==='read_file').length<=4)
   assert.ok(nextRead > 4, 'agent gets feedback and additional chances to edit before the bounded stop')
-  assert.equal((await workspace.readFile('w','src/cart.js'))?.content,'module.exports = { calculateTotals() { return 0 } }')
+  assert.match((await workspace.readFile('w','src/cart.js'))?.content ?? '', /builder_stub_not_implemented: getTotal/)
+  assert.equal(result.ok, false, 'a throwing placeholder is not a verified implementation')
 })
 
 test('failed inventory import is targeted for repair and verified by the host', async () => {
@@ -65,7 +66,9 @@ test('failed inventory import is targeted for repair and verified by the host', 
   const result = await new BuilderV2Agent(ai, dispatcher, workspace).run({
     workspaceId: 'w', objective, maxSteps: 8,
   })
-  assert.equal(sawTarget, true)
+  // For this import-only fixture the host can repair the export before any model call.
+  assert.equal(sawTarget, false)
+  assert.match((await workspace.readFile('w', 'src/inventory.js'))?.content ?? '', /builder_stub_not_implemented: createInventory/)
   assert.equal(result.ok, true)
   assert.equal(result.reason, 'verified')
   assert.equal(runs, 2)

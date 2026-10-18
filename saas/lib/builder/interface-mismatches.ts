@@ -62,7 +62,7 @@ const TEST_PATH = /(^|\/)(test|tests|__tests__)\/|\.(test|spec)\.[cm]?js$/
 
 const lineOf = (code: string, index: number) => code.slice(0, index).split('\n').length
 
-/** Split a parenthesised list at top-level commas, skipping strings and nested brackets. */
+/** Split a parenthesised list at top-level commas, skipping strings, comments and nested brackets. */
 function splitTopLevel(list: string): string[] {
   const parts: string[] = []
   let depth = 0, start = 0
@@ -72,6 +72,9 @@ function splitTopLevel(list: string): string[] {
       for (i++; i < list.length && list[i] !== ch; i++) if (list[i] === '\\') i++
       continue
     }
+    // A comma inside a comment is prose, not a separator (Codex on #4689).
+    if (ch === '/' && list[i + 1] === '/') { const end = list.indexOf('\n', i); if (end < 0) break; i = end; continue }
+    if (ch === '/' && list[i + 1] === '*') { const end = list.indexOf('*/', i + 2); if (end < 0) break; i = end + 1; continue }
     if ('([{'.includes(ch)) depth++
     else if (')]}'.includes(ch)) depth--
     else if (ch === ',' && depth === 0) { parts.push(list.slice(start, i)); start = i + 1 }
@@ -200,6 +203,52 @@ function classMethods(code: string, name: string): string[] | null {
   return classDetails(code, name)?.methods ?? null
 }
 
+/**
+ * Members of the object literal a function body returns at its top level: `return { a: function (x) {}, b(y) {},
+ * c: (z) => {} }`. Returns null when the body does not end in an object literal.
+ */
+function objectLiteralMembers(body: string): Omit<ClassDetails, 'constructor'> | null {
+  // A concise arrow body `({ ... })` is the literal itself.
+  const concise = /^\s*\(\s*\{/.exec(body)
+  if (concise) return literalMembers(body, concise[0].length - 1)
+  // The last top-level `return {` of the body.
+  let depth = 0, at = -1
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i]
+    if (ch === '"' || ch === "'" || ch === '`') {
+      for (i++; i < body.length && body[i] !== ch; i++) if (body[i] === '\\') i++
+      continue
+    }
+    if (ch === '{') { if (depth === 0 && /\breturn\s*$/.test(body.slice(Math.max(0, i - 12), i))) at = i; depth++ }
+    else if (ch === '}') depth--
+  }
+  if (at < 0) return null
+  return literalMembers(body, at)
+}
+
+function literalMembers(body: string, at: number): Omit<ClassDetails, 'constructor'> | null {
+  const literal = braceBody(body, at)
+  if (literal === null) return null
+  const methods: string[] = [], chainable: string[] = [], copyReturning: Array<{ method: string; line: number }> = []
+  const methodSignatures: Record<string, BuilderSignature> = {}
+  for (const raw of splitTopLevel(literal)) {
+    // Leading comments belong to the member that follows them.
+    const entry = raw.replace(/^(?:\s*(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/))*\s*/, '')
+    // `a: function (x) {`, `b(y) {`, `c: (z) => {`, `d: (z) => expr`, `e: async (z) => {`
+    const member = new RegExp(`^(?:async\\s+)?(${IDENT})\\s*(?::\\s*(?:async\\s*)?(?:function\\s*)?)?\\(([^)]*)\\)\\s*(=>)?\\s*(\\{)?`).exec(entry)
+    if (!member || (!member[3] && !member[4])) continue
+    methods.push(member[1])
+    methodSignatures[member[1]] = signatureOf(member[2])
+    if (!member[4]) continue
+    const methodBody = braceBody(entry, member[0].length - 1)
+    if (methodBody === null) continue
+    if (/\breturn\s+this\b(?![.\[(])/.test(methodBody)) chainable.push(member[1])
+    const copy = /\breturn\s+(?:\{\s*\.\.\.|Object\.assign\(\s*\{\s*\}|structuredClone\(|JSON\.parse\(\s*JSON\.stringify\()/.exec(methodBody)
+    if (copy) copyReturning.push({ method: member[1], line: lineOf(body, at) + lineOf(literal, literal.indexOf(raw) + raw.indexOf(entry)) - 1 + lineOf(methodBody, copy.index) - 1 })
+  }
+  return { methods, chainable, copyReturning, methodSignatures }
+}
+
 /** What a CommonJS source module exports, and the methods of the classes it exports. */
 export function builderModuleInterface(module: string, code: string): BuilderModuleInterface | null {
   const exports = new Set<string>()
@@ -242,15 +291,41 @@ export function builderModuleInterface(module: string, code: string): BuilderMod
   const factories: Record<string, string> = {}
   for (const name of exports) {
     if (classes[name]) continue
+    // `exports.Name = class ... {}`: an anonymous class bound to the export name.
+    const exportedClass = new RegExp(`\\b(?:module\\.)?exports\\.${name}\\s*=\\s*class\\b`).exec(code)
+    if (exportedClass) {
+      const details = classDetails(code.replace(exportedClass[0], `${exportedClass[0].replace(/class\b$/, '')}class ${name}`), name)
+      if (details) {
+        classes[name] = details.methods
+        if (details.chainable.length) chainable[name] = details.chainable
+        if (details.copyReturning.length) copyReturning[name] = details.copyReturning
+        if (details.constructor) signatures[name] = details.constructor
+        for (const [method, signature] of Object.entries(details.methodSignatures)) signatures[`${name}.prototype.${method}`] = signature
+      }
+      continue
+    }
     const binding = new RegExp(`\\b${name}\\s*:\\s*(${IDENT})`).exec(code)?.[1] ?? name
-    const head = new RegExp(`\\bfunction\\s+${binding}\\s*\\(([^)]*)\\)\\s*\\{|\\b(?:const|let|var)\\s+${binding}\\s*=\\s*(?:async\\s*)?(?:function\\s*)?\\(([^)]*)\\)\\s*(?:=>\\s*)?`).exec(code)
+    // function f(params) {   |   const f = (params) => / function (params) {   |   exports.f = function (params) { / (params) => {
+    const head = new RegExp(`\\bfunction\\s+${binding}\\s*\\(([^)]*)\\)\\s*\\{|\\b(?:(?:const|let|var)\\s+|(?:module\\.)?exports\\.)${binding}\\s*=\\s*(?:async\\s*)?(?:function\\s*)?\\(([^)]*)\\)\\s*(?:=>\\s*)?`).exec(code)
     if (!head) continue
     signatures[name] = signatureOf(head[1] ?? head[2] ?? '')
     const rest = code.slice(head.index + head[0].length)
-    const body = rest.startsWith('{') ? braceBody(rest, 0) : head[0].endsWith('{') ? braceBody(code, head.index + head[0].length - 1) : rest.split('\n')[0]
+    const conciseLiteral = /^\s*\(\s*\{/.test(rest) ? parenBody(rest, rest.indexOf('(')) : null
+    const body = rest.startsWith('{') ? braceBody(rest, 0) : head[0].endsWith('{') ? braceBody(code, head.index + head[0].length - 1)
+      : conciseLiteral !== null ? `(${conciseLiteral})` : rest.split('\n')[0]
     const created = body ? new RegExp(`\\bnew\\s+(${IDENT})\\s*\\(`).exec(body)?.[1] : undefined
     const exported = created ? Object.keys(classes).find(key => key === created || new RegExp(`\\b${key}\\s*:\\s*${created}\\b`).test(code)) : undefined
-    if (exported) factories[name] = exported
+    if (exported) { factories[name] = exported; continue }
+    // A factory returning an object literal (`return { add: function () {}, total() {} }`) is the class of what it
+    // returns: its methods, signatures and copy-returning getters are recorded under the factory's own name.
+    const literal = body ? objectLiteralMembers(body) : null
+    if (literal && literal.methods.length) {
+      classes[name] = literal.methods
+      factories[name] = name
+      if (literal.chainable.length) chainable[name] = literal.chainable
+      if (literal.copyReturning.length) copyReturning[name] = literal.copyReturning.map(item => ({ method: item.method, line: lineOf(code, head.index) + item.line - 1 }))
+      for (const [method, signature] of Object.entries(literal.methodSignatures)) signatures[`${name}.prototype.${method}`] = signature
+    }
   }
   return { module, exports: [...exports], classes, factories, exportStatement, signatures, chainable, defaultExport: single, copyReturning }
 }

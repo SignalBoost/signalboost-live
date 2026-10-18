@@ -62,14 +62,21 @@ test('Codex review on #4628: a resumed slice with no new receipt does not re-sav
     .run({ workspaceId: 'w', objective: 'Fix a.js', maxSteps: 1 })
   const fresh = first.checkpoint!
   const reordered = Object.fromEntries(Object.entries(fresh).reverse()) as typeof fresh
-  let saves = 0
+  const saved: unknown[] = []
   const store: BuilderV2LeaseStore = {
     async load() { return { workspaceId: 'w', objective: 'Fix a.js', claimGeneration: 2, checkpoint: reordered } },
-    async save() { saves++; return true },
+    async save(_job, _generation, checkpoint) { saved.push(checkpoint); return true },
   }
   const agent = new BuilderV2Agent({ async generate() { throw new Error('builder_turn_timeout') } },
     new BuilderV2Dispatcher(workspace, { async run() { throw Error('no run') } }), workspace)
   const cycle = await runBuilderV2JobCycle({ jobId: 'j', claimGeneration: 2, store, agent, maxSteps: 4 })
   assert.equal(cycle.status, 'paused')
-  assert.equal(saves, 0)
+  // Since #4688 the checkpoint carries the whole-job model-call budget, and a timed-out call counts, so this slice
+  // saves exactly once — for that increment. Everything else is byte-identical to the reordered checkpoint: the
+  // key order alone did not cause the save.
+  assert.equal(saved.length, 1)
+  const { modelCalls: before, ...restBefore } = reordered as Record<string, unknown>
+  const { modelCalls: after, ...restAfter } = saved[0] as Record<string, unknown>
+  assert.equal(after, (before as number) + 1)
+  assert.equal(JSON.stringify(Object.fromEntries(Object.entries(restAfter).sort())), JSON.stringify(Object.fromEntries(Object.entries(restBefore).sort())))
 })

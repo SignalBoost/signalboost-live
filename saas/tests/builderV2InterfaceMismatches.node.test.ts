@@ -281,3 +281,51 @@ test('copy mutation: reported only with a resolved receiver, inside the declarin
   // A redeclaration inside the same block ends the first binding's visibility.
   assert.deepEqual(builderInterfaceMismatches(base('  read(id) { const copy = this.depot.snapshot(id); { const copy = {}; copy.n = 1 } return copy }\n')), [])
 })
+
+test('production job-86599e16 (factory style, Jest): the unsatisfiable test setup is named as a missing constructor argument', () => {
+  const { files } = fixture['job-86599e16']
+  // Every module is `exports.createX = function (...) { return { method: function () {} } }`; no `class` anywhere.
+  assert.ok(files.filter(file => file.path.startsWith('src/')).every(file => !/\bclass\s+[A-Z]\w*\s*\{/.test(file.content)))
+  const cart = builderModuleInterface('src/cart.js', files.find(file => file.path === 'src/cart.js')!.content)!
+  assert.deepEqual(cart.classes.createCart, ['addItem', 'removeItem', 'updateQuantity', 'getItems', 'getTotal', 'setCatalog', 'getCatalog'])
+  assert.deepEqual(cart.factories, { createCart: 'createCart' })
+  assert.deepEqual(cart.signatures.createCart, { params: ['catalogRef'], required: 1, rest: false })
+  assert.deepEqual(cart.signatures['createCart.prototype.addItem'], { params: ['productId', 'quantity'], required: 2, rest: false })
+  // The two failing tests build the cart with createCart() and then expect price totals it cannot compute: the model
+  // edited src/cart.js eleven times. The check points at the test wiring on the first turn.
+  assert.deepEqual(builderInterfaceMismatches(files).map(m => `${m.kind}:${m.name}@${m.test}:${m.line}`), [
+    'wrong_argument_count:createCart(catalogRef) called with 0 arguments@tests/system.test.js:123',
+  ])
+})
+
+test('factory-literal and exports.X forms: methods, signatures, chaining, copies and missing methods', () => {
+  const files: File[] = [
+    { path: 'src/bin.js', content: "exports.createBin = function (owner, limit = 10) {\n  const items = []\n  return {\n    add: function (x) { items.push(x); return this },\n    size() { return items.length },\n    peek: (i) => items[i],\n    snapshot: function () { return { ...items[0] } },\n  }\n}\nexports.Tag = class {\n  constructor(label) { this.label = label }\n  text() { return this.label }\n}\n" },
+    { path: 'test/bin.test.js', content: "const { createBin, Tag } = require('../src/bin')\nconst bin = createBin('me')\nbin.add(1).size()\nbin.peek(0)\nbin.drop(0)\ncreateBin()\ncreateBin('a', 1, 2)\nconst tag = new Tag()\ntag.text(); tag.color()\n" },
+  ]
+  const api = builderModuleInterface('src/bin.js', files[0].content)!
+  assert.deepEqual(api.classes, { createBin: ['add', 'size', 'peek', 'snapshot'], Tag: ['text'] })
+  assert.deepEqual(api.chainable, { createBin: ['add'] })
+  assert.deepEqual(api.copyReturning, { createBin: [{ method: 'snapshot', line: 7 }] })
+  assert.deepEqual(builderInterfaceMismatches(files).map(m => `${m.kind}:${m.name}@${m.line}`), [
+    'wrong_argument_count:createBin(owner, limit = 10) called with 0 arguments@6',
+    'wrong_argument_count:createBin(owner, limit = 10) called with 3 arguments@7',
+    'wrong_argument_count:Tag(label) called with 0 arguments@8',
+    'missing_method:createBin.prototype.drop@5',
+    'missing_method:Tag.prototype.color@9',
+  ])
+})
+
+test('factory literals: commas inside comments do not split members, and concise arrow factories are parsed', () => {
+  const files: File[] = [
+    { path: 'src/till.js', content: "exports.createTill = function () {\n  let count = 0\n  return {\n    // Add an item, returning the new count\n    add: function (x) { count += x; return count },\n    /* total, as a number */\n    total() { return count },\n  }\n}\nexports.createLedger = () => ({\n  post(entry) { return entry },\n  balance: () => 0,\n})\n" },
+    { path: 'test/till.test.js', content: "const { createTill, createLedger } = require('../src/till')\nconst till = createTill()\ntill.add(1); till.total(); till.clear()\nconst ledger = createLedger()\nledger.post({}); ledger.balance(); ledger.close()\ncreateLedger(1)\n" },
+  ]
+  const api = builderModuleInterface('src/till.js', files[0].content)!
+  assert.deepEqual(api.classes, { createTill: ['add', 'total'], createLedger: ['post', 'balance'] })
+  assert.deepEqual(builderInterfaceMismatches(files).map(m => `${m.kind}:${m.name}@${m.line}`), [
+    'wrong_argument_count:createLedger() called with 1 argument@6',
+    'missing_method:createTill.prototype.clear@3',
+    'missing_method:createLedger.prototype.close@5',
+  ])
+})

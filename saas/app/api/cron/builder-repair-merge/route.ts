@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { reconcileMergedRepositoryRepairs } from '@/lib/builder/repository-repair-reconciliation'
 import { completePendingRepositoryRepairMerges } from '@/lib/builder/repository-repair-merge-continuation'
 import { builderAutoMergeSnapshotPort } from '@/lib/builder/repository-repair-snapshot-host'
 import {
   completeBuilderRepositoryRepairAfterMerge,
+  pendingBuilderRepositoryRepairs,
   failBuilderRepositoryRepairAfterMergedDeployment,
   failBuilderRepositoryRepairAfterSupersededBase,
 } from '@/lib/builder/repository-repair-job-lifecycle'
@@ -17,11 +19,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Observe already-merged PRs independently of auto-merge enablement and mutable PR text.
+  const reconciliation = await reconcileMergedRepositoryRepairs({
+    pending: await pendingBuilderRepositoryRepairs(),
+    token: process.env.GITHUB_WRITE_TOKEN || '',
+    complete: completeBuilderRepositoryRepairAfterMerge,
+    deadlineAtMs: Date.now() + 15_000,
+  })
   const result = await completePendingRepositoryRepairMerges({
     snapshotPort: builderAutoMergeSnapshotPort(),
     deadlineAtMs: Date.now() + 60_000,
   })
-  let builderJobsCompleted = 0
+  let builderJobsCompleted = reconciliation.completed
   let builderJobsFailed = 0
   for (const outcome of result.outcomes) {
     if (outcome.outcome === 'merged' && outcome.mergeCommitSha) {
@@ -95,5 +104,6 @@ export async function GET(request: Request) {
       if (failed) builderJobsFailed += 1
     }
   }
-  return NextResponse.json({ ...result, builderJobsCompleted, builderJobsFailed }, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
+  return NextResponse.json({ ...result, reconciliation, builderJobsCompleted, builderJobsFailed }, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
 }
+

@@ -5,6 +5,7 @@ import { createSupabaseMergeWatchStore } from './merge-watch-store.ts'
 import { enqueueSignalBoostRepositoryRepairJob } from './repository-repair-job.ts'
 import { signalBoostDeployedRepairTarget } from './repository-repair-target.ts'
 import { recordBuilderEpisode } from './episodic-memory.ts'
+import type { PendingRepositoryRepair } from './repository-repair-reconciliation.ts'
 
 const MAX_PRODUCTION_REPAIR_ATTEMPTS = 3
 
@@ -60,6 +61,26 @@ async function pausedRepairJob(db: SupabaseClient, pullRequestNumber: number) {
   if (error) throw new Error('builder_repository_merge_job_read_failed')
   if (!row || !UUID.test(String(row.id)) || !UUID.test(String(row.user_id)) || !UUID.test(String(row.workspace_id))) return null
   return row
+}
+
+/** Read only server-owned paused jobs; merged PRs need not remain in GitHub's open list. */
+export async function pendingBuilderRepositoryRepairs(): Promise<PendingRepositoryRepair[]> {
+  const db = serviceClient()
+  if (!db) throw new Error('builder_job_storage_unavailable')
+  const { data, error } = await db.from('builder_jobs').select('metadata,result')
+    .eq('status', 'paused').contains('metadata', { platformRepair: true })
+    .contains('result', { repository_merge_pending: true })
+    .order('updated_at', { ascending: true }).limit(4)
+  if (error) throw new Error('builder_repository_merge_jobs_read_failed')
+  return (data || []).flatMap(row => {
+    const result = record(row.result), metadata = record(row.metadata)
+    const pullRequestNumber = Number(result.pull_request_number)
+    const baseBranch = String(metadata.branch || '')
+    const repairCommitSha = String(result.repair_commit_sha || '')
+    if (!Number.isInteger(pullRequestNumber) || pullRequestNumber < 1 || !SAFE_BRANCH.test(baseBranch) || !SAFE_SHA.test(repairCommitSha)) return []
+    return [{ pullRequestNumber, baseBranch, repairCommitSha,
+      preMergeSnapshotId: typeof result.pre_merge_snapshot_id === 'string' ? result.pre_merge_snapshot_id : null }]
+  })
 }
 
 async function persistHistory(input: {
@@ -142,6 +163,7 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
   deploymentState?: string | null
   preMergeSnapshotId?: string | null
   productionAcceptancePassed?: boolean
+  mergeEvidence?: 'observed_github'
 }): Promise<boolean> {
   if (!Number.isInteger(input.pullRequestNumber) || input.pullRequestNumber < 1 || !SAFE_SHA.test(input.mergeCommitSha) || !SAFE_BRANCH.test(input.baseBranch)) return false
   const db = serviceClient()
@@ -181,7 +203,7 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
     return false
   }
 
-  const plainReply = `Builder completed the repository repair. PR #${input.pullRequestNumber} passed the governed merge gates and was merged into ${input.baseBranch} as ${input.mergeCommitSha}.${input.detail ? ` ${String(input.detail).trim()}` : ''}`
+  const plainReply = `Builder completed the repository repair. PR #${input.pullRequestNumber} ${input.mergeEvidence === 'observed_github' ? 'was observed merged on GitHub into' : 'passed the governed merge gates and was merged into'} ${input.baseBranch} as ${input.mergeCommitSha}.${input.detail ? ` ${String(input.detail).trim()}` : ''}`
   let artifactFiles = files(record(row.result).files)
   try {
     artifactFiles = await persistResultArtifact({ userId: String(row.user_id), workspaceId: String(row.workspace_id) }, plainReply)
@@ -198,6 +220,8 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
     status: 'succeeded',
     repository_merge_pending: false,
     merge_taken: true,
+    merge_refused_reason: null,
+    merge_evidence: input.mergeEvidence || 'governed_worker',
     production_acceptance_required: input.baseBranch === 'main',
     production_acceptance_passed: input.baseBranch === 'main' ? input.productionAcceptancePassed === true : null,
     merge_commit_sha: input.mergeCommitSha,
@@ -238,7 +262,7 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
     summary: plainReply,
     finishedAt: updatedAt,
     evidence: {
-      verification: input.baseBranch === 'main' ? 'production_acceptance_passed' : 'governed_merge_completed',
+      verification: input.baseBranch === 'main' ? 'production_acceptance_passed' : input.mergeEvidence === 'observed_github' ? 'github_merge_observed' : 'governed_merge_completed',
       pullRequestNumber: input.pullRequestNumber,
       mergeCommitSha: input.mergeCommitSha,
       productionAcceptancePassed: input.baseBranch === 'main' ? input.productionAcceptancePassed === true : false,
@@ -466,3 +490,4 @@ export async function failBuilderRepositoryRepairAfterMergedDeployment(input: {
   })
   return true
 }
+

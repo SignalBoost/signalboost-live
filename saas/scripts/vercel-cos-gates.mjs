@@ -22,6 +22,7 @@ const tests = [
   'tests/builderV2OperationalLimits.node.test.ts',
   'tests/builderV2RepairCapability.node.test.ts',
   'tests/builderV2CheckpointConsistency.node.test.ts',
+  'tests/builderV2DurableAcceptance.node.test.ts',
   'tests/labCustomerTraining.node.test.ts',
   'tests/labExperimentComparison.node.test.ts',
   'tests/labExperimentCsv.node.test.ts',

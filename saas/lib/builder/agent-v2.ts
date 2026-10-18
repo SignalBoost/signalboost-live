@@ -33,7 +33,7 @@ export const BUILDER_V2_MODEL_RETRIES = 3
  */
 const WORKING_SET_CHARS = 12_000
 // Preserve more of failing assertions and stack traces without expanding the 12K source working set.
-const FAILURE_OUTPUT_CHARS = 8_000
+const FAILURE_OUTPUT_CHARS = 12_000
 const MODEL_RETRY_BASE_MS = 1_000
 const MODEL_RETRY_MAX_MS = 15_000
 
@@ -301,6 +301,12 @@ function salvageActions(value: string): BuilderV2Action[] {
     at = end + 1
   }
   return actions
+}
+
+/** Host-sourced placeholder: never silently passes functional tests. */
+export function builderMissingExportStub(name: string): string {
+  if (!/^[A-Za-z_$][\w$]*$/.test(name)) throw Error('builder_stub_invalid_identifier')
+  return `function ${name}() {\n  throw new Error('builder_stub_not_implemented: ${name}')\n}`
 }
 
 function parseDecision(value: string | null): Decision | null {
@@ -576,6 +582,37 @@ export class BuilderV2Agent {
       // shows these one stack trace at a time; listing them all lets one reply reconcile every module.
       const interfaceRepairs: BuilderInterfaceRepair[] = missingFiles().length ? []
         : await builderWorkspaceInterfaceRepairs(this.workspace, options.workspaceId, knownFiles).catch(() => [])
+      // Only host-write when an exact object-literal export is known. A stub throws until completed by the model.
+      // Record through the dispatcher so checkpoint revision and acceptance are never silently advanced.
+      let stubbed = false
+      for (const repair of interfaceRepairs) {
+        if (!repair.missing.some(item => item.kind === 'missing_export') || !repair.exportStatement?.startsWith('module.exports = {')) continue
+        const current = await this.workspace?.readFile(options.workspaceId, repair.module)
+        if (!current) continue
+        const statement = repair.exportStatement
+        const start = current.content.indexOf(statement)
+        if (start < 0) continue
+        const brace = statement.lastIndexOf('}')
+        if (brace < 0) continue
+        const target = start + brace
+        const missingNames = [...new Set(repair.missing.filter(item => item.kind === 'missing_export').map(item => item.name))]
+          .filter(name => /^[A-Za-z_$][\\w$]*$/.test(name))
+          .filter(name => !repair.exports.includes(name))
+        if (!missingNames.length) continue
+        const inside = current.content.slice(start + statement.indexOf('{') + 1, target).trim()
+        const needsComma = inside.length > 0 && !inside.endsWith(',')
+        const insertion = (needsComma ? ',' : '') + '\n' +
+          missingNames.map(name => '  ' + name + ': ' + builderMissingExportStub(name)).join(',\n') + '\n'
+        const edited = current.content.slice(0, target) + insertion + current.content.slice(target)
+        const action: BuilderV2Action = { tool: 'write_file', path: repair.module, content: edited }
+        const receipt = await this.dispatcher.dispatch(options.workspaceId, action, { seenContent: current.content })
+        if (receipt.changed) {
+          record(action, receipt)
+          await persist()
+          stubbed = true
+        }
+      }
+      if (stubbed) continue
       const working = await workingSet(interfaceRepairs.map(repair => repair.module))
       if (this.modelCalls >= this.modelCallBudget) {
         return { ok: false, reason: 'builder_v2_model_call_budget_exhausted', summary: 'Whole-job model-call budget reached.', steps, checkpoint: await snapshot() }

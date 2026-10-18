@@ -12,7 +12,7 @@ test('Builder V2 refuses repeat failed suites until a source revision changes', 
 })
 
 test('after test failure next recommended action is a repair, not another run', () => {
-  assert.match(source, /\{ tool: 'edit_file', reason: 'Repair the last failing test before rerunning the unchanged revision' \}/)
+  assert.match(source, /\{ tool: 'edit_file', reason: 'Repair the last failing command before rerunning the unchanged revision' \}/)
   assert.match(source, /if \(hostVerificationDue\(\)\)/)
 })
 
@@ -21,5 +21,6 @@ test('continuation restores latest failing host test and inspections across slic
   assert.match(source, /latestFailedTest: currentFailure\(\)/)
   assert.match(source, /const currentRevisionRuns = \(\) => steps\.slice\(steps\.findLastIndex\(step => step\.changed\) \+ 1\)/)
   assert.match(source, /receipt\.tool === 'read_file' && receipt\.ok/)
-  assert.match(source, /The host has already run the suite on this unchanged revision/)
+  assert.match(source, /The host has already run the command on this unchanged revision/)
 })
+

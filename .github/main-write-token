@@ -1,2 +1,3 @@
-base_sha=1066fdb32569d18635b806f36f1db3c17c775c75
-branch=fix/builder-v2-inventory-verification-20261018
+base_sha=db5de54a072e8893f42142b31aab342c4893bbbb
+branch=fix/builder-v2-runtime-repair-context-20261018
+

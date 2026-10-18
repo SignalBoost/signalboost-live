@@ -33,10 +33,11 @@ const objective = ['# MiniFlow', 'Build a complete, working **MiniFlow** applica
   'miniflow/', '├── package.json', '├── index.js', '├── src', '│   └── catalog.js', '└── test', '    └── catalog.test.js', '```',
   'Implement at least **2 meaningful automated tests**.', '## Mandatory verification', 'Execute all three commands:', '```bash',
   'npm test', 'node --test test/*.test.js', 'node index.js', '```'].join('\n')
-// The production defect: the tests call createCatalog, the module exports a class.
+// A functional defect keeps this focused on working-set retention. A missing
+// export now triggers the separate host stub-insertion path before model repair.
 const files: Record<string, string> = {
   'package.json': '{"name":"miniflow","version":"1.0.0","scripts":{"test":"node --test test/*.test.js"}}\n',
-  'src/catalog.js': 'class Catalog {\n  constructor() { this.items = [] }\n  add(item) { this.items.push(item); return item }\n}\nmodule.exports = { Catalog }\n',
+  'src/catalog.js': 'class Catalog {\n  constructor() { this.items = [] }\n  add(item) { this.items.push(item); return item }\n}\nfunction createCatalog() { throw new TypeError("catalog not initialized") }\nmodule.exports = { Catalog, createCatalog }\n',
   'test/catalog.test.js': "const test = require('node:test')\nconst assert = require('node:assert')\nconst { createCatalog } = require('../src/catalog.js')\ntest('adds', () => assert.equal(createCatalog().add(1), 1))\ntest('starts empty', () => assert.equal(createCatalog().items.length, 0))\n",
   'index.js': "const { Catalog } = require('./src/catalog.js')\nconsole.log('items', new Catalog().items.length)\n",
 }
@@ -57,7 +58,7 @@ test('the failing output and the opened files stay in every prompt, also after r
   for (const prompt of prompts) {
     const failure = JSON.parse(prompt.latestFailedTest)
     assert.equal(failure.command, 'npm test')
-    assert.match(failure.output, /createCatalog is not a function/)
+    assert.match(failure.output, /catalog not initialized/)
   }
   const last = prompts.at(-1)!
   assert.deepEqual(Object.keys(last.openFiles).sort(), ['index.js', 'package.json', 'src/catalog.js', 'test/catalog.test.js'])
@@ -67,10 +68,10 @@ test('the failing output and the opened files stay in every prompt, also after r
 
   // Next slice, resumed from the checkpoint: the model still sees the failure and the files without reading again.
   let resumedPrompt: Record<string, any> | undefined
-  const fix = JSON.stringify({ type: 'tool', action: { tool: 'edit_file', path: 'test/catalog.test.js', search: "const { createCatalog } = require('../src/catalog.js')", replace: "const { Catalog } = require('../src/catalog.js')\nconst createCatalog = () => new Catalog()" } })
+  const fix = JSON.stringify({ type: 'tool', action: { tool: 'edit_file', path: 'src/catalog.js', search: 'throw new TypeError("catalog not initialized")', replace: 'return new Catalog()' } })
   const resumed = await new BuilderV2Agent({ async generate(request) { resumedPrompt ??= JSON.parse(String(request.prompt)); return fix } },
     new BuilderV2Dispatcher(workspace, localRunner), workspace).run({ workspaceId: 'w', objective, maxSteps: 2, checkpoint: first.checkpoint })
-  assert.match(JSON.parse(resumedPrompt!.latestFailedTest).output, /createCatalog is not a function/)
+  assert.match(JSON.parse(resumedPrompt!.latestFailedTest).output, /catalog not initialized/)
   assert.equal(resumedPrompt!.openFiles['test/catalog.test.js'], files['test/catalog.test.js'])
   assert.equal(resumed.ok, true, resumed.reason)
 })
@@ -88,3 +89,4 @@ test('the working set stays within its budget', async () => {
   assert.equal(last.openFiles['src/big.js'], undefined)
   assert.equal(last.openFiles['src/catalog.js'], files['src/catalog.js'])
 })
+

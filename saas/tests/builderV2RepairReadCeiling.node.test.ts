@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { runInNewContext } from 'node:vm'
 import { BuilderV2Agent } from '../lib/builder/agent-v2.ts'
 import { BuilderV2Dispatcher } from '../lib/builder/agent-v2-dispatcher.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
@@ -41,11 +42,18 @@ test('failed inventory import is targeted for repair and verified by the host', 
     async run() {
       runs++
       const file = await workspace.readFile('w', 'src/inventory.js')
-      const fixed = file?.content.includes('createInventory')
-      return { exitCode: fixed ? 0 : 1,
-        stdout: fixed ? '# tests 1\n# pass 1\n# fail 0' :
-          'test/inventory.test.js:10:1\nTypeError: createInventory is not a function',
-        stderr: '', timedOut: false }
+      // Execute the export: a throwing host placeholder must fail verification too.
+      try {
+        const output = runInNewContext(
+          `${file?.content}\nconst { createInventory } = module.exports; JSON.stringify(createInventory())`,
+          { module: { exports: {} } }, { timeout: 1000 },
+        )
+        assert.equal(output, '{}')
+        return { exitCode: 0, stdout: '# tests 1\n# pass 1\n# fail 0', stderr: '', timedOut: false }
+      } catch (error) {
+        return { exitCode: 1, stdout: `test/inventory.test.js:10:1\n${String(error)}`,
+          stderr: '', timedOut: false }
+      }
     },
   })
   let sawTarget = false
@@ -53,22 +61,24 @@ test('failed inventory import is targeted for repair and verified by the host', 
     const value = JSON.parse(prompt) as {
       activeRepair?: { targets?: Array<{test: string; sources: string[]}> }
       latestFailedTest?: string
+      openFiles?: Record<string, string>
     }
     if (value.latestFailedTest) {
-      sawTarget = value.activeRepair?.targets?.some(target =>
+      sawTarget ||= value.activeRepair?.targets?.some(target =>
         target.test === 'test/inventory.test.js' && target.sources.includes('src/inventory.js')) ?? false
     }
     return JSON.stringify({type: 'tool', action: {tool: 'edit_file', path: 'src/inventory.js',
-      search: 'module.exports = {}',
+      search: value.openFiles?.['src/inventory.js'] ?? 'module.exports = {}',
       replace: 'module.exports = { createInventory() { return {} } }'}})
   } }
   const objective = 'Create these files:\nsrc/inventory.js\ntest/inventory.test.js\n\nRun:\nnpm test'
   const result = await new BuilderV2Agent(ai, dispatcher, workspace).run({
     workspaceId: 'w', objective, maxSteps: 8,
   })
-  // Host stub writes the export, and the model still receives targeted repair evidence.
+  // Repair uses the current source; only the implemented export verifies.
   assert.equal(sawTarget, true)
-  assert.match((await workspace.readFile('w', 'src/inventory.js'))?.content ?? '', /builder_stub_not_implemented: createInventory/)
+  assert.equal((await workspace.readFile('w', 'src/inventory.js'))?.content,
+    'module.exports = { createInventory() { return {} } }')
   assert.equal(result.ok, true)
   assert.equal(result.reason, 'verified')
   assert.equal(runs, 2)

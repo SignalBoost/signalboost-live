@@ -106,6 +106,10 @@ export async function runBuilderV2JobCycle(input: {
   // Slice budget, cancellation (slice deadline) and a model timeout/outage after progress all pause with the
   // checkpoint; the job's slice cap still bounds how often it resumes.
   if (result.reason === 'builder_v2_step_budget' || result.reason === 'builder_v2_cancelled' || result.reason === 'builder_v2_model_unavailable') {
+    if (result.reason === 'builder_v2_cancelled' && input.signal?.aborted &&
+        (input.signal.reason instanceof Error && input.signal.reason.message === 'builder_v2_total_deadline_exceeded')) {
+      return { status: 'failed', result, reason: 'builder_v2_total_deadline_exceeded' }
+    }
     // Compare content, not identity: every snapshot is a new object, so identity re-saved an unchanged checkpoint.
     // Key order is ignored: a checkpoint read back from the jsonb column does not keep it (Codex on #4628).
     if (result.checkpoint && canonicalJson(result.checkpoint) !== canonicalJson(persisted)

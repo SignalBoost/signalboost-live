@@ -9,7 +9,7 @@ import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './contr
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
 import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, requeueBuilderContinuationCycle, readBuilderWorkspaceFingerprint, type BuilderJobRecord } from './job-store.ts'
-import { MAX_WORK_SLICES, builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport, builderJobOverTotalDeadline } from './work-budget.ts'
+import { MAX_WORK_SLICES, builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport, builderJobOverTotalDeadline, BUILDER_JOB_TOTAL_DEADLINE_MS } from './work-budget.ts'
 import { builderContractObjective, builderTaskContract, builderTaskProgress } from './task-contract.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { builderNextAction } from './user-guidance.ts'
@@ -386,6 +386,10 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         deadlineAtMs: Date.now() + 210_000,
       })
       const browserPortV2 = createBuilderPlaywrightCliPort({ ownerAuthorized: job.ownerAuthorized === true })
+      const deadlineController = new AbortController()
+      const deadlineTimer = setTimeout(() => deadlineController.abort(new Error('builder_v2_total_deadline_exceeded')),
+        Math.max(0, Date.parse(job.createdAt) + BUILDER_JOB_TOTAL_DEADLINE_MS - Date.now()))
+      deadlineTimer.unref?.()
       const v2 = new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, new VercelSandboxBuilderRunner(), {
         beforeRun({ workspaceId, command }) {
           if (workspaceId !== job.workspaceId || !command.trim()) throw Error('builder_execution_context_denied')
@@ -406,9 +410,10 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           return await withBuilderSliceDeadline(() => runBuilderV2JobCycle({
             jobId: job.id, claimGeneration: job.claimGeneration,
             store: createBuilderV2SupabaseLeaseStore(db, job.userId),
-            agent: v2, maxSteps: 24,
+            agent: v2, maxSteps: 24, signal: deadlineController.signal,
           }), BUILDER_SLICE_HARD_DEADLINE_MS)
         } finally {
+          clearTimeout(deadlineTimer)
           // Every V2 work slice owns its browser sandbox; never leak it across claims.
           await browserPortV2.close().catch(() => console.warn('[builder_v2_browser_cleanup_failed]', { jobId: job.id }))
         }

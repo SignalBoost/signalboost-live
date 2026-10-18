@@ -122,10 +122,12 @@ export function validateBuilderV2ReceiptHistory(checkpoint: BuilderV2Checkpoint)
       || typeof receipt.ok !== 'boolean' || typeof receipt.changed !== 'boolean') return false
     if (receipt.changed && (!receipt.ok || (receipt.tool !== 'write_file' && receipt.tool !== 'edit_file'))) return false
     if (receipt.changed) revision++
-    if (receipt.tool === 'run_tests' && receipt.ok) {
+    if (receipt.tool === 'run_tests') {
       const output = receipt.output as { exitCode?: unknown; timedOut?: unknown } | undefined
-      if (!output || output.exitCode !== 0 || output.timedOut !== false) return false
-      verifiedRevision = revision
+      // Mirror record(): failed host verification clears proof, never inherits stale success.
+      // Successful receipts must include actual host exit and timeout evidence.
+      if (receipt.ok && (!output || output.exitCode !== 0 || output.timedOut !== false)) return false
+      verifiedRevision = receipt.ok ? revision : -1
     }
     if (receipt.changed || receipt.tool === 'run_tests' && receipt.ok) unproductive = 0
     else unproductive++
@@ -372,7 +374,15 @@ export class BuilderV2Agent {
       if (saved.workspaceDigest !== await workspaceDigest(this.workspace, options.workspaceId)) {
         return { ok: false, reason: 'builder_v2_checkpoint_workspace_changed', steps: [] }
       }
-      if (!validateBuilderV2ReceiptHistory(saved) || [saved.revision, saved.verifiedRevision, saved.unproductive].some(n => !Number.isSafeInteger(n) || n < -1 || n > BUILDER_V2_MAX_RECEIPTS)) {
+      const countersValid = [saved.revision, saved.verifiedRevision, saved.unproductive]
+        .every(n => Number.isSafeInteger(n) && n >= -1 && n <= BUILDER_V2_MAX_RECEIPTS)
+      if (!countersValid || !validateBuilderV2ReceiptHistory(saved)) {
+        // Persist only a bounded reason/category, never checkpoint contents or workspace source.
+        console.error('[builder_v2_checkpoint_rejected]', {
+          countersValid, steps: Array.isArray(saved.steps) ? saved.steps.length : 'invalid',
+          revision: saved.revision, verifiedRevision: saved.verifiedRevision,
+          unproductive: saved.unproductive,
+        })
         return { ok: false, reason: 'builder_v2_checkpoint_invalid', steps: [] }
       }
     }

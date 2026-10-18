@@ -596,7 +596,7 @@ export class BuilderV2Agent {
         if (brace < 0) continue
         const target = start + brace
         const missingNames = [...new Set(repair.missing.filter(item => item.kind === 'missing_export').map(item => item.name))]
-          .filter(name => /^[A-Za-z_$][\\w$]*$/.test(name))
+          .filter(name => /^[A-Za-z_$][\w$]*$/.test(name))
           .filter(name => !repair.exports.includes(name))
         if (!missingNames.length) continue
         const inside = current.content.slice(start + statement.indexOf('{') + 1, target).trim()

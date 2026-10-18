@@ -1,2 +1,2 @@
-base_sha=aed73e9cbb6f69f8a9edca73041dbd53dc07416d
-branch=fix/builder-v2-defensive-copy-mutation-20261017
+base_sha=cff2789d2e0d5e8d607174ea47a5d51496eb8cba
+branch=fix/builder-v2-factory-literal-interfaces-20261017

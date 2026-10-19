@@ -725,10 +725,10 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // Fast text transforms remain the FIRST executable branch, but only for a verified edit intent.
 // A miss is not terminal: the request falls through to the normal COS chain under the same turn.
   if(!artifactContinuation&&!fastEditAlreadyAttempted&&isFastTextTransform(input,{previousAssistant:precedingAssistant})){
-    // Production 2026-10-15: an edit answered "editing models did not respond in time" and the
-    // owner's immediate manual retry of the same text succeeded. Make that retry here, once, inside
-    // the same turn, instead of asking the person to resend.
-    const fast=await runFastTextTransform(input)??await runFastTextTransform(input)
+    // One bounded fast-editor attempt per turn. A second identical invocation doubled
+    // provider latency and could starve the browser response budget without changing routing.
+    // Failure falls through to the existing COS path under the same turn.
+    const fast=await runFastTextTransform(input)
     if(fast){
       const executionProvenance=authoritativeProvenance(null,{invoked:false})
       ;(executionProvenance as any).local_reasoning={invoked:true,model:fast.reasonerLabel,confidence:fast.reviewVerdict==='self_reviewed'?0.75:0.95}

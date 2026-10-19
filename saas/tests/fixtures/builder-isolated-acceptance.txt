@@ -1,0 +1,28 @@
+Run a real, isolated end-to-end Builder acceptance test.
+
+Use Builder V2 and the configured approved models. Do not modify or deploy the production platform.
+
+Limits: one attempt, maximum 10 minutes and $0.50 in inference spending. Enforce these limits before starting. If you cannot enforce them, stop and explain.
+
+Create an isolated Node.js repository with:
+- sum.js exporting sum(a, b), deliberately implemented as a - b.
+- sum.test.js using node:test and strict assertions for:
+  sum(2, 3) === 5
+  sum(0, 4) === 4
+  sum(-2, 3) === 1
+- A small HTTP endpoint /sum?a=2&b=3 that calls the same sum function.
+
+Acceptance sequence:
+1. Persist the original files and record their revision.
+2. Run node --test sum.test.js and record the actual failure.
+3. Inspect and repair only sum.js. Preserve the test assertions.
+4. Rerun the identical command and require all three tests to pass.
+5. Commit the repair and open a PR against the isolated test branch—not production/main.
+6. Automatically deploy the exact repaired revision to a preview.
+7. Request the preview endpoint and verify HTTP 200 with {"total":5}.
+8. Persist the files, execution receipts, PR URL, preview URL, elapsed time, model-call count, and recorded inference cost.
+9. Ensure the final job status, History entry, and saved result agree.
+
+Do not fabricate execution, weaken tests, hardcode HTTP output, bypass approval gates, or silently substitute a workspace-only test for repository/PR/deployment verification.
+
+Report PASS only after every step is verified. Otherwise report INCOMPLETE, identify the exact blocker, and preserve completed work. Do not restart automatically.

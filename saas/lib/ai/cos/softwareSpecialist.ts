@@ -27,6 +27,7 @@ import {
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
 import { readBuilderObjective } from '@/lib/builder/request-contract'
 import { runCosSoftwareSpecialistProductionHarness } from '@/lib/ai/cos/softwareSpecialistHarness'
+import { builderExecutionAdmissionBlocker } from '@/lib/builder/execution-admission'
 import {
   COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY,
   createCosProductionIngressManifest,
@@ -390,6 +391,13 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
 
   if (!specialistRelevant) return null
 
+  const admissionBlocker = builderExecutionAdmissionBlocker(objective)
+  if (admissionBlocker) return NextResponse.json({
+    ...admissionBlocker,
+    source: 'cos-builder-admission-blocked',
+    ...softwareSpecialistFields('software.delegate'),
+  }, { status: 422 })
+
   const existingParent = currentCosHarnessIngress()?.manifest ?? null
   if (!existingParent) {
     let parentManifest
@@ -476,3 +484,4 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
 
   return harness.value
 }
+

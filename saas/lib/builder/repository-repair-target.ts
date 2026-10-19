@@ -1,6 +1,8 @@
 // saas/lib/builder/repository-repair-target.ts
 import { analyzeOperationalLog } from '../ai/cos/pastedOperationalLog.ts'
 import { isRepairObjective, opensWithCreationDirective } from './regression-gate.ts'
+import { isExplicitIsolatedProjectBuild } from './isolated-project-intent.ts'
+export { isExplicitIsolatedProjectBuild } from './isolated-project-intent.ts'
 
 export const SIGNALBOOST_REPOSITORY = 'SignalBoost/signalboost-live' as const
 export const SIGNALBOOST_REPOSITORY_URL = 'https://github.com/SignalBoost/signalboost-live.git' as const
@@ -41,11 +43,6 @@ const PLATFORM_PUBLISH_INTENT = /\b(?:commit(?:\s+it)?|push|open\s+(?:a\s+)?pr|p
 // An explicit new isolated project is not a request to repair this platform.
 // Later negative constraints ("do not modify the platform repository") and
 // conditional test-repair instructions must not grant Platform Engineer authority.
-export function isExplicitIsolatedProjectBuild(input: string): boolean {
-  const opening = String(input || '').trim().slice(0, 1000)
-  return /\b(?:build|create|implement|develop)\b[\s\S]{0,220}\b(?:from scratch|new isolated workspace|new workspace|new project)\b/i.test(opening)
-    && /\b(?:application|app|project|system|service|website|tool)\b/i.test(opening)
-}
 
 function isExplicitPlatformRepairObjective(input: string): boolean {
   const objective = String(input || '').trim()
@@ -394,3 +391,4 @@ export function signalBoostRepositoryRepairObjective(target: SignalBoostReposito
     `Failure evidence:\n${evidence}`,
   ].filter(Boolean).join('\n\n').slice(0, 7_900)
 }
+

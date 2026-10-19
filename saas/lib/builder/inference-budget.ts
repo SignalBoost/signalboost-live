@@ -36,7 +36,7 @@ export function readBuilderRunLimits(objective: string): BuilderRunLimits | null
   const nanos = amounts.map(amount => {
     if (!/^\d+(?:\.\d{1,9})?$/.test(amount)) throw new BuilderBudgetError('builder_budget_amount_invalid')
     const [whole, fraction = ''] = amount.split('.')
-    const value = Number(BigInt(whole) * 1_000_000_000n + BigInt(fraction.padEnd(9, '0')))
+    const value = Number(BigInt(whole) * BigInt(1_000_000_000) + BigInt(fraction.padEnd(9, '0')))
     if (!Number.isSafeInteger(value) || value <= 0 || value > 100_000_000_000) throw new BuilderBudgetError('builder_budget_amount_invalid')
     return value
   })
@@ -115,8 +115,12 @@ export function builderBudgetedModelFetch(fetchImpl: typeof fetch): typeof fetch
       ? inputTokens * quote.inputNanosPerToken + outputTokens * quote.outputNanosPerToken : null
     const reported = Number.isSafeInteger(reportedRaw) ? reportedRaw : null
     const measured = Number.isSafeInteger(measuredRaw) ? measuredRaw : null
-    const accounted = response.ok && measured !== null && inputTokens <= quote.contextTokens && outputTokens <= quote.outputTokens
-      ? Math.max(measured, reported ?? 0) : null
+    // Providers may report billable usage even on an error response. A ceiling breach
+    // must disable the ledger regardless of HTTP status, never leave room for a retry.
+    const maximumRecorded = Math.max(measured ?? 0, reported ?? 0)
+    const accounted = maximumRecorded > quote.upperNanodollars ? maximumRecorded
+      : response.ok && measured !== null && inputTokens <= quote.contextTokens && outputTokens <= quote.outputTokens
+        ? maximumRecorded : null
     await context.store.settle(callId, accounted, reported)
     if ((reportedRaw !== null && reported === null) || (measuredRaw !== null && measured === null)) {
       throw new BuilderBudgetError('builder_budget_usage_invalid')

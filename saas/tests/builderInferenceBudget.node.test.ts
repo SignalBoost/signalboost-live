@@ -219,6 +219,24 @@ test('a provider cost above its quoted bound is recorded and disables subsequent
   } finally { await db.close() }
 })
 
+test('billable usage above the reservation blocks retries even on an HTTP error', async () => {
+  const { db, store, ledger } = await database()
+  let modelCalls = 0
+  const guarded = builderBudgetedModelFetch(async input => {
+    if (String(input).endsWith('/models/list')) return Response.json(catalog)
+    modelCalls++
+    return Response.json({ usage: { prompt_tokens: 10, completion_tokens: 2,
+      estimated_cost: (quote.upperNanodollars + 1) / 1e9 } }, { status: 500 })
+  })
+  try {
+    await assert.rejects(withBuilderInferenceBudget(store, Date.now() + 10000,
+      () => guarded(endpoint, { method: 'POST', body: JSON.stringify(body) })), /ceiling_breached/)
+    assert.equal((await ledger()).blocked, true)
+    await assert.rejects(store.reserve(randomUUID(), quote), /builder_budget_exhausted/)
+    assert.equal(modelCalls, 1)
+  } finally { await db.close() }
+})
+
 test('database enforces original deadline and refuses cap reset, duplicate call, other tenant, and terminal job', async () => {
   const { db, store, job, ledger } = await database()
   try {

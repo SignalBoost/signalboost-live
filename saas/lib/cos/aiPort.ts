@@ -1,4 +1,5 @@
 import { currentHarnessExecutionContext } from '../../platform-harness/runtime/execution-context.ts'
+import { checkBuilderInferenceDeadline, currentBuilderInferenceBudget } from '../builder/inference-budget.ts'
 import { throwIfInferenceAborted } from '../ai/inferenceCancellation.ts'
 // Injected model-access seam for COS generators. Text requests enter the shared COS gateway so
 // existing Portables gain durable reuse and single-flight protection without owning provider logic.
@@ -147,6 +148,22 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
       const harnessSignal = currentHarnessExecutionContext()?.signal
       if (harnessSignal) input = { ...input, signal: input.signal ? AbortSignal.any([input.signal, harnessSignal]) : harnessSignal }
       throwIfInferenceAborted(input.signal)
+      if (currentBuilderInferenceBudget()) {
+        checkBuilderInferenceDeadline()
+        // Keep the assigned/configured approved coding models. Unpriced owned GPU wake/probe
+        // paths are unavailable for a hard-dollar job; never assume their inference costs zero.
+        const assigned = await tryAssignedPlatformModelTurn({ ...input,
+          frequencyPenalty: 0, presencePenalty: 0, jsonObject: true,
+          usageContext: { feature: 'builder', purpose: 'coding_harness_budgeted' },
+          maxEstimatedCostUsd: deepInfraMaxCallUsd('builder'),
+        }, 'builder')
+        if (assigned.result?.content?.trim()) return assigned.result.content
+        return requireText(await callLocalModel({ ...input,
+          frequencyPenalty: 0, presencePenalty: 0, jsonObject: true,
+          usageContext: { feature: 'builder', purpose: 'coding_harness_budgeted' },
+          maxEstimatedCostUsd: deepInfraMaxCallUsd('builder'),
+        }, { ...localInferenceConfigFromEnv(), model: builderCodingModelFromEnv(), fallbackFromOwned: true }), 'builder coding')
+      }
       const graduate = await tryActiveGraduate('coder', input, { coding: true })
       throwIfInferenceAborted(input.signal)
       if (graduate.text) return graduate.text

@@ -43,17 +43,17 @@ test('runtime qualifiers do not change isolated scope; platform feature requests
   ]) assert.equal(isExplicitIsolatedProjectBuild(prompt), false, prompt)
 })
 
-test('the requested hard dollar cap fails admission honestly before a job can start', () => {
+test('a full external acceptance request remains blocked until publication is supported; valid caps are admitted', () => {
   const blocker = builderExecutionAdmissionBlocker(objective)
-  assert.equal(blocker?.error, 'builder_inference_spend_cap_unavailable')
+  assert.equal(blocker?.error, 'builder_isolated_publication_unavailable')
   assert.equal(blocker?.status, 'incomplete')
   assert.equal(blocker?.execution_allowed, false)
-  assert.match(blocker!.reply, /No Builder job or workspace was created/)
+  assert.match(blocker!.reply, /no job was started/)
   for (const limit of [
     'Limits: maximum $0.25 inference cost.',
     'Keep this job under 1 USD.',
     'Budget: at most 2 dollars.',
-  ]) assert.ok(builderExecutionAdmissionBlocker(limit), limit)
+  ]) assert.equal(builderExecutionAdmissionBlocker(limit), null, limit)
   for (const prompt of [
     'Create an isolated Node.js repository with sum.js and sum.test.js.',
     'Build an expense tracker that displays a $50 budget.',

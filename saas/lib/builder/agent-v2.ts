@@ -1,6 +1,7 @@
 import type { BuilderAiPort, BuilderWorkspacePort } from './contracts.ts'
 import { checkpointDigest, workspaceDigest } from './checkpoint.ts'
 import { BuilderV2Dispatcher, type BuilderV2Action, type BuilderV2Receipt } from './agent-v2-dispatcher.ts'
+import { BuilderBudgetError, checkBuilderInferenceDeadline } from './inference-budget.ts'
 import { builderTaskContract } from './task-contract.ts'
 import { builderWorkspaceInterfaceRepairs, builderWorkspaceModuleInterfaces, type BuilderInterfaceRepair } from './interface-mismatches.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
@@ -596,8 +597,10 @@ export class BuilderV2Agent {
         instruction: 'Use the actual failing command, caller imports and source API to diagnose the failure. Prefer a targeted edit_file operation; avoid repeating read_file calls. Do not change tests merely to silence failures. Host verification runs after edits.' }
     }
     for (let calls = 0; calls < maxSteps && steps.length < BUILDER_V2_MAX_RECEIPTS; calls++) {
+      checkBuilderInferenceDeadline()
       if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
       const completed = await verifiedNow()
+      checkBuilderInferenceDeadline()
       if (completed) return completed
       // REA-inspired native harness: the host verifies complete work before asking a model
       // for another action. Avoids an entire provider round-trip and timeout per command.
@@ -693,6 +696,7 @@ export class BuilderV2Agent {
           allowTruncatedText: true,
         }, options.retryDelay ?? abortableDelay)
       } catch (error) {
+        if (error instanceof BuilderBudgetError) return { ok: false, reason: error.message, steps, checkpoint: await snapshot() }
         if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
         if (error instanceof Error && error.message === 'builder_v2_model_call_budget_exhausted') {
           return { ok: false, reason: 'builder_v2_model_call_budget_exhausted', summary: 'Whole-job model-call budget reached.', steps, checkpoint: await snapshot() }
@@ -825,7 +829,7 @@ export class BuilderV2Agent {
         this.modelCalls++ // Count attempted requests, including failed requests and retries.
         return await this.ai.generate(request)
       } catch (error) {
-        if (request.signal?.aborted || (error instanceof Error && error.message === 'builder_v2_model_call_budget_exhausted') || attempt >= BUILDER_V2_MODEL_RETRIES
+        if (error instanceof BuilderBudgetError || request.signal?.aborted || (error instanceof Error && error.message === 'builder_v2_model_call_budget_exhausted') || attempt >= BUILDER_V2_MODEL_RETRIES
           || (error instanceof Error && (error.message === 'local_model_output_truncated' || error.message === BUILDER_TURN_TIMEOUT_ERROR))) throw error
         await retryDelay(Math.min(MODEL_RETRY_MAX_MS, MODEL_RETRY_BASE_MS * 2 ** attempt), request.signal)
       }

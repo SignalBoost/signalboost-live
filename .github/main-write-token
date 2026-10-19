@@ -1,2 +1,3 @@
-base_sha=982a515c782658685369c92403c481f7b5998329
-branch=fix/builder-isolated-concierge-20261019
+base_sha=754ef11a1b9dda512cc14a2bff5e61a89956c50a
+branch=fix/builder-durable-inference-budget-20261019
+

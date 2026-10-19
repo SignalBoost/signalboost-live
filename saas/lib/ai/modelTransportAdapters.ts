@@ -1,4 +1,5 @@
 import { modelTransportSignal, throwIfInferenceAborted } from './inferenceCancellation.ts'
+import { builderBudgetedModelFetch } from '../builder/inference-budget.ts'
 // saas/lib/ai/modelTransportAdapters.ts
 import { requireModelCapability, type PlatformModelProfile } from './modelCapabilityRegistry.ts'
 import type {
@@ -408,7 +409,7 @@ export function createBuiltinModelTransportAdapters(input: {
   resolveCredential?: CredentialResolver
 }): readonly ModelTransportAdapter[] {
   const env = input.env || process.env
-  const fetchImpl = input.fetchImpl || fetch
+  const fetchImpl = builderBudgetedModelFetch(input.fetchImpl || fetch)
   const bindings = input.bindings || configuredModelTransportBindings(env)
   const profiles = new Map(input.profiles.map(profile => [profile.key, profile]))
   const adapters: ModelTransportAdapter[] = []
@@ -422,4 +423,5 @@ export function createBuiltinModelTransportAdapters(input: {
   }
   return Object.freeze(adapters)
 }
+
 

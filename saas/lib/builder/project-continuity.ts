@@ -1,6 +1,7 @@
 import type { EvidenceJob, EvidenceLookup } from './execution-evidence.ts'
 import { isNewApplicationSpecification } from './task-contract.ts'
 import { openingDirective } from './regression-gate.ts'
+import { isExplicitIsolatedProjectBuild } from './isolated-project-intent.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const NEW_PROJECT = /\b(?:new|another|separate|different|fresh|clean)\s+(?:(?:isolated|fresh|clean|empty|independent)\s+)?(?:project|workspace|app|application|website|repository)\b|\bstart\s+(?:over|fresh)\b|\bfrom\s+scratch\b/i
@@ -23,7 +24,7 @@ const CREATES_WHOLE_PROJECT = /\b(?:build|create|write|implement|generate|scaffo
  * particular package manifest (a static website has none).
  */
 export function isNewBuilderProjectObjective(objective: string): boolean {
-  return NEW_PROJECT.test(objective) || (isNewApplicationSpecification(objective)
+  return isExplicitIsolatedProjectBuild(objective) || NEW_PROJECT.test(objective) || (isNewApplicationSpecification(objective)
     && CREATES_WHOLE_PROJECT.test(openingDirective(objective).replace(/[*_`,]/g, ' ').replace(/\s+/g, ' ')))
 }
 
@@ -87,3 +88,4 @@ export function builderProjectBlockedReply(reason: 'busy' | 'unavailable'): stri
     ? 'Builder is still working on this project. Let that job finish before changing the same files.'
     : 'I could not retrieve this conversation’s Builder project. Your existing files were not changed. Try the request again.'
 }
+

@@ -33,7 +33,7 @@ import { resolveSemanticPublicIdentity, shouldResolveSemanticPublicIdentity } fr
 import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
-import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective, isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { decideCosAgentTurn, stableKnowledgeQuestionNeedsNoPlanner, type CosAgentDecision } from '@/lib/ai/cos/cosAgentDecision'
 import { encodePlannerSearchQueriesHeader, PLANNER_SEARCH_QUERIES_HEADER } from '@/lib/ai/cos/plannerSearchQueries'
 import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
@@ -238,7 +238,7 @@ async function executeBrowserTurn(req: NextRequest) {
       : authoringResponse
   }
 
-  if (browserSurface === 'concierge') {
+  if (browserSurface === 'concierge' && !isConciergeBuilderObjective(prompt, routingContext)) {
     const deterministicIdentity = publicConciergeIdentityReply(prompt)
     const semanticIdentityEligible = !deterministicIdentity && shouldResolveSemanticPublicIdentity(prompt)
     semanticIdentityInvoked = semanticIdentityEligible
@@ -297,6 +297,7 @@ async function executeBrowserTurn(req: NextRequest) {
   // Software Specialist owns Builder/Platform Engineer lifecycle. Repository authority follows the
   // authenticated owner identity, never the mouth that carried the request.
   const shouldConsultSoftwareSpecialist = hasSourceAttachment || explicitOperationalRepair
+    || isConciergeBuilderObjective(prompt, routingContext)
   const ownerRepositoryRepairAllowed = authenticatedOwner
     && ownerSoftwareAuthority.allowRepositoryRepair
     && (!operationalEvidence || explicitOperationalRepair)
@@ -679,3 +680,4 @@ export async function POST(req: NextRequest) {
     if (watchdogTimer.handle) clearTimeout(watchdogTimer.handle)
   }
 }
+

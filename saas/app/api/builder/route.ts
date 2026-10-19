@@ -17,6 +17,7 @@ import {
   type BuilderObjectiveFailureCode,
 } from '@/lib/builder/request-contract'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
+import { builderExecutionAdmissionBlocker } from '@/lib/builder/execution-admission'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -169,6 +170,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     objective = readBuilderObjective(body).objective
+    const admissionBlocker = builderExecutionAdmissionBlocker(objective)
+    if (admissionBlocker) return noStore(admissionBlocker, { status: 422 })
     conversationId = String(body?.conversationId || '').trim() || crypto.randomUUID()
     if (!UUID.test(conversationId)) return noStore({ error: 'Invalid conversation id.' }, { status: 400 })
     const requestedWorkspaceId = String(body?.workspaceId || '').trim()
@@ -454,3 +457,4 @@ export async function DELETE(request: Request) {
     return noStore({jobId, stopped:outcome==='stopped', status:outcome==='stopped'?'failed':'already_finished', reason:outcome==='stopped'?'builder_cancelled_by_owner':null})
   } catch {return noStore({error:'Builder stop failed; check job status before retrying.'},{status:503})}
 }
+

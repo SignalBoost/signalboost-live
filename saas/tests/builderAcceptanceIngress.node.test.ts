@@ -1,0 +1,127 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { stripTypeScriptTypes } from 'node:module'
+import test from 'node:test'
+import * as roles from '../lib/ai/cos/cosReasoningRolePolicy.ts'
+import * as scope from '../lib/builder/repository-repair-target.ts'
+import * as continuity from '../lib/builder/project-continuity.ts'
+import * as admission from '../lib/builder/execution-admission.ts'
+import * as requestContract from '../lib/builder/request-contract.ts'
+
+const objective = readFileSync(new URL('./fixtures/builder-isolated-acceptance.txt', import.meta.url), 'utf8')
+const userId = '11111111-1111-4111-8111-111111111111'
+const selectedWorkspace = '33333333-3333-4333-8333-333333333333'
+class NextResponse extends Response {
+  static json(body: unknown, init?: ResponseInit) {
+    return new NextResponse(JSON.stringify(body), { ...init, headers: { 'content-type': 'application/json' } })
+  }
+}
+
+// Execute the checked-in production handlers. Only their external ports are replaced; no Next,
+// provider, storage, or network dependency is needed for this no-cost admission/receipt test.
+function handler(path: string, exported: string, modules: Record<string, any>, fallback: any): any {
+  let code = stripTypeScriptTypes(readFileSync(new URL(path, import.meta.url), 'utf8'))
+  code = code.replace(/^import\s+\{([\s\S]*?)\}\s+from\s+['"]([^'"]+)['"];?/gm, (_, names, specifier) => {
+    const bindings = names.replace(/\b(\w+)\s+as\s+(\w+)/g, '$1: $2')
+    return `const {${bindings}} = new Proxy(modules[${JSON.stringify(specifier)}] || {}, {get: (target, key) => key in target ? target[key] : fallback[key]});`
+  })
+  code = code.replace(/^export\s+\{[^}]*\}\s+from[^\n]*$/gm, '')
+    .replace(/^export\s+/gm, '')
+  return new Function('modules', 'fallback', `${code}\nreturn ${exported}`)(modules, fallback)
+}
+
+function setup(owner: boolean, specialistResponse?: any) {
+  const calls = { model: 0, workspace: 0, jobs: [] as any[], repairs: 0, scheduled: 0 }
+  const unexpected = (name: string) => () => { throw new Error(`unexpected port: ${name}`) }
+  const fallback = new Proxy({}, { get: () => () => false })
+  const modules: Record<string, any> = {
+    'next/server': { NextResponse, after: () => { calls.scheduled++ } },
+    '@/lib/auth/access': { getAccess: async () => ({ userId, isOwner: owner }) },
+    '@/lib/auth/publicAuditIdentity': { publicAuditUserId: () => userId, withPublicAuditIdentity: (_: any, work: any) => work() },
+    '@/lib/auth/publicDeliveryScope': { withPublicDeliveryScope: (work: any) => work() },
+    '@/lib/ai/cos/cosReasoningRolePolicy': roles,
+    '@/lib/builder/repository-repair-target': scope,
+    '@/lib/builder/project-continuity': continuity,
+    '@/lib/builder/execution-admission': admission,
+    '@/lib/builder/request-contract': requestContract,
+    '@/lib/ai/cos/softwareSpecialistRecovery': {
+      trimObjectiveForHarness: (value: string) => value,
+      runSoftwareDelegationWithSafeRetry: (run: any, execute: any) => run(execute),
+    },
+    '@/platform-harness/adapters/cos-ingress': {
+      currentCosHarnessIngress: () => ({ manifest: { identity: { tenantId: 'test' } } }),
+    },
+    '@/lib/ai/cos/softwareSpecialistHarness': {
+      runCosSoftwareSpecialistProductionHarness: async ({ execute }: any) => ({ ok: true, value: await execute() }),
+    },
+    '@/lib/builder/execution-evidence': { builderEvidenceReply: async () => null },
+    '@/lib/builder/job-store': {
+      enqueueBuilderJob: async (job: any) => { calls.jobs.push(job) },
+      readBuilderEvidenceJob: unexpected('borrowed job history'),
+    },
+    '@/lib/builder/repository-repair-job': { enqueueSignalBoostRepositoryRepairJob: () => { calls.repairs++; throw new Error('platform repair forbidden') } },
+    '@/lib/builder/workspace-supabase': {
+      createSupabaseBuilderWorkspace: () => { calls.workspace++; return { ensureWorkspace: async () => {}, writeFile: unexpected('unexpected staged file') } },
+    },
+    '@/lib/builder/debug-file-job': { extractBuilderSourceFiles: () => [], planDebugFileJob: () => null },
+    '@/lib/ai/cos/cosTurnBudget': { turnDeadlineRemainingMs: () => 100_000 },
+    '@/lib/i18n/responseLanguage': { resolveResponseLanguage: () => 'en' },
+    '@/lib/ai/cos/pastedOperationalLog': { analyzeOperationalLog: () => ({}), isOperationalLogEvidence: () => false },
+    '@/lib/ai/cos/publicConciergeIdentity': { publicConciergeIdentityReply: () => null },
+    '@/lib/ai/cos/publicConciergeIdentityIntent': { shouldResolveSemanticPublicIdentity: () => true, resolveSemanticPublicIdentity: unexpected('identity model') },
+    '@/lib/public-brand': { PUBLIC_BRAND: { name: 'iTMounts' } },
+    '@/app/api/cos-primary/route': { POST: () => { calls.model++; return NextResponse.json({ reply: 'HTTP\nPASS\nINCOMPLETE' }) } },
+    '@/lib/ai/cos/cosAgentDecision': { decideCosAgentTurn: unexpected('general planner') },
+  }
+  const specialist = handler('../lib/ai/cos/softwareSpecialist.ts', 'tryCosSoftwareSpecialist', modules, fallback)
+  modules['@/lib/ai/cos/softwareSpecialist'] = { tryCosSoftwareSpecialist: specialistResponse || (async (input: any) => { const r = await specialist(input); assert.ok(r, 'eligible build must produce a specialist response'); return r }) }
+  return { calls, specialist, browser: handler('../app/api/cos-browser/route.ts', 'POST', modules, fallback), developer: handler('../app/api/builder/route.ts', 'POST', modules, fallback) }
+}
+
+function request(prompt: string, assistant = false) {
+  const req = new Request('https://itmounts.com/api/cos-browser', {
+    method: 'POST', headers: assistant ? { 'x-signalboost-surface': 'cos' } : {},
+    body: JSON.stringify({ objective: prompt, workspaceId: selectedWorkspace, messages: [{ role: 'user', content: prompt }] }),
+  })
+  return Object.assign(req, { nextUrl: new URL(req.url) })
+}
+
+test('Concierge and COS return the real admission blocker instead of words from the request', async () => {
+  for (const owner of [false, true]) for (const assistant of [false, true]) {
+    const { browser, calls } = setup(owner)
+    const response = await browser(request(objective, assistant))
+    const result = await response.json()
+    assert.equal(response.status, 422)
+    assert.equal(result.error, 'builder_inference_spend_cap_unavailable')
+    assert.equal(result.status, 'incomplete')
+    assert.equal(result.jobId, undefined)
+    assert.equal(result.execution_allowed, false)
+    assert.deepEqual(calls, { model: 0, workspace: 0, jobs: [], repairs: 0, scheduled: 0 })
+  }
+})
+
+test('Developer applies the same cap rejection before workspace/repair/job creation', async () => {
+  const { developer, calls } = setup(true)
+  const response = await developer(request(objective))
+  assert.equal(response.status, 422)
+  assert.equal((await response.json()).error, 'builder_inference_spend_cap_unavailable')
+  assert.deepEqual(calls, { model: 0, workspace: 0, jobs: [], repairs: 0, scheduled: 0 })
+})
+
+test('an admitted isolated build queues V2 once and carries the same job ID through public presentation', async () => {
+  const prompt = 'Create an isolated Node.js repository with sum.js and sum.test.js. Repair the function, commit the change, and open a PR against the isolated branch. Do not modify production/main.'
+  const { browser, calls } = setup(true)
+  const response = await browser(request(prompt))
+  const result = await response.json()
+  assert.equal(response.status, 202)
+  assert.equal(calls.jobs.length, 1)
+  assert.equal(calls.jobs[0].metadata.builderEngine, 'v2')
+  assert.equal(calls.repairs, 0)
+  assert.equal(calls.model, 0)
+  assert.equal(calls.scheduled, 1)
+  assert.equal(result.jobId, calls.jobs[0].jobId)
+  assert.equal(result.workspaceId, calls.jobs[0].workspaceId)
+  assert.notEqual(result.workspaceId, selectedWorkspace)
+  assert.match(result.reply, new RegExp(result.jobId))
+  assert.equal(result.orchestrator, undefined)
+})

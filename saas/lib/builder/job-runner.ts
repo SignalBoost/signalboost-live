@@ -497,7 +497,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           publication = { ...published }
           const preview = await verifyIsolatedPreview({
             token: vercelToken, projectId, repository: published.repository,
-            commitSha: published.commitSha,
+            commitSha: published.commitSha, files: contents.filter((file): file is NonNullable<typeof file> => Boolean(file)),
             deadlineAt: Date.parse(job.createdAt) + totalDeadlineMs,
             signal: deadlineController.signal,
           })

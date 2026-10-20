@@ -17,6 +17,11 @@ const excluded = /(^|\/)(?:\.git|\.env(?:\..*)?|node_modules|\.next|\.vercel|sec
 const maxFiles = 100
 const maxBytes = 2_000_000
 
+export function wantsIsolatedPublication(objective: string): boolean {
+  return /\b(?:create|build|make)\b[\s\S]{0,100}\b(?:isolated|new)\b/i.test(objective)
+    && /\b(?:pull request|open\s+(?:a\s+)?pr|deploy[\s\S]{0,100}preview|publish\s+(?:the\s+)?repo)\b/i.test(objective)
+}
+
 export function validateIsolatedFiles(files: readonly BuilderFile[]): void {
   if (!files.length || files.length > maxFiles) throw new Error('builder_isolated_file_count_invalid')
   let bytes = 0

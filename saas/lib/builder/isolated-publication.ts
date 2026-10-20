@@ -99,3 +99,56 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   if (!pr.html_url || !Number.isInteger(pr.number)) throw new Error('builder_isolated_pull_request_unconfirmed')
   return { repository: created.full_name, pullRequestUrl: pr.html_url, pullRequestNumber: pr.number, commitSha: commit.sha }
 }
+
+
+/** Owner-only preview of the exact GitHub commit. No arbitrary host supplied by model text. */
+export async function verifyIsolatedPreview(input: Readonly<{
+  token: string
+  projectId: string
+  repository: string
+  commitSha: string
+  deadlineAt: number
+  signal?: AbortSignal
+  request?: typeof fetch
+}>): Promise<Readonly<{ deploymentId: string; previewUrl: string; status: 'verified' }>> {
+  if (!input.token || !/^prj_[a-zA-Z0-9_]+$/.test(input.projectId)) throw new Error('builder_isolated_vercel_configuration_invalid')
+  if (!/^[0-9a-f]{40}$/i.test(input.commitSha)) throw new Error('builder_isolated_commit_invalid')
+  if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(input.repository)) throw new Error('builder_isolated_repository_invalid')
+  const http = input.request ?? fetch
+  const headers = { Authorization: `Bearer ${input.token}`, 'Content-Type': 'application/json' }
+  const bounded = async (url: string, init: RequestInit): Promise<any> => {
+    if (Date.now() >= input.deadlineAt || input.signal?.aborted) throw new Error('builder_isolated_publication_deadline_exceeded')
+    const response = await http(url, { ...init, signal: input.signal })
+    if (!response.ok) throw new Error(`builder_isolated_vercel_http_${response.status}`)
+    return response.json()
+  }
+  // Git-source deployment fixes preview identity to the exact verified repair commit.
+  const deployed = await bounded('https://api.vercel.com/v13/deployments', {
+    method: 'POST', headers,
+    body: JSON.stringify({
+      name: 'builder-isolated-preview',
+      project: input.projectId,
+      target: 'preview',
+      gitSource: { type: 'github', repo: input.repository, ref: input.commitSha },
+    }),
+  })
+  const id = String(deployed?.id || deployed?.uid || '')
+  if (!/^dpl_[a-zA-Z0-9]+$/.test(id)) throw new Error('builder_isolated_deployment_id_invalid')
+  let ready = false
+  let url = ''
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const record = await bounded(`https://api.vercel.com/v13/deployments/${encodeURIComponent(id)}`, { method: 'GET', headers })
+    if (record.readyState === 'ERROR' || record.readyState === 'CANCELED') throw new Error('builder_isolated_deployment_failed')
+    if (record.readyState === 'READY') {
+      ready = true
+      url = String(record.url || '')
+      break
+    }
+    if (Date.now() + 1500 >= input.deadlineAt) break
+    await new Promise(resolve => setTimeout(resolve, 1500))
+  }
+  if (!ready || !/^[a-zA-Z0-9.-]+\.vercel\.app$/.test(url)) throw new Error('builder_isolated_preview_not_ready')
+  const check = await bounded(`https://${url}/`, { method: 'GET', headers: { Accept: 'text/html,application/json' }, redirect: 'manual' })
+  if (typeof check !== 'object') throw new Error('builder_isolated_preview_invalid')
+  return { deploymentId: id, previewUrl: `https://${url}`, status: 'verified' }
+}

@@ -18,6 +18,8 @@ import {
 } from '@/lib/builder/request-contract'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { builderExecutionAdmissionBlocker } from '@/lib/builder/execution-admission'
+import { isExplicitIsolatedProjectBuild } from '@/lib/builder/isolated-project-intent'
+import { wantsIsolatedPublication } from '@/lib/builder/isolated-publication'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -308,7 +310,8 @@ export async function POST(request: Request) {
       }
     }
     const routingContext = { attachmentNames: files.map(file => file.path) }
-    if (!project.context && !repositoryTarget && !debugPlan && !logEvidence && !isConciergeBuilderObjective(objective, routingContext)) {
+    if (!project.context && !repositoryTarget && !debugPlan && !logEvidence && !isConciergeBuilderObjective(objective, routingContext)
+      && !(isExplicitIsolatedProjectBuild(objective) && wantsIsolatedPublication(objective))) {
       const reply = 'This request does not contain an executable coding or design objective with concrete source evidence. No Builder job was created and no code was run.'
       await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
       return noStore({

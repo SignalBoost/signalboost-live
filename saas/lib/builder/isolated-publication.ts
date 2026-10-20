@@ -115,6 +115,7 @@ export async function verifyIsolatedPreview(input: Readonly<{
   projectId: string
   repository: string
   commitSha: string
+  files: readonly BuilderFile[]
   deadlineAt: number
   signal?: AbortSignal
   request?: typeof fetch
@@ -122,6 +123,7 @@ export async function verifyIsolatedPreview(input: Readonly<{
   if (!input.token || !/^prj_[a-zA-Z0-9_]+$/.test(input.projectId)) throw new Error('builder_isolated_vercel_configuration_invalid')
   if (!/^[0-9a-f]{40}$/i.test(input.commitSha)) throw new Error('builder_isolated_commit_invalid')
   if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(input.repository)) throw new Error('builder_isolated_repository_invalid')
+  validateIsolatedFiles(input.files)
   const http = input.request ?? fetch
   const headers = { Authorization: `Bearer ${input.token}`, 'Content-Type': 'application/json' }
   const bounded = async (url: string, init: RequestInit): Promise<any> => {
@@ -131,14 +133,16 @@ export async function verifyIsolatedPreview(input: Readonly<{
     if (!response.ok) throw new Error(`builder_isolated_vercel_http_${response.status}`)
     return response.json()
   }
-  // Git-source deployment fixes preview identity to the exact verified repair commit.
+  // Deploy the same verified file set sent to GitHub: newly created private repos
+  // are not assumed to have a Vercel Git connection.
   const deployed = await bounded('https://api.vercel.com/v13/deployments', {
     method: 'POST', headers,
     body: JSON.stringify({
       name: 'builder-isolated-preview',
       project: input.projectId,
       target: 'preview',
-      gitSource: { type: 'github', repo: input.repository, ref: input.commitSha },
+      files: input.files.map(file => ({ file: file.path, data: file.content, encoding: 'utf-8' })),
+      meta: { builderCommitSha: input.commitSha, builderRepository: input.repository },
     }),
   })
   const id = String(deployed?.id || deployed?.uid || '')

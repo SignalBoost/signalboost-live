@@ -12,7 +12,7 @@ export type BuilderAdmissionBlocker = Readonly<{
 export function builderExecutionAdmissionBlocker(objective: string): BuilderAdmissionBlocker | null {
   // Budget support must not silently substitute a workspace-only result for requested Git/preview evidence.
   if (isExplicitIsolatedProjectBuild(objective)
-    && /\b(?:open\s+(?:a\s+)?pr|pull request|deploy[\s\S]{0,100}preview)\b/i.test(objective)) {
+    && /\b(?:(?:(?:open|create|raise|submit|publish)\s+(?:a\s+)?(?:pr|pull request))|pull request|(?:(?:deploy|publish|launch)\b[\s\S]{0,100}\bpreview)|(?:(?:push|publish)\s+(?:the\s+|a\s+)?(?:git\s+)?repositor(?:y|ies)))\b/i.test(objective)) {
     return { error: 'builder_isolated_publication_unavailable', status: 'incomplete',
       reply: 'INCOMPLETE: Builder V2 can enforce a per-run inference cap, but its isolated workspace lane cannot yet create and publish a Git repository, open its PR, or deploy a preview. No workspace-only run was substituted, and no job was started.',
       execution_allowed: false, external_action_taken: false }

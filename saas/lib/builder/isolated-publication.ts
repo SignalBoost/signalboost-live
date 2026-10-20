@@ -38,6 +38,7 @@ type Request = typeof fetch
 export async function publishVerifiedIsolatedProject(input: Readonly<{
   owner: string
   repositoryName: string
+  ownerType: 'user' | 'organization'
   token: string
   files: readonly BuilderFile[]
   verified: boolean
@@ -66,7 +67,7 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   }
 
   // Private-by-default creation. Never publish source into the platform repository.
-  const created = await json('/user/repos', 'POST', {
+  const created = await json(input.ownerType === 'organization' ? `/orgs/${encodeURIComponent(input.owner)}/repos` : '/user/repos', 'POST', {
     name: input.repositoryName, private: true, auto_init: true,
     description: 'Isolated Builder V2 verified project',
   })

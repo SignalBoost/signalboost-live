@@ -52,8 +52,10 @@ test('preview uses exact verified GitHub SHA and checks live endpoint', async ()
     calls.push(String(url))
     if (String(url).endsWith('/v13/deployments') && init?.method === 'POST') {
       const body = JSON.parse(String(init.body))
-      assert.equal(body.gitSource.ref, sha)
-      assert.equal(body.gitSource.repo, 'SignalBoost/builder-isolated-test')
+      assert.equal(body.meta.builderCommitSha, sha)
+      assert.equal(body.meta.builderRepository, 'SignalBoost/builder-isolated-test')
+      assert.equal(body.files[0].file, 'src/add.js')
+      assert.equal(body.files[0].data, files[0].content)
       assert.equal(body.target, 'preview')
       return Response.json({ id: 'dpl_abc123' })
     }
@@ -65,7 +67,7 @@ test('preview uses exact verified GitHub SHA and checks live endpoint', async ()
   }) as typeof fetch
   const result = await verifyIsolatedPreview({
     token: 'test', projectId: 'prj_abc123', repository: 'SignalBoost/builder-isolated-test',
-    commitSha: sha, deadlineAt: Date.now() + 60_000, request,
+    commitSha: sha, files, deadlineAt: Date.now() + 60_000, request,
   })
   assert.equal(result.status, 'verified')
   assert.equal(result.previewUrl, 'https://builder-test.vercel.app')
@@ -77,7 +79,7 @@ test('preview rejects deadline expiry before external effects', async () => {
   let called = false
   await assert.rejects(verifyIsolatedPreview({
     token: 'test', projectId: 'prj_abc123', repository: 'SignalBoost/builder-isolated-test',
-    commitSha: 'a'.repeat(40), deadlineAt: Date.now() - 1,
+    commitSha: 'a'.repeat(40), files, deadlineAt: Date.now() - 1,
     request: (async () => { called = true; throw new Error('unexpected') }) as typeof fetch,
   }), /deadline_exceeded/)
   assert.equal(called, false)

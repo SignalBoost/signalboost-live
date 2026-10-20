@@ -81,7 +81,7 @@ function setup(owner: boolean, specialistResponse?: any, forceClassifierFalse = 
     },
     '@/lib/builder/repository-repair-job': { enqueueSignalBoostRepositoryRepairJob: () => { calls.repairs++; throw new Error('platform repair forbidden') } },
     '@/lib/builder/workspace-supabase': {
-      createSupabaseBuilderWorkspace: () => { calls.workspace++; return { ensureWorkspace: async () => {}, writeFile: unexpected('unexpected staged file') } },
+      createSupabaseBuilderWorkspace: () => { calls.workspace++; return { ensureWorkspace: async () => {}, setObjective: async () => {}, writeFile: unexpected('unexpected staged file') } },
     },
     '@/lib/builder/debug-file-job': { extractBuilderSourceFiles: () => [], planDebugFileJob: () => null },
     '@/lib/ai/cos/cosTurnBudget': { turnDeadlineRemainingMs: () => 100_000 },

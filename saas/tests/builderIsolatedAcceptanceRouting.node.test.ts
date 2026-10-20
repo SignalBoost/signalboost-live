@@ -60,3 +60,15 @@ test('a full external acceptance request remains blocked until publication is su
     'Explain why the previous inference cost was $0.50.',
   ]) assert.equal(builderExecutionAdmissionBlocker(prompt), null, prompt)
 })
+
+
+test('isolated publication synonyms cannot bypass the end-to-end admission requirement', () => {
+  for (const prompt of [
+    'Create an isolated Node.js repository and create a PR.',
+    'Build an isolated Node.js repository and publish the repository.',
+    'Create an isolated Python repository and launch a preview.',
+    'Build an isolated repository and submit a pull request.',
+  ]) {
+    assert.equal(builderExecutionAdmissionBlocker(prompt)?.error, 'builder_isolated_publication_unavailable', prompt)
+  }
+})

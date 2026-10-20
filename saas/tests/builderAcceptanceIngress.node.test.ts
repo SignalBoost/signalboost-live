@@ -11,6 +11,22 @@ import * as requestContract from '../lib/builder/request-contract.ts'
 const objective = readFileSync(new URL('./fixtures/builder-isolated-acceptance.txt', import.meta.url), 'utf8')
 const userId = '11111111-1111-4111-8111-111111111111'
 const selectedWorkspace = '33333333-3333-4333-8333-333333333333'
+
+// Admission rejection cases must be deterministic on Vercel, where the real
+// publication credentials may be configured in the build environment.
+const publicationKeys = ['BUILDER_ISOLATED_GITHUB_OWNER', 'GITHUB_WRITE_TOKEN', 'VERCEL_TOKEN', 'BUILDER_ISOLATED_VERCEL_PROJECT_ID'] as const
+async function withoutPublicationConfig<T>(run: () => Promise<T>): Promise<T> {
+  const previous = publicationKeys.map(key => process.env[key])
+  for (const key of publicationKeys) delete process.env[key]
+  try { return await run() }
+  finally {
+    publicationKeys.forEach((key, index) => {
+      if (previous[index] === undefined) delete process.env[key]
+      else process.env[key] = previous[index]
+    })
+  }
+}
+
 class NextResponse extends Response {
   static json(body: unknown, init?: ResponseInit) {
     return new NextResponse(JSON.stringify(body), { ...init, headers: { 'content-type': 'application/json' } })
@@ -86,7 +102,7 @@ function request(prompt: string, assistant = false) {
   return Object.assign(req, { nextUrl: new URL(req.url) })
 }
 
-test('Concierge and COS return the real admission blocker instead of words from the request', async () => {
+test('Concierge and COS return the real admission blocker instead of words from the request', async () => withoutPublicationConfig(async () => {
   for (const owner of [false, true]) for (const assistant of [false, true]) {
     const { browser, calls } = setup(owner)
     const response = await browser(request(objective, assistant))
@@ -98,15 +114,15 @@ test('Concierge and COS return the real admission blocker instead of words from 
     assert.equal(result.execution_allowed, false)
     assert.deepEqual(calls, { model: 0, workspace: 0, jobs: [], repairs: 0, scheduled: 0 })
   }
-})
+}))
 
-test('Developer never substitutes a workspace-only result for an isolated PR/preview request', async () => {
+test('Developer never substitutes a workspace-only result for an isolated PR/preview request', async () => withoutPublicationConfig(async () => {
   const { developer, calls } = setup(true)
   const response = await developer(request(objective))
   assert.equal(response.status, 422)
   assert.equal((await response.json()).error, 'builder_isolated_publication_unavailable')
   assert.deepEqual(calls, { model: 0, workspace: 0, jobs: [], repairs: 0, scheduled: 0 })
-})
+}))
 
 test('an admitted isolated build queues V2 once and carries the same job ID through public presentation', async () => {
   const prompt = 'Create an isolated Node.js repository with sum.js and sum.test.js. Repair the function and run node --test sum.test.js. Limits: maximum $0.50 inference spending and maximum 10 minutes. Do not modify production/main.'

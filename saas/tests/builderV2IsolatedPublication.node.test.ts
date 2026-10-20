@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { publishVerifiedIsolatedProject, validateIsolatedFiles } from '../lib/builder/isolated-publication.ts'
+import { publishVerifiedIsolatedProject, validateIsolatedFiles, verifyIsolatedPreview, wantsIsolatedPublication } from '../lib/builder/isolated-publication.ts'
 
 const files = [{ path: 'src/add.js', content: 'module.exports = (a,b) => a+b', updatedAt: Date.now() }]
 test('isolated publisher rejects unverified work and unsafe paths before network calls', async () => {
@@ -43,4 +43,42 @@ test('verified private organization repository is published as a draft PR using 
   assert.equal(calls.at(-1)?.body.draft, true)
   assert.equal(calls.at(-1)?.body.base, 'main')
   assert.ok(calls.some(x => x.url.endsWith('/git/refs') && x.body.ref === 'refs/heads/builder/verified-repair'))
+})
+
+test('preview uses exact verified GitHub SHA and checks live endpoint', async () => {
+  const sha = 'a'.repeat(40)
+  const calls: string[] = []
+  const request = (async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push(String(url))
+    if (String(url).endsWith('/v13/deployments') && init?.method === 'POST') {
+      const body = JSON.parse(String(init.body))
+      assert.equal(body.gitSource.ref, sha)
+      assert.equal(body.gitSource.repo, 'SignalBoost/builder-isolated-test')
+      assert.equal(body.target, 'preview')
+      return Response.json({ id: 'dpl_abc123' })
+    }
+    if (String(url).endsWith('/v13/deployments/dpl_abc123')) {
+      return Response.json({ readyState: 'READY', url: 'builder-test.vercel.app' })
+    }
+    if (String(url) === 'https://builder-test.vercel.app/') return new Response('<h1>OK</h1>', { status: 200 })
+    throw new Error('unexpected request')
+  }) as typeof fetch
+  const result = await verifyIsolatedPreview({
+    token: 'test', projectId: 'prj_abc123', repository: 'SignalBoost/builder-isolated-test',
+    commitSha: sha, deadlineAt: Date.now() + 60_000, request,
+  })
+  assert.equal(result.status, 'verified')
+  assert.equal(result.previewUrl, 'https://builder-test.vercel.app')
+  assert.equal(calls.length, 3)
+  assert.equal(wantsIsolatedPublication('Create an isolated Node.js repo, open a PR and deploy a preview.'), true)
+})
+
+test('preview rejects deadline expiry before external effects', async () => {
+  let called = false
+  await assert.rejects(verifyIsolatedPreview({
+    token: 'test', projectId: 'prj_abc123', repository: 'SignalBoost/builder-isolated-test',
+    commitSha: 'a'.repeat(40), deadlineAt: Date.now() - 1,
+    request: (async () => { called = true; throw new Error('unexpected') }) as typeof fetch,
+  }), /deadline_exceeded/)
+  assert.equal(called, false)
 })

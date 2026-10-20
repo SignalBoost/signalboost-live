@@ -15,6 +15,10 @@ on:
       - 'saas/lib/builder/edit-match.ts'
       - 'saas/lib/builder/workspace.ts'
       - 'saas/lib/builder/job-runner.ts'
+      - 'saas/lib/builder/inference-budget.ts'
+      - 'saas/lib/builder/inference-budget-store.ts'
+      - 'saas/supabase/migrations/*builder_inference_run_budget.sql'
+      - 'saas/tests/builderInferenceBudget.node.test.ts'
       - 'saas/tests/builderV2*'
       - 'saas/app/api/builder/route.ts'
       - '.github/workflows/builder-v2-verification.yml'
@@ -39,3 +43,5 @@ jobs:
         run: node --experimental-transform-types --test tests/builderV2IdleSlices.node.test.ts
       - name: Builder V2 suites and bounded model check
         run: node --experimental-transform-types --test tests/builderV2Acceptance.node.test.ts tests/builderV2CanaryRouting.node.test.ts tests/builderV2JobCycle.node.test.ts tests/builderV2OwnerRouting.node.test.ts tests/builderV2BatchedActions.node.test.ts tests/builderV2Dispatcher.node.test.ts tests/builderV2InspectionLoop.node.test.ts tests/builderV2LatestProof.node.test.ts tests/builderV2ModelCheck.node.test.ts tests/builderV2OrderFlowScripted.node.test.ts tests/builderV2ProgressReport.node.test.ts tests/builderV2ResumeBudget.node.test.ts tests/builderV2SharedSurfaceRouting.node.test.ts tests/builderV2SliceProgress.node.test.ts tests/builderV2SupabaseStore.node.test.ts tests/builderV2SyntaxCheck.node.test.ts tests/builderV2TimeoutHostVerify.node.test.ts tests/builderV2TruncatedReplies.node.test.ts tests/builderV2TruncationAcceptance.node.test.ts tests/builderV2ModelRetry.node.test.ts tests/builderV2WorkingSet.node.test.ts 
+      - name: Builder V2 inference cap and deadline regression
+        run: node --experimental-transform-types --test tests/builderInferenceBudget.node.test.ts

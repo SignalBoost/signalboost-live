@@ -89,6 +89,8 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   const baseSha = String(baseRef.object?.sha || '')
   if (!/^[0-9a-f]{40}$/i.test(baseSha)) throw new Error('builder_isolated_invalid_base_sha')
   const baseCommit = await json(`${encodedRepo}/git/commits/${baseSha}`)
+  // Keep the acceptance PR against an isolated test branch, not the repo's main.
+  await json(`${encodedRepo}/git/refs`, 'POST', { ref: 'refs/heads/isolated-test', sha: baseSha })
   const tree = []
   for (const file of input.files) {
     const blob = await json(`${encodedRepo}/git/blobs`, 'POST', { content: file.content, encoding: 'utf-8' })
@@ -101,7 +103,7 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   const branch = 'builder/verified-repair'
   await json(`${encodedRepo}/git/refs`, 'POST', { ref: `refs/heads/${branch}`, sha: commit.sha })
   const pr = await json(`${encodedRepo}/pulls`, 'POST', {
-    head: branch, base, title: 'Builder V2: verified project', body: 'Host tests passed before publication. Preview and deployment require separate independent verification.',
+    head: branch, base: 'isolated-test', title: 'Builder V2: verified project', body: 'Host tests passed before publication. Preview and deployment require separate independent verification.',
     draft: true,
   })
   if (!pr.html_url || !Number.isInteger(pr.number)) throw new Error('builder_isolated_pull_request_unconfirmed')

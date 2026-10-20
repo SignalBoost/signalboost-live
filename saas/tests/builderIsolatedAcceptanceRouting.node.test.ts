@@ -43,8 +43,16 @@ test('runtime qualifiers do not change isolated scope; platform feature requests
   ]) assert.equal(isExplicitIsolatedProjectBuild(prompt), false, prompt)
 })
 
-test('a full external acceptance request remains blocked until publication is supported; valid caps are admitted', () => {
-  const blocker = builderExecutionAdmissionBlocker(objective)
+test('a full external acceptance request is blocked when publication is unconfigured; valid caps are admitted', () => {
+  const keys = ['BUILDER_ISOLATED_GITHUB_OWNER', 'GITHUB_WRITE_TOKEN', 'VERCEL_TOKEN', 'BUILDER_ISOLATED_VERCEL_PROJECT_ID'] as const
+  const previous = keys.map(key => process.env[key])
+  for (const key of keys) delete process.env[key]
+  let blocker: ReturnType<typeof builderExecutionAdmissionBlocker>
+  try { blocker = builderExecutionAdmissionBlocker(objective) }
+  finally { keys.forEach((key, index) => {
+    if (previous[index] === undefined) delete process.env[key]
+    else process.env[key] = previous[index]
+  }) }
   assert.equal(blocker?.error, 'builder_isolated_publication_unavailable')
   assert.equal(blocker?.status, 'incomplete')
   assert.equal(blocker?.execution_allowed, false)

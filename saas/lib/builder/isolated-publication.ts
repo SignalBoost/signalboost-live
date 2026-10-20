@@ -148,7 +148,8 @@ export async function verifyIsolatedPreview(input: Readonly<{
     await new Promise(resolve => setTimeout(resolve, 1500))
   }
   if (!ready || !/^[a-zA-Z0-9.-]+\.vercel\.app$/.test(url)) throw new Error('builder_isolated_preview_not_ready')
-  const check = await bounded(`https://${url}/`, { method: 'GET', headers: { Accept: 'text/html,application/json' }, redirect: 'manual' })
-  if (typeof check !== 'object') throw new Error('builder_isolated_preview_invalid')
+  if (Date.now() >= input.deadlineAt || input.signal?.aborted) throw new Error('builder_isolated_publication_deadline_exceeded')
+  const response = await http(`https://${url}/`, { method: 'GET', redirect: 'manual', signal: input.signal })
+  if (response.status !== 200) throw new Error('builder_isolated_preview_smoke_failed')
   return { deploymentId: id, previewUrl: `https://${url}`, status: 'verified' }
 }

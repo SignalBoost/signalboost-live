@@ -1,5 +1,6 @@
 import { readBuilderRunLimits } from './inference-budget.ts'
 import { isExplicitIsolatedProjectBuild } from './isolated-project-intent.ts'
+import { wantsIsolatedPublication } from './isolated-publication.ts'
 export type BuilderAdmissionBlocker = Readonly<{
   error: 'builder_inference_spend_cap_unavailable' | 'builder_budget_amount_invalid' | 'builder_isolated_publication_unavailable'
   status: 'incomplete'
@@ -11,8 +12,9 @@ export type BuilderAdmissionBlocker = Readonly<{
 /** Call-count budgets and post-hoc usage records do not enforce a dollar ceiling. */
 export function builderExecutionAdmissionBlocker(objective: string): BuilderAdmissionBlocker | null {
   // Budget support must not silently substitute a workspace-only result for requested Git/preview evidence.
-  if (isExplicitIsolatedProjectBuild(objective)
-    && /\b(?:open\s+(?:a\s+)?pr|pull request|deploy[\s\S]{0,100}preview)\b/i.test(objective)) {
+  if (isExplicitIsolatedProjectBuild(objective) && wantsIsolatedPublication(objective)
+    && !(process.env.BUILDER_ISOLATED_GITHUB_OWNER && process.env.GITHUB_WRITE_TOKEN
+      && process.env.VERCEL_TOKEN && process.env.BUILDER_ISOLATED_VERCEL_PROJECT_ID)) {
     return { error: 'builder_isolated_publication_unavailable', status: 'incomplete',
       reply: 'INCOMPLETE: Builder V2 can enforce a per-run inference cap, but its isolated workspace lane cannot yet create and publish a Git repository, open its PR, or deploy a preview. No workspace-only run was substituted, and no job was started.',
       execution_allowed: false, external_action_taken: false }

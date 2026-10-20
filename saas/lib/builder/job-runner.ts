@@ -1,4 +1,5 @@
 import type { BuilderLoopCheckpoint } from './checkpoint.ts'
+import { publishVerifiedIsolatedProject, verifyIsolatedPreview, wantsIsolatedPublication } from './isolated-publication.ts'
 import { withHostProductionHarnessIngress } from '../../platform-harness/runtime/host-ingress.ts'
 import { classifyBuilderDocumentationIntent } from './documentation-intent.ts'
 import { builderRunSourceEvidence } from './source-evidence.ts'
@@ -468,16 +469,55 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         // Not paused: at the slice cap the job finishes below with that outcome; otherwise another claim owns it.
         if (job.claimGeneration < MAX_WORK_SLICES) return
       }
-      const success = cycle.status === 'verified'
+      const verified = cycle.status === 'verified'
+      const requiresPublication = wantsIsolatedPublication(job.objective)
       const reason = cycle.status === 'paused' ? 'builder_continuation_budget_exhausted' : cycle.reason
+      let publication: Record<string, unknown> | null = null
+      let publicationError: string | null = null
+      if (verified && requiresPublication) {
+        try {
+          // Isolated publication uses only an owner-authorized server credential. It is never
+          // inferred from model text or from a customer's provider connection.
+          if (!job.ownerAuthorized) throw new Error('builder_isolated_publication_not_authorized')
+          const token = process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN || ''
+          const owner = process.env.BUILDER_ISOLATED_GITHUB_OWNER || ''
+          const ownerType = process.env.BUILDER_ISOLATED_GITHUB_OWNER_TYPE === 'organization' ? 'organization' : 'user'
+          const vercelToken = process.env.VERCEL_TOKEN || ''
+          const projectId = process.env.BUILDER_ISOLATED_VERCEL_PROJECT_ID || ''
+          if (!token || !owner || !vercelToken || !projectId) throw new Error('builder_isolated_publication_not_configured')
+          if (builderJobOverTotalDeadline(job.createdAt, Date.now(), totalDeadlineMs)) throw new Error('builder_isolated_publication_deadline_exceeded')
+          const contents = await Promise.all(files.map(path => workspace.readFile(job.workspaceId, path)))
+          if (contents.some(file => !file)) throw new Error('builder_isolated_workspace_file_missing')
+          const published = await publishVerifiedIsolatedProject({
+            owner, ownerType, repositoryName: `builder-isolated-${job.id.replace(/[^a-z0-9]/gi, '').slice(0, 24)}`,
+            token, files: contents.filter((file): file is NonNullable<typeof file> => Boolean(file)),
+            verified: true, authorized: true, signal: deadlineController.signal,
+            deadlineAt: Date.parse(job.createdAt) + totalDeadlineMs,
+          })
+          publication = { ...published }
+          const preview = await verifyIsolatedPreview({
+            token: vercelToken, projectId, repository: published.repository,
+            commitSha: published.commitSha, files: contents.filter((file): file is NonNullable<typeof file> => Boolean(file)),
+            deadlineAt: Date.parse(job.createdAt) + totalDeadlineMs,
+            signal: deadlineController.signal,
+          })
+          publication = { ...published, ...preview }
+        } catch (error) {
+          publicationError = error instanceof Error ? error.message : 'builder_isolated_publication_failed'
+        }
+      }
+      const success = verified && (!requiresPublication || Boolean(publication && !publicationError && 'previewUrl' in publication))
+      const publicationReport = publication ? `\n\nIsolated publication: ${JSON.stringify(publication)}` : ''
       const reply = historyReply(success
-        ? `Builder V2 verified the workspace with recorded host test execution. ${cycle.result?.summary || ''}${budgetReport}`
-        : `Builder V2 could not complete verification: ${reason}\n\n${progress}${budgetReport}`, job.workspaceId, files)
+        ? `Builder V2 verified the workspace with recorded host test execution. ${cycle.result?.summary || ''}${publicationReport}${budgetReport}`
+        : `Builder V2 could not complete verification: ${publicationError || reason}\n\n${progress}${publicationReport}${budgetReport}`, job.workspaceId, files)
       await finishBuilderJob({
         jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
-        status: success ? 'succeeded' : 'failed', reply, error: success ? null : reason,
+        status: success ? 'succeeded' : 'failed', reply, error: success ? null : (publicationError || reason),
         result: { jobId: job.id, workspaceId: job.workspaceId, status: success ? 'succeeded' : 'failed',
-          reply, files, engine: 'v2', receipts: cycle.result?.steps ?? [], ...(inferenceBudget ? { inferenceBudget } : {}) },
+          reply, files, engine: 'v2', receipts: cycle.result?.steps ?? [],
+          ...(publication ? { isolatedPublication: publication } : {}),
+          ...(inferenceBudget ? { inferenceBudget } : {}) },
       })
       return
     }

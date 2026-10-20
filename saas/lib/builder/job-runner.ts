@@ -492,6 +492,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
             owner, ownerType, repositoryName: `builder-isolated-${job.id.replace(/[^a-z0-9]/gi, '').slice(0, 24)}`,
             token, files: contents.filter((file): file is NonNullable<typeof file> => Boolean(file)),
             verified: true, authorized: true, signal: deadlineController.signal,
+            deadlineAt: Date.parse(job.createdAt) + totalDeadlineMs,
           })
           publication = { ...published }
           const preview = await verifyIsolatedPreview({

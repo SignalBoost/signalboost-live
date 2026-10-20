@@ -7,6 +7,8 @@ import * as scope from '../lib/builder/repository-repair-target.ts'
 import * as continuity from '../lib/builder/project-continuity.ts'
 import * as admission from '../lib/builder/execution-admission.ts'
 import * as requestContract from '../lib/builder/request-contract.ts'
+import * as isolatedIntent from '../lib/builder/isolated-project-intent.ts'
+import * as publication from '../lib/builder/isolated-publication.ts'
 
 const objective = readFileSync(new URL('./fixtures/builder-isolated-acceptance.txt', import.meta.url), 'utf8')
 const userId = '11111111-1111-4111-8111-111111111111'
@@ -46,7 +48,7 @@ function handler(path: string, exported: string, modules: Record<string, any>, f
   return new Function('modules', 'fallback', `${code}\nreturn ${exported}`)(modules, fallback)
 }
 
-function setup(owner: boolean, specialistResponse?: any) {
+function setup(owner: boolean, specialistResponse?: any, forceClassifierFalse = false) {
   const calls = { model: 0, workspace: 0, jobs: [] as any[], repairs: 0, scheduled: 0 }
   const unexpected = (name: string) => () => { throw new Error(`unexpected port: ${name}`) }
   const fallback = new Proxy({}, { get: () => () => false })
@@ -55,7 +57,9 @@ function setup(owner: boolean, specialistResponse?: any) {
     '@/lib/auth/access': { getAccess: async () => ({ userId, isOwner: owner }) },
     '@/lib/auth/publicAuditIdentity': { publicAuditUserId: () => userId, withPublicAuditIdentity: (_: any, work: any) => work() },
     '@/lib/auth/publicDeliveryScope': { withPublicDeliveryScope: (work: any) => work() },
-    '@/lib/ai/cos/cosReasoningRolePolicy': roles,
+    '@/lib/ai/cos/cosReasoningRolePolicy': forceClassifierFalse ? { ...roles, isConciergeBuilderObjective: () => false } : roles,
+    '@/lib/builder/isolated-project-intent': isolatedIntent,
+    '@/lib/builder/isolated-publication': publication,
     '@/lib/builder/repository-repair-target': scope,
     '@/lib/builder/project-continuity': continuity,
     '@/lib/builder/execution-admission': admission,
@@ -140,4 +144,24 @@ test('an admitted isolated build queues V2 once and carries the same job ID thro
   assert.notEqual(result.workspaceId, selectedWorkspace)
   assert.match(result.reply, new RegExp(result.jobId))
   assert.equal(result.orchestrator, undefined)
+})
+
+
+test('Developer admits explicit isolated PR and preview jobs when generic classifier misses the task', async () => {
+  const { developer, calls } = setup(true, undefined, true)
+  // Intake must not depend solely on a prose-oriented Concierge classifier.
+  const keys = ['BUILDER_ISOLATED_GITHUB_OWNER', 'GITHUB_WRITE_TOKEN', 'VERCEL_TOKEN', 'BUILDER_ISOLATED_VERCEL_PROJECT_ID'] as const
+  const previous = keys.map(key => process.env[key])
+  keys.forEach(key => { process.env[key] = 'test-only' })
+  let response: Response
+  try { response = await developer(request(objective)) }
+  finally { keys.forEach((key, index) => {
+    if (previous[index] === undefined) delete process.env[key]
+    else process.env[key] = previous[index]
+  }) }
+  const data = await response.json()
+  assert.equal(response.status, 202, JSON.stringify(data))
+  assert.equal(calls.jobs.length, 1)
+  assert.equal(calls.jobs[0].metadata.builderEngine, 'v2')
+  assert.equal(calls.repairs, 0)
 })

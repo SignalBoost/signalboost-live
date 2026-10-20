@@ -1,3 +1,2 @@
-base_sha=754ef11a1b9dda512cc14a2bff5e61a89956c50a
-branch=fix/builder-durable-inference-budget-20261019
-
+base_sha=baabee39ddc1e28e42260f1e426fa4d61f0154cf
+branch=fix/builder-v2-isolated-publisher-20261020

@@ -49,6 +49,7 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   verified: boolean
   authorized: boolean
   signal?: AbortSignal
+  deadlineAt?: number
   request?: Request
 }>): Promise<IsolatedPublication> {
   if (!input.authorized || !input.verified) throw new Error('builder_isolated_publication_not_authorized')
@@ -64,8 +65,10 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   }
   const api = 'https://api.github.com'
   async function json(path: string, method = 'GET', body?: unknown): Promise<any> {
-    if (input.signal?.aborted) throw new Error('builder_isolated_publication_cancelled')
-    const response = await http(api + path, { method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: input.signal })
+    if (input.signal?.aborted || (input.deadlineAt && Date.now() >= input.deadlineAt)) throw new Error('builder_isolated_publication_deadline_exceeded')
+    const timeout = input.deadlineAt ? Math.max(1, input.deadlineAt - Date.now()) : 30_000
+    const signal = input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout)
+    const response = await http(api + path, { method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal })
     const payload = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(`builder_isolated_github_http_${response.status}`)
     return payload
@@ -123,7 +126,8 @@ export async function verifyIsolatedPreview(input: Readonly<{
   const headers = { Authorization: `Bearer ${input.token}`, 'Content-Type': 'application/json' }
   const bounded = async (url: string, init: RequestInit): Promise<any> => {
     if (Date.now() >= input.deadlineAt || input.signal?.aborted) throw new Error('builder_isolated_publication_deadline_exceeded')
-    const response = await http(url, { ...init, signal: input.signal })
+    const signal = input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(Math.max(1, input.deadlineAt - Date.now()))]) : AbortSignal.timeout(Math.max(1, input.deadlineAt - Date.now()))
+    const response = await http(url, { ...init, signal })
     if (!response.ok) throw new Error(`builder_isolated_vercel_http_${response.status}`)
     return response.json()
   }
@@ -154,7 +158,8 @@ export async function verifyIsolatedPreview(input: Readonly<{
   }
   if (!ready || !/^[a-zA-Z0-9.-]+\.vercel\.app$/.test(url)) throw new Error('builder_isolated_preview_not_ready')
   if (Date.now() >= input.deadlineAt || input.signal?.aborted) throw new Error('builder_isolated_publication_deadline_exceeded')
-  const response = await http(`https://${url}/`, { method: 'GET', redirect: 'manual', signal: input.signal })
+  const signal = input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(Math.max(1, input.deadlineAt - Date.now()))]) : AbortSignal.timeout(Math.max(1, input.deadlineAt - Date.now()))
+  const response = await http(`https://${url}/`, { method: 'GET', redirect: 'manual', signal })
   if (response.status !== 200) throw new Error('builder_isolated_preview_smoke_failed')
   return { deploymentId: id, previewUrl: `https://${url}`, status: 'verified' }
 }

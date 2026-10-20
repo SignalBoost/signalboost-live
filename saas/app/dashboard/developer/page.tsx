@@ -222,7 +222,14 @@ export default function DeveloperPage() {
       }
       setWorkspaceFiles(data.files || [])
       setTrace(data.trace || [])
-      if (!response.ok) { setError(data.error || 'Builder could not complete this request.'); return }
+      if (!response.ok) {
+        // API error codes are machine identifiers, not workspace names or instructions.
+        // Surface the explanatory response before falling back to an error identifier.
+        setError(data.reply || (data.error === 'builder_objective_not_coding'
+          ? 'Builder needs a concrete software task (for example, create or repair code and run tests). No job was started.'
+          : data.error || 'Builder could not complete this request.'))
+        return
+      }
       setReply(data.reply || 'Builder completed without a final report.')
 
       if (response.status === 202 && data.jobId) {

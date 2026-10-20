@@ -1,4 +1,5 @@
 import { throwIfInferenceAborted } from './inferenceCancellation.ts'
+import { BuilderBudgetError, builderBudgetedModelFetch, currentBuilderInferenceBudget } from '../builder/inference-budget.ts'
 import { randomUUID } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
@@ -554,7 +555,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
       }))
     }
     inferenceStartedAt = Date.now()
-    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+    const response = await builderBudgetedModelFetch(fetch)(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
       signal: controller.signal,
@@ -629,7 +630,8 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
     if (
       error instanceof Error
       && (
-        error.message === 'deepinfra_harness_cost_reservation_required'
+        error instanceof BuilderBudgetError
+        || error.message === 'deepinfra_harness_cost_reservation_required'
         || error.message.startsWith('harness_provider_cost_')
       )
     ) fatalGovernanceError = error
@@ -907,6 +909,8 @@ export async function callLocalModelTurn(args: LocalModelCallArgs, config?: Loca
   }
 
   const effectiveConfig = config ?? localInferenceConfigFromEnv()
+  // Capped jobs cannot wake or probe hourly compute without an attributable price ceiling.
+  if (currentBuilderInferenceBudget()) return callConfiguredModelTurn(args, effectiveConfig)
   if (!eligibleForRunpodPrimary(args, effectiveConfig)) {
     if (interactiveRunpodFirstEligible(args, effectiveConfig)) return runpodFirstInteractiveTurn(args, effectiveConfig)
     return callConfiguredModelTurn(args, effectiveConfig)
@@ -981,3 +985,4 @@ export async function checkLocalInferenceHealth(config = localInferenceConfigFro
     clearTimeout(timeout)
   }
 }
+

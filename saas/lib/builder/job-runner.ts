@@ -5,6 +5,8 @@ import { builderRunSourceEvidence } from './source-evidence.ts'
 import { builderPendingWriteEvidence } from './evidence-events.ts'
 // lib/builder/job-runner.ts
 import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
+import { readBuilderRunLimits, withBuilderInferenceBudget } from './inference-budget.ts'
+import { builderInferenceBudgetSummary, createBuilderInferenceBudgetStore, readBuilderInferenceBudgetReceipt } from './inference-budget-store.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
@@ -197,9 +199,10 @@ function historyReply(reply: string, workspaceId: string, files: readonly string
 }
 
 async function terminalFailure(job: BuilderJobRecord, error: string, trace: readonly BuilderToolTrace[] = job.checkpoint?.trace || []): Promise<void> {
+  const inferenceBudget = await readBuilderInferenceBudgetReceipt(getAdminSupabase(), job).catch(() => null)
   const safeTrace = publicTrace(trace)
   const workspace = createSupabaseBuilderWorkspace(job.userId)
-  const plainReply = `${repairAwareFailureReply(job, error, safeTrace)}\n\n${builderNextAction(error, trace)}`
+  const plainReply = `${repairAwareFailureReply(job, error, safeTrace)}\n\n${builderNextAction(error, trace)}${builderInferenceBudgetSummary(inferenceBudget)}`
   // A missing or unreadable prior workspace is a real blocker, not a reason
   // to create an empty replacement through writeFile/listFiles.
   const unavailablePriorSource = error.startsWith('builder_existing_source_') || error === 'builder_existing_workspace_missing'
@@ -223,6 +226,7 @@ async function terminalFailure(job: BuilderJobRecord, error: string, trace: read
       reply,
       files,
       trace: safeTrace,
+      ...(inferenceBudget ? { inferenceBudget } : {}),
     },
   })
   
@@ -372,9 +376,15 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     }
 
     // V2 is selected by durable job metadata for all surfaces. Existing V1
+    if (readBuilderRunLimits(job.objective) && (job.jobKind !== 'standard' || job.metadata.builderEngine !== 'v2' || job.metadata.platformRepair === true)) {
+      await terminalFailure(job, 'builder_budget_v2_required')
+      return
+    }
     // checkpoint jobs remain V1 because their engine tag is absent.
     if (job.jobKind === 'standard' && job.metadata.builderEngine === 'v2') {
-      if (builderJobOverTotalDeadline(job.createdAt, Date.now())) {
+      const runLimits = readBuilderRunLimits(job.objective)
+      const totalDeadlineMs = runLimits?.maxElapsedMs ?? BUILDER_JOB_TOTAL_DEADLINE_MS
+      if (builderJobOverTotalDeadline(job.createdAt, Date.now(), totalDeadlineMs)) {
         await terminalFailure(job, 'builder_v2_total_deadline_exceeded')
         return
       }
@@ -388,7 +398,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       const browserPortV2 = createBuilderPlaywrightCliPort({ ownerAuthorized: job.ownerAuthorized === true })
       const deadlineController = new AbortController()
       const deadlineTimer = setTimeout(() => deadlineController.abort(new Error('builder_v2_total_deadline_exceeded')),
-        Math.max(0, Date.parse(job.createdAt) + BUILDER_JOB_TOTAL_DEADLINE_MS - Date.now()))
+        Math.max(0, Date.parse(job.createdAt) + totalDeadlineMs - Date.now()))
       deadlineTimer.unref?.()
       const v2 = new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, new VercelSandboxBuilderRunner(), {
         beforeRun({ workspaceId, command }) {
@@ -407,11 +417,14 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       }, browserPortV2), workspace)
       const cycle = await (async () => {
         try {
-          return await withBuilderSliceDeadline(() => runBuilderV2JobCycle({
+          const executeCycle = () => withBuilderSliceDeadline(() => runBuilderV2JobCycle({
             jobId: job.id, claimGeneration: job.claimGeneration,
             store: createBuilderV2SupabaseLeaseStore(db, job.userId),
             agent: v2, maxSteps: 24, signal: deadlineController.signal,
           }), BUILDER_SLICE_HARD_DEADLINE_MS)
+          return runLimits
+            ? await withBuilderInferenceBudget(createBuilderInferenceBudgetStore(db, job), Date.parse(job.createdAt) + totalDeadlineMs, executeCycle)
+            : await executeCycle()
         } finally {
           clearTimeout(deadlineTimer)
           // Every V2 work slice owns its browser sandbox; never leak it across claims.
@@ -419,6 +432,8 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         }
       })()
       if (cycle.status === 'lost_lease') return
+      const inferenceBudget = await readBuilderInferenceBudgetReceipt(db, job)
+      const budgetReport = builderInferenceBudgetSummary(inferenceBudget)
       const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
       // What the build did so far, from host receipts, on every update the person sees.
       const progress = builderV2ProgressReport(job.objective, files, cycle.result?.steps ?? [],
@@ -432,21 +447,21 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         // rather than re-queueing the same checkpoint indefinitely.
         if (idleSlices >= 3) {
           const reason = 'builder_v2_continuation_no_progress'
-          const reply = historyReply(`Builder V2 stopped after three consecutive work slices without a new tool receipt or source revision. No verification was completed. The workspace is preserved.\\n\\n${progress}`, job.workspaceId, files)
+          const reply = historyReply(`Builder V2 stopped after three consecutive work slices without a new tool receipt or source revision. No verification was completed. The workspace is preserved.\n\n${progress}${budgetReport}`, job.workspaceId, files)
           await finishBuilderJob({
             jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
             status: 'failed', reply, error: reason,
             result: { jobId: job.id, workspaceId: job.workspaceId, status: 'failed',
-              reply, files, engine: 'v2', receipts: cycle.result.steps },
+              reply, files, engine: 'v2', receipts: cycle.result.steps, ...(inferenceBudget ? { inferenceBudget } : {}) },
           })
           return
         }
         const checkpoint: BuilderV2Checkpoint = { ...current, idleSlices }
-        const reply = historyReply(`Builder V2 saved its progress and will continue automatically. Verification is not complete.\n\n${progress}`, job.workspaceId, files)
+        const reply = historyReply(`Builder V2 saved its progress and will continue automatically. Verification is not complete.\n\n${progress}${budgetReport}`, job.workspaceId, files)
         const { data, error } = await db.rpc('pause_builder_job_slice', {
           p_job_id: job.id, p_user_id: job.userId, p_generation: job.claimGeneration,
           p_checkpoint: checkpoint, p_reply: reply,
-          p_result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, engine: 'v2' },
+          p_result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, engine: 'v2', ...(inferenceBudget ? { inferenceBudget } : {}) },
         })
         if (error) throw new Error(`builder_v2_checkpoint_persist_failed: ${error.message}`)
         if (data === true) return
@@ -456,13 +471,13 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       const success = cycle.status === 'verified'
       const reason = cycle.status === 'paused' ? 'builder_continuation_budget_exhausted' : cycle.reason
       const reply = historyReply(success
-        ? `Builder V2 verified the workspace with recorded host test execution. ${cycle.result?.summary || ''}`
-        : `Builder V2 could not complete verification: ${reason}\n\n${progress}`, job.workspaceId, files)
+        ? `Builder V2 verified the workspace with recorded host test execution. ${cycle.result?.summary || ''}${budgetReport}`
+        : `Builder V2 could not complete verification: ${reason}\n\n${progress}${budgetReport}`, job.workspaceId, files)
       await finishBuilderJob({
         jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
         status: success ? 'succeeded' : 'failed', reply, error: success ? null : reason,
         result: { jobId: job.id, workspaceId: job.workspaceId, status: success ? 'succeeded' : 'failed',
-          reply, files, engine: 'v2', receipts: cycle.result?.steps ?? [] },
+          reply, files, engine: 'v2', receipts: cycle.result?.steps ?? [], ...(inferenceBudget ? { inferenceBudget } : {}) },
       })
       return
     }

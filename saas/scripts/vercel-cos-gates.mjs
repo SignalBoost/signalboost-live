@@ -15,6 +15,7 @@ if (bypassAudit.status !== 0) process.exit(bypassAudit.status ?? 1)
 
 
 const tests = [
+  'tests/builderInferenceBudget.node.test.ts',
   'tests/builderIsolatedAcceptanceRouting.node.test.ts',
   'tests/builderAcceptanceIngress.node.test.ts',
   // Builder V2 repair and interface reconciliation regression coverage.
@@ -850,6 +851,7 @@ if (result.error) {
 
 process.exit(result.status ?? 1)
 // end of saas/scripts/vercel-cos-gates.mjs (if this line is missing, the paste was cut short)
+
 
 
 

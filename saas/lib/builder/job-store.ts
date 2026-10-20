@@ -1,5 +1,6 @@
 import type { BuilderLoopCheckpoint } from './checkpoint.ts'
 import { MAX_WORK_SLICES } from './work-budget.ts'
+import { readBuilderRunLimits } from './inference-budget.ts'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { EvidenceLookup } from './execution-evidence.ts'
 import { proposalObjective, workspaceFingerprint, type BuilderProposal } from './proposal.ts'
@@ -144,6 +145,10 @@ export async function enqueueBuilderJob(input: {
   }
   const db = serviceClient()
   if (!db) throw new Error('builder_job_storage_unavailable')
+  const runLimits = readBuilderRunLimits(input.objective)
+  if (runLimits && (input.jobKind !== 'standard' || input.metadata?.builderEngine !== 'v2' || input.metadata?.platformRepair === true)) {
+    throw new Error('builder_budget_v2_required')
+  }
   const { data, error } = await db.rpc('enqueue_builder_job', {
     p_job_id: input.jobId,
     p_workspace_id: input.workspaceId,
@@ -151,7 +156,7 @@ export async function enqueueBuilderJob(input: {
     p_conversation_id: input.conversationId,
     p_objective: String(input.objective || '').trim(),
     p_job_kind: input.jobKind,
-    p_metadata: input.metadata || {},
+    p_metadata: { ...input.metadata, ...(runLimits ? { builderRunLimits: runLimits } : {}) },
     p_owner_authorized: input.ownerAuthorized === true,
     p_running_reply: String(input.runningReply || '').trim(),
   })
@@ -397,3 +402,4 @@ export async function stopBuilderJobForUser(jobId: string, userId: string): Prom
   if(updateError) throw new Error('builder_job_cancel_write_failed')
   return stopped ? 'stopped' : 'already_finished'
 }
+

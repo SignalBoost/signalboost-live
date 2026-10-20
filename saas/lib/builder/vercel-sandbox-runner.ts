@@ -1,5 +1,6 @@
 // saas/lib/builder/vercel-sandbox-runner.ts
 import { Sandbox } from '@vercel/sandbox'
+import { checkBuilderInferenceDeadline, currentBuilderInferenceBudget } from './inference-budget.ts'
 import type { BuilderRunResult, BuilderRunnerPort } from './contracts.ts'
 import { normalizeBuilderSandboxCommand } from './project-context.ts'
 import { builderDependencyPlan, validateBuilderLock } from './dependencies.ts'
@@ -10,6 +11,11 @@ const COMMAND_TIMEOUT_MS = 20_000
 const SANDBOX_TIMEOUT_MS = 100_000
 const OUTPUT_LIMIT = 16_000
 const bounded = (value: string): string => String(value || '').slice(0, OUTPUT_LIMIT)
+function budgetTimeout(maximum: number): number {
+  checkBuilderInferenceDeadline()
+  const budget = currentBuilderInferenceBudget()
+  return budget ? Math.max(1, Math.min(maximum, budget.deadlineAt - Date.now())) : maximum
+}
 
 /** Host installs declared registry packages before exposing source. All user commands run deny-all. */
 export class VercelSandboxBuilderRunner implements BuilderRunnerPort {
@@ -21,12 +27,12 @@ export class VercelSandboxBuilderRunner implements BuilderRunnerPort {
     for (const file of input.files) builderFilePath(file.path)
     const dependencies = builderDependencyPlan(input.files)
     const sandbox = await this.createSandbox({
-      runtime: 'node24', timeout: SANDBOX_TIMEOUT_MS, resources: { vcpus: 1 },
+      runtime: 'node24', timeout: budgetTimeout(SANDBOX_TIMEOUT_MS), resources: { vcpus: 1 },
       networkPolicy: 'deny-all', persistent: false, env: { HOME: '/tmp' }, tags: { surface: 'cos-builder' },
     })
     const generatedFiles: { path: string; content: string }[] = []
     try {
-      const prepared = await sandbox.runCommand({ cmd: 'mkdir', args: ['-p', '--', ROOT], timeoutMs: COMMAND_TIMEOUT_MS })
+      const prepared = await sandbox.runCommand({ cmd: 'mkdir', args: ['-p', '--', ROOT], timeoutMs: budgetTimeout(COMMAND_TIMEOUT_MS) })
       if (prepared.exitCode !== 0) throw new Error('builder_sandbox_root_failed')
       if (dependencies) {
         await sandbox.writeFiles([
@@ -39,12 +45,12 @@ export class VercelSandboxBuilderRunner implements BuilderRunnerPort {
         try {
           const install = await sandbox.runCommand({ cmd: 'npm',
             args: [dependencies.command, '--ignore-scripts', '--no-audit', '--no-fund', '--registry=https://registry.npmjs.org',
-              '--userconfig=/tmp/builder-user.npmrc', '--globalconfig=/tmp/builder-global.npmrc'], cwd: ROOT, timeoutMs: 60_000 })
+              '--userconfig=/tmp/builder-user.npmrc', '--globalconfig=/tmp/builder-global.npmrc'], cwd: ROOT, timeoutMs: budgetTimeout(60_000) })
           if (install.exitCode !== 0) return { exitCode: install.exitCode, stdout: '',
             stderr: `Dependency installation failed before the requested command ran: ${bounded(await install.stderr())}`, timedOut: false,
             executedCommand: `npm ${dependencies.command} --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org --userconfig=/tmp/builder-user.npmrc --globalconfig=/tmp/builder-global.npmrc` }
           if (!dependencies.lock) {
-            const lock = await sandbox.runCommand({ cmd: 'cat', args: [`${ROOT}/package-lock.json`], timeoutMs: 5_000 })
+            const lock = await sandbox.runCommand({ cmd: 'cat', args: [`${ROOT}/package-lock.json`], timeoutMs: budgetTimeout(5_000) })
             if (lock.exitCode !== 0) throw new Error('builder_dependency_lock_missing')
             const content = await lock.stdout()
             if (Buffer.byteLength(content) > 512 * 1024) throw new Error('builder_dependency_lock_too_large')
@@ -57,8 +63,9 @@ export class VercelSandboxBuilderRunner implements BuilderRunnerPort {
         }
       }
       await sandbox.writeFiles(input.files.map(file => ({ path: `${ROOT}/${file.path}`, content: Buffer.from(file.content, 'utf8') })))
+      checkBuilderInferenceDeadline()
       try {
-        const result = await sandbox.runCommand({ cmd: 'sh', args: ['-lc', command], cwd: ROOT, timeoutMs: COMMAND_TIMEOUT_MS })
+        const result = await sandbox.runCommand({ cmd: 'sh', args: ['-lc', command], cwd: ROOT, timeoutMs: budgetTimeout(COMMAND_TIMEOUT_MS) })
         const [stdout, stderr] = await Promise.all([result.stdout(), result.stderr()])
         return { exitCode: result.exitCode, stdout: bounded(stdout), stderr: bounded(stderr), timedOut: false, generatedFiles }
       } catch (error) {
@@ -70,3 +77,4 @@ export class VercelSandboxBuilderRunner implements BuilderRunnerPort {
     }
   }
 }
+

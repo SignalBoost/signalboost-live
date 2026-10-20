@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { BuilderV2Agent, BUILDER_V2_MODEL_RETRIES } from '../lib/builder/agent-v2.ts'
 import { BuilderV2Dispatcher } from '../lib/builder/agent-v2-dispatcher.ts'
+import { BuilderBudgetError } from '../lib/builder/inference-budget.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import type { BuilderRunnerPort } from '../lib/builder/contracts.ts'
 
@@ -91,3 +92,16 @@ test('never retried: the slice budget running out, a cut-off reply, a cancellati
     assert.equal(calls, 1, name)
   }
 })
+
+test('durable dollar exhaustion terminates the agent without retrying or requesting continuation', async () => {
+  const workspace = await setup('budget')
+  let calls = 0
+  const agent = new BuilderV2Agent({ async generate() { calls++; throw new BuilderBudgetError('builder_budget_exhausted') } },
+    new BuilderV2Dispatcher(workspace, localRunner), workspace)
+  const outcome = await agent.run({ workspaceId: 'budget', objective, maxSteps: 4,
+    retryDelay: async () => { assert.fail('budget exhaustion must never retry') } })
+  assert.equal(outcome.reason, 'builder_budget_exhausted')
+  assert.equal(outcome.ok, false)
+  assert.equal(calls, 1)
+})
+

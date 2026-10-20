@@ -1,5 +1,7 @@
+import { readBuilderRunLimits } from './inference-budget.ts'
+import { isExplicitIsolatedProjectBuild } from './isolated-project-intent.ts'
 export type BuilderAdmissionBlocker = Readonly<{
-  error: 'builder_inference_spend_cap_unavailable'
+  error: 'builder_inference_spend_cap_unavailable' | 'builder_budget_amount_invalid' | 'builder_isolated_publication_unavailable'
   status: 'incomplete'
   reply: string
   execution_allowed: false
@@ -8,6 +10,20 @@ export type BuilderAdmissionBlocker = Readonly<{
 
 /** Call-count budgets and post-hoc usage records do not enforce a dollar ceiling. */
 export function builderExecutionAdmissionBlocker(objective: string): BuilderAdmissionBlocker | null {
+  // Budget support must not silently substitute a workspace-only result for requested Git/preview evidence.
+  if (isExplicitIsolatedProjectBuild(objective)
+    && /\b(?:open\s+(?:a\s+)?pr|pull request|deploy[\s\S]{0,100}preview)\b/i.test(objective)) {
+    return { error: 'builder_isolated_publication_unavailable', status: 'incomplete',
+      reply: 'INCOMPLETE: Builder V2 can enforce a per-run inference cap, but its isolated workspace lane cannot yet create and publish a Git repository, open its PR, or deploy a preview. No workspace-only run was substituted, and no job was started.',
+      execution_allowed: false, external_action_taken: false }
+  }
+  try {
+    if (readBuilderRunLimits(objective)) return null
+  } catch {
+    return { error: 'builder_budget_amount_invalid', status: 'incomplete',
+      reply: 'INCOMPLETE: The requested per-run dollar cap or runtime limit is invalid. No Builder job was started.',
+      execution_allowed: false, external_action_taken: false }
+  }
   const lines = String(objective || '').split(/\r?\n/)
   const hardSpendLimit = lines.some(line => {
     const runLimit = /^\s*(?:limits?|budget|spend(?:ing)? (?:cap|limit))\s*:/i.test(line)

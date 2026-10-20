@@ -4,6 +4,7 @@ import { parseBuyerModelProfiles } from '../lib/ai/modelCapabilityRegistry.ts'
 import { requireTransportForProfile } from '../lib/ai/modelTransportAdapter.ts'
 import { createBuiltinModelTransportAdapters } from '../lib/ai/modelTransportAdapters.ts'
 import { parseModelTransportBindings } from '../lib/ai/modelTransportConfig.ts'
+import { withBuilderInferenceBudget, BuilderBudgetError } from '../lib/builder/inference-budget.ts'
 
 function profile(input: {
   key: string
@@ -23,6 +24,27 @@ function profile(input: {
     training: {},
   }]))[0]
 }
+
+test('the real assigned-model transport cannot dispatch after a durable budget refusal', async () => {
+  const p = profile({ key: 'buyer-budget-v1', modelId: 'test/model', protocol: 'openai_compatible' })
+  const bindings = parseModelTransportBindings(JSON.stringify([{ profileKey: p.key, protocol: 'openai_compatible',
+    provider: 'deepinfra', endpoint: 'https://api.deepinfra.com/v1/openai/chat/completions' }]))
+  let models = 0
+  let reservations = 0
+  const adapters = createBuiltinModelTransportAdapters({ profiles: [p], bindings, fetchImpl: async input => {
+    if (String(input) === 'https://api.deepinfra.com/models/list') return Response.json([{ model_name: 'test/model',
+      type: 'text-generation', max_tokens: 1000, pricing: { type: 'tokens', cents_per_input_token: 0.001, cents_per_output_token: 0.002 } }])
+    models++
+    throw new Error('paid dispatch must not happen')
+  } })
+  await assert.rejects(withBuilderInferenceBudget({
+    reserve: async () => { reservations++; throw new BuilderBudgetError('builder_budget_exhausted') },
+    settle: async () => assert.fail('no response to settle'),
+  }, Date.now() + 10000, () => requireTransportForProfile(p, adapters).chat({ profile: p,
+    messages: [{ role: 'user', content: 'repair' }], maxOutputTokens: 100 })), /builder_budget_exhausted/)
+  assert.equal(reservations, 1)
+  assert.equal(models, 0)
+})
 
 test('buyer transport bindings keep endpoints and credential names separate from model profiles', () => {
   const [binding] = parseModelTransportBindings(JSON.stringify([{
@@ -244,3 +266,4 @@ for (const protocol of ['openai_compatible', 'anthropic_messages', 'google_gener
     assert.equal(calls, 1)
   })
 }
+

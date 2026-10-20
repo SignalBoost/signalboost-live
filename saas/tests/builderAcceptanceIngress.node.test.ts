@@ -92,7 +92,7 @@ test('Concierge and COS return the real admission blocker instead of words from 
     const response = await browser(request(objective, assistant))
     const result = await response.json()
     assert.equal(response.status, 422)
-    assert.equal(result.error, 'builder_inference_spend_cap_unavailable')
+    assert.equal(result.error, 'builder_isolated_publication_unavailable')
     assert.equal(result.status, 'incomplete')
     assert.equal(result.jobId, undefined)
     assert.equal(result.execution_allowed, false)
@@ -100,16 +100,16 @@ test('Concierge and COS return the real admission blocker instead of words from 
   }
 })
 
-test('Developer applies the same cap rejection before workspace/repair/job creation', async () => {
+test('Developer never substitutes a workspace-only result for an isolated PR/preview request', async () => {
   const { developer, calls } = setup(true)
   const response = await developer(request(objective))
   assert.equal(response.status, 422)
-  assert.equal((await response.json()).error, 'builder_inference_spend_cap_unavailable')
+  assert.equal((await response.json()).error, 'builder_isolated_publication_unavailable')
   assert.deepEqual(calls, { model: 0, workspace: 0, jobs: [], repairs: 0, scheduled: 0 })
 })
 
 test('an admitted isolated build queues V2 once and carries the same job ID through public presentation', async () => {
-  const prompt = 'Create an isolated Node.js repository with sum.js and sum.test.js. Repair the function, commit the change, and open a PR against the isolated branch. Do not modify production/main.'
+  const prompt = 'Create an isolated Node.js repository with sum.js and sum.test.js. Repair the function and run node --test sum.test.js. Limits: maximum $0.50 inference spending and maximum 10 minutes. Do not modify production/main.'
   const { browser, calls } = setup(true)
   const response = await browser(request(prompt))
   const result = await response.json()

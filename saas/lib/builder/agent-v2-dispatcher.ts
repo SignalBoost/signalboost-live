@@ -1,6 +1,7 @@
 import type { BuilderBrowserCliAction, BuilderBrowserCliPort, BuilderFile, BuilderRunnerPort, BuilderWorkspacePort } from './contracts.ts'
 import { builderSyntaxError } from './syntax-check.ts'
 import { applySearchReplace } from './edit-match.ts'
+import { checkBuilderInferenceDeadline } from './inference-budget.ts'
 import { withBuilderExecutionHooks, type BuilderExecutionHook } from './execution-hooks.ts'
 
 /**
@@ -60,6 +61,7 @@ export class BuilderV2Dispatcher {
   async dispatch(workspaceId: string, action: BuilderV2Action, options: Readonly<{ seenContent?: string }> = {}): Promise<BuilderV2Receipt> {
     if (!workspaceId.trim()) return { tool: action.tool, ok: false, changed: false, error: 'builder_workspace_required' }
     return this.serialized(workspaceId, async () => {
+      checkBuilderInferenceDeadline()
       try {
         if (action.tool === 'list_files') {
           return { tool: action.tool, ok: true, changed: false, output: await this.workspace.listFiles(workspaceId) }
@@ -155,3 +157,4 @@ export class BuilderV2Dispatcher {
     })
   }
 }
+

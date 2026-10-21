@@ -275,11 +275,12 @@ export function createGovernedBuilderAiPort(
   options?: { deadlineAtMs?: number; maxElapsedMs?: number },
 ): BuilderAiPort {
   const deadlineAtMs = boundedDeadline(options)
+  let deadlineExpired = false
 
   return Object.freeze({
     async generate(input) {
       const remainingMs = Math.floor(deadlineAtMs - Date.now())
-      if (remainingMs <= 0) throw new Error(BUILDER_TURN_TIMEOUT_ERROR)
+      if (deadlineExpired || remainingMs <= 0) throw new Error(BUILDER_TURN_TIMEOUT_ERROR)
 
       input.signal?.throwIfAborted()
       const controller = new AbortController()
@@ -292,7 +293,10 @@ export function createGovernedBuilderAiPort(
       }
       const abortFromCaller = () => abort(input.signal?.reason)
       input.signal?.addEventListener('abort', abortFromCaller, { once: true })
-      timer = setTimeout(() => abort(new Error(BUILDER_TURN_TIMEOUT_ERROR)), Math.max(1, remainingMs))
+      timer = setTimeout(() => {
+        deadlineExpired = true
+        abort(new Error(BUILDER_TURN_TIMEOUT_ERROR))
+      }, Math.max(1, remainingMs))
       try {
         const response = await Promise.race([
           ai.generate({ ...input, signal: controller.signal }),

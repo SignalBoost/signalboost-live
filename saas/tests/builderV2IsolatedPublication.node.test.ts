@@ -120,7 +120,7 @@ test('preview uses exact verified GitHub SHA and checks live endpoint', async ()
       assert.equal(body.meta.builderRepository, 'SignalBoost/builder-isolated-test')
       assert.equal(body.files[0].file, 'src/add.js')
       assert.equal(body.files[0].data, files[0].content)
-      assert.equal(body.target, 'preview')
+      assert.equal(body.target, undefined, 'Vercel Preview must omit target')
       return Response.json({ id: 'dpl_abc123' })
     }
     if (String(url).endsWith('/v13/deployments/dpl_abc123')) {
@@ -149,3 +149,11 @@ test('preview rejects deadline expiry before external effects', async () => {
   assert.equal(called, false)
 })
 
+
+test('preview returns the sanitized Vercel validation code on deployment 400', async () => {
+  const request = (async () => Response.json({ error: { code: 'invalid_deployment_target', message: 'untrusted detail' } }, { status: 400 })) as typeof fetch
+  await assert.rejects(verifyIsolatedPreview({
+    token: 'test', projectId: 'prj_abc123', repository: 'SignalBoost/builder-isolated-test',
+    commitSha: 'a'.repeat(40), files, deadlineAt: Date.now() + 60_000, request,
+  }), /^Error: builder_isolated_vercel_http_400_invalid_deployment_target$/)
+})

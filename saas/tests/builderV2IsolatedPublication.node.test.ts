@@ -194,19 +194,25 @@ test('requested endpoint must return matching JSON, not merely homepage success'
   assert.equal(seen.at(-1), 'https://example.vercel.app/sum?a=2&b=3')
 })
 
-test('explicit fresh private repo request creates a private org repository before publishing', async () => {
+// A GitHub where the owner is a personal account or an organization and the job's repository does not exist yet.
+function freshGitHub(options: { ownerType?: string; create?: Response; lookup?: Response; refPendingFor?: number } = {}) {
   const calls: { path: string; method: string; body: any }[] = []
   const name = `builder-${jobKey}`
+  let pending = options.refPendingFor ?? 0
   const request = (async (url: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(url)).pathname
     const method = init?.method || 'GET'
     const body = init?.body ? JSON.parse(String(init.body)) : null
     calls.push({ path, method, body })
-    if (path === '/orgs/SignalBoost/repos' && method === 'POST')
-      return Response.json({ full_name: `SignalBoost/${name}`, private: true }, { status: 201 })
+    if (path === '/users/SignalBoost') return Response.json({ login: 'SignalBoost', type: options.ownerType ?? 'User' })
+    if ((path === '/user/repos' || path === '/orgs/SignalBoost/repos') && method === 'POST')
+      return options.create ?? Response.json({ full_name: `SignalBoost/${name}`, private: true }, { status: 201 })
     if (path === `/repos/SignalBoost/${name}`)
-      return Response.json({ full_name: `SignalBoost/${name}`, private: true, default_branch: 'main' })
-    if (path.endsWith('/git/ref/heads/main')) return Response.json({ object: { sha: sha('a') } })
+      return options.lookup ?? Response.json({ full_name: `SignalBoost/${name}`, private: true, default_branch: 'main' })
+    if (path.endsWith('/git/ref/heads/main')) {
+      if (pending-- > 0) return Response.json({ message: 'Git Repository is empty.' }, { status: 409 })
+      return Response.json({ object: { sha: sha('a') } })
+    }
     if (path.endsWith('/git/commits/' + sha('a'))) return Response.json({ tree: { sha: sha('b') } })
     if (path.endsWith('/git/blobs')) return Response.json({ sha: sha('c') })
     if (path.endsWith('/git/trees')) return Response.json({ sha: sha('d') })
@@ -215,28 +221,52 @@ test('explicit fresh private repo request creates a private org repository befor
     if (path.endsWith('/pulls')) return Response.json({ number: 1, html_url: `https://github.com/SignalBoost/${name}/pull/1` })
     return Response.json({ error: 'unexpected' }, { status: 404 })
   }) as typeof fetch
-  const result = await publishVerifiedIsolatedProject({
-    owner: 'SignalBoost', jobKey, token: 'test', files,
-    verified: true, authorized: true, newRepository: true, request,
-  })
-  assert.equal(result.repository, `SignalBoost/${name}`)
-  assert.equal(calls[0].path, '/orgs/SignalBoost/repos')
-  assert.equal(calls[0].body.private, true)
-  assert.equal(calls[0].body.auto_init, true)
-  assert.equal(calls.at(-1)?.body.base, 'main')
+  return { calls, request, name }
+}
+const publishFresh = (request: typeof fetch) => publishVerifiedIsolatedProject({
+  owner: 'SignalBoost', jobKey, token: 'test', files, verified: true, authorized: true, newRepository: true, request,
 })
 
-test('private repository creation denied with 403 fails closed without shared fallback', async () => {
-  const calls: string[] = []
-  const request = (async (url: string | URL | Request) => {
-    calls.push(new URL(String(url)).pathname)
-    return Response.json({ message: 'Forbidden' }, { status: 403 })
-  }) as typeof fetch
-  await assert.rejects(publishVerifiedIsolatedProject({
-    owner: 'SignalBoost', jobKey, token: 'test', files,
-    verified: true, authorized: true, newRepository: true, request,
-  }), /builder_isolated_github_create_repository_http_403/)
-  assert.deepEqual(calls, ['/orgs/SignalBoost/repos'])
+// Production 2026-10-21: SignalBoost is a personal account, so creating under /orgs/SignalBoost answered 404.
+test('a new private repository is created where the owner lives: /user for a personal account, /orgs for an organization', async () => {
+  for (const [ownerType, endpoint] of [['User', '/user/repos'], ['Organization', '/orgs/SignalBoost/repos']] as const) {
+    const gh = freshGitHub({ ownerType })
+    const result = await publishFresh(gh.request)
+    assert.equal(result.repository, `SignalBoost/${gh.name}`, ownerType)
+    assert.equal(gh.calls[0].path, '/users/SignalBoost', 'the owner type is read first')
+    const create = gh.calls[1]
+    assert.equal(create.path, endpoint, ownerType)
+    assert.deepEqual([create.body.name, create.body.private, create.body.auto_init], [gh.name, true, true])
+    assert.ok(!gh.calls.some(call => call.path.startsWith('/repos/SignalBoost/builder-isolated')), 'never the shared repository')
+    const tree = gh.calls.find(call => call.path.endsWith('/git/trees'))!.body
+    assert.deepEqual(tree.tree.map((entry: any) => entry.path), ['src/add.js'], 'a dedicated repository holds the job at its root')
+    assert.equal(gh.calls.at(-1)?.body.base, 'main')
+  }
+})
+
+test('a refused repository creation fails closed with a named reason and no shared fallback', async () => {
+  for (const status of [403, 404]) {
+    const gh = freshGitHub({ create: Response.json({ message: 'Forbidden' }, { status }) })
+    await assert.rejects(publishFresh(gh.request), new RegExp(`^Error: builder_isolated_repository_creation_not_permitted_${status}$`))
+    assert.deepEqual(gh.calls.map(call => call.path), ['/users/SignalBoost', '/user/repos'])
+  }
+})
+
+test('a repository created somewhere else, or public, or unreadable by the token is refused before any write', async () => {
+  const elsewhere = freshGitHub({ create: Response.json({ full_name: `someone-else/builder-${jobKey}`, private: true }, { status: 201 }) })
+  await assert.rejects(publishFresh(elsewhere.request), /builder_isolated_created_repository_invalid/)
+  const unreadable = freshGitHub({ lookup: Response.json({ message: 'Not Found' }, { status: 404 }) })
+  await assert.rejects(publishFresh(unreadable.request), /builder_isolated_created_repository_not_accessible/)
+  for (const gh of [elsewhere, unreadable]) assert.ok(!gh.calls.some(call => call.path.endsWith('/git/blobs')))
+})
+
+test('the first commit of a just-created repository is waited for, briefly', async () => {
+  const gh = freshGitHub({ refPendingFor: 2 })
+  const result = await publishFresh(gh.request)
+  assert.equal(result.commitSha, sha('e'))
+  assert.equal(gh.calls.filter(call => call.path.endsWith('/git/ref/heads/main')).length, 3)
+  // The shared repository is never waited for: an empty one is a configuration error.
+  await assert.rejects(publish('SignalBoost', github({ defaultRef: Response.json({}, { status: 409 }) }).request), /builder_isolated_repository_empty/)
 })
 
 test('verified API response is retained in the durable publication receipt', async () => {

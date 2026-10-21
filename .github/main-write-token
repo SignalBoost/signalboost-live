@@ -1,2 +1,2 @@
-base_sha=3a403366f8122c4295e291ee154978b80335eb5c
-branch=fix/builder-owner-merges-verified-pr-20261021
+base_sha=71ea75de295999cd4de4952171b9ffbd2a7aa8d6
+branch=fix/builder-new-repo-owner-type-20261021

@@ -441,3 +441,8 @@ test('recognized Builder work cannot disappear into unrelated COS conversation',
   assert.match(source, /execution_allowed: false/)
   assert.match(source, /status: 503/)
 })
+
+test('new application creation cannot be intercepted by missing-source repair prompt', () => {
+  const specialist = read('../lib/ai/cos/softwareSpecialist.ts')
+  assert.match(specialist, /if \(repairRequested && !newProject && !roleMatched && !designMatched/)
+})

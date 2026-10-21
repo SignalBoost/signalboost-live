@@ -9,6 +9,7 @@
 // reference material: a question someone else asked in that thread ("Can you please check with
 // Luis about these transactions?") must not turn "edit - <reply> <quoted thread>" into a new question.
 
+import { isSoftwareRepairRequest } from './softwareRepairIntent.ts'
 import { stripQuotedEmailThread } from './quotedEmailThread.ts'
 
 export type FastTextTransformContext = {
@@ -66,6 +67,8 @@ export function isFastTextTransform(input: string, context: FastTextTransformCon
   const text = String(input || '').trim()
   const match = FAST_TEXT_COMMAND.exec(text)
   if (!match) return false
+  // "Fix the Failed to fetch error on the Builder page" is software work, not a text edit.
+  if (isSoftwareRepairRequest(text)) return false
 
   const priorDraft = hasUsablePriorDraft(context.previousAssistant)
   const payload = suppliedDraftAfterCommand(text, match[0].length)

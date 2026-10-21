@@ -10,6 +10,9 @@ import { after, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { publicAuditUserId } from '@/lib/auth/publicAuditIdentity'
 import { isConciergeBuilderObjective, type CosCodingRoutingContext } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { isSoftwareRepairRequest } from '@/lib/ai/cos/softwareRepairIntent'
+import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
+import type { SupportedLanguage } from '@/lib/i18n/supportedLanguages'
 import { trimObjectiveForHarness, runSoftwareDelegationWithSafeRetry } from '@/lib/ai/cos/softwareSpecialistRecovery'
 export { extractFailureEvidence } from '@/lib/ai/cos/softwareSpecialistRecovery'
 import { isOperationalLogEvidence } from '@/lib/ai/cos/pastedOperationalLog'
@@ -91,6 +94,21 @@ function softwareSpecialistFields(skill: string) {
   }
 }
 
+// Asked when a repair request arrives with nothing to repair yet: one concrete next step, never a dead end.
+const SOURCE_REQUEST_REPLY: Readonly<Record<SupportedLanguage, string>> = Object.freeze({
+  en: 'I can fix that. Attach the file or files involved, paste the code here, or send the link to a public GitHub repository, and I will find the problem, repair it, run the tests and send you back the corrected files.',
+  es: 'Puedo arreglarlo. Adjunta el archivo o los archivos afectados, pega el código aquí o envía el enlace a un repositorio público de GitHub, y encontraré el problema, lo repararé, ejecutaré las pruebas y te devolveré los archivos corregidos.',
+  pt: 'Posso corrigir isso. Anexe o arquivo ou os arquivos envolvidos, cole o código aqui ou envie o link de um repositório público do GitHub, e eu vou encontrar o problema, corrigi-lo, executar os testes e devolver os arquivos corrigidos.',
+  pl: 'Mogę to naprawić. Dołącz plik lub pliki, których to dotyczy, wklej tutaj kod albo wyślij link do publicznego repozytorium GitHub, a znajdę problem, naprawię go, uruchomię testy i odeślę poprawione pliki.',
+  ru: 'Я могу это исправить. Прикрепите нужный файл или файлы, вставьте код сюда или пришлите ссылку на публичный репозиторий GitHub — я найду проблему, исправлю её, запущу тесты и верну вам исправленные файлы.',
+  de: 'Das kann ich beheben. Hängen Sie die betroffene Datei oder Dateien an, fügen Sie den Code hier ein oder senden Sie den Link zu einem öffentlichen GitHub-Repository, dann finde ich das Problem, behebe es, führe die Tests aus und schicke Ihnen die korrigierten Dateien zurück.',
+  fr: 'Je peux corriger cela. Joignez le ou les fichiers concernés, collez le code ici ou envoyez le lien d’un dépôt GitHub public, et je trouverai le problème, le corrigerai, exécuterai les tests et vous renverrai les fichiers corrigés.',
+  it: 'Posso risolverlo. Allega il file o i file coinvolti, incolla qui il codice o invia il link a un repository GitHub pubblico, e troverò il problema, lo correggerò, eseguirò i test e ti rimanderò i file corretti.',
+  ja: '修正できます。対象のファイルを添付するか、ここにコードを貼り付けるか、公開 GitHub リポジトリのリンクを送ってください。問題を特定して修正し、テストを実行してから、修正済みのファイルをお返しします。',
+  ko: '고칠 수 있습니다. 관련 파일을 첨부하거나, 여기에 코드를 붙여 넣거나, 공개 GitHub 저장소 링크를 보내 주세요. 문제를 찾아 수정하고 테스트를 실행한 뒤 수정된 파일을 돌려드리겠습니다.',
+  ar: 'يمكنني إصلاح ذلك. أرفق الملف أو الملفات المعنية، أو الصق الشيفرة هنا، أو أرسل رابط مستودع GitHub عام، وسأجد المشكلة وأصلحها وأشغّل الاختبارات ثم أعيد إليك الملفات المصحّحة.',
+})
+
 function runningReply(jobId: string): string {
   return `COS Software Specialist is running Builder job ${jobId}. Progress and the final result are durable in History; the action will not be replayed.`
 }
@@ -147,8 +165,10 @@ async function tryCosSoftwareSpecialistLegacy(
   const roleMatched = isConciergeBuilderObjective(objective, context)
   const designMatched = DESIGN_ARTIFACT.test(objective) && DESIGN_REQUEST.test(objective)
   const importRequested = builderRepositoryImportIntent(objective)
+  const repairRequested = isSoftwareRepairRequest(objective)
   const specialistRelevant = sourceAttached
     || mediaAttached
+    || repairRequested
     || roleMatched
     || designMatched
     || importRequested
@@ -257,8 +277,31 @@ async function tryCosSoftwareSpecialistLegacy(
   }, readBuilderEvidenceJob)
   if (project.blocked) return NextResponse.json({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: project.blocked === 'busy' ? 409 : 503 })
 
-  if (mediaAttached || !(roleMatched || designMatched || repositoryTarget || project.context)) return null
-  if (project.context || selectionBody?.workspaceId) return NextResponse.json({ reply: 'Builder V2 requires a fresh workspace; legacy workspace continuation is disabled.', execution_allowed: false, source: 'builder-v2-only' }, { status: 409 })
+  // A plain-language repair request with nothing to repair yet. The owner's request is a platform
+  // repair at the deployed revision (fix, test, commit, merge); anyone else is asked for the code
+  // instead of being given a generic answer.
+  const suppliedSource = sourceAttached || (Array.isArray(input.body?.files) && input.body.files.length > 0)
+  if (repairRequested && !suppliedSource && !mediaAttached && !repositoryTarget && !project.context) {
+    if (input.allowRepositoryRepair && access?.isOwner && access.userId) {
+      const target = signalBoostDeployedRepairTarget(rawObjective, {
+        commitSha: input.deployment?.commitSha || undefined,
+        branch: input.deployment?.branch || undefined,
+      }, { ownerRepairWithoutSource: true })
+      if (target) return enqueueRepositoryRepair({ body: input.body, objective, userId: access.userId, target, signal })
+    }
+    return NextResponse.json({
+      reply: SOURCE_REQUEST_REPLY[resolveResponseLanguage(rawObjective, input.body?.context?.language)],
+      source: 'cos-builder-source-requested',
+      execution_allowed: false,
+      external_action_taken: false,
+      ...softwareSpecialistFields('software.repair'),
+    })
+  }
+
+  if (mediaAttached || !(roleMatched || designMatched || repairRequested || repositoryTarget || project.context)) return null
+  // PR #4719: Builder V2 continues and repairs an existing project; only an explicitly selected
+  // workspace with no recorded job in this conversation is refused.
+  if (!project.context && selectionBody?.workspaceId) return NextResponse.json({ reply: 'Builder V2 requires a fresh workspace; legacy workspace continuation is disabled.', execution_allowed: false, source: 'builder-v2-only' }, { status: 409 })
 
   // Public Concierge intentionally receives guest access under public-delivery scope. Its server-
   // captured audit identity may own an isolated workspace, but it never gains owner repository authority.
@@ -331,6 +374,8 @@ async function tryCosSoftwareSpecialistLegacy(
             debugPaths: debugPlan.files,
           }
         : { productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null, ...(project.context ? { projectContext: project.context } : {}),
+            // The claimed worker re-reads the existing workspace before any edit (same rule as /api/builder).
+            ...(project.context && !stagedFiles.length ? { requiresExistingSource: true } : {}),
             builderEngine: 'v2' },
       ownerAuthorized: access?.isOwner === true,
       runningReply: reply,
@@ -383,6 +428,7 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   const assistanceMode = input.body?.assistanceMode ?? input.body?.context?.assistanceMode
   const specialistRelevant = sourceAttached
     || mediaAttached
+    || isSoftwareRepairRequest(objective)
     || isConciergeBuilderObjective(objective, context)
     || (DESIGN_ARTIFACT.test(objective) && DESIGN_REQUEST.test(objective))
     || builderRepositoryImportIntent(objective)

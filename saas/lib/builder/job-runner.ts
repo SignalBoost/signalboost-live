@@ -488,7 +488,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           const contents = await Promise.all(files.map(path => workspace.readFile(job.workspaceId, path)))
           if (contents.some(file => !file)) throw new Error('builder_isolated_workspace_file_missing')
           const published = await publishVerifiedIsolatedProject({
-            owner, repositoryName: `builder-isolated-${job.id.replace(/[^a-z0-9]/gi, '').slice(0, 24)}`,
+            owner, jobKey: job.id,
             token, files: contents.filter((file): file is NonNullable<typeof file> => Boolean(file)),
             verified: true, authorized: true, signal: deadlineController.signal,
             deadlineAt: Date.parse(job.createdAt) + totalDeadlineMs,

@@ -40,9 +40,18 @@ export function validateIsolatedFiles(files: readonly BuilderFile[]): void {
 
 type Request = typeof fetch
 
+/**
+ * Every verified job publishes into one pre-created private repository, never a new one per job: the credential then
+ * needs Contents + Pull requests on that single repository only, and no repository-creation authority anywhere.
+ * Production 2026-10-21: per-job creation was refused (HTTP 403) by a token scoped to existing repositories.
+ * Each job gets its own base and head branches, so jobs stay isolated and the repository's default branch is never written.
+ */
+export const ISOLATED_REPOSITORY_NAME = 'builder-isolated'
+const jobKeyPattern = /^[a-z0-9][a-z0-9-]{7,63}$/i
+
 export async function publishVerifiedIsolatedProject(input: Readonly<{
   owner: string
-  repositoryName: string
+  jobKey: string
   token: string
   files: readonly BuilderFile[]
   verified: boolean
@@ -52,7 +61,7 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   request?: Request
 }>): Promise<IsolatedPublication> {
   if (!input.authorized || !input.verified) throw new Error('builder_isolated_publication_not_authorized')
-  if (!safeName.test(input.owner) || !safeName.test(input.repositoryName) || !input.token) throw new Error('builder_isolated_destination_invalid')
+  if (!safeName.test(input.owner) || !jobKeyPattern.test(input.jobKey) || !input.token) throw new Error('builder_isolated_destination_invalid')
   validateIsolatedFiles(input.files)
   const http = input.request ?? fetch
   const headers = {
@@ -76,63 +85,46 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
     return payload
   }
 
-  // The account type is read from GitHub, never configured by hand: an organization endpoint for a personal account
-  // (or the reverse) answers 404. Production 2026-10-21: SignalBoost is a personal account.
-  const account = await json(`/users/${encodeURIComponent(input.owner)}`, 'GET', undefined, 'owner_lookup')
-  const owner = String(account.login || '')
-  if (owner.toLowerCase() !== input.owner.toLowerCase() || !safeName.test(owner)) throw new Error('builder_isolated_destination_invalid')
-  const organization = account.type === 'Organization'
-  if (!organization) {
-    // A personal-account repository is always created under the token's own account: refuse before creating it elsewhere.
-    const viewer = await json('/user', 'GET', undefined, 'token_account')
-    if (String(viewer.login || '').toLowerCase() !== owner.toLowerCase()) throw new Error('builder_isolated_token_account_mismatch')
-  }
-
-  // Private-by-default creation. Never publish source into the platform repository.
-  const created = await json(organization ? `/orgs/${encodeURIComponent(owner)}/repos` : '/user/repos', 'POST', {
-    name: input.repositoryName, private: true, auto_init: true,
-    description: 'Isolated Builder V2 verified project',
-  }, 'create_repository')
-  if (created.full_name !== `${owner}/${input.repositoryName}` || created.private !== true) {
-    throw new Error('builder_isolated_repository_identity_mismatch')
-  }
-  const encodedRepo = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(input.repositoryName)}`
-  const base = String(created.default_branch || 'main')
-  if (!safeName.test(base)) throw new Error('builder_isolated_invalid_default_branch')
-  // GitHub's auto_init repository creation may become visible before its first ref.
-  // Retry only the idempotent GET: never replay repository creation or git writes.
-  let baseRef: any
-  for (let attempt = 0; attempt < 5; attempt++) {
-    try {
-      baseRef = await json(`${encodedRepo}/git/ref/heads/${encodeURIComponent(base)}`, 'GET', undefined, 'default_branch_ref')
-      break
-    } catch (error) {
-      if (!(error instanceof Error) || error.message !== 'builder_isolated_github_default_branch_ref_http_404' || attempt === 4) throw error
-      await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)))
-    }
-  }
+  const repository = await json(`/repos/${encodeURIComponent(input.owner)}/${ISOLATED_REPOSITORY_NAME}`, 'GET', undefined, 'repository_lookup')
+    .catch((error: Error) => {
+      // A missing repository and a token without access to it answer the same 404.
+      throw new Error(error.message === 'builder_isolated_github_repository_lookup_http_404' ? 'builder_isolated_repository_unavailable' : error.message)
+    })
+  const fullName = String(repository.full_name || '')
+  if (fullName.toLowerCase() !== `${input.owner}/${ISOLATED_REPOSITORY_NAME}`.toLowerCase()) throw new Error('builder_isolated_repository_identity_mismatch')
+  // Never publish source into a public repository.
+  if (repository.private !== true) throw new Error('builder_isolated_repository_not_private')
+  const encodedRepo = `/repos/${fullName.split('/').map(encodeURIComponent).join('/')}`
+  const defaultBranch = String(repository.default_branch || '')
+  if (!safeName.test(defaultBranch)) throw new Error('builder_isolated_invalid_default_branch')
+  const baseRef = await json(`${encodedRepo}/git/ref/heads/${encodeURIComponent(defaultBranch)}`, 'GET', undefined, 'default_branch_ref')
+    .catch((error: Error) => {
+      // GitHub answers 409 for a repository with no commits (created without a README).
+      throw new Error(error.message === 'builder_isolated_github_default_branch_ref_http_409' ? 'builder_isolated_repository_empty' : error.message)
+    })
   const baseSha = String(baseRef.object?.sha || '')
   if (!/^[0-9a-f]{40}$/i.test(baseSha)) throw new Error('builder_isolated_invalid_base_sha')
-  const baseCommit = await json(`${encodedRepo}/git/commits/${baseSha}`)
-  // Keep the acceptance PR against an isolated test branch, not the repo's main.
-  await json(`${encodedRepo}/git/refs`, 'POST', { ref: 'refs/heads/isolated-test', sha: baseSha })
+  const baseCommit = await json(`${encodedRepo}/git/commits/${baseSha}`, 'GET', undefined, 'base_commit')
+  const baseBranch = `builder/${input.jobKey}/base`
+  const headBranch = `builder/${input.jobKey}/verified`
+  // The PR targets this job's own base branch, never the repository's default branch.
+  await json(`${encodedRepo}/git/refs`, 'POST', { ref: `refs/heads/${baseBranch}`, sha: baseSha }, 'create_base_branch')
   const tree = []
   for (const file of input.files) {
-    const blob = await json(`${encodedRepo}/git/blobs`, 'POST', { content: file.content, encoding: 'utf-8' })
+    const blob = await json(`${encodedRepo}/git/blobs`, 'POST', { content: file.content, encoding: 'utf-8' }, 'create_blob')
     tree.push({ path: file.path, mode: '100644', type: 'blob', sha: blob.sha })
   }
-  const newTree = await json(`${encodedRepo}/git/trees`, 'POST', { base_tree: baseCommit.tree.sha, tree })
+  const newTree = await json(`${encodedRepo}/git/trees`, 'POST', { base_tree: baseCommit.tree.sha, tree }, 'create_tree')
   const commit = await json(`${encodedRepo}/git/commits`, 'POST', {
     message: 'Builder V2: verified isolated project', tree: newTree.sha, parents: [baseSha],
-  })
-  const branch = 'builder/verified-repair'
-  await json(`${encodedRepo}/git/refs`, 'POST', { ref: `refs/heads/${branch}`, sha: commit.sha })
+  }, 'create_commit')
+  await json(`${encodedRepo}/git/refs`, 'POST', { ref: `refs/heads/${headBranch}`, sha: commit.sha }, 'create_head_branch')
   const pr = await json(`${encodedRepo}/pulls`, 'POST', {
-    head: branch, base: 'isolated-test', title: 'Builder V2: verified project', body: 'Host tests passed before publication. Preview and deployment require separate independent verification.',
+    head: headBranch, base: baseBranch, title: `Builder V2: verified project ${input.jobKey}`, body: 'Host tests passed before publication. Preview and deployment require separate independent verification.',
     draft: true,
-  })
+  }, 'create_pull_request')
   if (!pr.html_url || !Number.isInteger(pr.number)) throw new Error('builder_isolated_pull_request_unconfirmed')
-  return { repository: created.full_name, pullRequestUrl: pr.html_url, pullRequestNumber: pr.number, commitSha: commit.sha }
+  return { repository: fullName, pullRequestUrl: pr.html_url, pullRequestNumber: pr.number, commitSha: commit.sha }
 }
 
 

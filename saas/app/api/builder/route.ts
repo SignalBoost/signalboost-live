@@ -260,9 +260,9 @@ export async function POST(request: Request) {
       }, { status: 202 })
     }
     if (project.blocked) return noStore({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: 503 })
-    if (selectedWorkspaceId || project.context) {
-      return noStore({ error: 'builder_v2_requires_fresh_workspace' }, { status: 409 })
-    }
+    // V2 must be able to repair an existing workspace. Ownership/source checks below
+    // prevent unauthorized or empty continuations; a fresh workspace is required
+    // only for explicit new-project requests, handled above.
     workspaceId = project.workspaceId || workspaceId
     // A saved workspace may be opened from another browser conversation.
     // Its owner's active claim always wins; never start a competing job

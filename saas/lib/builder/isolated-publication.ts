@@ -77,8 +77,20 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
     return payload
   }
 
+  // Confirm GitHub's actual account type instead of trusting a stale Vercel setting.
+  // An organization-only create endpoint returns 404 for a user-owned account.
+  const ownerAccount = await json(`/users/${encodeURIComponent(input.owner)}`, 'GET', undefined, 'resolve_owner')
+  const actualOwnerType = ownerAccount?.type === 'Organization' ? 'organization'
+    : ownerAccount?.type === 'User' ? 'user' : null
+  if (!actualOwnerType || ownerAccount.login !== input.owner) throw new Error('builder_isolated_owner_identity_invalid')
+  // Personal repository creation always uses the authenticated user. Ensure the
+  // destination matches the authenticated principal before making a write.
+  if (actualOwnerType === 'user') {
+    const principal = await json('/user', 'GET', undefined, 'resolve_principal')
+    if (principal?.login !== input.owner) throw new Error('builder_isolated_github_user_identity_mismatch')
+  }
   // Private-by-default creation. Never publish source into the platform repository.
-  const created = await json(input.ownerType === 'organization' ? `/orgs/${encodeURIComponent(input.owner)}/repos` : '/user/repos', 'POST', {
+  const created = await json(actualOwnerType === 'organization' ? `/orgs/${encodeURIComponent(input.owner)}/repos` : '/user/repos', 'POST', {
     name: input.repositoryName, private: true, auto_init: true,
     description: 'Isolated Builder V2 verified project',
   }, 'create_repository')

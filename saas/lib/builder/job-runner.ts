@@ -481,7 +481,6 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           if (!job.ownerAuthorized) throw new Error('builder_isolated_publication_not_authorized')
           const token = process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN || ''
           const owner = process.env.BUILDER_ISOLATED_GITHUB_OWNER || ''
-          const ownerType = process.env.BUILDER_ISOLATED_GITHUB_OWNER_TYPE === 'organization' ? 'organization' : 'user'
           const vercelToken = process.env.VERCEL_TOKEN || ''
           const projectId = process.env.BUILDER_ISOLATED_VERCEL_PROJECT_ID || ''
           if (!token || !owner || !vercelToken || !projectId) throw new Error('builder_isolated_publication_not_configured')
@@ -489,7 +488,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           const contents = await Promise.all(files.map(path => workspace.readFile(job.workspaceId, path)))
           if (contents.some(file => !file)) throw new Error('builder_isolated_workspace_file_missing')
           const published = await publishVerifiedIsolatedProject({
-            owner, ownerType, repositoryName: `builder-isolated-${job.id.replace(/[^a-z0-9]/gi, '').slice(0, 24)}`,
+            owner, repositoryName: `builder-isolated-${job.id.replace(/[^a-z0-9]/gi, '').slice(0, 24)}`,
             token, files: contents.filter((file): file is NonNullable<typeof file> => Boolean(file)),
             verified: true, authorized: true, signal: deadlineController.signal,
             deadlineAt: Date.parse(job.createdAt) + totalDeadlineMs,

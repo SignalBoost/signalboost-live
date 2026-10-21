@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { publishVerifiedIsolatedProject, validateIsolatedFiles, verifyIsolatedPreview, wantsIsolatedPublication } from '../lib/builder/isolated-publication.ts'
 
@@ -6,7 +7,7 @@ const files = [{ path: 'src/add.js', content: 'module.exports = (a,b) => a+b', u
 test('isolated publisher rejects unverified work and unsafe paths before network calls', async () => {
   let calls = 0
   const request = (async () => { calls++; throw new Error('network forbidden') }) as typeof fetch
-  const base = { owner: 'SignalBoost', ownerType: 'organization' as const, repositoryName: 'builder-isolated-test', token: 'test', files, request }
+  const base = { owner: 'SignalBoost', repositoryName: 'builder-isolated-test', token: 'test', files, request }
   await assert.rejects(publishVerifiedIsolatedProject({ ...base, verified: false, authorized: true }), /not_authorized/)
   await assert.rejects(publishVerifiedIsolatedProject({ ...base, verified: true, authorized: false }), /not_authorized/)
   assert.throws(() => validateIsolatedFiles([{ ...files[0], path: '../secret' }]), /path_rejected/)
@@ -23,7 +24,8 @@ test('verified private organization repository is published as a draft PR using 
     calls.push({ url: String(url), method, body })
     const path = new URL(String(url)).pathname
     let result: any
-    if (path === '/orgs/SignalBoost/repos') result = { full_name: 'SignalBoost/builder-isolated-test', private: true, default_branch: 'main' }
+    if (path === '/users/SignalBoost') result = { login: 'SignalBoost', type: 'Organization' }
+    else if (path === '/orgs/SignalBoost/repos') result = { full_name: 'SignalBoost/builder-isolated-test', private: true, default_branch: 'main' }
     else if (path.endsWith('/git/ref/heads/main')) result = { object: { sha: sha('a') } }
     else if (path.endsWith('/git/commits/' + sha('a'))) result = { tree: { sha: sha('b') } }
     else if (path.endsWith('/git/blobs')) result = { sha: sha('c') }
@@ -34,12 +36,13 @@ test('verified private organization repository is published as a draft PR using 
     return new Response(JSON.stringify(result), { status: 200 })
   }) as typeof fetch
   const result = await publishVerifiedIsolatedProject({
-    owner: 'SignalBoost', ownerType: 'organization', repositoryName: 'builder-isolated-test', token: 'test',
+    owner: 'SignalBoost', repositoryName: 'builder-isolated-test', token: 'test',
     files, verified: true, authorized: true, request,
   })
   assert.equal(result.pullRequestNumber, 3)
   assert.equal(result.commitSha, sha('e'))
-  assert.equal(calls[0].body.private, true)
+  assert.equal(calls[0].url, 'https://api.github.com/users/SignalBoost', 'account type is read before creating')
+  assert.equal(calls.find(x => x.url.endsWith('/orgs/SignalBoost/repos'))?.body.private, true)
   assert.equal(calls.at(-1)?.body.draft, true)
   assert.equal(calls.at(-1)?.body.base, 'isolated-test')
   assert.ok(calls.some(x => x.url.endsWith('/git/refs') && x.body.ref === 'refs/heads/isolated-test'))
@@ -92,6 +95,7 @@ test('new repository default ref 404 is retried without repeating repository cre
   const sha = (v: string) => v.repeat(40)
   const request = (async (url: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(url)).pathname
+    if (path === '/users/SignalBoost') return Response.json({ login: 'SignalBoost', type: 'Organization' })
     if (path === '/orgs/SignalBoost/repos') { creates++; return Response.json({ full_name: 'SignalBoost/builder-isolated-test', private: true, default_branch: 'main' }) }
     if (path.endsWith('/git/ref/heads/main')) {
       refReads++
@@ -104,14 +108,66 @@ test('new repository default ref 404 is retried without repeating repository cre
     if (path.endsWith('/pulls')) return Response.json({ number: 1, html_url: 'https://github.com/SignalBoost/builder-isolated-test/pull/1' })
     return Response.json({})
   }) as typeof fetch
-  await publishVerifiedIsolatedProject({ owner: 'SignalBoost', ownerType: 'organization', repositoryName: 'builder-isolated-test',
+  await publishVerifiedIsolatedProject({ owner: 'SignalBoost', repositoryName: 'builder-isolated-test',
     token: 'test', files, verified: true, authorized: true, request })
   assert.equal(creates, 1)
   assert.equal(refReads, 2)
 })
 
-test('creation HTTP 404 is identified as a destination/permission failure', async () => {
+test('an unknown owner is reported at owner lookup, before anything is created', async () => {
   const request = (async () => Response.json({ message: 'Not Found' }, { status: 404 })) as typeof fetch
-  await assert.rejects(publishVerifiedIsolatedProject({ owner: 'SignalBoost', ownerType: 'organization', repositoryName: 'builder-isolated-test',
-    token: 'test', files, verified: true, authorized: true, request }), /builder_isolated_github_create_repository_http_404/)
+  await assert.rejects(publishVerifiedIsolatedProject({ owner: 'SignalBoost', repositoryName: 'builder-isolated-test',
+    token: 'test', files, verified: true, authorized: true, request }), /builder_isolated_github_owner_lookup_http_404/)
+})
+
+// Production 2026-10-21: SignalBoost is a personal account; a hand-set organization type sent creation to
+// /orgs/SignalBoost/repos, which GitHub answers with 404. The type now comes from GitHub itself.
+function personalAccount(viewer: string, onCreate: (path: string) => Response) {
+  const paths: string[] = []
+  const request = (async (url: string | URL | Request) => {
+    const path = new URL(String(url)).pathname
+    paths.push(path)
+    if (path.toLowerCase() === '/users/signalboost') return Response.json({ login: 'SignalBoost', type: 'User' })
+    if (path === '/user') return Response.json({ login: viewer })
+    if (path === '/user/repos' || path.startsWith('/orgs/')) return onCreate(path)
+    if (path.endsWith('/git/ref/heads/main')) return Response.json({ object: { sha: 'a'.repeat(40) } })
+    if (path.endsWith('/git/commits/' + 'a'.repeat(40))) return Response.json({ tree: { sha: 'b'.repeat(40) } })
+    if (path.endsWith('/git/blobs')) return Response.json({ sha: 'c'.repeat(40) })
+    if (path.endsWith('/git/trees')) return Response.json({ sha: 'd'.repeat(40) })
+    if (path.endsWith('/git/commits')) return Response.json({ sha: 'e'.repeat(40) })
+    if (path.endsWith('/pulls')) return Response.json({ number: 7, html_url: 'https://github.com/SignalBoost/builder-isolated-test/pull/7' })
+    return Response.json({})
+  }) as typeof fetch
+  return { paths, request }
+}
+
+test('a personal account is published through /user/repos, never the organization endpoint', async () => {
+  const github = personalAccount('signalboost', () => Response.json({ full_name: 'SignalBoost/builder-isolated-test', private: true, default_branch: 'main' }))
+  const result = await publishVerifiedIsolatedProject({ owner: 'signalboost', repositoryName: 'builder-isolated-test',
+    token: 'test', files, verified: true, authorized: true, request: github.request })
+  assert.equal(result.repository, 'SignalBoost/builder-isolated-test')
+  assert.equal(result.pullRequestNumber, 7)
+  assert.ok(github.paths.includes('/user/repos'))
+  assert.ok(!github.paths.some(path => path.startsWith('/orgs/')))
+  assert.ok(github.paths.includes('/repos/SignalBoost/builder-isolated-test/git/refs'), 'canonical owner name from GitHub')
+})
+
+test('a token from another account is refused before any repository is created', async () => {
+  let created = 0
+  const github = personalAccount('someone-else', () => { created++; return Response.json({}) })
+  await assert.rejects(publishVerifiedIsolatedProject({ owner: 'SignalBoost', repositoryName: 'builder-isolated-test',
+    token: 'test', files, verified: true, authorized: true, request: github.request }), /builder_isolated_token_account_mismatch/)
+  assert.equal(created, 0)
+})
+
+test('creation HTTP 404 is identified as a create-repository failure', async () => {
+  const github = personalAccount('SignalBoost', () => Response.json({ message: 'Not Found' }, { status: 404 }))
+  await assert.rejects(publishVerifiedIsolatedProject({ owner: 'SignalBoost', repositoryName: 'builder-isolated-test',
+    token: 'test', files, verified: true, authorized: true, request: github.request }), /builder_isolated_github_create_repository_http_404/)
+})
+
+test('no hand-set owner type remains in the publication path', () => {
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(runner, /BUILDER_ISOLATED_GITHUB_OWNER_TYPE/)
+  assert.doesNotMatch(runner, /ownerType/)
 })

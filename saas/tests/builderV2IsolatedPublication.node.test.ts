@@ -135,6 +135,8 @@ test('preview uses exact verified GitHub SHA and checks live endpoint', async ()
   })
   assert.equal(result.status, 'verified')
   assert.equal(result.previewUrl, 'https://builder-test.vercel.app')
+  assert.equal(result.endpointUrl, 'https://builder-test.vercel.app/')
+  assert.equal(result.httpStatus, 200)
   assert.equal(calls.length, 3)
   assert.equal(wantsIsolatedPublication('Create an isolated Node.js repo, open a PR and deploy a preview.'), true)
 })
@@ -232,4 +234,22 @@ test('private repository creation denied with 403 fails closed without shared fa
     verified: true, authorized: true, newRepository: true, request,
   }), /builder_isolated_github_create_repository_http_403/)
   assert.deepEqual(calls, ['/orgs/SignalBoost/repos'])
+})
+
+test('verified API response is retained in the durable publication receipt', async () => {
+  const request = (async (url: string | URL | Request, init?: RequestInit) => {
+    if (init?.method === 'POST') return Response.json({ id: 'dpl_valid123' })
+    if (String(url).endsWith('/v13/deployments/dpl_valid123'))
+      return Response.json({ readyState: 'READY', url: 'example.vercel.app' })
+    return Response.json({ total: 5 }, { status: 200 })
+  }) as typeof fetch
+  const result = await verifyIsolatedPreview({
+    token: 'test', projectId: 'prj_abc123', repository: 'SignalBoost/builder-isolated',
+    commitSha: 'a'.repeat(40), files,
+    objective: 'GET /sum?a=2&b=3\nExpected response:\n```json\n{"total":5}\n```',
+    deadlineAt: Date.now() + 60_000, request,
+  })
+  assert.equal(result.endpointUrl, 'https://example.vercel.app/sum?a=2&b=3')
+  assert.equal(result.httpStatus, 200)
+  assert.deepEqual(result.responseBody, { total: 5 })
 })

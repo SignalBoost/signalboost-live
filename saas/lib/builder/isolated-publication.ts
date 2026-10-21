@@ -43,6 +43,7 @@ type Request = typeof fetch
 export async function publishVerifiedIsolatedProject(input: Readonly<{
   owner: string
   repositoryName: string
+  existingRepository?: string
   token: string
   files: readonly BuilderFile[]
   verified: boolean

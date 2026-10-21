@@ -5,7 +5,8 @@ const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.ur
 const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
 test('V1 cannot be requested and standard Builder requests use V2', () => {
   assert.match(route, /requestedEngine !== undefined && requestedEngine !== 'v2'/)
-  assert.match(route, /if \(selectedWorkspaceId \|\| project\.context\)/)
+  // PR #4719: V2 repairs existing workspaces; only explicit new projects require a fresh one.
+  assert.doesNotMatch(route, /builder_v2_requires_fresh_workspace/)
   assert.match(route, /builderEngine: 'v2'/)
   assert.doesNotMatch(route, /requestedEngine !== 'v1'/)
 })

@@ -64,3 +64,50 @@ export async function followBuilderJob<T>(input: {
   }
   return { kind: 'still_running' }
 }
+
+export type BuilderRunSubmitOutcome<T> =
+  | Readonly<{ kind: 'answered'; response: BuilderJobCheck<T> }>
+  | Readonly<{ kind: 'accepted'; check: BuilderJobCheck<T> }>
+  | Readonly<{ kind: 'unreachable' }>
+
+// Production 2026-10-21: the Run request itself got no answer ("Failed to fetch") and the page stopped, without knowing
+// whether the server had already queued the job. The page now names the job before sending it. When the request gets
+// no answer, it asks the server about that job: a known job is followed; an unknown one is sent again under the same
+// name, and the server refuses to create a second job with that name — so a lost answer never becomes a lost or
+// doubled job.
+export async function submitBuilderRun<T>(input: {
+  post: () => Promise<BuilderJobCheck<T>>
+  check: () => Promise<BuilderJobCheck<T>>
+  sleep: (ms: number) => Promise<void>
+  delayMs?: number
+  maxUnansweredChecks?: number
+}): Promise<BuilderRunSubmitOutcome<T>> {
+  const maxUnanswered = input.maxUnansweredChecks ?? BUILDER_JOB_MAX_UNANSWERED_CHECKS
+  let sendRequest = true
+  for (let attempt = 0; attempt < maxUnanswered; attempt += 1) {
+    if (attempt > 0) await input.sleep(input.delayMs ?? BUILDER_JOB_POLL_DELAY_MS)
+    if (sendRequest) {
+      try {
+        return { kind: 'answered', response: await input.post() }
+      } catch {
+        // No answer: the job may or may not exist on the server. Ask before sending again.
+        sendRequest = false
+        continue
+      }
+    }
+    let check: BuilderJobCheck<T>
+    try {
+      check = await input.check()
+    } catch {
+      continue
+    }
+    if (check.status >= 500 || check.status === 429) continue
+    // The server has no job under this name: the request never arrived, so sending it again is safe.
+    if (check.status === 404) {
+      sendRequest = true
+      continue
+    }
+    return { kind: 'accepted', check }
+  }
+  return { kind: 'unreachable' }
+}

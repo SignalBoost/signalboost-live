@@ -7,7 +7,7 @@ import { isOperationalLogEvidence, isPastedOperationalLog } from '@/lib/ai/cos/p
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
-import { builderPollMayResume, builderSoleResumableJob, stopBuilderJobForUser, enqueueBuilderJob, getBuilderJobForUser, readBuilderEvidenceJob, readLatestBuilderWorkspaceJob } from '@/lib/builder/job-store'
+import { builderPollMayResume, builderSoleResumableJob, stopBuilderJobForUser, enqueueBuilderJob, getBuilderJobForUser, readBuilderEvidenceJob, readLatestBuilderWorkspaceJob, type BuilderJobRecord } from '@/lib/builder/job-store'
 import { runBuilderJob, selfHealingCapacityJob } from '@/lib/builder/job-runner'
 import { hasWorkspaceSource, isOwnerRepairWithoutSource, parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
@@ -34,6 +34,22 @@ function noStore(payload: unknown, init?: ResponseInit): NextResponse {
   const response = NextResponse.json(payload, init)
   response.headers.set('Cache-Control', 'no-store, max-age=0')
   return response
+}
+
+// A resent Run request (its first answer was lost) returns the job it already created instead of a second one.
+function requestedJobReply(job: BuilderJobRecord): NextResponse {
+  return noStore({
+    jobId: job.id, workspaceId: job.workspaceId, conversationId: job.conversationId,
+    status: job.status, resumable: true, reply: runningReply(job.id),
+  }, { status: 202 })
+}
+
+// Two copies of one request can race: the job id is the table's primary key, so exactly one is created and the
+// other's failed enqueue reports that same job instead of an error.
+async function requestedJobOrThrow(requestedJobId: string, userId: string, error: unknown): Promise<BuilderJobRecord> {
+  const existing = requestedJobId ? await getBuilderJobForUser(requestedJobId, userId).catch(() => null) : null
+  if (existing) return existing
+  throw error
 }
 
 function cleanFiles(value: unknown): DebugFileInput[] {
@@ -176,6 +192,12 @@ export async function POST(request: Request) {
     if (admissionBlocker) return noStore(admissionBlocker, { status: 422 })
     conversationId = String(body?.conversationId || '').trim() || crypto.randomUUID()
     if (!UUID.test(conversationId)) return noStore({ error: 'Invalid conversation id.' }, { status: 400 })
+    const requestedJobId = String(body?.jobId || '').trim()
+    if (requestedJobId && !UUID.test(requestedJobId)) return noStore({ error: 'Invalid job id.' }, { status: 400 })
+    if (requestedJobId) {
+      const existing = await getBuilderJobForUser(requestedJobId, access.userId)
+      if (existing) return requestedJobReply(existing)
+    }
     const requestedWorkspaceId = String(body?.workspaceId || '').trim()
     if (requestedWorkspaceId && !UUID.test(requestedWorkspaceId)) {
       return noStore({ error: 'Invalid workspace id.' }, { status: 400 })
@@ -226,12 +248,18 @@ export async function POST(request: Request) {
         await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
         return noStore({ error: 'builder_repository_repair_owner_required', reply, execution_allowed: false }, { status: 403 })
       }
-      const job = await enqueueSignalBoostRepositoryRepairJob({
-        userId: access.userId,
-        conversationId,
-        objective,
-        target: platformRepairTarget,
-      })
+      let job: Awaited<ReturnType<typeof enqueueSignalBoostRepositoryRepairJob>>
+      try {
+        job = await enqueueSignalBoostRepositoryRepairJob({
+          userId: access.userId,
+          conversationId,
+          objective,
+          target: platformRepairTarget,
+          ...(requestedJobId ? { jobId: requestedJobId } : {}),
+        })
+      } catch (error) {
+        return requestedJobReply(await requestedJobOrThrow(requestedJobId, access.userId, error))
+      }
       after(async () => { await runBuilderJob(job.jobId, access.userId) })
       return noStore({ ...job, status: 'queued', source: 'cos-platform-engineer' }, { status: 202 })
     }
@@ -299,12 +327,18 @@ export async function POST(request: Request) {
           }, { ownerRepairWithoutSource: true })
         : null
       if (ownerRepairTarget) {
-        const job = await enqueueSignalBoostRepositoryRepairJob({
-          userId: access.userId,
-          conversationId,
-          objective,
-          target: ownerRepairTarget,
-        })
+        let job: Awaited<ReturnType<typeof enqueueSignalBoostRepositoryRepairJob>>
+        try {
+          job = await enqueueSignalBoostRepositoryRepairJob({
+            userId: access.userId,
+            conversationId,
+            objective,
+            target: ownerRepairTarget,
+            ...(requestedJobId ? { jobId: requestedJobId } : {}),
+          })
+        } catch (error) {
+          return requestedJobReply(await requestedJobOrThrow(requestedJobId, access.userId, error))
+        }
         after(async () => { await runBuilderJob(job.jobId, access.userId) })
         return noStore({ ...job, status: 'queued', source: 'cos-platform-engineer' }, { status: 202 })
       }
@@ -376,39 +410,48 @@ export async function POST(request: Request) {
         return noStore({ reply: builderRepositoryErrorReply((error as Error).message), execution_allowed: false }, { status: 422 })
       }
     }
+    // A resent copy of this request must not rewrite files under a job its first copy already started.
+    if (requestedJobId) {
+      const existing = await getBuilderJobForUser(requestedJobId, access.userId)
+      if (existing) return requestedJobReply(existing)
+    }
     for (const file of files) await workspace.writeFile(workspaceId, file.path, file.content)
 
-    const jobId = crypto.randomUUID()
+    const jobId = requestedJobId || crypto.randomUUID()
     const reply = runningReply(jobId)
-    await enqueueBuilderJob({
-      jobId,
-      workspaceId,
-      userId: access.userId,
-      conversationId,
-      objective,
-      jobKind: debugPlan ? 'debug_file' : 'standard',
-      metadata: debugPlan
-        ? {
-            debugPath: debugPlan.path,
-            debugCommand: debugPlan.command,
-            debugRuntime: debugPlan.runtime,
-            debugPaths: debugPlan.files,
-          }
-        : logEvidence
+    try {
+      await enqueueBuilderJob({
+        jobId,
+        workspaceId,
+        userId: access.userId,
+        conversationId,
+        objective,
+        jobKind: debugPlan ? 'debug_file' : 'standard',
+        metadata: debugPlan
           ? {
-              ...(project.context ? { projectContext: project.context } : {}),
-              logEvidence: true,
-              passiveLogEvidence,
-              repositoryAuthority: false,
-              ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
-              builderEngine: 'v2',
+              debugPath: debugPlan.path,
+              debugCommand: debugPlan.command,
+              debugRuntime: debugPlan.runtime,
+              debugPaths: debugPlan.files,
             }
-          : { ...(project.context ? { projectContext: project.context } : {}),
-              ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
-              builderEngine: 'v2' },
-      ownerAuthorized: access.isOwner === true,
-      runningReply: reply,
-    })
+          : logEvidence
+            ? {
+                ...(project.context ? { projectContext: project.context } : {}),
+                logEvidence: true,
+                passiveLogEvidence,
+                repositoryAuthority: false,
+                ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
+                builderEngine: 'v2',
+              }
+            : { ...(project.context ? { projectContext: project.context } : {}),
+                ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
+                builderEngine: 'v2' },
+        ownerAuthorized: access.isOwner === true,
+        runningReply: reply,
+      })
+    } catch (error) {
+      return requestedJobReply(await requestedJobOrThrow(requestedJobId, access.userId, error))
+    }
 
     after(async () => {
       await runBuilderJob(jobId, access.userId)

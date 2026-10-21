@@ -63,6 +63,8 @@ export async function enqueueSignalBoostRepositoryRepairJob(input: {
   conversationId: string
   objective: string
   target: SignalBoostRepositoryRepairTarget
+  /** Browser-generated id for this request, so a resent request finds this job instead of creating another. */
+  jobId?: string
 }): Promise<Readonly<{ jobId: string; workspaceId: string; reply: string }>> {
   // Current-state preflight is mandatory before repository authority is exercised. A stale commit
   // is not a terminal user task failure: it is a Software Specialist replanning event. The
@@ -76,7 +78,7 @@ export async function enqueueSignalBoostRepositoryRepairJob(input: {
   const workspace = createSupabaseBuilderWorkspace(input.userId)
   if (!workspace) throw new Error('builder_job_storage_unavailable')
 
-  const jobId = crypto.randomUUID()
+  const jobId = input.jobId || crypto.randomUUID()
   const workspaceId = crypto.randomUUID()
   const stale = targetFreshness.status === 'superseded'
   const unverifiable = targetFreshness.status === 'unverifiable'

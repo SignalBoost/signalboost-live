@@ -18,6 +18,7 @@ const tests = [
   'tests/builderInferenceBudget.node.test.ts',
   'tests/builderIsolatedAcceptanceRouting.node.test.ts',
   'tests/builderAcceptanceIngress.node.test.ts',
+  'tests/builderRunSubmitRecovery.node.test.ts',
   // Builder V2 repair and interface reconciliation regression coverage.
   'tests/builderV2InterfaceMismatches.node.test.ts',
   'tests/builderV2RepairReadCeiling.node.test.ts',

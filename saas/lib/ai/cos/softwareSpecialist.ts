@@ -448,7 +448,22 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
 
   const execute = async (signal?: AbortSignal) => {
     try {
-      return await tryCosSoftwareSpecialistLegacy(input, signal)
+      const delegated = await tryCosSoftwareSpecialistLegacy(input, signal)
+      // A recognized executable software request must never silently fall through
+      // to the generic conversational answer generator when delegation declines.
+      // Guidance requests intentionally use the ordinary conversation path above.
+      if (delegated === null && (isConciergeBuilderObjective(objective, context)
+        || (DESIGN_ARTIFACT.test(objective) && DESIGN_REQUEST.test(objective))
+        || builderRepositoryImportIntent(objective))) {
+        return NextResponse.json({
+          reply: 'COS recognized a software execution request but could not admit it to Builder. No execution has been confirmed. Check History for an existing job before retrying.',
+          source: 'cos-builder-handoff-unavailable',
+          execution_allowed: false,
+          external_action_taken: false,
+          ...softwareSpecialistFields('software.delegate'),
+        }, { status: 503 })
+      }
+      return delegated
     } catch (error) {
       // Cancellation stays a Harness outcome. Never report an uncertain queued action as unstarted.
       if (signal?.aborted) throw error

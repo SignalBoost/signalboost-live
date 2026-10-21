@@ -432,3 +432,12 @@ test('a build request that opens with a question word but is addressed to the ag
     assert.equal(routed?.endpoint, '/api/builder', opening)
   }
 })
+
+test('recognized Builder work cannot disappear into unrelated COS conversation', () => {
+  const source = read('../lib/ai/cos/softwareSpecialist.ts')
+  assert.match(source, /const delegated = await tryCosSoftwareSpecialistLegacy\(input, signal\)/)
+  assert.match(source, /if \(delegated === null && \(isConciergeBuilderObjective\(objective, context\)/)
+  assert.match(source, /source: 'cos-builder-handoff-unavailable'/)
+  assert.match(source, /execution_allowed: false/)
+  assert.match(source, /status: 503/)
+})

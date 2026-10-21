@@ -119,6 +119,65 @@ async function github(call: GitHubCall, path: string, method = 'GET', body?: unk
 
 const repositoryPath = (fullName: string) => `/repos/${fullName.split('/').map(encodeURIComponent).join('/')}`
 
+/**
+ * Create the job's own private repository under the configured owner. GitHub has two endpoints: an organization's
+ * repositories are created under /orgs/{owner}, a personal account's under /user (the token's own account).
+ * Production 2026-10-21: SignalBoost is a personal account, so /orgs/SignalBoost/repos answered 404.
+ */
+async function createPrivateRepository(call: GitHubCall & { owner: string }, repositoryName: string): Promise<void> {
+  const owner = await github(call, `/users/${encodeURIComponent(call.owner)}`, 'GET', undefined, 'owner_lookup')
+  const ownerName = String(owner.login || '')
+  if (ownerName.toLowerCase() !== call.owner.toLowerCase()) throw new Error('builder_isolated_owner_identity_mismatch')
+  const path = owner.type === 'Organization' ? `/orgs/${encodeURIComponent(ownerName)}/repos`
+    : owner.type === 'User' ? '/user/repos'
+      : null
+  if (!path) throw new Error('builder_isolated_owner_type_unsupported')
+  let created: any
+  try {
+    created = await github(call, path, 'POST', {
+      name: repositoryName, private: true, auto_init: true,
+      description: 'Isolated Builder V2 verified project',
+    }, 'create_repository')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : ''
+    // 403/404: the credential may not create repositories for this owner. Never fall back to the shared repository.
+    if (/_create_repository_http_(?:403|404)$/.test(message)) throw new Error(`builder_isolated_repository_creation_not_permitted_${message.slice(-3)}`)
+    throw error
+  }
+  if (created.private !== true || String(created.full_name || '').toLowerCase() !== `${ownerName}/${repositoryName}`.toLowerCase()) {
+    // A personal-account token belonging to someone else creates the repository under that other account.
+    throw new Error('builder_isolated_created_repository_invalid')
+  }
+}
+
+async function lookupRepository(call: GitHubCall & { owner: string; newRepository?: boolean }, repositoryName: string): Promise<any> {
+  return github(call, `/repos/${encodeURIComponent(call.owner)}/${repositoryName}`, 'GET', undefined, 'repository_lookup')
+    .catch((error: Error) => {
+      if (error.message !== 'builder_isolated_github_repository_lookup_http_404') throw error
+      // A missing repository and a token without access to it answer the same 404. A just-created one the token
+      // cannot read means the token is limited to selected repositories.
+      throw new Error(call.newRepository ? 'builder_isolated_created_repository_not_accessible' : 'builder_isolated_repository_unavailable')
+    })
+}
+
+/** A just-created repository's first commit can trail its creation by a moment; wait for it within the deadline. */
+async function defaultBranchRef(call: GitHubCall, encodedRepo: string, branch: string, justCreated: boolean): Promise<any> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await github(call, `${encodedRepo}/git/ref/heads/${encodeURIComponent(branch)}`, 'GET', undefined, 'default_branch_ref')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      const pending = /_default_branch_ref_http_(?:404|409)$/.test(message)
+      if (justCreated && pending && attempt < 6 && !(call.deadlineAt && Date.now() + 1000 >= call.deadlineAt)) {
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        continue
+      }
+      // GitHub answers 409 for a repository with no commits (created without a README).
+      throw new Error(message === 'builder_isolated_github_default_branch_ref_http_409' ? 'builder_isolated_repository_empty' : message)
+    }
+  }
+}
+
 export async function publishVerifiedIsolatedProject(input: Readonly<{
   owner: string
   jobKey: string
@@ -136,22 +195,10 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   validateIsolatedFiles(input.files)
   const json = (path: string, method = 'GET', body?: unknown, stage = 'request') => github(input, path, method, body, stage)
 
-  // Explicit acceptance requiring a new private repository must never silently use the shared fallback.
-  // A 403 here means the server credential lacks repository-creation permission.
+  // Explicit acceptance requiring a new private repository must never silently use the shared repository.
   const repositoryName = input.newRepository ? `builder-${input.jobKey}` : ISOLATED_REPOSITORY_NAME
-  if (input.newRepository) {
-    const created = await json(`/orgs/${encodeURIComponent(input.owner)}/repos`, 'POST', {
-      name: repositoryName, private: true, auto_init: true,
-      description: 'Isolated Builder V2 verified project',
-    }, 'create_repository')
-    if (created.private !== true || String(created.full_name || '').toLowerCase() !==
-      `${input.owner}/${repositoryName}`.toLowerCase()) throw new Error('builder_isolated_created_repository_invalid')
-  }
-  const repository = await json(`/repos/${encodeURIComponent(input.owner)}/${repositoryName}`, 'GET', undefined, 'repository_lookup')
-    .catch((error: Error) => {
-      // A missing repository and a token without access to it answer the same 404.
-      throw new Error(error.message === 'builder_isolated_github_repository_lookup_http_404' ? 'builder_isolated_repository_unavailable' : error.message)
-    })
+  if (input.newRepository) await createPrivateRepository(input, repositoryName)
+  const repository = await lookupRepository(input, repositoryName)
   const fullName = String(repository.full_name || '')
   if (fullName.toLowerCase() !== `${input.owner}/${repositoryName}`.toLowerCase()) throw new Error('builder_isolated_repository_identity_mismatch')
   // Never publish source into a public repository.
@@ -159,20 +206,17 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   const encodedRepo = repositoryPath(fullName)
   const defaultBranch = String(repository.default_branch || '')
   if (!safeName.test(defaultBranch)) throw new Error('builder_isolated_invalid_default_branch')
-  const baseRef = await json(`${encodedRepo}/git/ref/heads/${encodeURIComponent(defaultBranch)}`, 'GET', undefined, 'default_branch_ref')
-    .catch((error: Error) => {
-      // GitHub answers 409 for a repository with no commits (created without a README).
-      throw new Error(error.message === 'builder_isolated_github_default_branch_ref_http_409' ? 'builder_isolated_repository_empty' : error.message)
-    })
+  const baseRef = await defaultBranchRef(input, encodedRepo, defaultBranch, input.newRepository === true)
   const baseSha = String(baseRef.object?.sha || '')
   if (!/^[0-9a-f]{40}$/i.test(baseSha)) throw new Error('builder_isolated_invalid_base_sha')
   const baseCommit = await json(`${encodedRepo}/git/commits/${baseSha}`, 'GET', undefined, 'base_commit')
-  const folder = isolatedProjectFolder(input.jobKey)
+  // A dedicated repository holds only this job, at its root; the shared one keeps each job in its own folder.
+  const folder = input.newRepository ? '' : isolatedProjectFolder(input.jobKey)
   const headBranch = `builder/${input.jobKey}/verified`
   const tree = []
   for (const file of input.files) {
     const blob = await json(`${encodedRepo}/git/blobs`, 'POST', { content: file.content, encoding: 'utf-8' }, 'create_blob')
-    tree.push({ path: `${folder}/${file.path}`, mode: '100644', type: 'blob', sha: blob.sha })
+    tree.push({ path: folder ? `${folder}/${file.path}` : file.path, mode: '100644', type: 'blob', sha: blob.sha })
   }
   const newTree = await json(`${encodedRepo}/git/trees`, 'POST', { base_tree: baseCommit.tree.sha, tree }, 'create_tree')
   const commit = await json(`${encodedRepo}/git/commits`, 'POST', {
@@ -182,7 +226,7 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   // A draft until the preview answers the requested endpoint; only then is it marked ready and merged.
   const pr = await json(`${encodedRepo}/pulls`, 'POST', {
     head: headBranch, base: defaultBranch, title: `Builder V2: verified project ${input.jobKey}`,
-    body: `Host tests passed before publication. Files: \`${folder}/\`. Builder merges this pull request only after its Vercel preview answers the requested endpoint.`,
+    body: `Host tests passed before publication. Files: \`${folder || '.'}/\`. Builder merges this pull request only after its Vercel preview answers the requested endpoint.`,
     draft: true,
   }, 'create_pull_request')
   if (!pr.html_url || !Number.isInteger(pr.number)) throw new Error('builder_isolated_pull_request_unconfirmed')

@@ -88,19 +88,27 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
     if (String(viewer.login || '').toLowerCase() !== owner.toLowerCase()) throw new Error('builder_isolated_token_account_mismatch')
   }
 
-  // Private-by-default creation. Never publish source into the platform repository.
-  const created = await json(organization ? `/orgs/${encodeURIComponent(owner)}/repos` : '/user/repos', 'POST', {
-    name: input.repositoryName, private: true, auto_init: true,
-    description: 'Isolated Builder V2 verified project',
-  }, 'create_repository')
-  if (created.full_name !== `${owner}/${input.repositoryName}` || created.private !== true) {
+  // Scoped-token lane: an existing private repository needs Contents and Pull requests write,
+  // not the account-wide permission required by POST /user/repos.
+  const existing = input.existingRepository?.trim()
+  if (existing && (existing.toLowerCase() === 'signalboost/signalboost-live' ||
+    !/^[a-zA-Z0-9][a-zA-Z0-9._-]*\/[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(existing) ||
+    existing.split('/')[0].toLowerCase() !== owner.toLowerCase())) {
+    throw new Error('builder_isolated_existing_repository_invalid')
+  }
+  const repoName = existing ? existing.split('/')[1] : input.repositoryName
+  const encodedRepo = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}`
+  const created = existing
+    ? await json(encodedRepo, 'GET', undefined, 'existing_repository_lookup')
+    : await json(organization ? `/orgs/${encodeURIComponent(owner)}/repos` : '/user/repos', 'POST', {
+      name: input.repositoryName, private: true, auto_init: true,
+      description: 'Isolated Builder V2 verified project',
+    }, 'create_repository')
+  if (String(created.full_name).toLowerCase() !== `${owner}/${repoName}`.toLowerCase() || created.private !== true) {
     throw new Error('builder_isolated_repository_identity_mismatch')
   }
-  const encodedRepo = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(input.repositoryName)}`
   const base = String(created.default_branch || 'main')
   if (!safeName.test(base)) throw new Error('builder_isolated_invalid_default_branch')
-  // GitHub's auto_init repository creation may become visible before its first ref.
-  // Retry only the idempotent GET: never replay repository creation or git writes.
   let baseRef: any
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
@@ -115,7 +123,7 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   if (!/^[0-9a-f]{40}$/i.test(baseSha)) throw new Error('builder_isolated_invalid_base_sha')
   const baseCommit = await json(`${encodedRepo}/git/commits/${baseSha}`)
   // Keep the acceptance PR against an isolated test branch, not the repo's main.
-  await json(`${encodedRepo}/git/refs`, 'POST', { ref: 'refs/heads/isolated-test', sha: baseSha })
+  if (!existing) await json(`${encodedRepo}/git/refs`, 'POST', { ref: 'refs/heads/isolated-test', sha: baseSha })
   const tree = []
   for (const file of input.files) {
     const blob = await json(`${encodedRepo}/git/blobs`, 'POST', { content: file.content, encoding: 'utf-8' })
@@ -125,10 +133,10 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   const commit = await json(`${encodedRepo}/git/commits`, 'POST', {
     message: 'Builder V2: verified isolated project', tree: newTree.sha, parents: [baseSha],
   })
-  const branch = 'builder/verified-repair'
+  const branch = existing ? `builder/verified-${input.repositoryName}` : 'builder/verified-repair'
   await json(`${encodedRepo}/git/refs`, 'POST', { ref: `refs/heads/${branch}`, sha: commit.sha })
   const pr = await json(`${encodedRepo}/pulls`, 'POST', {
-    head: branch, base: 'isolated-test', title: 'Builder V2: verified project', body: 'Host tests passed before publication. Preview and deployment require separate independent verification.',
+    head: branch, base: existing ? base : 'isolated-test', title: 'Builder V2: verified project', body: 'Host tests passed before publication. Preview and deployment require separate independent verification.',
     draft: true,
   })
   if (!pr.html_url || !Number.isInteger(pr.number)) throw new Error('builder_isolated_pull_request_unconfirmed')

@@ -1,4 +1,5 @@
 import type { BuilderAcceptanceLedger } from './acceptance-ledger.ts'
+import { isolatedPreviewProbe } from './isolated-publication.ts'
 
 export type BuilderFinalProof = Readonly<{
   passed: boolean
@@ -6,7 +7,7 @@ export type BuilderFinalProof = Readonly<{
   criteria: Readonly<Record<string, boolean>>
 }>
 
-/** Host-owned final verdict. A model summary or READY deployment cannot override missing evidence. */
+/** Compute final job success from host-owned receipts only; do not trust generated prose. */
 export function builderFinalProof(input: Readonly<{
   objective: string
   workspaceVerified: boolean
@@ -22,9 +23,27 @@ export function builderFinalProof(input: Readonly<{
   }
   requiresPublication: boolean
 }>): BuilderFinalProof {
-  const requestedNewRepo = /\bcreate\s+(?:a\s+)?new\s+private\s+(?:GitHub\s+)?repository\b/i.test(input.objective)
-  const requestedEndpoint = /\bGET\s+\/[^\s`<>"']+/i.test(input.objective)
+  const wantsNewRepository = /\bcreate\s+(?:a\s+)?new\s+private\s+(?:GitHub\s+)?repository\b/i.test(input.objective)
+  const wantsEndpoint = /\bGET\s+\//i.test(input.objective)
+  const requiresBudget = /\b(?:inference|AI)\s*(?:spending|budget|cost)\b/i.test(input.objective) &&
+    /\$\s*0\.50\b/.test(input.objective)
+  const requiresDeadline = /\b10\s*minutes?\b/i.test(input.objective)
   const p = input.publication
+
+  let endpointVerified = !wantsEndpoint
+  if (wantsEndpoint && p?.status === 'verified' && p.httpStatus === 200 &&
+      typeof p.endpointUrl === 'string' && typeof p.previewUrl === 'string') {
+    try {
+      const probe = isolatedPreviewProbe(input.objective)
+      const endpoint = new URL(p.endpointUrl)
+      const preview = new URL(p.previewUrl)
+      endpointVerified = endpoint.protocol === 'https:' &&
+        endpoint.origin === preview.origin && preview.hostname.endsWith('.vercel.app') &&
+        endpoint.pathname + endpoint.search === probe.path &&
+        (probe.expected === null || JSON.stringify(p.responseBody) === JSON.stringify(probe.expected))
+    } catch { endpointVerified = false }
+  }
+
   const criteria: Record<string, boolean> = {
     workspace: input.workspaceVerified,
     hostTests: input.acceptance.passed,
@@ -34,13 +53,13 @@ export function builderFinalProof(input: Readonly<{
       typeof p.commitSha === 'string' && /^[a-f0-9]{40}$/i.test(p.commitSha) &&
       typeof p.mergeCommitSha === 'string' && /^[a-f0-9]{40}$/i.test(p.mergeCommitSha),
     ),
-    newPrivateRepository: !requestedNewRepo || Boolean(p && p.repositoryCreated === true && p.repositoryPrivate === true),
-    endpoint: !requestedEndpoint || Boolean(p && p.status === 'verified' &&
-      p.httpStatus === 200 && typeof p.endpointUrl === 'string' && p.endpointUrl.includes('/')),
-    budget: !input.budget || (input.budget.accountedInferenceUsd + input.budget.pendingReservationUsd <= input.budget.maxInferenceUsd &&
+    newPrivateRepository: !wantsNewRepository || Boolean(p?.repositoryCreated === true && p?.repositoryPrivate === true),
+    endpoint: endpointVerified,
+    budget: !requiresBudget || Boolean(input.budget && input.budget.maxInferenceUsd <= 0.5 &&
+      input.budget.accountedInferenceUsd + input.budget.pendingReservationUsd <= input.budget.maxInferenceUsd &&
       input.budget.priceCeilingBreached !== true),
-    deadline: !input.budget || input.budget.elapsedMs <= 600_000 || !/\b10\s*minutes?\b/i.test(input.objective),
+    deadline: !requiresDeadline || Boolean(input.budget && input.budget.elapsedMs <= 600_000),
   }
-  const failureCode = Object.entries(criteria).find(([, ok]) => !ok)?.[0] ?? null
-  return { passed: failureCode === null, failureCode: failureCode ? 'builder_final_' + failureCode + '_unverified' : null, criteria }
+  const failed = Object.entries(criteria).find(([, ok]) => !ok)?.[0] ?? null
+  return { passed: failed === null, failureCode: failed ? `builder_final_${failed}_unverified` : null, criteria }
 }

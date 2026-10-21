@@ -351,7 +351,7 @@ test('a refused or unconfirmed merge fails the job instead of being reported as 
 
 test('the owner job succeeds only once the merge is confirmed', () => {
   const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
-  const lane = runner.slice(runner.indexOf('if (verified && requiresPublication)'), runner.indexOf('await finishBuilderJob(', runner.indexOf('if (verified && requiresPublication)')))
+  const lane = runner.slice(runner.indexOf('if (verified && acceptance.passed && requiresPublication)'), runner.indexOf('await finishBuilderJob(', runner.indexOf('if (verified && acceptance.passed && requiresPublication)')))
   assert.match(lane, /if \(!job\.ownerAuthorized\) throw new Error\('builder_isolated_publication_not_authorized'\)/)
   assert.ok(lane.indexOf('verifyIsolatedPreview(') < lane.indexOf('mergeVerifiedIsolatedPullRequest('), 'merge only after the preview')
   assert.match(lane, /previewVerified: preview\.status === 'verified'/)

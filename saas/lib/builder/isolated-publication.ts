@@ -10,6 +10,8 @@ export type IsolatedPublication = Readonly<{
   pullRequestUrl: string
   pullRequestNumber: number
   commitSha: string
+  repositoryCreated: boolean
+  repositoryPrivate: boolean
 }>
 
 const safeName = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,90}$/
@@ -239,7 +241,8 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
     draft: true,
   }, 'create_pull_request')
   if (!pr.html_url || !Number.isInteger(pr.number)) throw new Error('builder_isolated_pull_request_unconfirmed')
-  return { repository: fullName, pullRequestUrl: pr.html_url, pullRequestNumber: pr.number, commitSha: commit.sha }
+  return { repository: fullName, pullRequestUrl: pr.html_url, pullRequestNumber: pr.number, commitSha: commit.sha,
+    repositoryCreated: input.newRepository === true, repositoryPrivate: repository.private === true }
 }
 
 /**

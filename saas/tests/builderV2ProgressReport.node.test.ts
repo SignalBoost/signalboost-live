@@ -40,5 +40,5 @@ test('the paused and final V2 replies both carry the report', () => {
   const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
   assert.match(runner, /const progress = builderV2ProgressReport\(job\.objective, files, cycle\.result\?\.steps \?\? \[\],\s+\{ current: job\.claimGeneration, max: MAX_WORK_SLICES \}\)/)
   assert.match(runner, /Verification is not complete\.\\n\\n\$\{progress\}\$\{budgetReport\}`/)
-  assert.match(runner, /could not complete verification: \$\{publicationError \|\| acceptance\.failureCode \|\| reason\}\\n\\n\$\{progress\}\$\{publicationReport\}\$\{budgetReport\}`/)
+  assert.match(runner, /could not complete verification: \$\{publicationError \|\| acceptance\.failureCode \|\| finalProof\.failureCode \|\| reason\}\\n\\n\$\{progress\}\$\{publicationReport\}\$\{budgetReport\}`/)
 })

@@ -1,3 +1,4 @@
+import { builderFinalProof } from './final-proof.ts'
 import { builderAcceptanceLedger } from './acceptance-ledger.ts'
 import type { BuilderLoopCheckpoint } from './checkpoint.ts'
 import { publishVerifiedIsolatedProject, mergeVerifiedIsolatedPullRequest, verifyIsolatedPreview, isolatedDeploymentFiles, wantsIsolatedPublication } from './isolated-publication.ts'
@@ -516,16 +517,20 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           publicationError = error instanceof Error ? error.message : 'builder_isolated_publication_failed'
         }
       }
-      const success = verified && acceptance.passed && (!requiresPublication || Boolean(publication && !publicationError && 'mergeCommitSha' in publication))
+      const finalProof = builderFinalProof({
+        objective: job.objective, workspaceVerified: verified, acceptance,
+        publication, publicationError, budget: inferenceBudget, requiresPublication,
+      })
+      const success = finalProof.passed
       const publicationReport = publication ? `\n\nIsolated publication: ${JSON.stringify(publication)}` : ''
       const reply = historyReply(success
         ? `Builder V2 verified the workspace with recorded host test execution. ${cycle.result?.summary || ''}${publicationReport}${budgetReport}`
-        : `Builder V2 could not complete verification: ${publicationError || acceptance.failureCode || reason}\n\n${progress}${publicationReport}${budgetReport}`, job.workspaceId, files)
+        : `Builder V2 could not complete verification: ${publicationError || acceptance.failureCode || finalProof.failureCode || reason}\n\n${progress}${publicationReport}${budgetReport}`, job.workspaceId, files)
       await finishBuilderJob({
         jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
-        status: success ? 'succeeded' : 'failed', reply, error: success ? null : (publicationError || acceptance.failureCode || reason),
+        status: success ? 'succeeded' : 'failed', reply, error: success ? null : (publicationError || acceptance.failureCode || finalProof.failureCode || reason),
         result: { jobId: job.id, workspaceId: job.workspaceId, status: success ? 'succeeded' : 'failed',
-          reply, files, engine: 'v2', receipts: cycle.result?.steps ?? [], acceptanceLedger: acceptance,
+          reply, files, engine: 'v2', receipts: cycle.result?.steps ?? [], acceptanceLedger: acceptance, finalProof,
           ...(publication ? { isolatedPublication: publication } : {}),
           ...(inferenceBudget ? { inferenceBudget } : {}) },
       })

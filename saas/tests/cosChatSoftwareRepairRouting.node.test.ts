@@ -95,6 +95,9 @@ test('a repair of absent code asks for it; a build or inline code goes to Builde
     'Debug my Python script, it crashes on startup',
     'my login form does not submit, can you fix it?',
     'Fix the Failed to fetch error on the Builder page',
+    // Codex on #4736: a build word describing the problem is not an instruction to build.
+    'Fix my app: users cannot create an account',
+    'Fix the build error in my app',
   ]) assert.equal(repairAwaitingSource(prompt), true, prompt)
   const spec = readFileSync(new URL('./builderTitledSpecificationRouting.node.test.ts', import.meta.url), 'utf8')
   const objective = JSON.parse(spec.slice(spec.indexOf('const spec = ') + 'const spec = '.length, spec.indexOf('\nconst conversationId')))
@@ -102,5 +105,8 @@ test('a repair of absent code asks for it; a build or inline code goes to Builde
     objective,
     'Create a Node.js script that adds two numbers, run it and fix any bugs',
     'debug this:\nfunction add(a, b) {\n  return a - b\n}',
+    // Codex on #4736: a snippet too small for the paste detector is still the code.
+    'Debug this Python script:\nx = [1, 2]\nprint(x[2])',
+    'Can you build me a todo app and fix any failing tests?',
   ]) assert.equal(repairAwaitingSource(prompt), false, prompt.slice(0, 60))
 })

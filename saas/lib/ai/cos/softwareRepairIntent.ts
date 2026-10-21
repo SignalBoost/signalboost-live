@@ -30,8 +30,24 @@ export function isSoftwareRepairRequest(prompt: string): boolean {
   return true
 }
 
-// Asks Builder to make something: a build spec, or "create … and fix any bugs". Building needs no source first.
-const BUILD_ACTION = /\b(?:create|build|make|write|implement|scaffold|generate|develop)\b/i
+// An instruction to make something: "Create a Node.js script … and fix any bugs", "Can you build me …".
+// A build word that only describes the problem ("users cannot create an account", "the build error") is not one.
+const BUILD_VERB = '(?:create|build|make|write|implement|scaffold|generate|develop)'
+const BUILD_INSTRUCTION = new RegExp(
+  `(?:^|[.!?\\n]\\s*)(?:please\\s+)?${BUILD_VERB}\\s+(?:me\\s+)?(?:a|an|the|my|this|new)\\b`
+  + `|\\b(?:can|could|would|will)\\s+you\\s+(?:please\\s+)?${BUILD_VERB}\\b`
+  + `|\\bi\\s+(?:want|need|would\\s+like)\\s+(?:you\\s+to\\s+)?${BUILD_VERB}\\b`,
+  'i',
+)
+// A short snippet under the request ("Debug this Python script:\nx = [1, 2]\nprint(x[2])") is the code, even
+// when it is too small for the two-signal paste detector (Codex on #4736).
+const INLINE_CODE_LINE = /^\s*(?:[A-Za-z_$][\w$.[\]'"]*\s*[+\-*/%]?=(?!=)\s*\S|[A-Za-z_$][\w$.]*\s*\(.*\)\s*;?\s*$|(?:def|class|function|const|let|var|import|from|return|if|for|while|async|export)\b)/
+
+function carriesInlineCode(text: string): boolean {
+  if (pastedSourceCode(text)) return true
+  const lines = text.split(/\r?\n/).slice(1).map(line => line.trim()).filter(Boolean)
+  return lines.some(line => INLINE_CODE_LINE.test(line))
+}
 
 /**
  * A repair of code that is not here: "Fix the bug in checkout.ts", "Debug my Python script, it crashes".
@@ -41,7 +57,7 @@ const BUILD_ACTION = /\b(?:create|build|make|write|implement|scaffold|generate|d
 export function repairAwaitingSource(prompt: string): boolean {
   const text = String(prompt || '')
   return isSoftwareRepairRequest(text)
-    && !BUILD_ACTION.test(text)
+    && !BUILD_INSTRUCTION.test(text)
     && !structuredApplicationBuild(text)
-    && !pastedSourceCode(text)
+    && !carriesInlineCode(text)
 }

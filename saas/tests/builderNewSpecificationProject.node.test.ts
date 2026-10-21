@@ -69,3 +69,12 @@ test('the shared Software Specialist surface applies the same new-project rule (
   assert.match(surface, /builderEngine: 'v2'/)
   assert.doesNotMatch(surface, /workspaceIdFrom\(input\.body\)/)
 })
+
+test('V2 route accepts an owned prior workspace and retains strict source checks', () => {
+  const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(route, /if \(selectedWorkspaceId \|\| project\.context\)\s*\{\s*return noStore\(\{ error: 'builder_v2_requires_fresh_workspace'/)
+  assert.match(route, /const continuationWorkspace = !newProjectRequested/)
+  assert.match(route, /await workspace\.hasWorkspace\(workspaceId\)/)
+  assert.match(route, /await workspace\.listFiles\(workspaceId\)/)
+  assert.match(route, /requiresExistingSource: true/)
+})

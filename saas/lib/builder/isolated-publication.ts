@@ -149,7 +149,13 @@ export async function verifyIsolatedPreview(input: Readonly<{
     if (Date.now() >= input.deadlineAt || input.signal?.aborted) throw new Error('builder_isolated_publication_deadline_exceeded')
     const signal = input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(Math.max(1, input.deadlineAt - Date.now()))]) : AbortSignal.timeout(Math.max(1, input.deadlineAt - Date.now()))
     const response = await http(url, { ...init, signal })
-    if (!response.ok) throw new Error(`builder_isolated_vercel_http_${response.status}`)
+    if (!response.ok) {
+      const error = await response.json().catch(() => null)
+      const rawCode = typeof error?.error?.code === 'string' ? error.error.code : ''
+      const code = /^[a-z0-9_]{1,64}$/i.test(rawCode) ? rawCode.toLowerCase() : 'unknown'
+      // Report the Vercel error code, but not untrusted response text or credentials.
+      throw new Error(`builder_isolated_vercel_http_${response.status}_${code}`)
+    }
     return response.json()
   }
   // Deploy the same verified file set sent to GitHub: newly created private repos
@@ -159,7 +165,7 @@ export async function verifyIsolatedPreview(input: Readonly<{
     body: JSON.stringify({
       name: 'builder-isolated-preview',
       project: input.projectId,
-      target: 'preview',
+      // Vercel Preview is the default when target is omitted.
       files: input.files.map(file => ({ file: file.path, data: file.content, encoding: 'utf-8' })),
       meta: { builderCommitSha: input.commitSha, builderRepository: input.repository },
     }),

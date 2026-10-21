@@ -349,6 +349,8 @@ export default function AssistantPage() {
           target: 'cos',
           signal: controller.signal,
           onProgress: setActivity,
+          // The 290 s deadline bounds the request; an accepted Builder job is followed to its result.
+          onJobAccepted: () => clearTimeout(deadline),
           body: {
             messages: apiMessages,
             attachments: attachments.length ? attachments : undefined,

@@ -301,6 +301,9 @@ export async function postWithAgentProgress(args: {
   body: unknown
   signal: AbortSignal
   onProgress: (event: AgentProgressEvent) => void
+  /** Called once the server has accepted a durable Builder job, before following it. A caller's own
+   * response deadline belongs to the request, not to the job it started; Stop still aborts `signal`. */
+  onJobAccepted?: () => void
 }): Promise<{ ok: boolean; status: number; data: any }> {
   const startedAt = Date.now()
   let sequence = 0
@@ -555,6 +558,7 @@ export async function postWithAgentProgress(args: {
   // Follow the job for its whole lifetime, as the Developer page does (job-poll.ts). Production 2026-10-21: chat
   // stopped after 180 checks (~4.5 minutes) and left "Builder is running job …" as the final answer of a job
   // that kept running for several more minutes.
+  args.onJobAccepted?.()
   const followUntil = Date.now() + BUILDER_JOB_FOLLOW_WINDOW_MS
   while (Date.now() < followUntil) {
     report('running', repairRequest

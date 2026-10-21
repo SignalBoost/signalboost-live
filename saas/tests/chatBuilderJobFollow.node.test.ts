@@ -26,6 +26,8 @@ function simulatedBrowser(jobRunsForMs: number) {
   let statusChecks = 0
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input)
+    // Like the browser: an aborted request rejects.
+    if (init?.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
     if (url.startsWith('/api/assistant/chats')) return Response.json({ error: 'not found' }, { status: 404 })
     if (url.startsWith('/api/builder?jobId=')) {
       statusChecks += 1
@@ -61,6 +63,33 @@ test('following stops at the job lifetime window and points to History', async (
     assert.equal(result.status, 202)
     assert.ok(browser.checks() <= BUILDER_JOB_FOLLOW_WINDOW_MS / BUILDER_JOB_POLL_DELAY_MS + 1)
   } finally { browser.restore() }
+})
+
+// Codex on #4739: the owner Assistant page aborts its request after 290 s. That deadline bounds the request, not
+// the accepted job; the page clears it once the job is accepted, and Stop still aborts.
+test('a caller deadline that is cleared on job acceptance does not cut the job short; Stop still does', async () => {
+  for (const stopAtMs of [null, 60_000] as const) {
+    const browser = simulatedBrowser(8 * 60_000)
+    try {
+      const controller = new AbortController()
+      const startedAt = Date.now()
+      let deadlineArmed = true
+      const run = postWithAgentProgress({
+        target: 'cos', body, signal: controller.signal,
+        onJobAccepted: () => { deadlineArmed = false },
+        onProgress: () => {
+          const elapsed = Date.now() - startedAt
+          if (deadlineArmed && elapsed > 290_000) controller.abort()
+          if (stopAtMs !== null && elapsed > stopAtMs) controller.abort()
+        },
+      })
+      if (stopAtMs === null) assert.equal((await run).data.reply, 'Builder V2 verified the workspace.')
+      else await assert.rejects(run, (error: Error) => error.name === 'AbortError')
+    } finally { browser.restore() }
+  }
+  const page = readFileSync(new URL('../app/dashboard/assistant/page.tsx', import.meta.url), 'utf8')
+  assert.match(page, /const deadline = setTimeout\(\(\) => \{ hitDeadline = true; controller\.abort\(\) \}, CLIENT_DEADLINE_MS\)/)
+  assert.match(page, /onJobAccepted: \(\) => clearTimeout\(deadline\)/)
 })
 
 test('chat and the Developer page share one follow window', () => {

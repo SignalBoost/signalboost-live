@@ -76,7 +76,7 @@ test('Concierge explicitly classifies an acceptance specification listing files 
     'Create an isolated Node.js project with the following files:',
     '- package.json', '- index.js', '- src/calculator.js', '- test/calculator.test.js',
     'Run npm test and node --test test/*.test.js.',
-  ].join('\\n')
+  ].join('\n')
   assert.equal(structuredApplicationBuild(prompt), true)
   assert.equal(isConciergeBuilderObjective(prompt), true)
   assert.equal(structuredApplicationBuild('Explain how to build a Node.js application with the following files: src/app.js and test/app.test.js; run npm test.'), false)

@@ -45,7 +45,7 @@ export function builderAcceptanceLedger(
     }]
   })
   const commands: BuilderCommandEvidence[] = requested.map(command => {
-    const matching = runs.filter(run => command.pattern.test(run.command) && run.receiptIndex > latestSourceChangeIndex)
+    const matching = runs.filter(run => run.command === command.name && run.receiptIndex > latestSourceChangeIndex)
     const passed = matching.filter(run => run.passed).at(-1)
     return passed ?? matching.at(-1) ?? {
       command: command.name,

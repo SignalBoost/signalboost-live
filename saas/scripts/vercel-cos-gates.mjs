@@ -22,6 +22,7 @@ const tests = [
   'tests/builderTitledSpecificationRouting.node.test.ts',
   'tests/cosChatSoftwareRepairRouting.node.test.ts',
   'tests/chatBuilderJobFollow.node.test.ts',
+  'tests/builderV2IsolatedPublication.node.test.ts',
   // Builder V2 repair and interface reconciliation regression coverage.
   'tests/builderV2InterfaceMismatches.node.test.ts',
   'tests/builderV2RepairReadCeiling.node.test.ts',

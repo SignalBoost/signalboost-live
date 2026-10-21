@@ -1,5 +1,5 @@
 import type { BuilderLoopCheckpoint } from './checkpoint.ts'
-import { publishVerifiedIsolatedProject, verifyIsolatedPreview, isolatedDeploymentFiles, wantsIsolatedPublication } from './isolated-publication.ts'
+import { publishVerifiedIsolatedProject, mergeVerifiedIsolatedPullRequest, verifyIsolatedPreview, isolatedDeploymentFiles, wantsIsolatedPublication } from './isolated-publication.ts'
 import { withHostProductionHarnessIngress } from '../../platform-harness/runtime/host-ingress.ts'
 import { classifyBuilderDocumentationIntent } from './documentation-intent.ts'
 import { builderRunSourceEvidence } from './source-evidence.ts'
@@ -503,11 +503,18 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
             signal: deadlineController.signal,
           })
           publication = { ...published, ...preview }
+          // This lane is owner-only (checked above): the owner's job ends merged, not as a PR left for him.
+          const merged = await mergeVerifiedIsolatedPullRequest({
+            token, repository: published.repository, pullRequestNumber: published.pullRequestNumber,
+            commitSha: published.commitSha, previewVerified: preview.status === 'verified',
+            signal: deadlineController.signal, deadlineAt: Date.parse(job.createdAt) + totalDeadlineMs,
+          })
+          publication = { ...published, ...preview, ...merged }
         } catch (error) {
           publicationError = error instanceof Error ? error.message : 'builder_isolated_publication_failed'
         }
       }
-      const success = verified && (!requiresPublication || Boolean(publication && !publicationError && 'previewUrl' in publication))
+      const success = verified && (!requiresPublication || Boolean(publication && !publicationError && 'mergeCommitSha' in publication))
       const publicationReport = publication ? `\n\nIsolated publication: ${JSON.stringify(publication)}` : ''
       const reply = historyReply(success
         ? `Builder V2 verified the workspace with recorded host test execution. ${cycle.result?.summary || ''}${publicationReport}${budgetReport}`

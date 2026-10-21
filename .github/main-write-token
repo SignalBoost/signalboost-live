@@ -1,2 +1,2 @@
-base_sha=2ca6ad115378aeff0ec99a7f47a96aea4275324b
-branch=fix/builder-new-private-repo-acceptance-20261021
+base_sha=3a403366f8122c4295e291ee154978b80335eb5c
+branch=fix/builder-owner-merges-verified-pr-20261021

@@ -490,6 +490,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           const preparedFiles = isolatedDeploymentFiles(contents.filter((file): file is NonNullable<typeof file> => Boolean(file)))
           const published = await publishVerifiedIsolatedProject({
             owner, jobKey: job.id,
+            newRepository: /\bcreate\s+(?:a\s+)?new\s+private\s+(?:GitHub\s+)?repository\b/i.test(job.objective),
             token, files: preparedFiles,
             verified: true, authorized: true, signal: deadlineController.signal,
             deadlineAt: Date.parse(job.createdAt) + totalDeadlineMs,

@@ -186,7 +186,7 @@ export function structuredApplicationBuild(prompt: string): boolean {
   const opening = openingInstruction(body)
   if (EXPLANATION_OPENING.test(opening) && !DIRECTED_BUILD.test(opening)) return false
   return /\b(?:build|create|implement)\b[\s\S]{0,200}\b(?:application|app|project|system)\b/i.test(body)
-    && /\b(?:required files|file structure|project structure|create all|create the following files)\b/i.test(body)
+    && /\b(?:required files|file structure|project structure|create all|create the following files|with the following files|following files)\b/i.test(body)
     && (/(?:^|[\s`'"(])(?:src|test|tests)\/[\w.-]+\.(?:[cm]?js|tsx?|jsx|py)\b/m.test(body)
       // A drawn directory tree names files without their directory prefix:
       // "├── src/" then "│   ├── catalog.js". Those lines are just as concrete.

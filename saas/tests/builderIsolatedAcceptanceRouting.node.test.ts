@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { isConciergeBuilderObjective } from '../lib/ai/cos/cosReasoningRolePolicy.ts'
+import { isConciergeBuilderObjective, structuredApplicationBuild } from '../lib/ai/cos/cosReasoningRolePolicy.ts'
 import { isExplicitIsolatedProjectBuild, parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '../lib/builder/repository-repair-target.ts'
 import { isNewBuilderProjectObjective, selectBuilderProject } from '../lib/builder/project-continuity.ts'
 import { builderExecutionAdmissionBlocker } from '../lib/builder/execution-admission.ts'
@@ -67,4 +67,17 @@ test('a full external acceptance request is blocked when publication is unconfig
     'Build an expense tracker that displays a $50 budget.',
     'Explain why the previous inference cost was $0.50.',
   ]) assert.equal(builderExecutionAdmissionBlocker(prompt), null, prompt)
+})
+
+test('Concierge explicitly classifies an acceptance specification listing files in natural language', () => {
+  const prompt = [
+    '# BUILDER V2 — END-TO-END ACCEPTANCE TEST',
+    'Build, debug, test, publish, and deploy a small Node.js application called Calculator API.',
+    'Create an isolated Node.js project with the following files:',
+    '- package.json', '- index.js', '- src/calculator.js', '- test/calculator.test.js',
+    'Run npm test and node --test test/*.test.js.',
+  ].join('\\n')
+  assert.equal(structuredApplicationBuild(prompt), true)
+  assert.equal(isConciergeBuilderObjective(prompt), true)
+  assert.equal(structuredApplicationBuild('Explain how to build a Node.js application with the following files: src/app.js and test/app.test.js; run npm test.'), false)
 })

@@ -394,13 +394,12 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
 
   if (!specialistRelevant) return null
 
-  if (assistanceMode === 'guide' || assistanceMode === 'collaborate') {
+  if (assistanceMode === 'guide') return null
+  if (assistanceMode === 'collaborate') {
     return NextResponse.json({
-      reply: assistanceMode === 'guide'
-        ? 'Guidance mode is selected. I can analyze your code or error and suggest specific fixes without editing your repository. Share the failing command or relevant files.'
-        : 'Collaborative mode is selected. I can propose a repair plan, but I will not change code or access a repository until you explicitly approve the next action.',
-      source: 'cos-builder-assistance-mode',
-      assistanceMode,
+      reply: 'I can prepare and explain the proposed code changes. To authorize Builder to make changes, switch to Handle it for me. Repository access remains separately permissioned.',
+      source: 'cos-builder-approval-required',
+      assistanceMode: 'collaborate',
       execution_allowed: false,
       external_action_taken: false,
       ...softwareSpecialistFields('software.guide'),

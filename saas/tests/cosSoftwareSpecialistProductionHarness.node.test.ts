@@ -57,7 +57,8 @@ test('public Software Specialist export cannot bypass the Production Harness', (
   assert.doesNotMatch(source, /export async function tryCosSoftwareSpecialistLegacy\(/)
   assert.match(source, /export async function tryCosSoftwareSpecialist\(/)
   assert.match(source, /runCosSoftwareSpecialistProductionHarness\(\{/)
-  assert.match(source, /return await tryCosSoftwareSpecialistLegacy\(input, signal\)/)
+  assert.match(source, /const delegated = await tryCosSoftwareSpecialistLegacy\(input, signal\)/)
+  assert.match(source, /execute: guarded/)
   const exported = source.slice(source.indexOf('export async function tryCosSoftwareSpecialist('))
   assert.match(exported, /if \(!specialistRelevant\) return null/)
   assert.ok(

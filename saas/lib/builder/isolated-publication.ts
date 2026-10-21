@@ -63,7 +63,7 @@ export function isolatedPreviewProbe(objective: string): { path: string; expecte
   const endpoint = /\bGET\s+(\/[^\s`<>"']+)/i.exec(objective)
   if (!endpoint) return { path: '/', expected: null }
   const path = endpoint[1]
-  if (!/^\/[A-Za-z0-9_~!type Request = typeof fetch'()*+,;=:@%/?-]+$/.test(path) || path.startsWith('//')) {
+  if (!/^\/[A-Za-z0-9_~%?&=.+-]+$/.test(path) || path.startsWith('//')) {
     throw new Error('builder_isolated_preview_path_invalid')
   }
   const fixture = /expected\s+response\s*:\s*```(?:json)?\s*([\s\S]*?)```/i.exec(objective)

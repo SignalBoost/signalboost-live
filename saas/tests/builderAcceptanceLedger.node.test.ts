@@ -52,3 +52,12 @@ test('ordinary jobs with no explicit test commands retain current behavior', () 
     latestSourceChangeIndex: -1, initialFailureReproduced: false,
   })
 })
+
+test('a single compound shell run cannot masquerade as two independent test commands', () => {
+  const ledger = builderAcceptanceLedger(objective, [
+    run('npm test', false), edit,
+    run('npm test && node --test test/*.test.js', true),
+  ])
+  assert.equal(ledger.passed, false)
+  assert.equal(ledger.failureCode, 'builder_acceptance_required_command_unverified')
+})

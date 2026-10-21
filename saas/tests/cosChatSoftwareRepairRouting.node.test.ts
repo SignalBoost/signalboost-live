@@ -10,6 +10,7 @@ import test from 'node:test'
 import { isSoftwareRepairRequest } from '../lib/ai/cos/softwareRepairIntent.ts'
 import { isFastTextTransform } from '../lib/ai/cos/fastTextTransformIntent.ts'
 import { SUPPORTED_LANGUAGES } from '../lib/i18n/supportedLanguages.ts'
+import { isConciergeBuilderObjective } from '../lib/ai/cos/cosReasoningRolePolicy.ts'
 
 const REPAIRS = [
   'Fix the Failed to fetch error on the Builder page',
@@ -60,8 +61,9 @@ test('chat ingress sends a repair request to the Software Specialist before any 
 test('the specialist repairs the platform for the owner and asks everyone else for the code, never a dead end', () => {
   const specialist = readFileSync(new URL('../lib/ai/cos/softwareSpecialist.ts', import.meta.url), 'utf8')
   const legacy = specialist.slice(specialist.indexOf('async function tryCosSoftwareSpecialistLegacy'), specialist.indexOf('export async function tryCosSoftwareSpecialist('))
-  const branch = legacy.slice(legacy.indexOf('if (repairRequested && !suppliedSource'), legacy.indexOf("source: 'cos-builder-source-requested'"))
-  assert.ok(legacy.indexOf('const project = await selectBuilderProject(') < legacy.indexOf('if (repairRequested && !suppliedSource'), 'an existing project is continued, not replaced')
+  const branch = legacy.slice(legacy.indexOf('if (repairRequested && !roleMatched && !designMatched && !suppliedSource'), legacy.indexOf("source: 'cos-builder-source-requested'"))
+  assert.ok(branch.length > 0, 'a build spec or design request is never answered with the request for code')
+  assert.ok(legacy.indexOf('const project = await selectBuilderProject(') < legacy.indexOf('if (repairRequested && !roleMatched'), 'an existing project is continued, not replaced')
   assert.match(branch, /!project\.context/)
   assert.match(branch, /input\.allowRepositoryRepair && access\?\.isOwner && access\.userId/)
   assert.match(branch, /signalBoostDeployedRepairTarget\(rawObjective, \{[\s\S]*?\}, \{ ownerRepairWithoutSource: true \}\)/)
@@ -77,4 +79,11 @@ test('a conversation with a recorded project is continued by Builder V2 instead 
   assert.doesNotMatch(specialist, /if \(project\.context \|\| selectionBody\?\.workspaceId\)/)
   assert.match(specialist, /if \(!project\.context && selectionBody\?\.workspaceId\)/)
   assert.match(specialist, /\.\.\.\(project\.context && !stagedFiles\.length \? \{ requiresExistingSource: true \} : \{\}\)/)
+})
+
+test('the acceptance spec is a Builder build, not a repair waiting for code', () => {
+  const spec = readFileSync(new URL('./builderTitledSpecificationRouting.node.test.ts', import.meta.url), 'utf8')
+  const objective = JSON.parse(spec.slice(spec.indexOf('const spec = ') + 'const spec = '.length, spec.indexOf('\nconst conversationId')))
+  assert.equal(isSoftwareRepairRequest(objective), true, 'it does read as a repair')
+  assert.equal(isConciergeBuilderObjective(objective, { attachmentNames: [] }), true, 'so Builder must take it before the request-for-code branch')
 })

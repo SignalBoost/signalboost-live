@@ -281,7 +281,10 @@ async function tryCosSoftwareSpecialistLegacy(
   // repair at the deployed revision (fix, test, commit, merge); anyone else is asked for the code
   // instead of being given a generic answer.
   const suppliedSource = sourceAttached || (Array.isArray(input.body?.files) && input.body.files.length > 0)
-  if (repairRequested && !suppliedSource && !mediaAttached && !repositoryTarget && !project.context) {
+  // Only a request nothing else in Builder would take: a build spec, a design request or a coding
+  // task with its own evidence is Builder's (Production 2026-10-21: the acceptance spec says "debug"
+  // and "repair" and was answered with the request for code).
+  if (repairRequested && !roleMatched && !designMatched && !suppliedSource && !mediaAttached && !repositoryTarget && !project.context) {
     if (input.allowRepositoryRepair && access?.isOwner && access.userId) {
       const target = signalBoostDeployedRepairTarget(rawObjective, {
         commitSha: input.deployment?.commitSha || undefined,

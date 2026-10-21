@@ -150,32 +150,41 @@ async function createPrivateRepository(call: GitHubCall & { owner: string }, rep
   }
 }
 
+/**
+ * A repository GitHub has just created is not readable at once: its lookup and its first commit trail the creation
+ * by a moment. Production 2026-10-21: builder-0c95a720… was created private under SignalBoost, and the lookup one
+ * request later answered 404. Only a just-created repository is waited for, briefly and within the job deadline.
+ */
+async function untilCreated<T>(call: GitHubCall, justCreated: boolean, pending: RegExp, read: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await read()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      if (!justCreated || !pending.test(message) || attempt >= 10 || (call.deadlineAt && Date.now() + 1000 >= call.deadlineAt)) throw error
+      await new Promise(resolve => setTimeout(resolve, 1000))
+    }
+  }
+}
+
 async function lookupRepository(call: GitHubCall & { owner: string; newRepository?: boolean }, repositoryName: string): Promise<any> {
-  return github(call, `/repos/${encodeURIComponent(call.owner)}/${repositoryName}`, 'GET', undefined, 'repository_lookup')
+  return untilCreated(call, call.newRepository === true, /_repository_lookup_http_404$/,
+    () => github(call, `/repos/${encodeURIComponent(call.owner)}/${repositoryName}`, 'GET', undefined, 'repository_lookup'))
     .catch((error: Error) => {
       if (error.message !== 'builder_isolated_github_repository_lookup_http_404') throw error
-      // A missing repository and a token without access to it answer the same 404. A just-created one the token
-      // cannot read means the token is limited to selected repositories.
+      // A missing repository and a token without access to it answer the same 404. A just-created one still
+      // unreadable after the wait means the token cannot read it (limited to selected repositories).
       throw new Error(call.newRepository ? 'builder_isolated_created_repository_not_accessible' : 'builder_isolated_repository_unavailable')
     })
 }
 
-/** A just-created repository's first commit can trail its creation by a moment; wait for it within the deadline. */
 async function defaultBranchRef(call: GitHubCall, encodedRepo: string, branch: string, justCreated: boolean): Promise<any> {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return await github(call, `${encodedRepo}/git/ref/heads/${encodeURIComponent(branch)}`, 'GET', undefined, 'default_branch_ref')
-    } catch (error) {
-      const message = error instanceof Error ? error.message : ''
-      const pending = /_default_branch_ref_http_(?:404|409)$/.test(message)
-      if (justCreated && pending && attempt < 6 && !(call.deadlineAt && Date.now() + 1000 >= call.deadlineAt)) {
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        continue
-      }
+  return untilCreated(call, justCreated, /_default_branch_ref_http_(?:404|409)$/,
+    () => github(call, `${encodedRepo}/git/ref/heads/${encodeURIComponent(branch)}`, 'GET', undefined, 'default_branch_ref'))
+    .catch((error: Error) => {
       // GitHub answers 409 for a repository with no commits (created without a README).
-      throw new Error(message === 'builder_isolated_github_default_branch_ref_http_409' ? 'builder_isolated_repository_empty' : message)
-    }
-  }
+      throw new Error(error.message === 'builder_isolated_github_default_branch_ref_http_409' ? 'builder_isolated_repository_empty' : error.message)
+    })
 }
 
 export async function publishVerifiedIsolatedProject(input: Readonly<{

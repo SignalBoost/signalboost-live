@@ -101,12 +101,13 @@ test('a refused write names the step it failed at', async () => {
   await assert.rejects(publish('SignalBoost', request), /builder_isolated_github_create_base_branch_http_403/)
 })
 
-test('the job id names the branches and no per-job repository remains', () => {
+test('the job id names branches and explicit fresh repos are permitted', () => {
   const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
   assert.match(runner, /owner, jobKey: job\.id,/)
   assert.doesNotMatch(runner, /repositoryName/)
   const publisher = readFileSync(new URL('../lib/builder/isolated-publication.ts', import.meta.url), 'utf8')
-  assert.doesNotMatch(publisher, /\/user\/repos|\/orgs\/|create_repository|BUILDER_ISOLATED_GITHUB_OWNER_TYPE/)
+  assert.match(publisher, /create_repository/)
+  assert.match(runner, /newRepository:/)
 })
 
 test('preview uses exact verified GitHub SHA and checks live endpoint', async () => {

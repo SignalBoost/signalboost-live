@@ -2,6 +2,7 @@ import { isConciergeBuilderObjective, structuredApplicationBuild } from './cosRe
 import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMessage } from './operator-progress.ts'
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findDurableCosTurnReply, findRecoveredAssistantTurn, type RecoveredAssistantTurn } from './assistantTransportRecovery.ts'
 import { planResearchTask } from './researchBudget.ts'
+import { BUILDER_JOB_FOLLOW_WINDOW_MS, BUILDER_JOB_POLL_DELAY_MS } from '../../builder/job-poll.ts'
 
 export type AgentProgressEvent = {
   phase: 'accepted' | 'running' | 'complete'
@@ -10,8 +11,6 @@ export type AgentProgressEvent = {
   elapsedMs: number
 }
 
-const JOB_POLL_DELAY_MS = 1_500
-const JOB_POLL_ATTEMPTS = 180
 const COS_TURN_POLL_DELAY_MS = 1_500
 const COS_TURN_FOREGROUND_WAIT_MS = 180_000
 const COS_HISTORY_READ_DEADLINE_MS = 2_000
@@ -553,14 +552,18 @@ export async function postWithAgentProgress(args: {
 
   // Once a POST has returned a durable job id, every later request is read-only status checking.
   // A transient GET/network loss must never throw away the accepted job or cause a second POST.
-  for (let attempt = 0; attempt < JOB_POLL_ATTEMPTS; attempt += 1) {
+  // Follow the job for its whole lifetime, as the Developer page does (job-poll.ts). Production 2026-10-21: chat
+  // stopped after 180 checks (~4.5 minutes) and left "Builder is running job …" as the final answer of a job
+  // that kept running for several more minutes.
+  const followUntil = Date.now() + BUILDER_JOB_FOLLOW_WINDOW_MS
+  while (Date.now() < followUntil) {
     report('running', repairRequest
       ? operatorProgressMessage({ stage: 'fixing', target: progressTarget, builder: true })
       : `COS Builder job ${String(data.status || 'running')} — checking durable progress`)
 
     let poll: Response
     try {
-      await wait(JOB_POLL_DELAY_MS, args.signal)
+      await wait(BUILDER_JOB_POLL_DELAY_MS, args.signal)
       poll = await fetch(`/api/builder?jobId=${encodeURIComponent(jobId)}`, {
         method: 'GET', credentials: 'include', cache: 'no-store', signal: args.signal,
         headers: { accept: 'application/json' },

@@ -23,7 +23,8 @@ test('verified private organization repository is published as a draft PR using 
     calls.push({ url: String(url), method, body })
     const path = new URL(String(url)).pathname
     let result: any
-    if (path === '/orgs/SignalBoost/repos') result = { full_name: 'SignalBoost/builder-isolated-test', private: true, default_branch: 'main' }
+    if (path === '/users/SignalBoost') result = { login: 'SignalBoost', type: 'Organization' }
+    else if (path === '/orgs/SignalBoost/repos') result = { full_name: 'SignalBoost/builder-isolated-test', private: true, default_branch: 'main' }
     else if (path.endsWith('/git/ref/heads/main')) result = { object: { sha: sha('a') } }
     else if (path.endsWith('/git/commits/' + sha('a'))) result = { tree: { sha: sha('b') } }
     else if (path.endsWith('/git/blobs')) result = { sha: sha('c') }
@@ -92,6 +93,7 @@ test('new repository default ref 404 is retried without repeating repository cre
   const sha = (v: string) => v.repeat(40)
   const request = (async (url: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(url)).pathname
+    if (path === '/users/SignalBoost') return Response.json({ login: 'SignalBoost', type: 'Organization' })
     if (path === '/orgs/SignalBoost/repos') { creates++; return Response.json({ full_name: 'SignalBoost/builder-isolated-test', private: true, default_branch: 'main' }) }
     if (path.endsWith('/git/ref/heads/main')) {
       refReads++
@@ -111,7 +113,44 @@ test('new repository default ref 404 is retried without repeating repository cre
 })
 
 test('creation HTTP 404 is identified as a destination/permission failure', async () => {
-  const request = (async () => Response.json({ message: 'Not Found' }, { status: 404 })) as typeof fetch
+  const request = (async (url: string | URL | Request) => new URL(String(url)).pathname === '/users/SignalBoost'
+    ? Response.json({ login: 'SignalBoost', type: 'Organization' })
+    : Response.json({ message: 'Not Found' }, { status: 404 })) as typeof fetch
   await assert.rejects(publishVerifiedIsolatedProject({ owner: 'SignalBoost', ownerType: 'organization', repositoryName: 'builder-isolated-test',
     token: 'test', files, verified: true, authorized: true, request }), /builder_isolated_github_create_repository_http_404/)
+})
+
+test('misconfigured organization owner type is corrected for a GitHub user', async () => {
+  const paths: string[] = []
+  const request = (async (url: string | URL | Request) => {
+    const path = new URL(String(url)).pathname
+    paths.push(path)
+    if (path === '/users/SignalBoost') return Response.json({ login: 'SignalBoost', type: 'User' })
+    if (path === '/user') return Response.json({ login: 'SignalBoost' })
+    if (path === '/user/repos') return Response.json({ full_name: 'SignalBoost/builder-isolated-test', private: true, default_branch: 'main' })
+    if (path.endsWith('/git/ref/heads/main')) return Response.json({ object: { sha: 'a'.repeat(40) } })
+    if (path.endsWith('/git/commits/' + 'a'.repeat(40))) return Response.json({ tree: { sha: 'b'.repeat(40) } })
+    if (path.endsWith('/git/blobs')) return Response.json({ sha: 'c'.repeat(40) })
+    if (path.endsWith('/git/trees')) return Response.json({ sha: 'd'.repeat(40) })
+    if (path.endsWith('/git/commits')) return Response.json({ sha: 'e'.repeat(40) })
+    if (path.endsWith('/pulls')) return Response.json({ number: 3, html_url: 'https://github.com/SignalBoost/builder-isolated-test/pull/3' })
+    return Response.json({})
+  }) as typeof fetch
+  await publishVerifiedIsolatedProject({ owner: 'SignalBoost', ownerType: 'organization', repositoryName: 'builder-isolated-test',
+    token: 'test', files, verified: true, authorized: true, request })
+  assert.ok(paths.includes('/user/repos'))
+  assert.ok(!paths.includes('/orgs/SignalBoost/repos'))
+})
+
+test('personal repository publication refuses to write as the wrong GitHub account', async () => {
+  const paths: string[] = []
+  const request = (async (url: string | URL | Request) => {
+    const path = new URL(String(url)).pathname
+    paths.push(path)
+    return Response.json(path === '/users/SignalBoost' ? { login: 'SignalBoost', type: 'User' } : { login: 'another-user' })
+  }) as typeof fetch
+  await assert.rejects(publishVerifiedIsolatedProject({ owner: 'SignalBoost', ownerType: 'organization',
+    repositoryName: 'builder-isolated-test', token: 'test', files, verified: true, authorized: true, request }),
+  /builder_isolated_github_user_identity_mismatch/)
+  assert.ok(!paths.includes('/user/repos'))
 })

@@ -70,12 +70,15 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
       tree.length = 0
       continue
     }
-    if (/^run(?:\s+(?:these|the following)\s+commands)?(?:\s+against\s+the\s+actual\s+generated\s+files)?\s*:\s*$/i.test(line) || /^execute\s+(?:these|the following|all(?:\s+\w+)?)\s+commands(?:\s+in\s+the\s+builder\s+workspace)?\s*:\s*$/i.test(line)) {
+    // A bare "Execute:" or "Run:" line introduces the command list, as in the owner's Calculator API acceptance spec.
+    if (/^run(?:\s+(?:these|the following)\s+commands)?(?:\s+against\s+the\s+actual\s+generated\s+files)?\s*:\s*$/i.test(line) || /^execute(?:\s+(?:these|the following|all(?:\s+\w+)?)\s+commands(?:\s+in\s+the\s+builder\s+workspace)?)?\s*:\s*$/i.test(line)) {
       runList = true
       fileList = false
       continue
     }
-    if (/^(?:(?:create|write|deliver|provide)(?:\s+(?:these|the|following|files|all|at least))*|(?:required\s+)?(?:project\s+)?(?:file\s+)?structure)\s*:\s*$/i.test(line) || /^create\s+at\s+least\s+(?:these|the|following)\s+files\s*:\s*$/i.test(line) || /^create\s+all\s+\d+\s+files\s*:\s*$/i.test(line)) {
+    // "Create an isolated Node.js project with the following files:" introduces the file list like "Create these files:".
+    if (/^(?:(?:create|write|deliver|provide)(?:\s+(?:these|the|following|files|all|at least))*|(?:required\s+)?(?:project\s+)?(?:file\s+)?structure)\s*:\s*$/i.test(line) || /^create\s+at\s+least\s+(?:these|the|following)\s+files\s*:\s*$/i.test(line) || /^create\s+all\s+\d+\s+files\s*:\s*$/i.test(line)
+      || /^(?:create|build|write)\b[^:]{0,120}\bwith\s+the\s+following\s+files\s*:\s*$/i.test(line)) {
       fileList = true
       continue
     }

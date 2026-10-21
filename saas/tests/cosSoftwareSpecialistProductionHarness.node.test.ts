@@ -57,7 +57,11 @@ test('public Software Specialist export cannot bypass the Production Harness', (
   assert.doesNotMatch(source, /export async function tryCosSoftwareSpecialistLegacy\(/)
   assert.match(source, /export async function tryCosSoftwareSpecialist\(/)
   assert.match(source, /runCosSoftwareSpecialistProductionHarness\(\{/)
-  assert.match(source, /return await tryCosSoftwareSpecialistLegacy\(input, signal\)/)
+  // PR #4729 keeps the legacy result to fail closed on a declined handoff; the call still runs only inside the
+  // harness-guarded execute step.
+  const guardedExecute = source.slice(source.indexOf('const execute = async (signal?: AbortSignal) => {'), source.indexOf('runCosSoftwareSpecialistProductionHarness({'))
+  assert.match(guardedExecute, /const delegated = await tryCosSoftwareSpecialistLegacy\(input, signal\)/)
+  assert.equal((source.match(/await tryCosSoftwareSpecialistLegacy\(/g) || []).length, 1, 'the legacy controller has exactly one caller')
   const exported = source.slice(source.indexOf('export async function tryCosSoftwareSpecialist('))
   assert.match(exported, /if \(!specialistRelevant\) return null/)
   assert.ok(

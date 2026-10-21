@@ -1,2 +1,2 @@
-base_sha=68c3e7d7a87eeef86c768b48caa6cb4063c72426
-branch=feat/cos-chat-software-repair-harness-20261021
+base_sha=c7cc723e57a52b670ace85cff3fd252c932bcc97
+branch=fix/release-gate-harness-assertion-20261021

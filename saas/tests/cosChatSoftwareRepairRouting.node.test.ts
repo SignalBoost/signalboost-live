@@ -61,9 +61,9 @@ test('chat ingress sends a repair request to the Software Specialist before any 
 test('the specialist repairs the platform for the owner and asks everyone else for the code, never a dead end', () => {
   const specialist = readFileSync(new URL('../lib/ai/cos/softwareSpecialist.ts', import.meta.url), 'utf8')
   const legacy = specialist.slice(specialist.indexOf('async function tryCosSoftwareSpecialistLegacy'), specialist.indexOf('export async function tryCosSoftwareSpecialist('))
-  const branch = legacy.slice(legacy.indexOf('if (repairRequested && !roleMatched && !designMatched && !suppliedSource'), legacy.indexOf("source: 'cos-builder-source-requested'"))
+  const branch = legacy.slice(legacy.indexOf('if (repairRequested && !newProject && !roleMatched && !designMatched && !suppliedSource'), legacy.indexOf("source: 'cos-builder-source-requested'"))
   assert.ok(branch.length > 0, 'a build spec or design request is never answered with the request for code')
-  assert.ok(legacy.indexOf('const project = await selectBuilderProject(') < legacy.indexOf('if (repairRequested && !roleMatched'), 'an existing project is continued, not replaced')
+  assert.ok(legacy.indexOf('const project = await selectBuilderProject(') < legacy.indexOf('if (repairRequested && !newProject && !roleMatched'), 'an existing project is continued, not replaced')
   assert.match(branch, /!project\.context/)
   assert.match(branch, /input\.allowRepositoryRepair && access\?\.isOwner && access\.userId/)
   assert.match(branch, /signalBoostDeployedRepairTarget\(rawObjective, \{[\s\S]*?\}, \{ ownerRepairWithoutSource: true \}\)/)

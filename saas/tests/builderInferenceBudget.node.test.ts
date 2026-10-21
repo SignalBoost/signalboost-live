@@ -86,6 +86,28 @@ test('quote reserves full context, full output, and ignores cached-token savings
   assert.throws(() => quoteDeepInfraRequest(endpoint, body, []), /price_unavailable/)
 })
 
+test('large-context model admits a small request under the half-dollar cap', async () => {
+  const largeCatalog = [{ ...catalog[0], max_tokens: 131072,
+    pricing: { type: 'tokens', cents_per_input_token: 0.0001, cents_per_output_token: 0.0002 } }]
+  const bounded = quoteDeepInfraRequest(endpoint, body, largeCatalog)
+  assert.ok(bounded.contextTokens < 131072)
+  assert.ok(bounded.upperNanodollars < 500_000_000)
+  const { db, store, ledger } = await database()
+  let modelCalls = 0
+  const transport = builderBudgetedModelFetch((async url => {
+    if (String(url).endsWith('/models/list')) return Response.json(largeCatalog)
+    modelCalls++
+    return Response.json({ choices: [{ message: { content: 'ok' } }],
+      usage: { prompt_tokens: 15, completion_tokens: 2 } })
+  }) as typeof fetch)
+  try {
+    await withBuilderInferenceBudget(store, Date.now() + 10_000,
+      () => transport(endpoint, { body: JSON.stringify(body) }))
+    assert.equal(modelCalls, 1)
+    assert.equal((await ledger()).call_count, 1)
+  } finally { await db.close() }
+})
+
 test('tiny cap blocks BEFORE the first model HTTP request and persists the empty ledger', async () => {
   const { db, store, ledger } = await database(1)
   let modelCalls = 0

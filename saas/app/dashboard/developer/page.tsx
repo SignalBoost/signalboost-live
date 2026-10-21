@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { MAX_BUILDER_RAW_OBJECTIVE_CHARS } from '@/lib/builder/request-contract'
-import { followBuilderJob } from '@/lib/builder/job-poll'
+import { followBuilderJob, submitBuilderRun } from '@/lib/builder/job-poll'
 import { uiText } from '@/lib/i18n/uiText'
 
 type WorkspaceFile = { path: string; content: string }
@@ -43,6 +43,7 @@ const COPY: Record<string, Record<Lang, string>> = {
   unknown: { en: uiText('generatedUi.u_b23a6a8439c0dde5'), es: 'desconocido', pt: 'desconhecido', pl: 'nieznany', ru: 'неизвестно', de: 'unbekannt', fr: 'inconnu', it: 'sconosciuto', ja: '不明', ko: '알 수 없음', ar: 'غير معروف' },
   timedOut: { en: uiText('generatedUi.u_3dcd80f1b15f796e'), es: 'se agotó el tiempo', pt: 'tempo esgotado', pl: 'przekroczono czas', ru: 'время истекло', de: 'Zeitüberschreitung', fr: 'délai dépassé', it: 'scaduto', ja: 'タイムアウト', ko: '시간 초과', ar: 'انتهت المهلة' },
   failed: { en: uiText('generatedUi.u_5d28a90f4498a814'), es: 'falló', pt: 'falhou', pl: 'nie powiodło się', ru: 'сбой', de: 'fehlgeschlagen', fr: 'échec', it: 'non riuscito', ja: '失敗', ko: '실패', ar: 'فشل' },
+  unreachable: { en: 'Builder could not be reached, so job {id} was not confirmed. Nothing ran twice. Check your connection and press Run Builder again.', es: 'No se pudo contactar con Builder, así que el trabajo {id} no se confirmó. Nada se ejecutó dos veces. Revisa tu conexión y pulsa Ejecutar Builder de nuevo.', pt: 'Não foi possível contactar o Builder, então o trabalho {id} não foi confirmado. Nada foi executado duas vezes. Verifique sua conexão e clique em Executar Builder novamente.', pl: 'Nie udało się połączyć z Builderem, więc zadanie {id} nie zostało potwierdzone. Nic nie uruchomiono dwa razy. Sprawdź połączenie i ponownie kliknij Uruchom Builder.', ru: 'Не удалось связаться с Builder, поэтому задача {id} не подтверждена. Ничего не запускалось дважды. Проверьте подключение и снова нажмите «Запустить Builder».', de: 'Builder war nicht erreichbar, daher wurde Auftrag {id} nicht bestätigt. Nichts wurde doppelt ausgeführt. Prüfen Sie Ihre Verbindung und klicken Sie erneut auf Builder ausführen.', fr: 'Builder est injoignable : la tâche {id} n’a pas été confirmée. Rien n’a été exécuté deux fois. Vérifiez votre connexion et cliquez à nouveau sur Lancer Builder.', it: 'Builder non è raggiungibile, quindi il job {id} non è stato confermato. Nulla è stato eseguito due volte. Controlla la connessione e premi di nuovo Esegui Builder.', ja: 'Builder に接続できなかったため、ジョブ {id} は確認されていません。二重実行はありません。接続を確認して、もう一度「Builder を実行」を押してください。', ko: 'Builder에 연결할 수 없어 작업 {id}이(가) 확인되지 않았습니다. 중복 실행은 없습니다. 연결을 확인하고 Builder 실행을 다시 누르세요.', ar: 'تعذّر الوصول إلى Builder، لذا لم يتم تأكيد المهمة {id}. لم يُنفَّذ أي شيء مرتين. تحقّق من اتصالك ثم اضغط تشغيل Builder مرة أخرى.' },
   certification: { en: uiText('generatedUi.u_79a04dc5140b03ef'), es: 'Certificación de Builder: nivel {level}/3 · intentos verificados {attempts}', pt: 'Certificação do Builder: nível {level}/3 · tentativas verificadas {attempts}', pl: 'Certyfikacja Buildera: poziom {level}/3 · zweryfikowane próby {attempts}', ru: 'Сертификация Builder: уровень {level}/3 · проверенные попытки {attempts}', de: 'Builder-Zertifizierung: Stufe {level}/3 · verifizierte Versuche {attempts}', fr: 'Certification Builder : niveau {level}/3 · tentatives vérifiées {attempts}', it: 'Certificazione Builder: livello {level}/3 · tentativi verificati {attempts}', ja: 'ビルダー認定: レベル {level}/3 · 検証済みの試行 {attempts}', ko: '빌더 인증: 레벨 {level}/3 · 검증된 시도 {attempts}', ar: 'شهادة المنشئ: المستوى {level}/3 · المحاولات الموثّقة {attempts}' },
 }
 
@@ -209,12 +210,28 @@ export default function DeveloperPage() {
     if (!task || running || openingWorkspace) return
     setRunning(true); setError(''); setReply(''); setTrace([]); setLiveProgress(null); setActivitySeconds(0); setActiveJobId('')
     try {
-      const response = await fetch('/api/builder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ objective: task, conversationId: conversationIdRef.current, workspaceId: workspaceId || undefined, files }),
+      // The job is named before it is sent, so a lost answer can be checked instead of guessed.
+      const requestJobId = crypto.randomUUID()
+      const requestBody = JSON.stringify({ objective: task, conversationId: conversationIdRef.current, workspaceId: workspaceId || undefined, files, jobId: requestJobId })
+      const submitted = await submitBuilderRun<BuilderReply>({
+        post: async () => {
+          const response = await fetch('/api/builder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: requestBody })
+          const data = await response.json().catch(() => ({})) as BuilderReply
+          return { status: response.status, ok: response.ok, data }
+        },
+        check: async () => {
+          const response = await fetch(`/api/builder?jobId=${encodeURIComponent(requestJobId)}`, { cache: 'no-store' })
+          const data = await response.json().catch(() => ({})) as BuilderReply
+          return { status: response.status, ok: response.ok, data }
+        },
+        sleep,
       })
-      let data = await response.json().catch(() => ({})) as BuilderReply
+      if (submitted.kind === 'unreachable') { setError(interpolate('unreachable', requestJobId, '{id}')); return }
+      // A job the server already holds is followed like a fresh 202, whatever state it is in.
+      const response = submitted.kind === 'answered'
+        ? submitted.response
+        : { status: 202, ok: true, data: { ...submitted.check.data, jobId: requestJobId } }
+      let data = response.data as BuilderReply
       if (data.workspaceId) setWorkspaceId(data.workspaceId)
       if (data.conversationId) {
         conversationIdRef.current = data.conversationId

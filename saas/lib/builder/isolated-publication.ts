@@ -96,6 +96,7 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   signal?: AbortSignal
   deadlineAt?: number
   request?: Request
+  newRepository?: boolean
 }>): Promise<IsolatedPublication> {
   if (!input.authorized || !input.verified) throw new Error('builder_isolated_publication_not_authorized')
   if (!safeName.test(input.owner) || !jobKeyPattern.test(input.jobKey) || !input.token) throw new Error('builder_isolated_destination_invalid')
@@ -122,13 +123,24 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
     return payload
   }
 
-  const repository = await json(`/repos/${encodeURIComponent(input.owner)}/${ISOLATED_REPOSITORY_NAME}`, 'GET', undefined, 'repository_lookup')
+  // Explicit acceptance requiring a new private repository must never silently use the shared fallback.
+  // A 403 here means the server credential lacks repository-creation permission.
+  const repositoryName = input.newRepository ? `builder-${input.jobKey}` : ISOLATED_REPOSITORY_NAME
+  if (input.newRepository) {
+    const created = await json(`/orgs/${encodeURIComponent(input.owner)}/repos`, 'POST', {
+      name: repositoryName, private: true, auto_init: true,
+      description: 'Isolated Builder V2 verified project',
+    }, 'create_repository')
+    if (created.private !== true || String(created.full_name || '').toLowerCase() !==
+      `${input.owner}/${repositoryName}`.toLowerCase()) throw new Error('builder_isolated_created_repository_invalid')
+  }
+  const repository = await json(`/repos/${encodeURIComponent(input.owner)}/${repositoryName}`, 'GET', undefined, 'repository_lookup')
     .catch((error: Error) => {
       // A missing repository and a token without access to it answer the same 404.
       throw new Error(error.message === 'builder_isolated_github_repository_lookup_http_404' ? 'builder_isolated_repository_unavailable' : error.message)
     })
   const fullName = String(repository.full_name || '')
-  if (fullName.toLowerCase() !== `${input.owner}/${ISOLATED_REPOSITORY_NAME}`.toLowerCase()) throw new Error('builder_isolated_repository_identity_mismatch')
+  if (fullName.toLowerCase() !== `${input.owner}/${repositoryName}`.toLowerCase()) throw new Error('builder_isolated_repository_identity_mismatch')
   // Never publish source into a public repository.
   if (repository.private !== true) throw new Error('builder_isolated_repository_not_private')
   const encodedRepo = `/repos/${fullName.split('/').map(encodeURIComponent).join('/')}`

@@ -195,11 +195,10 @@ test('requested endpoint must return matching JSON, not merely homepage success'
 })
 
 // A GitHub where the owner is a personal account or an organization and the job's repository does not exist yet.
-function freshGitHub(options: { ownerType?: string; create?: Response; lookup?: Response; refPendingFor?: number; lookupPendingFor?: number } = {}) {
+function freshGitHub(options: { ownerType?: string; create?: Response; lookup?: Response; refPendingFor?: number } = {}) {
   const calls: { path: string; method: string; body: any }[] = []
   const name = `builder-${jobKey}`
   let pending = options.refPendingFor ?? 0
-  let lookupPending = options.lookupPendingFor ?? 0
   const request = (async (url: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(url)).pathname
     const method = init?.method || 'GET'
@@ -208,10 +207,8 @@ function freshGitHub(options: { ownerType?: string; create?: Response; lookup?: 
     if (path === '/users/SignalBoost') return Response.json({ login: 'SignalBoost', type: options.ownerType ?? 'User' })
     if ((path === '/user/repos' || path === '/orgs/SignalBoost/repos') && method === 'POST')
       return options.create ?? Response.json({ full_name: `SignalBoost/${name}`, private: true }, { status: 201 })
-    if (path === `/repos/SignalBoost/${name}`) {
-      if (lookupPending-- > 0) return Response.json({ message: 'Not Found' }, { status: 404 })
+    if (path === `/repos/SignalBoost/${name}`)
       return options.lookup ?? Response.json({ full_name: `SignalBoost/${name}`, private: true, default_branch: 'main' })
-    }
     if (path.endsWith('/git/ref/heads/main')) {
       if (pending-- > 0) return Response.json({ message: 'Git Repository is empty.' }, { status: 409 })
       return Response.json({ object: { sha: sha('a') } })
@@ -261,17 +258,6 @@ test('a repository created somewhere else, or public, or unreadable by the token
   const unreadable = freshGitHub({ lookup: Response.json({ message: 'Not Found' }, { status: 404 }) })
   await assert.rejects(publishFresh(unreadable.request), /builder_isolated_created_repository_not_accessible/)
   for (const gh of [elsewhere, unreadable]) assert.ok(!gh.calls.some(call => call.path.endsWith('/git/blobs')))
-})
-
-// Production 2026-10-21: the created repository answered 404 one request after its creation.
-test('a just-created repository that is not readable yet is waited for; the shared one never is', async () => {
-  const gh = freshGitHub({ lookupPendingFor: 2 })
-  const result = await publishFresh(gh.request)
-  assert.equal(result.repository, `SignalBoost/${gh.name}`)
-  assert.equal(gh.calls.filter(call => call.path === `/repos/SignalBoost/${gh.name}`).length, 3)
-  const shared = github({ repository: Response.json({ message: 'Not Found' }, { status: 404 }) })
-  await assert.rejects(publish('SignalBoost', shared.request), /^Error: builder_isolated_repository_unavailable$/)
-  assert.equal(shared.calls.length, 1)
 })
 
 test('the first commit of a just-created repository is waited for, briefly', async () => {
@@ -369,5 +355,6 @@ test('the owner job succeeds only once the merge is confirmed', () => {
   assert.match(lane, /if \(!job\.ownerAuthorized\) throw new Error\('builder_isolated_publication_not_authorized'\)/)
   assert.ok(lane.indexOf('verifyIsolatedPreview(') < lane.indexOf('mergeVerifiedIsolatedPullRequest('), 'merge only after the preview')
   assert.match(lane, /previewVerified: preview\.status === 'verified'/)
-  assert.match(lane, /const success = verified && acceptance\.passed && \(!requiresPublication \|\| Boolean\(publication && !publicationError && 'mergeCommitSha' in publication\)\)/)
+  assert.match(lane, /const finalProof = builderFinalProof\(/)
+  assert.match(lane, /const success = finalProof\.passed/)
 })

@@ -49,10 +49,11 @@ export function isolatedDeploymentFiles(files: readonly BuilderFile[]): BuilderF
   if (files.some(file => file.path === 'api/index.js' || file.path === 'vercel.json')) {
     throw new Error('builder_isolated_adapter_path_conflict')
   }
+  const updatedAt = files.find(file => file.path === 'index.js')?.updatedAt ?? Date.now()
   const adapted = [
     ...files,
-    { path: 'api/index.js', content: "const server = require('../index.js')\nmodule.exports = (req, res) => server.emit('request', req, res)\n" },
-    { path: 'vercel.json', content: JSON.stringify({ version: 2, rewrites: [{ source: '/(.*)', destination: '/api/index' }] }) + '\n' },
+    { path: 'api/index.js', updatedAt, content: "const server = require('../index.js')\nmodule.exports = (req, res) => server.emit('request', req, res)\n" },
+    { path: 'vercel.json', updatedAt, content: JSON.stringify({ version: 2, rewrites: [{ source: '/(.*)', destination: '/api/index' }] }) + '\n' },
   ]
   validateIsolatedFiles(adapted)
   return adapted

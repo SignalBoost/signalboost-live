@@ -1,3 +1,4 @@
+import { builderAcceptanceLedger } from './acceptance-ledger.ts'
 import type { BuilderAiPort, BuilderWorkspacePort } from './contracts.ts'
 import { checkpointDigest, workspaceDigest } from './checkpoint.ts'
 import { BuilderV2Dispatcher, type BuilderV2Action, type BuilderV2Receipt } from './agent-v2-dispatcher.ts'
@@ -729,12 +730,30 @@ export class BuilderV2Agent {
         const verified = verifiedRevision === revision && verifiedRevision >= 0
         const listed = await this.dispatcher.dispatch(options.workspaceId, { tool: 'list_files' })
         const files = Array.isArray(listed.output) ? listed.output.map(file => String((file as { path?: unknown }).path)) : []
-        const acceptance = builderV2Acceptance(options.objective, files, steps)
-        if (verified && acceptance.satisfied) return { ok: true, reason: 'verified', steps, summary: decision.summary }
+        // A passing npm test is not evidence for a separately requested node --test invocation.
+        // Before accepting a model's finish signal, let the host execute any missing explicitly
+        // requested verification commands once. This costs no additional model inference.
+        let acceptance = builderV2Acceptance(options.objective, files, steps)
+        if (verified && acceptance.missingFiles.length === 0 && steps.length < BUILDER_V2_MAX_RECEIPTS) {
+          const proof = builderAcceptanceLedger(options.objective, steps)
+          for (const pending of proof.commands.filter(command => !command.passed)) {
+            if (steps.length >= BUILDER_V2_MAX_RECEIPTS || options.signal?.aborted) break
+            const action: BuilderV2Action = { tool: 'run_tests', command: pending.command }
+            const receipt = await this.dispatcher.dispatch(options.workspaceId, action)
+            record(action, receipt)
+            if (!receipt.ok) break
+          }
+          acceptance = builderV2Acceptance(options.objective, files, steps)
+        }
+        const hostProof = builderAcceptanceLedger(options.objective, steps)
+        if (verifiedRevision === revision && verifiedRevision >= 0 &&
+            acceptance.satisfied && hostProof.passed) {
+          return { ok: true, reason: 'verified', steps, summary: decision.summary }
+        }
         // An early or unverified finish is feedback, not the end of the build: the model receives the exact unmet
         // checklist and keeps working. Not a receipt, so counters rebuilt from receipts on resume stay valid.
         // Bounded so a model that keeps claiming completion ends with the unmet checklist instead of looping.
-        const error = verified ? 'builder_v2_checklist_incomplete' : 'builder_v2_unverified_completion'
+        const error = verified ? (hostProof.failureCode || 'builder_v2_checklist_incomplete') : 'builder_v2_unverified_completion'
         if (++checklistRejections >= REJECTION_LIMIT) return { ok: false, reason: error, steps, checkpoint: await snapshot() }
         lastReceipt = JSON.stringify({ tool: 'finish', ok: false, error, ...acceptance,
           next: acceptance.missingFiles.length ? ['write_file'] : acceptance.pendingBrowser ? ['browser_cli', 'edit_file', 'run_tests'] : ['run_tests', 'edit_file'] }).slice(0, 20_000)

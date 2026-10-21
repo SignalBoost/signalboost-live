@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { builderAcceptanceLedger } from '../lib/builder/acceptance-ledger.ts'
 import { BuilderV2Agent, builderV2Acceptance } from '../lib/builder/agent-v2.ts'
 import { BuilderV2Dispatcher, type BuilderV2Receipt } from '../lib/builder/agent-v2-dispatcher.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
@@ -79,3 +80,25 @@ test('a model that keeps claiming completion ends with the checklist reason, nev
   assert.ok(outcome.checkpoint, 'the work done so far is saved')
 })
 // end of saas/tests/builderV2Acceptance.node.test.ts (if this line is missing, the paste was cut short)
+
+test('host executes second explicitly requested command before publishing verified completion', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const executed: string[] = []
+  const decisions = [
+    { type: 'tool', action: { tool: 'write_file', path: 'index.js', content: 'module.exports = 5\n' } },
+    { type: 'tool', action: { tool: 'run_tests', command: 'npm test' } },
+    { type: 'finish', summary: 'all done' },
+  ]
+  const ai = { async generate() { return JSON.stringify(decisions.shift() ?? { type: 'finish', summary: 'done' }) } }
+  const runner = { async run({ command }: { command: string }) {
+    executed.push(command)
+    return { exitCode: 0, stdout: 'ℹ pass 12\nℹ fail 0\n', stderr: '', timedOut: false, executedCommand: command }
+  } }
+  const objective = 'Create Calculator API. Execute npm test and node --test test/*.test.js. Both commands must pass.'
+  assert.equal(builderAcceptanceLedger(objective, []).commands.length, 2)
+  const outcome = await new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, runner), workspace)
+    .run({ workspaceId: 'calculator-auto', objective, maxSteps: 20 })
+  assert.equal(outcome.ok, true)
+  assert.deepEqual(executed, ['npm test', 'node --test test/*.test.js'])
+  assert.equal(outcome.steps.filter(receipt => receipt.tool === 'run_tests').length, 2)
+})

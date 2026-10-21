@@ -188,7 +188,7 @@ export async function verifyIsolatedPreview(input: Readonly<{
   deadlineAt: number
   signal?: AbortSignal
   request?: typeof fetch
-}>): Promise<Readonly<{ deploymentId: string; previewUrl: string; status: 'verified' }>> {
+}>): Promise<Readonly<{ deploymentId: string; previewUrl: string; status: 'verified'; endpointUrl: string; httpStatus: number; responseBody?: unknown }>> {
   if (!input.token || !/^prj_[a-zA-Z0-9_]+$/.test(input.projectId)) throw new Error('builder_isolated_vercel_configuration_invalid')
   if (!/^[0-9a-f]{40}$/i.test(input.commitSha)) throw new Error('builder_isolated_commit_invalid')
   if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(input.repository)) throw new Error('builder_isolated_repository_invalid')
@@ -241,11 +241,15 @@ export async function verifyIsolatedPreview(input: Readonly<{
   const probe = isolatedPreviewProbe(input.objective || '')
   const response = await http(`https://${url}${probe.path}`, { method: 'GET', redirect: 'manual', signal })
   if (response.status !== 200) throw new Error('builder_isolated_preview_endpoint_status_invalid')
+  let confirmedBody: unknown = undefined
   if (probe.expected !== null) {
     let actual: unknown
     try { actual = await response.json() }
     catch { throw new Error('builder_isolated_preview_endpoint_json_invalid') }
     if (JSON.stringify(actual) !== JSON.stringify(probe.expected)) throw new Error('builder_isolated_preview_endpoint_response_mismatch')
+    confirmedBody = actual
   }
-  return { deploymentId: id, previewUrl: `https://${url}`, status: 'verified' }
+  return { deploymentId: id, previewUrl: `https://${url}`, status: 'verified',
+    endpointUrl: `https://${url}${probe.path}`, httpStatus: response.status,
+    ...(confirmedBody === undefined ? {} : { responseBody: confirmedBody }) }
 }

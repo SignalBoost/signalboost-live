@@ -171,3 +171,45 @@ test('no hand-set owner type remains in the publication path', () => {
   assert.doesNotMatch(runner, /BUILDER_ISOLATED_GITHUB_OWNER_TYPE/)
   assert.doesNotMatch(runner, /ownerType/)
 })
+
+test('existing private repository publishes a unique draft PR without repository creation', async () => {
+  const paths: string[] = []
+  const sha = (c: string) => c.repeat(40)
+  const request = (async (url: string | URL | Request) => {
+    const path = new URL(String(url)).pathname
+    paths.push(path)
+    if (path === '/users/SignalBoost') return Response.json({ login: 'SignalBoost', type: 'User' })
+    if (path === '/user') return Response.json({ login: 'SignalBoost' })
+    if (path === '/repos/SignalBoost/builder-isolated') return Response.json({ full_name: 'SignalBoost/builder-isolated', private: true, default_branch: 'main' })
+    if (path.endsWith('/git/ref/heads/main')) return Response.json({ object: { sha: sha('a') } })
+    if (path.endsWith('/git/commits/' + sha('a'))) return Response.json({ tree: { sha: sha('b') } })
+    if (path.endsWith('/git/blobs')) return Response.json({ sha: sha('c') })
+    if (path.endsWith('/git/trees')) return Response.json({ sha: sha('d') })
+    if (path.endsWith('/git/commits')) return Response.json({ sha: sha('e') })
+    if (path.endsWith('/pulls')) return Response.json({ number: 5, html_url: 'https://github.com/SignalBoost/builder-isolated/pull/5' })
+    return Response.json({})
+  }) as typeof fetch
+  const result = await publishVerifiedIsolatedProject({
+    owner: 'SignalBoost', repositoryName: 'builder-isolated-uniquejob', existingRepository: 'SignalBoost/builder-isolated',
+    token: 'test', files, verified: true, authorized: true, request,
+  })
+  assert.equal(result.repository, 'SignalBoost/builder-isolated')
+  assert.ok(paths.includes('/repos/SignalBoost/builder-isolated'))
+  assert.ok(!paths.includes('/user/repos'))
+  assert.ok(!paths.includes('/orgs/SignalBoost/repos'))
+})
+test('existing-repository lane cannot target the platform source repository', async () => {
+  let calls = 0
+  await assert.rejects(publishVerifiedIsolatedProject({
+    owner: 'SignalBoost', repositoryName: 'builder-isolated-job', existingRepository: 'SignalBoost/signalboost-live',
+    token: 'test', files, verified: true, authorized: true,
+    request: (async (url: string | URL | Request) => {
+      calls++
+      const path = new URL(String(url)).pathname
+      if (path === '/users/SignalBoost') return Response.json({ login: 'SignalBoost', type: 'User' })
+      if (path === '/user') return Response.json({ login: 'SignalBoost' })
+      throw new Error('unexpected network call')
+    }) as typeof fetch,
+  }), /builder_isolated_existing_repository_invalid/)
+  assert.equal(calls, 2)
+})

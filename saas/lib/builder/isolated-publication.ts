@@ -43,7 +43,6 @@ type Request = typeof fetch
 export async function publishVerifiedIsolatedProject(input: Readonly<{
   owner: string
   repositoryName: string
-  ownerType: 'user' | 'organization'
   token: string
   files: readonly BuilderFile[]
   verified: boolean
@@ -77,15 +76,27 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
     return payload
   }
 
+  // The account type is read from GitHub, never configured by hand: an organization endpoint for a personal account
+  // (or the reverse) answers 404. Production 2026-10-21: SignalBoost is a personal account.
+  const account = await json(`/users/${encodeURIComponent(input.owner)}`, 'GET', undefined, 'owner_lookup')
+  const owner = String(account.login || '')
+  if (owner.toLowerCase() !== input.owner.toLowerCase() || !safeName.test(owner)) throw new Error('builder_isolated_destination_invalid')
+  const organization = account.type === 'Organization'
+  if (!organization) {
+    // A personal-account repository is always created under the token's own account: refuse before creating it elsewhere.
+    const viewer = await json('/user', 'GET', undefined, 'token_account')
+    if (String(viewer.login || '').toLowerCase() !== owner.toLowerCase()) throw new Error('builder_isolated_token_account_mismatch')
+  }
+
   // Private-by-default creation. Never publish source into the platform repository.
-  const created = await json(input.ownerType === 'organization' ? `/orgs/${encodeURIComponent(input.owner)}/repos` : '/user/repos', 'POST', {
+  const created = await json(organization ? `/orgs/${encodeURIComponent(owner)}/repos` : '/user/repos', 'POST', {
     name: input.repositoryName, private: true, auto_init: true,
     description: 'Isolated Builder V2 verified project',
   }, 'create_repository')
-  if (created.full_name !== `${input.owner}/${input.repositoryName}` || created.private !== true) {
+  if (created.full_name !== `${owner}/${input.repositoryName}` || created.private !== true) {
     throw new Error('builder_isolated_repository_identity_mismatch')
   }
-  const encodedRepo = `/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.repositoryName)}`
+  const encodedRepo = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(input.repositoryName)}`
   const base = String(created.default_branch || 'main')
   if (!safeName.test(base)) throw new Error('builder_isolated_invalid_default_branch')
   // GitHub's auto_init repository creation may become visible before its first ref.

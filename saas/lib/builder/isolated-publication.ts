@@ -64,13 +64,16 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
     'User-Agent': 'SignalBoost-Builder-V2',
   }
   const api = 'https://api.github.com'
-  async function json(path: string, method = 'GET', body?: unknown): Promise<any> {
+  async function json(path: string, method = 'GET', body?: unknown, stage = 'request'): Promise<any> {
     if (input.signal?.aborted || (input.deadlineAt && Date.now() >= input.deadlineAt)) throw new Error('builder_isolated_publication_deadline_exceeded')
     const timeout = input.deadlineAt ? Math.max(1, input.deadlineAt - Date.now()) : 30_000
     const signal = input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout)
     const response = await http(api + path, { method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal })
     const payload = await response.json().catch(() => ({}))
-    if (!response.ok) throw new Error(`builder_isolated_github_http_${response.status}`)
+    if (!response.ok) {
+      // Never expose GitHub's response body or authentication details to job history.
+      throw new Error(`builder_isolated_github_${stage}_http_${response.status}`)
+    }
     return payload
   }
 
@@ -78,14 +81,25 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   const created = await json(input.ownerType === 'organization' ? `/orgs/${encodeURIComponent(input.owner)}/repos` : '/user/repos', 'POST', {
     name: input.repositoryName, private: true, auto_init: true,
     description: 'Isolated Builder V2 verified project',
-  })
+  }, 'create_repository')
   if (created.full_name !== `${input.owner}/${input.repositoryName}` || created.private !== true) {
     throw new Error('builder_isolated_repository_identity_mismatch')
   }
   const encodedRepo = `/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.repositoryName)}`
   const base = String(created.default_branch || 'main')
   if (!safeName.test(base)) throw new Error('builder_isolated_invalid_default_branch')
-  const baseRef = await json(`${encodedRepo}/git/ref/heads/${encodeURIComponent(base)}`)
+  // GitHub's auto_init repository creation may become visible before its first ref.
+  // Retry only the idempotent GET: never replay repository creation or git writes.
+  let baseRef: any
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      baseRef = await json(`${encodedRepo}/git/ref/heads/${encodeURIComponent(base)}`, 'GET', undefined, 'default_branch_ref')
+      break
+    } catch (error) {
+      if (!(error instanceof Error) || error.message !== 'builder_isolated_github_default_branch_ref_http_404' || attempt === 4) throw error
+      await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)))
+    }
+  }
   const baseSha = String(baseRef.object?.sha || '')
   if (!/^[0-9a-f]{40}$/i.test(baseSha)) throw new Error('builder_isolated_invalid_base_sha')
   const baseCommit = await json(`${encodedRepo}/git/commits/${baseSha}`)

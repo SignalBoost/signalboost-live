@@ -85,3 +85,33 @@ test('preview rejects deadline expiry before external effects', async () => {
   }), /deadline_exceeded/)
   assert.equal(called, false)
 })
+
+test('new repository default ref 404 is retried without repeating repository creation', async () => {
+  let creates = 0
+  let refReads = 0
+  const sha = (v: string) => v.repeat(40)
+  const request = (async (url: string | URL | Request, init?: RequestInit) => {
+    const path = new URL(String(url)).pathname
+    if (path === '/orgs/SignalBoost/repos') { creates++; return Response.json({ full_name: 'SignalBoost/builder-isolated-test', private: true, default_branch: 'main' }) }
+    if (path.endsWith('/git/ref/heads/main')) {
+      refReads++
+      return refReads === 1 ? Response.json({ message: 'Not Found' }, { status: 404 }) : Response.json({ object: { sha: sha('a') } })
+    }
+    if (path.endsWith('/git/commits/' + sha('a'))) return Response.json({ tree: { sha: sha('b') } })
+    if (path.endsWith('/git/blobs')) return Response.json({ sha: sha('c') })
+    if (path.endsWith('/git/trees')) return Response.json({ sha: sha('d') })
+    if (path.endsWith('/git/commits')) return Response.json({ sha: sha('e') })
+    if (path.endsWith('/pulls')) return Response.json({ number: 1, html_url: 'https://github.com/SignalBoost/builder-isolated-test/pull/1' })
+    return Response.json({})
+  }) as typeof fetch
+  await publishVerifiedIsolatedProject({ owner: 'SignalBoost', ownerType: 'organization', repositoryName: 'builder-isolated-test',
+    token: 'test', files, verified: true, authorized: true, request })
+  assert.equal(creates, 1)
+  assert.equal(refReads, 2)
+})
+
+test('creation HTTP 404 is identified as a destination/permission failure', async () => {
+  const request = (async () => Response.json({ message: 'Not Found' }, { status: 404 })) as typeof fetch
+  await assert.rejects(publishVerifiedIsolatedProject({ owner: 'SignalBoost', ownerType: 'organization', repositoryName: 'builder-isolated-test',
+    token: 'test', files, verified: true, authorized: true, request }), /builder_isolated_github_create_repository_http_404/)
+})

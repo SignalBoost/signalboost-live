@@ -79,7 +79,7 @@ const CODE_SHAPE_SIGNALS: readonly RegExp[] = [
   /^\s*(?:@[A-Za-z]|\$[A-Za-z_]|--\s|\/\/\s|#\s*[A-Za-z])/m,
 ]
 
-function pastedSourceCode(prompt: string): boolean {
+export function pastedSourceCode(prompt: string): boolean {
   const text = String(prompt || '')
   if (CODE_FENCE.test(text)) return true
   if (text.split(/\n/).filter(line => line.trim()).length < 2) return false

@@ -6,6 +6,8 @@
 // route demanded pasted code, a file name or a stack trace. A repair verb (or a broken-behaviour
 // phrase) aimed at a software subject is enough; authoring a message stays an edit.
 
+import { pastedSourceCode, structuredApplicationBuild } from './cosReasoningRolePolicy.ts'
+
 const REPAIR_ACTION = /\b(?:fix|fixes|fixing|debug|debugging|repair|troubleshoot|resolve)\b/i
 const BROKEN_BEHAVIOUR = /\b(?:(?:does|do|did|is|are)\s*(?:not|n['’]t)\s+(?:work|working|load|loading|submit|submitting|save|saving|open|opening|start|starting|run|running|respond|responding|show|showing|display|displaying|connect|connecting)|not\s+working|broken|crash(?:es|ed|ing)?|fails?|failing|failed\s+to\s+\w+|throws?|stuck|hangs?|freez(?:es|ing))\b/i
 const SOFTWARE_SUBJECT = /\b(?:app|application|website|web\s*site|site|page|screen|button|form|login|log\s*in|sign[\s-]?in|signup|sign[\s-]?up|checkout|cart|dashboard|endpoint|api|server|backend|frontend|database|query|function|component|module|script|code|bug|error|exception|stack\s*trace|crash|build|deploy(?:ment)?|test|tests|route|link|menu|navbar|upload|download|builder|workspace|plugin|extension|integration|webhook|cron|job|request|response|fetch|timeout|404|500|502|503)\b/i
@@ -26,4 +28,20 @@ export function isSoftwareRepairRequest(prompt: string): boolean {
     if (!SOFTWARE_SUBJECT.test(withoutProse)) return false
   }
   return true
+}
+
+// Asks Builder to make something: a build spec, or "create … and fix any bugs". Building needs no source first.
+const BUILD_ACTION = /\b(?:create|build|make|write|implement|scaffold|generate|develop)\b/i
+
+/**
+ * A repair of code that is not here: "Fix the bug in checkout.ts", "Debug my Python script, it crashes".
+ * Naming a file or a language is not the file (Codex on #4734). A request that builds something, or that
+ * carries its code inline, is Builder's to run directly.
+ */
+export function repairAwaitingSource(prompt: string): boolean {
+  const text = String(prompt || '')
+  return isSoftwareRepairRequest(text)
+    && !BUILD_ACTION.test(text)
+    && !structuredApplicationBuild(text)
+    && !pastedSourceCode(text)
 }

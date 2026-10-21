@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { isSoftwareRepairRequest } from '../lib/ai/cos/softwareRepairIntent.ts'
+import { isSoftwareRepairRequest, repairAwaitingSource } from '../lib/ai/cos/softwareRepairIntent.ts'
 import { isFastTextTransform } from '../lib/ai/cos/fastTextTransformIntent.ts'
 import { SUPPORTED_LANGUAGES } from '../lib/i18n/supportedLanguages.ts'
 import { isConciergeBuilderObjective } from '../lib/ai/cos/cosReasoningRolePolicy.ts'
@@ -61,9 +61,9 @@ test('chat ingress sends a repair request to the Software Specialist before any 
 test('the specialist repairs the platform for the owner and asks everyone else for the code, never a dead end', () => {
   const specialist = readFileSync(new URL('../lib/ai/cos/softwareSpecialist.ts', import.meta.url), 'utf8')
   const legacy = specialist.slice(specialist.indexOf('async function tryCosSoftwareSpecialistLegacy'), specialist.indexOf('export async function tryCosSoftwareSpecialist('))
-  const branch = legacy.slice(legacy.indexOf('if (repairRequested && !roleMatched && !designMatched && !suppliedSource'), legacy.indexOf("source: 'cos-builder-source-requested'"))
-  assert.ok(branch.length > 0, 'a build spec or design request is never answered with the request for code')
-  assert.ok(legacy.indexOf('const project = await selectBuilderProject(') < legacy.indexOf('if (repairRequested && !roleMatched'), 'an existing project is continued, not replaced')
+  const branch = legacy.slice(legacy.indexOf('if (repairAwaitingSource(objective) && !newProject && !designMatched && !suppliedSource'), legacy.indexOf("source: 'cos-builder-source-requested'"))
+  assert.ok(branch.length > 100, 'the request-for-code branch is found')
+  assert.ok(legacy.indexOf('const project = await selectBuilderProject(') < legacy.indexOf('if (repairAwaitingSource(objective)'), 'an existing project is continued, not replaced')
   assert.match(branch, /!project\.context/)
   assert.match(branch, /input\.allowRepositoryRepair && access\?\.isOwner && access\.userId/)
   assert.match(branch, /signalBoostDeployedRepairTarget\(rawObjective, \{[\s\S]*?\}, \{ ownerRepairWithoutSource: true \}\)/)
@@ -86,4 +86,21 @@ test('the acceptance spec is a Builder build, not a repair waiting for code', ()
   const objective = JSON.parse(spec.slice(spec.indexOf('const spec = ') + 'const spec = '.length, spec.indexOf('\nconst conversationId')))
   assert.equal(isSoftwareRepairRequest(objective), true, 'it does read as a repair')
   assert.equal(isConciergeBuilderObjective(objective, { attachmentNames: [] }), true, 'so Builder must take it before the request-for-code branch')
+})
+
+// Codex on #4734: naming a file or a language is not the file.
+test('a repair of absent code asks for it; a build or inline code goes to Builder', () => {
+  for (const prompt of [
+    'Fix the bug in checkout.ts',
+    'Debug my Python script, it crashes on startup',
+    'my login form does not submit, can you fix it?',
+    'Fix the Failed to fetch error on the Builder page',
+  ]) assert.equal(repairAwaitingSource(prompt), true, prompt)
+  const spec = readFileSync(new URL('./builderTitledSpecificationRouting.node.test.ts', import.meta.url), 'utf8')
+  const objective = JSON.parse(spec.slice(spec.indexOf('const spec = ') + 'const spec = '.length, spec.indexOf('\nconst conversationId')))
+  for (const prompt of [
+    objective,
+    'Create a Node.js script that adds two numbers, run it and fix any bugs',
+    'debug this:\nfunction add(a, b) {\n  return a - b\n}',
+  ]) assert.equal(repairAwaitingSource(prompt), false, prompt.slice(0, 60))
 })

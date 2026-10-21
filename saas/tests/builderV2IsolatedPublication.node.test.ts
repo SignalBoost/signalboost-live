@@ -40,7 +40,7 @@ test('verified private organization repository is published as a draft PR using 
   })
   assert.equal(result.pullRequestNumber, 3)
   assert.equal(result.commitSha, sha('e'))
-  assert.equal(calls[0].body.private, true)
+  assert.equal(calls.find(x => x.url.endsWith('/orgs/SignalBoost/repos'))?.body.private, true)
   assert.equal(calls.at(-1)?.body.draft, true)
   assert.equal(calls.at(-1)?.body.base, 'isolated-test')
   assert.ok(calls.some(x => x.url.endsWith('/git/refs') && x.body.ref === 'refs/heads/isolated-test'))

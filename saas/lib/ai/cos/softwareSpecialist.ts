@@ -284,7 +284,7 @@ async function tryCosSoftwareSpecialistLegacy(
   // Only a request nothing else in Builder would take: a build spec, a design request or a coding
   // task with its own evidence is Builder's (Production 2026-10-21: the acceptance spec says "debug"
   // and "repair" and was answered with the request for code).
-  if (repairRequested && !roleMatched && !designMatched && !suppliedSource && !mediaAttached && !repositoryTarget && !project.context) {
+  if (repairRequested && !newProject && !roleMatched && !designMatched && !suppliedSource && !mediaAttached && !repositoryTarget && !project.context) {
     if (input.allowRepositoryRepair && access?.isOwner && access.userId) {
       const target = signalBoostDeployedRepairTarget(rawObjective, {
         commitSha: input.deployment?.commitSha || undefined,

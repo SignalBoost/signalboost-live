@@ -410,6 +410,11 @@ export async function POST(request: Request) {
         return noStore({ reply: builderRepositoryErrorReply((error as Error).message), execution_allowed: false }, { status: 422 })
       }
     }
+    // A resent copy of this request must not rewrite files under a job its first copy already started.
+    if (requestedJobId) {
+      const existing = await getBuilderJobForUser(requestedJobId, access.userId)
+      if (existing) return requestedJobReply(existing)
+    }
     for (const file of files) await workspace.writeFile(workspaceId, file.path, file.content)
 
     const jobId = requestedJobId || crypto.randomUUID()

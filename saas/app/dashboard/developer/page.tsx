@@ -17,6 +17,8 @@ const ALLOWED_ATTACHMENT = /\.(?:txt|log|md|mdx|yaml|yml|json|jsonl|csv|xml|js|c
 const BUILDER_HANDOFF_FILES_KEY = 'cos-builder-handoff-files-v1'
 const BUILDER_LAST_JOB_KEY = 'cos-builder-last-job-v1'
 const BUILDER_CONVERSATION_KEY = 'cos-builder-conversation-v1'
+// A Run whose answer never came keeps its job id, so pressing Run again with the same request resolves that job instead of starting a second one.
+const BUILDER_UNCONFIRMED_RUN_KEY = 'cos-builder-unconfirmed-run-v1'
 function filename(path: string): string { return path.split('/').pop() || 'download.txt' }
 function sleep(ms: number): Promise<void> { return new Promise(resolve => setTimeout(resolve, ms)) }
 
@@ -211,8 +213,11 @@ export default function DeveloperPage() {
     setRunning(true); setError(''); setReply(''); setTrace([]); setLiveProgress(null); setActivitySeconds(0); setActiveJobId('')
     try {
       // The job is named before it is sent, so a lost answer can be checked instead of guessed.
-      const requestJobId = crypto.randomUUID()
-      const requestBody = JSON.stringify({ objective: task, conversationId: conversationIdRef.current, workspaceId: workspaceId || undefined, files, jobId: requestJobId })
+      const request = JSON.stringify({ objective: task, conversationId: conversationIdRef.current, workspaceId: workspaceId || undefined, files })
+      let unconfirmed: { jobId?: string; request?: string } | null = null
+      try { unconfirmed = JSON.parse(sessionStorage.getItem(BUILDER_UNCONFIRMED_RUN_KEY) || 'null') } catch { /* no unconfirmed run */ }
+      const requestJobId = unconfirmed?.request === request && /^[0-9a-f-]{36}$/i.test(unconfirmed.jobId || '') ? unconfirmed.jobId! : crypto.randomUUID()
+      const requestBody = JSON.stringify({ ...JSON.parse(request), jobId: requestJobId })
       const submitted = await submitBuilderRun<BuilderReply>({
         post: async () => {
           const response = await fetch('/api/builder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: requestBody })
@@ -226,7 +231,12 @@ export default function DeveloperPage() {
         },
         sleep,
       })
-      if (submitted.kind === 'unreachable') { setError(interpolate('unreachable', requestJobId, '{id}')); return }
+      if (submitted.kind === 'unreachable') {
+        try { sessionStorage.setItem(BUILDER_UNCONFIRMED_RUN_KEY, JSON.stringify({ jobId: requestJobId, request })) } catch { /* storage unavailable */ }
+        setError(interpolate('unreachable', requestJobId, '{id}'))
+        return
+      }
+      try { sessionStorage.removeItem(BUILDER_UNCONFIRMED_RUN_KEY) } catch { /* storage unavailable */ }
       // A job the server already holds is followed like a fresh 202, whatever state it is in.
       const response = submitted.kind === 'answered'
         ? submitted.response

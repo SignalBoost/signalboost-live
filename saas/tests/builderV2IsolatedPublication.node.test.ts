@@ -188,3 +188,48 @@ test('requested endpoint must return matching JSON, not merely homepage success'
   }), /endpoint_response_mismatch/)
   assert.equal(seen.at(-1), 'https://example.vercel.app/sum?a=2&b=3')
 })
+
+test('explicit fresh private repo request creates a private org repository before publishing', async () => {
+  const calls: { path: string; method: string; body: any }[] = []
+  const name = `builder-${jobKey}`
+  const request = (async (url: string | URL | Request, init?: RequestInit) => {
+    const path = new URL(String(url)).pathname
+    const method = init?.method || 'GET'
+    const body = init?.body ? JSON.parse(String(init.body)) : null
+    calls.push({ path, method, body })
+    if (path === '/orgs/SignalBoost/repos' && method === 'POST')
+      return Response.json({ full_name: `SignalBoost/${name}`, private: true }, { status: 201 })
+    if (path === `/repos/SignalBoost/${name}`)
+      return Response.json({ full_name: `SignalBoost/${name}`, private: true, default_branch: 'main' })
+    if (path.endsWith('/git/ref/heads/main')) return Response.json({ object: { sha: sha('a') } })
+    if (path.endsWith('/git/commits/' + sha('a'))) return Response.json({ tree: { sha: sha('b') } })
+    if (path.endsWith('/git/blobs')) return Response.json({ sha: sha('c') })
+    if (path.endsWith('/git/trees')) return Response.json({ sha: sha('d') })
+    if (path.endsWith('/git/commits')) return Response.json({ sha: sha('e') })
+    if (path.endsWith('/git/refs')) return Response.json({ ref: 'ok' }, { status: 201 })
+    if (path.endsWith('/pulls')) return Response.json({ number: 1, html_url: `https://github.com/SignalBoost/${name}/pull/1` })
+    return Response.json({ error: 'unexpected' }, { status: 404 })
+  }) as typeof fetch
+  const result = await publishVerifiedIsolatedProject({
+    owner: 'SignalBoost', jobKey, token: 'test', files,
+    verified: true, authorized: true, newRepository: true, request,
+  })
+  assert.equal(result.repository, `SignalBoost/${name}`)
+  assert.equal(calls[0].path, '/orgs/SignalBoost/repos')
+  assert.equal(calls[0].body.private, true)
+  assert.equal(calls[0].body.auto_init, true)
+  assert.equal(calls.at(-1)?.body.base, `builder/${jobKey}/base`)
+})
+
+test('private repository creation denied with 403 fails closed without shared fallback', async () => {
+  const calls: string[] = []
+  const request = (async (url: string | URL | Request) => {
+    calls.push(new URL(String(url)).pathname)
+    return Response.json({ message: 'Forbidden' }, { status: 403 })
+  }) as typeof fetch
+  await assert.rejects(publishVerifiedIsolatedProject({
+    owner: 'SignalBoost', jobKey, token: 'test', files,
+    verified: true, authorized: true, newRepository: true, request,
+  }), /builder_isolated_github_create_repository_http_403/)
+  assert.deepEqual(calls, ['/orgs/SignalBoost/repos'])
+})

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { ISOLATED_REPOSITORY_NAME, publishVerifiedIsolatedProject, validateIsolatedFiles, verifyIsolatedPreview, isolatedDeploymentFiles, isolatedPreviewProbe, wantsIsolatedPublication } from '../lib/builder/isolated-publication.ts'
+import { ISOLATED_REPOSITORY_NAME, mergeVerifiedIsolatedPullRequest, publishVerifiedIsolatedProject, validateIsolatedFiles, verifyIsolatedPreview, isolatedDeploymentFiles, isolatedPreviewProbe, wantsIsolatedPublication } from '../lib/builder/isolated-publication.ts'
 
 const files = [{ path: 'src/add.js', content: 'module.exports = (a,b) => a+b', updatedAt: Date.now() }]
 const jobKey = '6b3a4e35-5bcb-4f21-a2d7-9cf4c841c25e'
@@ -46,7 +46,9 @@ test('isolated publisher rejects unverified work and unsafe paths before network
 
 // Production 2026-10-21: creating a repository per job was refused (HTTP 403). Every job now publishes into the one
 // pre-created private repository, so the token needs only Contents + Pull requests there.
-test('a verified job is published into the fixed private repository as a draft PR between its own branches', async () => {
+// Owner asked the same day for PR #4 to be merged: the PR now targets the default branch, and each job's files sit in
+// their own folder so concurrent jobs can never conflict there.
+test('a verified job is published into the fixed private repository as a draft PR to the default branch, in its own folder', async () => {
   const gh = github()
   const result = await publish('SignalBoost', gh.request)
   assert.equal(ISOLATED_REPOSITORY_NAME, 'builder-isolated')
@@ -56,13 +58,13 @@ test('a verified job is published into the fixed private repository as a draft P
   assert.equal(gh.calls[0].path, '/repos/SignalBoost/builder-isolated', 'the repository is looked up first')
   assert.ok(!gh.calls.some(call => call.path === '/user/repos' || call.path.startsWith('/orgs/')), 'no repository is ever created')
   const refs = gh.calls.filter(call => call.path.endsWith('/git/refs')).map(call => call.body)
-  assert.deepEqual(refs, [
-    { ref: `refs/heads/builder/${jobKey}/base`, sha: sha('a') },
-    { ref: `refs/heads/builder/${jobKey}/verified`, sha: sha('e') },
-  ])
+  assert.deepEqual(refs, [{ ref: `refs/heads/builder/${jobKey}/verified`, sha: sha('e') }], 'the default branch is never written directly')
+  const tree = gh.calls.find(call => call.path.endsWith('/git/trees'))!.body
+  assert.deepEqual(tree.tree.map((entry: any) => entry.path), [`projects/${jobKey}/src/add.js`])
+  assert.equal(tree.base_tree, sha('b'))
   const pr = gh.calls.at(-1)!
-  assert.equal(pr.body.draft, true)
-  assert.equal(pr.body.base, `builder/${jobKey}/base`, 'never the default branch')
+  assert.equal(pr.body.draft, true, 'a draft until the preview is verified')
+  assert.equal(pr.body.base, 'main')
   assert.equal(pr.body.head, `builder/${jobKey}/verified`)
   assert.equal(gh.calls.find(call => call.path.endsWith('/git/commits') && call.method === 'POST')?.body.parents[0], sha('a'))
 })
@@ -98,7 +100,7 @@ test('a refused write names the step it failed at', async () => {
     if (init?.method === 'POST' && path.endsWith('/git/refs')) return Response.json({ message: 'Resource not accessible' }, { status: 403 })
     return github().request(url, init)
   }) as typeof fetch
-  await assert.rejects(publish('SignalBoost', request), /builder_isolated_github_create_base_branch_http_403/)
+  await assert.rejects(publish('SignalBoost', request), /builder_isolated_github_create_head_branch_http_403/)
 })
 
 test('the job id names branches and explicit fresh repos are permitted', () => {
@@ -221,7 +223,7 @@ test('explicit fresh private repo request creates a private org repository befor
   assert.equal(calls[0].path, '/orgs/SignalBoost/repos')
   assert.equal(calls[0].body.private, true)
   assert.equal(calls[0].body.auto_init, true)
-  assert.equal(calls.at(-1)?.body.base, `builder/${jobKey}/base`)
+  assert.equal(calls.at(-1)?.body.base, 'main')
 })
 
 test('private repository creation denied with 403 fails closed without shared fallback', async () => {
@@ -253,4 +255,75 @@ test('verified API response is retained in the durable publication receipt', asy
   assert.equal(result.endpointUrl, 'https://example.vercel.app/sum?a=2&b=3')
   assert.equal(result.httpStatus, 200)
   assert.deepEqual(result.responseBody, { total: 5 })
+})
+
+// A GitHub holding one draft PR #3 whose head is the verified commit.
+function mergeable(options: { head?: string; base?: string; ready?: unknown; merge?: Response; merged?: boolean } = {}) {
+  const calls: { path: string; method: string; body: any }[] = []
+  let draft = true
+  let merged = false
+  const request = (async (url: string | URL | Request, init?: RequestInit) => {
+    const method = init?.method || 'GET'
+    const path = new URL(String(url)).pathname
+    const body = init?.body ? JSON.parse(String(init.body)) : null
+    calls.push({ path, method, body })
+    if (path === '/repos/SignalBoost/builder-isolated') return Response.json({ full_name: 'SignalBoost/builder-isolated', private: true, default_branch: 'main' })
+    if (path === '/repos/SignalBoost/builder-isolated/pulls/3' && method === 'GET') {
+      return Response.json({ node_id: 'PR_node3', draft, head: { sha: options.head ?? sha('e') }, base: { ref: options.base ?? 'main' },
+        merged: options.merged ?? merged, merge_commit_sha: (options.merged ?? merged) ? sha('f') : null })
+    }
+    if (path === '/graphql') {
+      assert.equal(body.variables.id, 'PR_node3')
+      draft = false
+      return Response.json(options.ready ?? { data: { markPullRequestReadyForReview: { pullRequest: { isDraft: false } } } })
+    }
+    if (path === '/repos/SignalBoost/builder-isolated/pulls/3/merge' && method === 'PUT') {
+      if (draft) return Response.json({ message: 'Pull Request is still a draft' }, { status: 405 })
+      if (options.merge) return options.merge
+      merged = true
+      return Response.json({ merged: true, sha: sha('f') })
+    }
+    return Response.json({ message: 'Not Found' }, { status: 404 })
+  }) as typeof fetch
+  return { calls, request }
+}
+const merge = (request: typeof fetch, overrides: Partial<{ previewVerified: boolean; commitSha: string }> = {}) => mergeVerifiedIsolatedPullRequest({
+  token: 'test', repository: 'SignalBoost/builder-isolated', pullRequestNumber: 3, commitSha: sha('e'), previewVerified: true, request, ...overrides,
+})
+
+test('after a verified preview the draft PR is marked ready, merged at the verified commit and confirmed', async () => {
+  const gh = mergeable()
+  assert.deepEqual(await merge(gh.request), { mergedInto: 'main', mergeCommitSha: sha('f') })
+  const put = gh.calls.find(call => call.method === 'PUT')!
+  assert.equal(put.body.sha, sha('e'), 'pinned to the tested and previewed commit')
+  assert.equal(put.body.merge_method, 'merge')
+  assert.ok(gh.calls.findIndex(call => call.path === '/graphql') < gh.calls.indexOf(put), 'ready before merge')
+  assert.equal(gh.calls.at(-1)!.method, 'GET', 'the merge is confirmed by reading the PR back')
+})
+
+test('nothing is merged without a verified preview, a matching head and the default branch as base', async () => {
+  for (const [label, gh, overrides, error] of [
+    ['unverified preview', mergeable(), { previewVerified: false }, /merge_requires_verified_preview/],
+    ['head moved after verification', mergeable({ head: sha('9') }), {}, /merge_head_changed/],
+    ['PR aimed elsewhere', mergeable({ base: 'builder/x/base' }), {}, /merge_base_invalid/],
+    ['ready refused', mergeable({ ready: { errors: [{ message: 'no' }] } }), {}, /mark_ready_refused/],
+  ] as const) {
+    await assert.rejects(merge(gh.request, overrides), error, label)
+    assert.ok(!gh.calls.some(call => call.method === 'PUT'), `${label}: no merge attempted`)
+  }
+})
+
+test('a refused or unconfirmed merge fails the job instead of being reported as merged', async () => {
+  await assert.rejects(merge(mergeable({ merge: Response.json({ message: 'conflict' }, { status: 409 }) }).request), /^Error: builder_isolated_github_merge_http_409$/)
+  const silent = mergeable({ merge: Response.json({ merged: true }), merged: false })
+  await assert.rejects(merge(silent.request), /merge_unconfirmed/)
+})
+
+test('the owner job succeeds only once the merge is confirmed', () => {
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  const lane = runner.slice(runner.indexOf('if (verified && requiresPublication)'), runner.indexOf('await finishBuilderJob(', runner.indexOf('if (verified && requiresPublication)')))
+  assert.match(lane, /if \(!job\.ownerAuthorized\) throw new Error\('builder_isolated_publication_not_authorized'\)/)
+  assert.ok(lane.indexOf('verifyIsolatedPreview(') < lane.indexOf('mergeVerifiedIsolatedPullRequest('), 'merge only after the preview')
+  assert.match(lane, /previewVerified: preview\.status === 'verified'/)
+  assert.match(lane, /const success = verified && \(!requiresPublication \|\| Boolean\(publication && !publicationError && 'mergeCommitSha' in publication\)\)/)
 })

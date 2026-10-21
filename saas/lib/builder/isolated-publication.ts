@@ -81,10 +81,43 @@ type Request = typeof fetch
  * Every verified job publishes into one pre-created private repository, never a new one per job: the credential then
  * needs Contents + Pull requests on that single repository only, and no repository-creation authority anywhere.
  * Production 2026-10-21: per-job creation was refused (HTTP 403) by a token scoped to existing repositories.
- * Each job gets its own base and head branches, so jobs stay isolated and the repository's default branch is never written.
+ * Each job's files live under their own folder, so jobs never overwrite or conflict with one another on the default branch.
  */
 export const ISOLATED_REPOSITORY_NAME = 'builder-isolated'
 const jobKeyPattern = /^[a-z0-9][a-z0-9-]{7,63}$/i
+
+export function isolatedProjectFolder(jobKey: string): string {
+  if (!jobKeyPattern.test(jobKey)) throw new Error('builder_isolated_destination_invalid')
+  return `projects/${jobKey}`
+}
+
+type GitHubCall = Readonly<{ token: string; signal?: AbortSignal; deadlineAt?: number; request?: Request }>
+
+async function github(call: GitHubCall, path: string, method = 'GET', body?: unknown, stage = 'request'): Promise<any> {
+  if (call.signal?.aborted || (call.deadlineAt && Date.now() >= call.deadlineAt)) throw new Error('builder_isolated_publication_deadline_exceeded')
+  const timeout = call.deadlineAt ? Math.max(1, call.deadlineAt - Date.now()) : 30_000
+  const signal = call.signal ? AbortSignal.any([call.signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout)
+  const response = await (call.request ?? fetch)('https://api.github.com' + path, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${call.token}`,
+      'Accept': 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'SignalBoost-Builder-V2',
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    signal,
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    // Never expose GitHub's response body or authentication details to job history.
+    throw new Error(`builder_isolated_github_${stage}_http_${response.status}`)
+  }
+  return payload
+}
+
+const repositoryPath = (fullName: string) => `/repos/${fullName.split('/').map(encodeURIComponent).join('/')}`
 
 export async function publishVerifiedIsolatedProject(input: Readonly<{
   owner: string
@@ -101,27 +134,7 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   if (!input.authorized || !input.verified) throw new Error('builder_isolated_publication_not_authorized')
   if (!safeName.test(input.owner) || !jobKeyPattern.test(input.jobKey) || !input.token) throw new Error('builder_isolated_destination_invalid')
   validateIsolatedFiles(input.files)
-  const http = input.request ?? fetch
-  const headers = {
-    'Authorization': `Bearer ${input.token}`,
-    'Accept': 'application/vnd.github+json',
-    'Content-Type': 'application/json',
-    'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'SignalBoost-Builder-V2',
-  }
-  const api = 'https://api.github.com'
-  async function json(path: string, method = 'GET', body?: unknown, stage = 'request'): Promise<any> {
-    if (input.signal?.aborted || (input.deadlineAt && Date.now() >= input.deadlineAt)) throw new Error('builder_isolated_publication_deadline_exceeded')
-    const timeout = input.deadlineAt ? Math.max(1, input.deadlineAt - Date.now()) : 30_000
-    const signal = input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout)
-    const response = await http(api + path, { method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal })
-    const payload = await response.json().catch(() => ({}))
-    if (!response.ok) {
-      // Never expose GitHub's response body or authentication details to job history.
-      throw new Error(`builder_isolated_github_${stage}_http_${response.status}`)
-    }
-    return payload
-  }
+  const json = (path: string, method = 'GET', body?: unknown, stage = 'request') => github(input, path, method, body, stage)
 
   // Explicit acceptance requiring a new private repository must never silently use the shared fallback.
   // A 403 here means the server credential lacks repository-creation permission.
@@ -143,7 +156,7 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   if (fullName.toLowerCase() !== `${input.owner}/${repositoryName}`.toLowerCase()) throw new Error('builder_isolated_repository_identity_mismatch')
   // Never publish source into a public repository.
   if (repository.private !== true) throw new Error('builder_isolated_repository_not_private')
-  const encodedRepo = `/repos/${fullName.split('/').map(encodeURIComponent).join('/')}`
+  const encodedRepo = repositoryPath(fullName)
   const defaultBranch = String(repository.default_branch || '')
   if (!safeName.test(defaultBranch)) throw new Error('builder_isolated_invalid_default_branch')
   const baseRef = await json(`${encodedRepo}/git/ref/heads/${encodeURIComponent(defaultBranch)}`, 'GET', undefined, 'default_branch_ref')
@@ -154,26 +167,70 @@ export async function publishVerifiedIsolatedProject(input: Readonly<{
   const baseSha = String(baseRef.object?.sha || '')
   if (!/^[0-9a-f]{40}$/i.test(baseSha)) throw new Error('builder_isolated_invalid_base_sha')
   const baseCommit = await json(`${encodedRepo}/git/commits/${baseSha}`, 'GET', undefined, 'base_commit')
-  const baseBranch = `builder/${input.jobKey}/base`
+  const folder = isolatedProjectFolder(input.jobKey)
   const headBranch = `builder/${input.jobKey}/verified`
-  // The PR targets this job's own base branch, never the repository's default branch.
-  await json(`${encodedRepo}/git/refs`, 'POST', { ref: `refs/heads/${baseBranch}`, sha: baseSha }, 'create_base_branch')
   const tree = []
   for (const file of input.files) {
     const blob = await json(`${encodedRepo}/git/blobs`, 'POST', { content: file.content, encoding: 'utf-8' }, 'create_blob')
-    tree.push({ path: file.path, mode: '100644', type: 'blob', sha: blob.sha })
+    tree.push({ path: `${folder}/${file.path}`, mode: '100644', type: 'blob', sha: blob.sha })
   }
   const newTree = await json(`${encodedRepo}/git/trees`, 'POST', { base_tree: baseCommit.tree.sha, tree }, 'create_tree')
   const commit = await json(`${encodedRepo}/git/commits`, 'POST', {
-    message: 'Builder V2: verified isolated project', tree: newTree.sha, parents: [baseSha],
+    message: `Builder V2: verified project ${input.jobKey}`, tree: newTree.sha, parents: [baseSha],
   }, 'create_commit')
   await json(`${encodedRepo}/git/refs`, 'POST', { ref: `refs/heads/${headBranch}`, sha: commit.sha }, 'create_head_branch')
+  // A draft until the preview answers the requested endpoint; only then is it marked ready and merged.
   const pr = await json(`${encodedRepo}/pulls`, 'POST', {
-    head: headBranch, base: baseBranch, title: `Builder V2: verified project ${input.jobKey}`, body: 'Host tests passed before publication. Preview and deployment require separate independent verification.',
+    head: headBranch, base: defaultBranch, title: `Builder V2: verified project ${input.jobKey}`,
+    body: `Host tests passed before publication. Files: \`${folder}/\`. Builder merges this pull request only after its Vercel preview answers the requested endpoint.`,
     draft: true,
   }, 'create_pull_request')
   if (!pr.html_url || !Number.isInteger(pr.number)) throw new Error('builder_isolated_pull_request_unconfirmed')
   return { repository: fullName, pullRequestUrl: pr.html_url, pullRequestNumber: pr.number, commitSha: commit.sha }
+}
+
+/**
+ * Owner jobs end merged: after the preview of the exact commit is verified, the draft PR is marked ready and merged
+ * into the repository's default branch, pinned to that commit. The merge is reported only once GitHub confirms it.
+ */
+export async function mergeVerifiedIsolatedPullRequest(input: Readonly<{
+  token: string
+  repository: string
+  pullRequestNumber: number
+  commitSha: string
+  previewVerified: boolean
+  signal?: AbortSignal
+  deadlineAt?: number
+  request?: Request
+}>): Promise<Readonly<{ mergedInto: string; mergeCommitSha: string }>> {
+  if (!input.previewVerified) throw new Error('builder_isolated_merge_requires_verified_preview')
+  if (!input.token || !/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(input.repository)) throw new Error('builder_isolated_repository_invalid')
+  if (!Number.isInteger(input.pullRequestNumber) || input.pullRequestNumber < 1) throw new Error('builder_isolated_pull_request_invalid')
+  if (!/^[0-9a-f]{40}$/i.test(input.commitSha)) throw new Error('builder_isolated_commit_invalid')
+  const encodedRepo = repositoryPath(input.repository)
+  const pull = await github(input, `${encodedRepo}/pulls/${input.pullRequestNumber}`, 'GET', undefined, 'pull_request_lookup')
+  const repository = await github(input, encodedRepo, 'GET', undefined, 'repository_lookup')
+  const defaultBranch = String(repository.default_branch || '')
+  // Merge only the commit that was tested and previewed, only into the default branch.
+  if (String(pull.head?.sha || '').toLowerCase() !== input.commitSha.toLowerCase()) throw new Error('builder_isolated_merge_head_changed')
+  if (!safeName.test(defaultBranch) || pull.base?.ref !== defaultBranch) throw new Error('builder_isolated_merge_base_invalid')
+  if (pull.draft === true) {
+    const ready = await github(input, '/graphql', 'POST', {
+      query: 'mutation($id: ID!) { markPullRequestReadyForReview(input: { pullRequestId: $id }) { pullRequest { isDraft } } }',
+      variables: { id: String(pull.node_id || '') },
+    }, 'mark_ready')
+    if (ready?.errors?.length || ready?.data?.markPullRequestReadyForReview?.pullRequest?.isDraft !== false) {
+      throw new Error('builder_isolated_github_mark_ready_refused')
+    }
+  }
+  await github(input, `${encodedRepo}/pulls/${input.pullRequestNumber}/merge`, 'PUT', {
+    sha: input.commitSha, merge_method: 'merge',
+    commit_title: `Merge Builder V2 verified project (#${input.pullRequestNumber})`,
+  }, 'merge')
+  const merged = await github(input, `${encodedRepo}/pulls/${input.pullRequestNumber}`, 'GET', undefined, 'merge_confirmation')
+  const mergeCommitSha = String(merged.merge_commit_sha || '')
+  if (merged.merged !== true || !/^[0-9a-f]{40}$/i.test(mergeCommitSha)) throw new Error('builder_isolated_merge_unconfirmed')
+  return { mergedInto: defaultBranch, mergeCommitSha }
 }
 
 

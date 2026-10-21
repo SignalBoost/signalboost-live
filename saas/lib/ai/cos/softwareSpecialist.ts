@@ -378,6 +378,9 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   const context = routingContext(input.body)
   const sourceAttached = hasSourceAttachment(context)
   const mediaAttached = hasImageOrPdfAttachment(input.body)
+  // Guidance-only requests must not enqueue Builder or mutate a repository.
+  // The default remains autonomous for existing clients; collaboration requires consent.
+  const assistanceMode = input.body?.assistanceMode ?? input.body?.context?.assistanceMode
   const specialistRelevant = sourceAttached
     || mediaAttached
     || isConciergeBuilderObjective(objective, context)
@@ -390,6 +393,19 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
     || (input.allowRepositoryRepair === true && isOperationalLogEvidence(objective))
 
   if (!specialistRelevant) return null
+
+  if (assistanceMode === 'guide' || assistanceMode === 'collaborate') {
+    return NextResponse.json({
+      reply: assistanceMode === 'guide'
+        ? 'Guidance mode is selected. I can analyze your code or error and suggest specific fixes without editing your repository. Share the failing command or relevant files.'
+        : 'Collaborative mode is selected. I can propose a repair plan, but I will not change code or access a repository until you explicitly approve the next action.',
+      source: 'cos-builder-assistance-mode',
+      assistanceMode,
+      execution_allowed: false,
+      external_action_taken: false,
+      ...softwareSpecialistFields('software.guide'),
+    })
+  }
 
   const admissionBlocker = builderExecutionAdmissionBlocker(objective)
   if (admissionBlocker) return NextResponse.json({

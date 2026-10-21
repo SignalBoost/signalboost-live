@@ -280,10 +280,12 @@ export function conciergeBuilderRequest(body: unknown): { endpoint: '/api/builde
       files.push({ path, content })
     }
   } else {
-    const pasted = pastedConciergeSourceFile(objective)
     // A from-scratch application specification has no source file yet. It must
-    // create an empty Builder workspace, not silently fall through to COS chat.
-    if (!pasted && !structuredApplicationBuild(objective)) return null
+    // create an empty Builder workspace, not silently fall through to COS chat; its fenced
+    // examples (an expected JSON response, the test commands) are not source to stage.
+    const specification = structuredApplicationBuild(objective)
+    const pasted = specification ? null : pastedConciergeSourceFile(objective)
+    if (!pasted && !specification) return null
     if (pasted) files.push(pasted)
   }
 

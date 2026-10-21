@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { ISOLATED_REPOSITORY_NAME, publishVerifiedIsolatedProject, validateIsolatedFiles, verifyIsolatedPreview, wantsIsolatedPublication } from '../lib/builder/isolated-publication.ts'
+import { ISOLATED_REPOSITORY_NAME, publishVerifiedIsolatedProject, validateIsolatedFiles, verifyIsolatedPreview, isolatedDeploymentFiles, isolatedPreviewProbe, wantsIsolatedPublication } from '../lib/builder/isolated-publication.ts'
 
 const files = [{ path: 'src/add.js', content: 'module.exports = (a,b) => a+b', updatedAt: Date.now() }]
 const jobKey = '6b3a4e35-5bcb-4f21-a2d7-9cf4c841c25e'
@@ -156,4 +156,35 @@ test('preview returns the sanitized Vercel validation code on deployment 400', a
     token: 'test', projectId: 'prj_abc123', repository: 'SignalBoost/builder-isolated-test',
     commitSha: 'a'.repeat(40), files, deadlineAt: Date.now() + 60_000, request,
   }), /^Error: builder_isolated_vercel_http_400_invalid_deployment_target$/)
+})
+
+test('Node server export is published with a deterministic Vercel function adapter', () => {
+  const source = [...files, { path: 'index.js', content: "const http = require('http'); const server = http.createServer((req,res)=>res.end('ok')); module.exports = server;", updatedAt: Date.now() }]
+  const adapted = isolatedDeploymentFiles(source)
+  assert.equal(adapted.length, source.length + 2)
+  assert.equal(adapted.find(f => f.path === 'index.js')?.content, source[1].content)
+  assert.match(adapted.find(f => f.path === 'api/index.js')?.content || '', /server.emit/)
+  assert.equal(JSON.parse(adapted.find(f => f.path === 'vercel.json')?.content || '{}').rewrites[0].destination, '/api/index')
+})
+
+test('acceptance probe uses the exact requested GET and expected JSON', () => {
+  const objective = 'GET /sum?a=2&b=3\n\nExpected response:\n```json\n{"total":5}\n```'
+  assert.deepEqual(isolatedPreviewProbe(objective), { path: '/sum?a=2&b=3', expected: { total: 5 } })
+  assert.throws(() => isolatedPreviewProbe('GET /sum?a=2&b=3'), /expected_response_missing/)
+})
+
+test('requested endpoint must return matching JSON, not merely homepage success', async () => {
+  const objective = 'GET /sum?a=2&b=3\nExpected response:\n```json\n{"total":5}\n```'
+  const seen: string[] = []
+  const request = (async (url: string | URL | Request, init?: RequestInit) => {
+    seen.push(String(url))
+    if (init?.method === 'POST') return Response.json({ id: 'dpl_valid123' })
+    if (String(url).endsWith('/v13/deployments/dpl_valid123')) return Response.json({ readyState: 'READY', url: 'example.vercel.app' })
+    return Response.json({ total: 4 }, { status: 200 })
+  }) as typeof fetch
+  await assert.rejects(verifyIsolatedPreview({
+    token: 'test', projectId: 'prj_abc123', repository: 'SignalBoost/builder-isolated',
+    commitSha: 'a'.repeat(40), files, objective, deadlineAt: Date.now() + 60_000, request,
+  }), /endpoint_response_mismatch/)
+  assert.equal(seen.at(-1), 'https://example.vercel.app/sum?a=2&b=3')
 })

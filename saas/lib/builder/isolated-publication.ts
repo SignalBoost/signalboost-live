@@ -38,6 +38,43 @@ export function validateIsolatedFiles(files: readonly BuilderFile[]): void {
   }
 }
 
+/**
+ * Adapt a host-verified Node HTTP server to Vercel Functions without modifying its source.
+ * The adapter is deterministic, published to GitHub and deployed with the same content.
+ */
+export function isolatedDeploymentFiles(files: readonly BuilderFile[]): BuilderFile[] {
+  validateIsolatedFiles(files)
+  const entry = files.find(file => file.path === 'index.js')?.content || ''
+  if (!/module\.exports\s*=\s*server\s*;?/.test(entry) || !/createServer\s*\(/.test(entry)) return [...files]
+  if (files.some(file => file.path === 'api/index.js' || file.path === 'vercel.json')) {
+    throw new Error('builder_isolated_adapter_path_conflict')
+  }
+  const updatedAt = files.find(file => file.path === 'index.js')?.updatedAt ?? Date.now()
+  const adapted = [
+    ...files,
+    { path: 'api/index.js', updatedAt, content: "const server = require('../index.js')\nmodule.exports = (req, res) => server.emit('request', req, res)\n" },
+    { path: 'vercel.json', updatedAt, content: JSON.stringify({ version: 2, rewrites: [{ source: '/(.*)', destination: '/api/index' }] }) + '\n' },
+  ]
+  validateIsolatedFiles(adapted)
+  return adapted
+}
+
+/** Only relative same-origin GET paths and literal JSON response fixtures are accepted. */
+export function isolatedPreviewProbe(objective: string): { path: string; expected: unknown | null } {
+  const endpoint = /\bGET\s+(\/[^\s`<>"']+)/i.exec(objective)
+  if (!endpoint) return { path: '/', expected: null }
+  const path = endpoint[1]
+  if (!/^\/[A-Za-z0-9_~%?&=.+-]+$/.test(path) || path.startsWith('//')) {
+    throw new Error('builder_isolated_preview_path_invalid')
+  }
+  const fixture = /expected\s+response\s*:\s*```(?:json)?\s*([\s\S]*?)```/i.exec(objective)
+  if (!fixture) throw new Error('builder_isolated_preview_expected_response_missing')
+  let expected: unknown
+  try { expected = JSON.parse(fixture[1]) }
+  catch { throw new Error('builder_isolated_preview_expected_json_invalid') }
+  return { path, expected }
+}
+
 type Request = typeof fetch
 
 /**
@@ -135,6 +172,7 @@ export async function verifyIsolatedPreview(input: Readonly<{
   repository: string
   commitSha: string
   files: readonly BuilderFile[]
+  objective?: string
   deadlineAt: number
   signal?: AbortSignal
   request?: typeof fetch
@@ -188,7 +226,14 @@ export async function verifyIsolatedPreview(input: Readonly<{
   if (!ready || !/^[a-zA-Z0-9.-]+\.vercel\.app$/.test(url)) throw new Error('builder_isolated_preview_not_ready')
   if (Date.now() >= input.deadlineAt || input.signal?.aborted) throw new Error('builder_isolated_publication_deadline_exceeded')
   const signal = input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(Math.max(1, input.deadlineAt - Date.now()))]) : AbortSignal.timeout(Math.max(1, input.deadlineAt - Date.now()))
-  const response = await http(`https://${url}/`, { method: 'GET', redirect: 'manual', signal })
-  if (response.status !== 200) throw new Error('builder_isolated_preview_smoke_failed')
+  const probe = isolatedPreviewProbe(input.objective || '')
+  const response = await http(`https://${url}${probe.path}`, { method: 'GET', redirect: 'manual', signal })
+  if (response.status !== 200) throw new Error('builder_isolated_preview_endpoint_status_invalid')
+  if (probe.expected !== null) {
+    let actual: unknown
+    try { actual = await response.json() }
+    catch { throw new Error('builder_isolated_preview_endpoint_json_invalid') }
+    if (JSON.stringify(actual) !== JSON.stringify(probe.expected)) throw new Error('builder_isolated_preview_endpoint_response_mismatch')
+  }
   return { deploymentId: id, previewUrl: `https://${url}`, status: 'verified' }
 }

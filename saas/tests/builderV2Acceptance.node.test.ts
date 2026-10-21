@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { builderAcceptanceLedger } from '../lib/builder/acceptance-ledger.ts'
 import { BuilderV2Agent, builderV2Acceptance } from '../lib/builder/agent-v2.ts'
 import { BuilderV2Dispatcher, type BuilderV2Receipt } from '../lib/builder/agent-v2-dispatcher.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
@@ -94,6 +95,7 @@ test('host executes second explicitly requested command before publishing verifi
     return { exitCode: 0, stdout: 'ℹ pass 12\nℹ fail 0\n', stderr: '', timedOut: false, executedCommand: command }
   } }
   const objective = 'Create Calculator API. Execute npm test and node --test test/*.test.js. Both commands must pass.'
+  assert.equal(builderAcceptanceLedger(objective, []).commands.length, 2)
   const outcome = await new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, runner), workspace)
     .run({ workspaceId: 'calculator-auto', objective, maxSteps: 20 })
   assert.equal(outcome.ok, true)

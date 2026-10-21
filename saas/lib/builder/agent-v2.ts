@@ -483,13 +483,17 @@ export class BuilderV2Agent {
     })
     const verifiedNow = async (): Promise<BuilderV2Outcome | null> => {
       const acceptance = builderV2Acceptance(options.objective, knownFiles, steps)
-      return acceptance.satisfied && missingFiles().length === 0
+      return acceptance.satisfied && builderAcceptanceLedger(options.objective, steps).passed && missingFiles().length === 0
         ? { ok: true, reason: 'verified', summary: 'Every required command passed on the host after the latest source change.', steps, checkpoint: await snapshot() }
         : null
     }
+    const requiredHostCommands = () => [...new Set([
+      ...checklist.commands,
+      ...builderAcceptanceLedger(options.objective, steps).commands.map(command => command.command),
+    ])]
     const hostVerificationDue = () => checklist.files.length > 0
-      && missingFiles().length === 0 && checklist.commands.length > 0 && syntaxErrors.size === 0
-      && checklist.commands.some(command => !latestCommandRun(command))
+      && missingFiles().length === 0 && requiredHostCommands().length > 0 && syntaxErrors.size === 0
+      && requiredHostCommands().some(command => !latestCommandRun(command))
       && !currentRevisionRuns().some(step => !step.ok)
     const hostVerify = async (): Promise<BuilderV2Outcome | null> => {
       // Reproduce the last failing command first after an edit, then prove every
@@ -499,11 +503,12 @@ export class BuilderV2Agent {
         { requestedCommand?: string } | undefined)?.requestedCommand
       // Preserve explicit setup/build ordering. Only move a failure ahead of
       // test-only predecessors, never ahead of install/generate/build steps.
-      const failedIndex = checklist.commands.indexOf(failedCommand ?? '')
-      const testOnlyPrefix = failedIndex >= 0 && checklist.commands.slice(0, failedIndex)
+      const requiredCommands = requiredHostCommands()
+      const failedIndex = requiredCommands.indexOf(failedCommand ?? '')
+      const testOnlyPrefix = failedIndex >= 0 && requiredCommands.slice(0, failedIndex)
         .every(command => /^(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test(?:\s|$)|node\s+--test(?:\s|$))/.test(command))
       const commands = testOnlyPrefix
-        ? [failedCommand!, ...checklist.commands.filter(command => command !== failedCommand)] : checklist.commands
+        ? [failedCommand!, ...requiredCommands.filter(command => command !== failedCommand)] : requiredCommands
       for (const command of commands) {
         if (latestCommandRun(command)?.ok) continue
         if (latestCommandRun(command) && !latestCommandRun(command)?.ok) return null

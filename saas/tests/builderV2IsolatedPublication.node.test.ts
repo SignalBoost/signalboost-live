@@ -355,5 +355,6 @@ test('the owner job succeeds only once the merge is confirmed', () => {
   assert.match(lane, /if \(!job\.ownerAuthorized\) throw new Error\('builder_isolated_publication_not_authorized'\)/)
   assert.ok(lane.indexOf('verifyIsolatedPreview(') < lane.indexOf('mergeVerifiedIsolatedPullRequest('), 'merge only after the preview')
   assert.match(lane, /previewVerified: preview\.status === 'verified'/)
-  assert.match(lane, /const success = verified && acceptance\.passed && \(!requiresPublication \|\| Boolean\(publication && !publicationError && 'mergeCommitSha' in publication\)\)/)
+  assert.match(lane, /const finalProof = builderFinalProof\\(/)
+  assert.match(lane, /const success = finalProof\\.passed/)
 })

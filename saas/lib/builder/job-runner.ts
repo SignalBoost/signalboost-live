@@ -1,5 +1,5 @@
 import type { BuilderLoopCheckpoint } from './checkpoint.ts'
-import { publishVerifiedIsolatedProject, verifyIsolatedPreview, wantsIsolatedPublication } from './isolated-publication.ts'
+import { publishVerifiedIsolatedProject, verifyIsolatedPreview, isolatedDeploymentFiles, wantsIsolatedPublication } from './isolated-publication.ts'
 import { withHostProductionHarnessIngress } from '../../platform-harness/runtime/host-ingress.ts'
 import { classifyBuilderDocumentationIntent } from './documentation-intent.ts'
 import { builderRunSourceEvidence } from './source-evidence.ts'
@@ -487,16 +487,17 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           if (builderJobOverTotalDeadline(job.createdAt, Date.now(), totalDeadlineMs)) throw new Error('builder_isolated_publication_deadline_exceeded')
           const contents = await Promise.all(files.map(path => workspace.readFile(job.workspaceId, path)))
           if (contents.some(file => !file)) throw new Error('builder_isolated_workspace_file_missing')
+          const preparedFiles = isolatedDeploymentFiles(contents.filter((file): file is NonNullable<typeof file> => Boolean(file)))
           const published = await publishVerifiedIsolatedProject({
             owner, jobKey: job.id,
-            token, files: contents.filter((file): file is NonNullable<typeof file> => Boolean(file)),
+            token, files: preparedFiles,
             verified: true, authorized: true, signal: deadlineController.signal,
             deadlineAt: Date.parse(job.createdAt) + totalDeadlineMs,
           })
           publication = { ...published }
           const preview = await verifyIsolatedPreview({
             token: vercelToken, projectId, repository: published.repository,
-            commitSha: published.commitSha, files: contents.filter((file): file is NonNullable<typeof file> => Boolean(file)),
+            commitSha: published.commitSha, files: preparedFiles, objective: job.objective,
             deadlineAt: Date.parse(job.createdAt) + totalDeadlineMs,
             signal: deadlineController.signal,
           })

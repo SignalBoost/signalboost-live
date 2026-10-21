@@ -6,7 +6,8 @@ test('Software Specialist dispatches only V2 standard jobs',()=>{
   const s=read('../lib/ai/cos/softwareSpecialist.ts')
   assert.match(s,/builderEngine: 'v2'/)
   assert.match(s,/if \(debugPlan\) return NextResponse\.json/)
-  assert.match(s,/if \(project\.context \|\| selectionBody\?\.workspaceId\)/)
+  // PR #4719 parity: a recorded project in this conversation is continued; only a bare selected workspace is refused.
+  assert.match(s,/if \(!project\.context && selectionBody\?\.workspaceId\)/)
 })
 test('Developer surface disallows explicit V1 and legacy debug mode',()=>{
   const s=read('../app/api/builder/route.ts')

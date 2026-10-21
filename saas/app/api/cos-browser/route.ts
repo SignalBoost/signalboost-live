@@ -40,6 +40,7 @@ import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresL
 import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioScope'
 import { mentionsPlatformConcept } from '@/lib/ai/cos/cosPlatformGlossary'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
+import { isSoftwareRepairRequest } from '@/lib/ai/cos/softwareRepairIntent'
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { runWithTurnDeadline, turnDeadlineRemainingMs } from '@/lib/ai/cos/cosTurnBudget'
 
@@ -190,7 +191,9 @@ async function executeBrowserTurn(req: NextRequest) {
   // They require no identity/visual/software classification and no privileged authority. Execute
   // the bounded editor immediately on BOTH Concierge and Assistant so the homepage cannot spend
   // ~30 seconds on unrelated semantic classifiers before the edit model call.
-  const directTextTransformation = detectDirectTextTransformation(prompt)
+  // A request to repair software is never a text edit, even when it opens with "Fix the …".
+  const softwareRepairRequest = isSoftwareRepairRequest(prompt)
+  const directTextTransformation = softwareRepairRequest ? null : detectDirectTextTransformation(prompt)
   const directTextHasAttachments = hasAttachments
   if (directTextTransformation && !directTextHasAttachments) {
     // There is one editor capability, inside canonical COS. Browser ingress must never run a
@@ -222,6 +225,7 @@ async function executeBrowserTurn(req: NextRequest) {
   // execute cosPrimaryPost; public Concierge retains public audit/delivery scope and presentation.
   const fastAuthoringIngress = !directTextHasAttachments
     && isAuthoringObjectiveWithoutLiveLookup(prompt)
+    && !softwareRepairRequest
     && !isCosCodingObjective(prompt, routingContext)
     && !isConciergeArtifactObjective(prompt)
     && !isConciergeVisualObjective(prompt)
@@ -238,7 +242,7 @@ async function executeBrowserTurn(req: NextRequest) {
       : authoringResponse
   }
 
-  if (browserSurface === 'concierge' && !isConciergeBuilderObjective(prompt, routingContext)) {
+  if (browserSurface === 'concierge' && !softwareRepairRequest && !isConciergeBuilderObjective(prompt, routingContext)) {
     const deterministicIdentity = publicConciergeIdentityReply(prompt)
     const semanticIdentityEligible = !deterministicIdentity && shouldResolveSemanticPublicIdentity(prompt)
     semanticIdentityInvoked = semanticIdentityEligible
@@ -297,6 +301,7 @@ async function executeBrowserTurn(req: NextRequest) {
   // Software Specialist owns Builder/Platform Engineer lifecycle. Repository authority follows the
   // authenticated owner identity, never the mouth that carried the request.
   const shouldConsultSoftwareSpecialist = hasSourceAttachment || explicitOperationalRepair
+    || softwareRepairRequest
     || isConciergeBuilderObjective(prompt, routingContext)
   const ownerRepositoryRepairAllowed = authenticatedOwner
     && ownerSoftwareAuthority.allowRepositoryRepair

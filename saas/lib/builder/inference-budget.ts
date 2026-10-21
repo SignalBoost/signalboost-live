@@ -64,9 +64,15 @@ export function quoteDeepInfraRequest(endpoint: string, body: any, catalog: unkn
   }
   const entry = Array.isArray(catalog) ? catalog.find(m => m.model_name === body.model && m.type === 'text-generation') : null
   if (!entry || entry.pricing?.type !== 'tokens' || entry.private || entry.deprecated) throw new BuilderBudgetError('builder_budget_price_unavailable')
-  const contextTokens = entry.max_tokens
+  const modelContextTokens = entry.max_tokens
   const outputTokens = body.max_tokens
-  if (!Number.isSafeInteger(contextTokens) || contextTokens <= 0 || !Number.isSafeInteger(outputTokens) || outputTokens <= 0 || outputTokens > contextTokens) {
+  // Byte count conservatively bounds text tokens for byte-level tokenizers;
+  // reserve additional room for message framing and provider overhead.
+  const inputBytes = body.messages.reduce((sum: number, message: any) =>
+    sum + Buffer.byteLength(JSON.stringify(message), 'utf8'), 0)
+  const estimatedInputCeiling = inputBytes + body.messages.length * 1024 + 4096
+  const contextTokens = Math.min(modelContextTokens, estimatedInputCeiling)
+  if (!Number.isSafeInteger(contextTokens) || contextTokens <= 0 || !Number.isSafeInteger(outputTokens) || outputTokens <= 0 || outputTokens > modelContextTokens) {
     throw new BuilderBudgetError('builder_budget_token_bound_invalid')
   }
   // Reserve the entire provider-declared context, not a characters/4 token guess. Ignore

@@ -519,7 +519,9 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       }
       const finalProof = builderFinalProof({
         objective: job.objective, workspaceVerified: verified, acceptance,
-        publication, publicationError, budget: inferenceBudget, requiresPublication,
+        publication, publicationError,
+        budget: inferenceBudget ? { ...inferenceBudget, elapsedMs: Math.max(0, Date.now() - Date.parse(job.createdAt)) } : null,
+        requiresPublication,
       })
       const success = finalProof.passed
       const publicationReport = publication ? `\n\nIsolated publication: ${JSON.stringify(publication)}` : ''

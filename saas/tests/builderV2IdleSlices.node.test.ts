@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {builderV2IdleSliceCount} from '../lib/builder/agent-v2.ts'
@@ -33,4 +34,11 @@ test('actual source changes and successful authoritative verification reset the 
  assert.equal(builderV2IdleSliceCount(prior,{...prior,steps:[{tool:'edit_file',ok:true,changed:true}],revision:23}),0)
  assert.equal(builderV2IdleSliceCount(prior,{...prior,steps:[{tool:'run_tests',ok:true,changed:false,output:{exitCode:0,timedOut:false}}]}),0)
  assert.equal(builderV2IdleSliceCount(prior,{...prior,steps:[{tool:'run_tests',ok:true,changed:false,output:{exitCode:1,timedOut:false}}]}),3)
+})
+
+test('V2 idle continuation uses checkpoint-derived recovery guidance instead of repeating the same prompt', () => {
+  const source = readFileSync(new URL('../lib/builder/agent-v2.ts', import.meta.url), 'utf8')
+  assert.match(source, /saved\?\.idleSlices \? \{ continuationRecovery:/)
+  assert.match(source, /Do not list files or finish\. Write the named missingRequiredFiles/)
+  assert.match(source, /continuationRecovery:[\s\S]*?idleSlices: saved\.idleSlices/)
 })

@@ -173,9 +173,9 @@ export default function VoiceInputButton({
           <path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8" />
         </svg>
       </button>
-      <label className="sr-only">
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11 }} title="Optional: normalize recognized English developer terms">
         <input type="checkbox" checked={developerTerms} onChange={event => setDeveloperTerms(event.target.checked)} />
-        Format English developer terms in voice dictation
+        Dev terms
       </label>
       {error ? <span className="sr-only" role="status">{error}</span> : null}
     </>

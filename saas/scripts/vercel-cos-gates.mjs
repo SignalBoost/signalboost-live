@@ -28,6 +28,7 @@ const tests = [
   'tests/builderAssistanceModes.node.test.ts',
   'tests/builderAssistanceModeTransport.node.test.ts',
   'tests/builderApprovalPrompt.node.test.ts',
+  'tests/platformObservability.node.test.ts',
   'tests/cosAssistanceModeHarness.node.test.ts',
   'tests/builderHistoricalAcceptanceReport.node.test.ts',
   'tests/builderDurableProgress.node.test.ts',

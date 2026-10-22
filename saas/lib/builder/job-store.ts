@@ -4,6 +4,7 @@ import { readBuilderRunLimits } from './inference-budget.ts'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { EvidenceLookup } from './execution-evidence.ts'
 import { proposalObjective, workspaceFingerprint, type BuilderProposal } from './proposal.ts'
+import { currentTraceId, currentTraceparent, markActiveSpanFailed } from '../observability/tracing.ts'
 
 export type BuilderJobKind = 'standard' | 'debug_file'
 export type BuilderJobStatus = 'queued' | 'running' | 'paused' | 'succeeded' | 'failed'
@@ -129,6 +130,13 @@ export async function readLatestBuilderWorkspaceJob(input: {
   return data ? toJob(data) : null
 }
 
+/** The trace of the request that queued the job: every later work slice continues it (see runBuilderJob). */
+function jobTrace(): Record<string, string> {
+  const traceparent = currentTraceparent()
+  const traceId = currentTraceId()
+  return traceparent && traceId ? { traceparent, traceId } : {}
+}
+
 export async function enqueueBuilderJob(input: {
   jobId: string
   workspaceId: string
@@ -156,7 +164,7 @@ export async function enqueueBuilderJob(input: {
     p_conversation_id: input.conversationId,
     p_objective: String(input.objective || '').trim(),
     p_job_kind: input.jobKind,
-    p_metadata: { ...input.metadata, ...(runLimits ? { builderRunLimits: runLimits } : {}) },
+    p_metadata: { ...input.metadata, ...(runLimits ? { builderRunLimits: runLimits } : {}), ...jobTrace() },
     p_owner_authorized: input.ownerAuthorized === true,
     p_running_reply: String(input.runningReply || '').trim(),
   })
@@ -232,6 +240,13 @@ export async function reconcileStaleBuilderJobs(input: {
   return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0
 }
 
+/** Read-only lookup of the job a work slice is about to claim, for its trace and labels. No reconciliation. */
+export async function peekBuilderJob(jobId: string, userId: string): Promise<BuilderJobRecord | null> {
+  if (!UUID.test(jobId) || !UUID.test(userId)) return null
+  const db = serviceClient()
+  return db ? readBuilderJob(db, jobId, userId) : null
+}
+
 export async function getBuilderJobForUser(jobId: string, userId: string): Promise<BuilderJobRecord | null> {
   if (!UUID.test(jobId) || !UUID.test(userId)) return null
   const db = serviceClient()
@@ -275,6 +290,7 @@ export async function finishBuilderJob(input: {
     p_error: input.error || null,
   })
   if (error) throw new Error(`builder_job_finish: ${error.message}`)
+  if (input.status === 'failed') markActiveSpanFailed(input.error || 'builder_job_failed')
   // Best-effort terminal telemetry. Status is owned by the generation-fenced RPC above.
   const { error: telemetryError } = await db.from('builder_jobs').update({
     last_finished_at: new Date().toISOString(),

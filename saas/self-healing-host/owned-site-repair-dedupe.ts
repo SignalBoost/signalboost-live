@@ -49,13 +49,16 @@ function ms(value: unknown): number {
 
 /**
  * Returns the existing repair that makes a new one redundant, or null when a new repair should be queued.
- * Active = queued, paused, or running with a recent heartbeat. Recently attempted = succeeded within 6h.
+ * Active = queued, paused, or running with a recent heartbeat. Recently attempted = succeeded within 6h (or failed,
+ * when suppressAfterFailure).
  * Newest match wins so the reported job is the one the owner will see progressing.
  */
 export function ownedSiteRepairBlocker(input: {
   rows: readonly OwnedSiteRepairRow[]
   key: string
   nowMs: number
+  /** A failed attempt also suppresses retries for the window (a repair that could not fix it will not on retry). */
+  suppressAfterFailure?: boolean
 }): OwnedSiteRepairBlocker | null {
   const scope = ownedSiteRepairScope(input.key)
   if (!scope) return null
@@ -72,7 +75,7 @@ export function ownedSiteRepairBlocker(input: {
   if (active) return Object.freeze({ disposition: 'already_active', jobId: String(active.id) })
 
   const recent = sameScope.find(row => {
-    if (row.status !== 'succeeded') return false
+    if (row.status !== 'succeeded' && !(input.suppressAfterFailure === true && row.status === 'failed')) return false
     const created = ms(row.created_at)
     return Number.isFinite(created) && input.nowMs - created < OWNED_SITE_REPAIR_RETRY_SUPPRESSION_MS
   })

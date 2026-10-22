@@ -12,6 +12,7 @@ import { ownedSiteCybersecurityMonitoringCollector } from '@/self-healing-host/o
 import { aiSecurityMonitoringCollector, AI_SECURITY_NATIVE_PROBE } from '@/self-healing-host/ai-security-monitoring'
 import { universityMassDistillationMonitoringCollector } from '@/self-healing-host/university-distillation-monitoring'
 import { interactiveModelHealthMonitoringCollector } from '@/self-healing-host/interactive-model-health-monitoring'
+import { PLATFORM_REQUEST_ERROR_PROBE, PLATFORM_REQUEST_ERROR_SUPERVISED_EVENT, platformRequestErrorMonitoringCollector } from '@/self-healing-host/platform-request-error-monitoring'
 import { verifyPendingExactVercelRepairOutcomes } from '@/self-healing-host/vercel-deployment-outcome-verifier'
 import { SupabaseNativeProbeStore, createNativeProactiveMonitoringCollectors, type CertificateTarget } from '@/self-healing-host/native-proactive-monitoring'
 import { SupabaseVercelHealthStore } from '@/lib/supervisor/providers/vercel'
@@ -92,6 +93,8 @@ export async function GET(req: NextRequest) {
     universityMassDistillationMonitoringCollector({ db }),
     // Chat/model health: samples reach the owner briefing; critical evidence is staged for Supervisor review.
     interactiveModelHealthMonitoringCollector({ db }),
+    // Uncaught server errors anywhere on the platform (instrumentation.ts): the Supervisor repairs them.
+    platformRequestErrorMonitoringCollector({ db }),
     livePlatformHealthCollector(db),
   ]
   const result = await runNativeMonitoring({ context: { provider: 'signalboost-platform', environment: 'production', metadata: { source: 'native-proactive-monitoring-cron', readOnly: true, providerMutations: false } }, collectors, nativeEnabled: process.env.SELF_HEALING_NATIVE_MONITORING_ENABLED !== 'false', externalConnected: process.env.SELF_HEALING_EXTERNAL_MONITORING_CONNECTED === 'true' })
@@ -162,6 +165,28 @@ export async function GET(req: NextRequest) {
   if (supervisedSecurityRows.length) {
     const { error } = await db.from('supervisor_audit_events').upsert(supervisedSecurityRows, { onConflict: 'event_id', ignoreDuplicates: true })
     if (error) console.warn('[ai-security-supervision] audit acknowledgement failed', String(error.message || 'unknown').slice(0,160))
+  }
+
+  // Each recorded request error raises one incident: once its repair is queued (or already active / recently
+  // attempted) the events are marked supervised and later cycles skip them. An unavailable repair is retried.
+  const supervisedRequestErrorRows = remediation.flatMap(item => {
+    const incident = incidents.find(candidate => candidate.incidentId === item.incidentId)
+    if (incident?.metadata?.nativeProbe !== PLATFORM_REQUEST_ERROR_PROBE || item.outcome !== 'staged') return []
+    const observationEventIds = Array.isArray(incident.metadata.observationEventIds) ? incident.metadata.observationEventIds.map(String) : []
+    if (!observationEventIds.length) return []
+    return [{
+      event_id: `${PLATFORM_REQUEST_ERROR_SUPERVISED_EVENT}:${item.incidentId}`,
+      execution_id: item.incidentId,
+      incident_id: item.incidentId,
+      event_type: PLATFORM_REQUEST_ERROR_SUPERVISED_EVENT,
+      occurred_at: new Date().toISOString(),
+      payload: { observationEventIds, outcome: item.outcome, message: String(item.message || '').slice(0, 300) },
+      schema_version: 'platform-request-error-supervision-v1',
+    }]
+  })
+  if (supervisedRequestErrorRows.length) {
+    const { error } = await db.from('supervisor_audit_events').upsert(supervisedRequestErrorRows, { onConflict: 'event_id', ignoreDuplicates: true })
+    if (error) console.warn('[platform-request-error-supervision] acknowledgement failed', String(error.message || 'unknown').slice(0, 160))
   }
 
   const status = result.collectorErrors.length === collectors.length ? 503 : 200

@@ -1,4 +1,5 @@
 import type { BuilderAiPort, BuilderToolId } from './contracts.ts'
+import { withSpan } from '../observability/tracing.ts'
 
 type ExecutableBuilderToolId = Exclude<BuilderToolId, 'model_control'>
 
@@ -278,37 +279,45 @@ export function createGovernedBuilderAiPort(
   let deadlineExpired = false
 
   return Object.freeze({
-    async generate(input) {
-      const remainingMs = Math.floor(deadlineAtMs - Date.now())
-      if (deadlineExpired || remainingMs <= 0) throw new Error(BUILDER_TURN_TIMEOUT_ERROR)
-
-      input.signal?.throwIfAborted()
-      const controller = new AbortController()
-      let timer: ReturnType<typeof setTimeout> | undefined
-      let rejectCancellation: (reason: unknown) => void = () => {}
-      const cancellation = new Promise<never>((_, reject) => { rejectCancellation = reject })
-      const abort = (reason: unknown) => {
-        controller.abort(reason)
-        rejectCancellation(reason)
-      }
-      const abortFromCaller = () => abort(input.signal?.reason)
-      input.signal?.addEventListener('abort', abortFromCaller, { once: true })
-      timer = setTimeout(() => {
-        deadlineExpired = true
-        abort(new Error(BUILDER_TURN_TIMEOUT_ERROR))
-      }, Math.max(1, remainingMs))
-      try {
-        const response = await Promise.race([
-          ai.generate({ ...input, signal: controller.signal }),
-          cancellation,
-        ])
-        controller.signal.throwIfAborted()
-        return normalizeBuilderControlOutput(response)
-      } finally {
-        if (timer) clearTimeout(timer)
-        input.signal?.removeEventListener('abort', abortFromCaller)
-      }
-    },
+    // One span per model call. Provider, model, tokens and cost are on the provider_inference_usage row, which
+    // carries this trace id; the provider HTTP call itself is the child fetch span.
+    generate: input => withSpan('builder.model.generate', { 'builder.model.max_tokens': input.maxTokens }, async span => {
+      const reply = await generateWithinDeadline(input)
+      span.setAttribute('builder.model.reply_chars', reply?.length ?? 0)
+      return reply
+    }),
   })
+
+  async function generateWithinDeadline(input: Parameters<BuilderAiPort['generate']>[0]): Promise<string | null> {
+    const remainingMs = Math.floor(deadlineAtMs - Date.now())
+    if (deadlineExpired || remainingMs <= 0) throw new Error(BUILDER_TURN_TIMEOUT_ERROR)
+
+    input.signal?.throwIfAborted()
+    const controller = new AbortController()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let rejectCancellation: (reason: unknown) => void = () => {}
+    const cancellation = new Promise<never>((_, reject) => { rejectCancellation = reject })
+    const abort = (reason: unknown) => {
+      controller.abort(reason)
+      rejectCancellation(reason)
+    }
+    const abortFromCaller = () => abort(input.signal?.reason)
+    input.signal?.addEventListener('abort', abortFromCaller, { once: true })
+    timer = setTimeout(() => {
+      deadlineExpired = true
+      abort(new Error(BUILDER_TURN_TIMEOUT_ERROR))
+    }, Math.max(1, remainingMs))
+    try {
+      const response = await Promise.race([
+        ai.generate({ ...input, signal: controller.signal }),
+        cancellation,
+      ])
+      controller.signal.throwIfAborted()
+      return normalizeBuilderControlOutput(response)
+    } finally {
+      if (timer) clearTimeout(timer)
+      input.signal?.removeEventListener('abort', abortFromCaller)
+    }
+  }
 }
 

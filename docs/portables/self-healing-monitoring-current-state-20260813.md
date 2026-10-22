@@ -272,6 +272,27 @@ Governed execution:
 9. Preserve buyer-hosted/BYOM/BYOA connector and credential boundaries.
 10. Update this handoff if the acceptance evidence changes the status.
 
+## Platform observability and request-error repair (2026-10-22)
+
+The platform is traced on the OpenTelemetry standard:
+- `saas/instrumentation.ts` registers `@vercel/otel`, which covers every route, page, server action and outbound fetch.
+- `saas/lib/observability/tracing.ts` holds the helpers, with no host coupling.
+- On Vercel, traces show under Logs → Traces once a sampling rule is set. Retention follows runtime logs: 1 hour on Hobby, 1 day on Pro.
+- Any other backend is chosen with the standard OpenTelemetry settings or a Vercel Trace Drain.
+
+Durable trace records (no new tables):
+- `provider_inference_usage.correlation_id` holds the trace id for every model call that has no correlation id of its own.
+- `builder_jobs.metadata.traceId` and `traceparent`: each work slice continues the trace of the request that queued the job (`builder.job.slice` → `builder.model.generate` / `builder.tool` / `builder.publish.isolated`).
+- `supervisor_audit_events` with `event_type = 'platform_request_error'` holds each uncaught server error. It is recorded by `onRequestError`, redacted, has no query string, is keyed by trace id, and is bounded per instance.
+
+Supervisor ownership:
+- `self-healing-host/platform-request-error-monitoring.ts` turns those errors into native incidents, one per route + error, at most 3 per cycle.
+- The incidents go through the existing COS diagnosis and owned-platform Platform Engineer repair (`enqueuePlatformRequestErrorRepair`).
+- Builder must reproduce the error before editing and must never hide the error.
+- A failed repair suppresses retries for the same route + error for 6 hours.
+- Handled error events are marked `platform_request_error_supervised`.
+- Status: unit- and SDK-tested. A live Production repair from a real request error is not yet observed.
+
 ## Status language
 
 Correct statements:

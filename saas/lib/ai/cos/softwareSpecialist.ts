@@ -300,6 +300,18 @@ async function tryCosSoftwareSpecialistLegacy(
       }, { ownerRepairWithoutSource: true })
       if (target) return enqueueRepositoryRepair({ body: input.body, objective, userId: access.userId, target, signal })
     }
+    // Do not tell an authenticated platform owner to upload a repository that
+    // the Platform Engineer already knows how to access. Explain the routing
+    // blocker instead; never invent repository authority or enqueue a guess.
+    if (access?.isOwner && access.userId) return NextResponse.json({
+      reply: input.allowRepositoryRepair
+        ? 'The repository repair target could not be established from this request. No repository action was taken. Specify the failing command, error or affected component so Platform Engineer can select and verify the correct source.'
+        : 'Repository repair was not authorized on this COS route. No repository action was taken. Use the authenticated owner repair workflow.',
+      source: 'cos-builder-repository-routing-blocked',
+      execution_allowed: false,
+      external_action_taken: false,
+      ...softwareSpecialistFields('software.repair'),
+    })
     return NextResponse.json({
       reply: SOURCE_REQUEST_REPLY[resolveResponseLanguage(rawObjective, input.body?.context?.language)],
       source: 'cos-builder-source-requested',

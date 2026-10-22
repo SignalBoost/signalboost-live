@@ -30,6 +30,8 @@ const tests = [
   'tests/builderApprovalPrompt.node.test.ts',
   'tests/platformObservability.node.test.ts',
   'tests/builderNodeTestCommand.node.test.ts',
+  'tests/ownedSiteRepairDedupe.node.test.ts',
+  'tests/auditOwnedRepositoryRecovery.node.test.ts',
   'tests/cosAssistanceModeHarness.node.test.ts',
   'tests/builderHistoricalAcceptanceReport.node.test.ts',
   'tests/builderDurableProgress.node.test.ts',

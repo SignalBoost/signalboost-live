@@ -5,7 +5,9 @@ import type { ApprovedRunSystemResult } from '@/lib/audit/approvedRunRemediation
 
 const REPO = 'SignalBoost/signalboost-live'
 const BASE_BRANCH = 'main'
-const FAILED_RETRY_SUPPRESSION_MS = 15 * 60 * 1000
+// Production 2026-10-22: a 15-minute hold re-queued the same failing audit run every monitoring cycle (9 jobs in 3 hours,
+// builder_regression_not_reproduced). A failed recovery waits as long as a completed one before the next attempt.
+const FAILED_RETRY_SUPPRESSION_MS = 6 * 60 * 60 * 1000
 const COMPLETED_RECHECK_WINDOW_MS = 6 * 60 * 60 * 1000
 
 // These categories have deterministic source-local reproduction rules. Model-written

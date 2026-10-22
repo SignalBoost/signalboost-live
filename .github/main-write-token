@@ -1,2 +1,2 @@
-base_sha=d4e03b52a04ff1a2f21f6656bb545459ab63eec8
-branch=fix/builder-proof-typescript-runner-20261022
+base_sha=c3d7dcb6a57e0cde9194c718f2525950222715a8
+branch=fix/self-healing-failed-repair-loop-20261022

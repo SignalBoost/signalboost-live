@@ -36,6 +36,18 @@ test('an objective without a checklist keeps plain verified completion', () => {
   assert.equal(builderV2Acceptance('Build storage', [], [write, passRun('node --test', 1)]).satisfied, true)
 })
 
+test('explicit repair cannot be declared verified by JavaScript syntax checking alone', () => {
+  const original = 'Fix the broken job worker and verify the lock release and error handling.'
+  const syntax = passRun('node --check pasted-source.js', 0)
+  assert.equal(builderV2Acceptance(original, ['pasted-source.js'], [write, syntax]).satisfied, false,
+    'node --check must not satisfy behavioral repair')
+  const behavioral = passRun('node --test test/worker.test.js', 3)
+  assert.equal(builderV2Acceptance(original, ['pasted-source.js'], [write, syntax, behavioral]).satisfied, true,
+    'a real successful behavioral verification receipt after the edit can satisfy repair')
+  assert.equal(builderV2Acceptance('Only check syntax of pasted-source.js', ['pasted-source.js'], [write, syntax]).satisfied, true,
+    'a syntax-only request may be satisfied by a syntax check')
+})
+
 test('a premature finish gets the exact unmet checklist, and the agent completes once it is met', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   const objective = 'Create these files:\n- src/a.js\n- test/a.test.js\n\nRun:\nnode --test test/*.test.js\n\nWrite at least 2 tests.'

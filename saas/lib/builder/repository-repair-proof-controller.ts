@@ -113,7 +113,10 @@ export function createRepositoryRepairProofController(input: {
   let baselineState: 'pending' | 'failed' | 'passed' | 'invalid' = 'pending'
 
   function assertReproductionWrite(path: string) {
-    if (proofCommand || REPRODUCTION_PATH.test(String(path || ''))) return
+    // A selected command is not proof of a defect. Never mutate implementation
+    // before the original revision has actually failed the host-run proof.
+    if (REPRODUCTION_PATH.test(String(path || ''))) return
+    if (proofCommand && baselineState === 'failed' && provedGeneration === workspaceGeneration) return
     throw new Error('builder_regression_proof_required_before_source_edit: run the narrowest test, typecheck, or build that fails on the reported defect first (a new regression test under tests/ may be written to reproduce it); source is edited only after that proof fails')
   }
 

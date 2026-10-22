@@ -122,3 +122,30 @@ test('authenticated platform owner receives an explicit repository routing block
   assert.match(specialist, /The repository repair target could not be established/)
   assert.match(specialist, /execution_allowed: false/)
 })
+
+// Production 2026-10-22: the owner pasted the failed Vercel log of a52675a with no request. It read as a repair
+// request ("failed", "Error", "build"), so chat started a new-project Builder job in an empty workspace with the log
+// as its specification: 1 list_files receipt, 17 model calls, builder_v2_continuation_no_progress.
+const PASTED_VERCEL_FAILURE = [
+  '14:31:05.498 Running build in Washington, D.C., USA (East) – iad1',
+  '14:31:05.499 Build machine configuration: 30 cores, 60 GB (Turbo Build Machine)',
+  '14:31:05.582 Cloning github.com/SignalBoost/signalboost-live (Branch: main, Commit: a52675a)',
+  '14:31:07.301 Cloning completed: 1.719s',
+  '14:31:08.321 Restored build cache from previous deployment (5cA4qFnAeabV42NyboimbFrnjuqw)',
+  '14:31:08.558 Running "if [ "$VERCEL_ENV" = "production" ]; then npm run build:production; else npm run build; fi"',
+  '14:33:10.100 ✖ failed host test preloads source and stops repeated read-only repair loops (28.9ms)',
+  '14:33:10.103 ℹ fail 2',
+  '14:33:10.200 Error: Command "npm run build:production" exited with 1',
+].join('\n')
+
+test('a pasted log with no request is evidence for diagnosis, never a repair request or an empty build', () => {
+  assert.equal(isSoftwareRepairRequest(PASTED_VERCEL_FAILURE), false)
+  assert.equal(repairAwaitingSource(PASTED_VERCEL_FAILURE), false)
+  assert.equal(isConciergeBuilderObjective(PASTED_VERCEL_FAILURE, {}), false)
+  // Asking for the repair still is one, with or without the log.
+  assert.equal(isSoftwareRepairRequest(`Fix this build failure:\n${PASTED_VERCEL_FAILURE}`), true)
+  assert.equal(isSoftwareRepairRequest('the build fails on main, fix it'), true)
+  // With no repair request the browser ingress answers with the diagnosis and its repair offer.
+  const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+  assert.ok(route.indexOf('if (softwareSpecialist)') < route.indexOf('if (operationalEvidence && !hasSourceAttachment)'))
+})

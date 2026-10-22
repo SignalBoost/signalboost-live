@@ -7,6 +7,7 @@
 // phrase) aimed at a software subject is enough; authoring a message stays an edit.
 
 import { pastedSourceCode, structuredApplicationBuild } from './cosReasoningRolePolicy.ts'
+import { isPastedOperationalLog } from './pastedOperationalLog.ts'
 
 const REPAIR_ACTION = /\b(?:fix|fixes|fixing|debug|debugging|repair|troubleshoot|resolve)\b/i
 const BROKEN_BEHAVIOUR = /\b(?:(?:does|do|did|is|are)\s*(?:not|n['’]t)\s+(?:work|working|load|loading|submit|submitting|save|saving|open|opening|start|starting|run|running|respond|responding|show|showing|display|displaying|connect|connecting)|not\s+working|broken|crash(?:es|ed|ing)?|fails?|failing|failed\s+to\s+\w+|throws?|stuck|hangs?|freez(?:es|ing))\b/i
@@ -18,6 +19,11 @@ const EDIT_COMMAND = /^\s*(?:edit|rewrite|proofread|polish|translate|correct)\b/
 const PROSE_REPAIR = /\b(?:fix|correct|repair)\s+(?:the\s+|my\s+|this\s+|these\s+|any\s+)?(?:grammar|spelling|typos?|punctuation|wording|phrasing|tone|email|e-mail|letter|message|text|sentence|paragraph|draft|translation)\b/i
 
 export function isSoftwareRepairRequest(prompt: string): boolean {
+  // A pasted build/runtime log with no repair request is evidence, not a request: it is diagnosed and offered a
+  // repair the person must accept. Production 2026-10-22: a pasted Vercel log ("failed", "Error", "build") read as
+  // a repair request, so chat started a new-project Builder job in an empty workspace with the log as its
+  // specification; the model could only list the empty workspace until builder_v2_continuation_no_progress.
+  if (isPastedOperationalLog(String(prompt || ''))) return false
   const text = String(prompt || '').trim().slice(0, 4000)
   if (!text || EDIT_COMMAND.test(text) || PROSE_REPAIR.test(text)) return false
   const asksRepair = REPAIR_ACTION.test(text) || BROKEN_BEHAVIOUR.test(text)

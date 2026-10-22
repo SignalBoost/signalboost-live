@@ -18,6 +18,7 @@ const passing: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout:
 
 test('a resumed job gets a fresh slice budget instead of pausing forever once it holds maxSteps receipts', async () => {
   const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('w', 'package.json', JSON.stringify({ scripts: { test: 'node --test' } }))
   const objective = 'Create index.js and run npm test.'
   const first = scripted(Array.from({ length: 24 }, (_, i) => tool({ tool: 'write_file', path: `src/f${i}.js`, content: `module.exports = ${i}\n` })))
   const sliceOne = await new BuilderV2Agent(first.ai, new BuilderV2Dispatcher(workspace, passing), workspace)

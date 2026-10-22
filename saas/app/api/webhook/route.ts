@@ -184,7 +184,7 @@ async function handleCreditTopup(
   }
 
   const raw = session.metadata?.creditAmount
-  const credits = Number.parseInt(String(raw ?? ''), 10)
+  const credits = typeof raw === 'string' && /^[1-9][0-9]*$/.test(raw) ? Number(raw) : NaN
   if (!Number.isInteger(credits) || credits <= 0 || credits > 100000) {
     console.error(`Webhook ${type}: invalid creditAmount`, { raw, sessionId: session.id })
     return NextResponse.json({ error: 'credit_topup_amount_invalid' }, { status: 422 })

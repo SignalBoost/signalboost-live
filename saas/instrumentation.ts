@@ -16,8 +16,13 @@ import type { Instrumentation } from 'next'
 export async function register() {
   const spanProcessors: SpanProcessorOrName[] = ['auto']
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    const { serverErrorSpanProcessor } = await import('./lib/observability/requestErrorHost.ts')
-    spanProcessors.push(serverErrorSpanProcessor())
+    // Observability never stops the server from starting: without the processor, tracing still runs.
+    try {
+      const { serverErrorSpanProcessor } = await import('./lib/observability/requestErrorHost.ts')
+      spanProcessors.push(serverErrorSpanProcessor())
+    } catch (error) {
+      console.error('[instrumentation_server_error_processor_unavailable]', error instanceof Error ? error.message.slice(0, 200) : 'unknown')
+    }
   }
   registerOTel({ serviceName: 'itmounts', traceSampler: 'always_on', spanProcessors })
 }

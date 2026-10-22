@@ -194,7 +194,7 @@ test('the Supervisor raises one incident per failing route + error, skips superv
 test('platform wiring: instrumentation, model usage, job enqueue and job slices carry the trace', () => {
   const instrumentation = read('../instrumentation.ts')
   assert.match(instrumentation, /registerOTel\(\{ serviceName: 'itmounts', traceSampler: 'always_on', spanProcessors \}\)/)
-  assert.match(instrumentation, /if \(process\.env\.NEXT_RUNTIME === 'nodejs'\) \{\n\s*const \{ serverErrorSpanProcessor \} = await import\('\.\/lib\/observability\/requestErrorHost\.ts'\)\n\s*spanProcessors\.push\(serverErrorSpanProcessor\(\)\)/)
+  assert.match(instrumentation, /if \(process\.env\.NEXT_RUNTIME === 'nodejs'\) \{[\s\S]*?try \{\n\s*const \{ serverErrorSpanProcessor \} = await import\('\.\/lib\/observability\/requestErrorHost\.ts'\)\n\s*spanProcessors\.push\(serverErrorSpanProcessor\(\)\)\n\s*\} catch/)
   assert.match(instrumentation, /export const onRequestError: Instrumentation\.onRequestError/)
   assert.match(read('../lib/ai/localInferenceUsage.ts'), /correlation_id: clean\(record\.context\.correlationId, 240\) \?\? currentTraceId\(\)/)
   const store = read('../lib/builder/job-store.ts')

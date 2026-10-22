@@ -130,10 +130,10 @@ export async function readLatestBuilderWorkspaceJob(input: {
   return data ? toJob(data) : null
 }
 
-/** The trace of the request that queued the job: every later work slice continues it (see runBuilderJob). */
+/** The trace of the request that queued the job: every later work slice continues it in the worker. */
 function jobTrace(): Record<string, string> {
-  const traceparent = currentTraceparent()
-  const traceId = currentTraceId()
+  const traceparent = typeof currentTraceparent === 'function' ? currentTraceparent() : null
+  const traceId = typeof currentTraceId === 'function' ? currentTraceId() : null
   return traceparent && traceId ? { traceparent, traceId } : {}
 }
 

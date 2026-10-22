@@ -13,8 +13,9 @@ test('prefix cache stats distinguish Anthropic cache reads and writes', () => {
 })
 
 test('OpenAI cached tokens are included in prompt tokens, not counted twice', () => {
-  assert.match(helper, /openAi \? nonnegative\(usage\.prompt_tokens\)/)
+  assert.match(helper, /openAi \? nonnegative\(usage\.prompt_tokens \?\? usage\.input_tokens\)/)
   assert.match(helper, /usage\.prompt_tokens_details\?\.cached_tokens/)
+  assert.match(helper, /usage\.input_tokens_details\?\.cached_tokens/)
   assert.match(helper, /Math\.min\(inputTokens, cacheReadTokens\)/)
 })
 

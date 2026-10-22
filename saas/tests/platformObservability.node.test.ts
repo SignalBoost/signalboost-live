@@ -14,7 +14,7 @@ import { trace } from '@opentelemetry/api'
 import {
   currentTraceId, currentTraceparent, markActiveSpanFailed, withSpan, withTraceparent,
 } from '../lib/observability/tracing.ts'
-import { createPlatformRequestErrorRecorder, PLATFORM_REQUEST_ERROR_EVENT } from '../lib/observability/requestErrors.ts'
+import { createPlatformRequestErrorRecorder, PLATFORM_REQUEST_ERROR_EVENT, recordsSupervisorErrors } from '../lib/observability/requestErrors.ts'
 import { agentTraceEvent, emitAgentTrace } from '../lib/observability/agentTrace.ts'
 import { BuilderV2Dispatcher } from '../lib/builder/agent-v2-dispatcher.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
@@ -24,6 +24,8 @@ import {
   platformRequestErrorMonitoringCollector,
 } from '../self-healing-host/platform-request-error-monitoring.ts'
 import { ownedSiteRepairBlocker } from '../self-healing-host/owned-site-repair-dedupe.ts'
+import { createServerErrorSpanProcessor, serverErrorFromSpan } from '../lib/observability/serverErrorSpanProcessor.ts'
+import { SpanKind } from '@opentelemetry/api'
 
 const exporter = new InMemorySpanExporter()
 registerOTel({ serviceName: 'itmounts-test', spanProcessors: [new SimpleSpanProcessor(exporter)] })
@@ -124,6 +126,7 @@ test('a captured request error is recorded once per trace, redacted, and storms 
   assert.equal(row.incident_id, 'a'.repeat(32))
   assert.equal(row.payload.path, '/api/builder', 'the query string never leaves the request')
   assert.equal(row.payload.method, 'POST')
+  assert.equal(row.payload.routePath, '/app/api/builder', 'the route file and the route name share one key')
   const stored = JSON.stringify(row)
   for (const secret of ['SECRET123', 'sk-live-abcdef1234567890', 'user:pw']) assert.equal(stored.includes(secret), false, secret)
   console.log('[proof] recorded request error', stored)
@@ -190,7 +193,8 @@ test('the Supervisor raises one incident per failing route + error, skips superv
 
 test('platform wiring: instrumentation, model usage, job enqueue and job slices carry the trace', () => {
   const instrumentation = read('../instrumentation.ts')
-  assert.match(instrumentation, /registerOTel\(\{ serviceName: 'itmounts' \}\)/)
+  assert.match(instrumentation, /registerOTel\(\{ serviceName: 'itmounts', traceSampler: 'always_on', spanProcessors \}\)/)
+  assert.match(instrumentation, /if \(process\.env\.NEXT_RUNTIME === 'nodejs'\) \{\n\s*const \{ serverErrorSpanProcessor \} = await import\('\.\/lib\/observability\/requestErrorHost\.ts'\)\n\s*spanProcessors\.push\(serverErrorSpanProcessor\(\)\)/)
   assert.match(instrumentation, /export const onRequestError: Instrumentation\.onRequestError/)
   assert.match(read('../lib/ai/localInferenceUsage.ts'), /correlation_id: clean\(record\.context\.correlationId, 240\) \?\? currentTraceId\(\)/)
   const store = read('../lib/builder/job-store.ts')
@@ -199,4 +203,45 @@ test('platform wiring: instrumentation, model usage, job enqueue and job slices 
   const runner = read('../lib/builder/job-runner.ts')
   assert.match(runner, /const queued = await peekBuilderJob\(jobId, userId\)\.catch\(\(\) => null\)\n\s*return withTraceparent\(queued\?\.metadata\.traceparent, \(\) => withSpan\('builder\.job\.slice'/)
   assert.match(runner, /return withSpan\('builder\.publish\.isolated'/)
+})
+
+test('a request a route answered with HTTP 500 itself is recorded; deliberate 502/503/504 and other spans are not', async () => {
+  const span = (kind: SpanKind, attributes: Record<string, unknown>, traceId = 'd'.repeat(32)) =>
+    ({ kind, attributes, spanContext: () => ({ traceId, spanId: '1'.repeat(16), traceFlags: 1 }) }) as any
+  const request = (status: number, extra: Record<string, unknown> = {}) => span(SpanKind.SERVER, {
+    'next.span_type': 'BaseServer.handleRequest', 'http.status_code': status, 'http.method': 'POST',
+    'http.target': '/api/builder?token=SECRET', 'next.route': '/api/builder', ...extra })
+  const handled = serverErrorFromSpan(request(500))!
+  assert.deepEqual({ path: handled.path, method: handled.method, routePath: handled.routePath, routeType: handled.routeType, traceId: handled.traceId },
+    { path: '/api/builder?token=SECRET', method: 'POST', routePath: '/app/api/builder', routeType: 'response', traceId: 'd'.repeat(32) })
+  assert.equal((handled.error as Error).name, 'http_500')
+  for (const ignored of [request(503), request(502), request(504), request(200),
+    span(SpanKind.CLIENT, { 'next.span_type': 'BaseServer.handleRequest', 'http.status_code': 500 }),
+    span(SpanKind.SERVER, { 'next.span_type': 'AppRender.getBodyResult', 'http.status_code': 500 })]) {
+    assert.equal(serverErrorFromSpan(ignored), null)
+  }
+
+  // The write is awaited by forceFlush (the SDK flushes before the function ends) and lands redacted in the ledger.
+  const rows: any[] = []
+  let release!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  const recorder = createPlatformRequestErrorRecorder({ from: () => ({ async upsert(value: unknown) { await gate; rows.push(value); return { error: null } } }) })
+  const processor = createServerErrorSpanProcessor(recorder)
+  processor.onEnd(request(500))
+  processor.onEnd(request(503))
+  assert.equal(rows.length, 0)
+  const flushed = processor.forceFlush()
+  release()
+  await flushed
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].payload.errorCode, 'http_500')
+  assert.equal(rows[0].payload.path, '/api/builder')
+  assert.equal(rows[0].payload.routePath, '/app/api/builder')
+  assert.equal(JSON.stringify(rows[0]).includes('SECRET'), false)
+  console.log('[proof] recorded handled 500', JSON.stringify(rows[0].payload))
+})
+
+test('only Production errors reach the Supervisor: a preview deployment shares the database but not the repair loop', () => {
+  assert.deepEqual(['production', undefined, 'preview', 'development'].map(env => recordsSupervisorErrors(env)), [true, true, false, false])
+  assert.match(read('../lib/observability/requestErrorHost.ts'), /async function record\(input: PlatformRequestError\): Promise<void> \{\n\s*if \(!recordsSupervisorErrors\(\)\) return/)
 })

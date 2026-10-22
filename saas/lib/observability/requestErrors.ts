@@ -1,6 +1,6 @@
 // saas/lib/observability/requestErrors.ts
 //
-// Durable record of a server error Next.js captured (instrumentation.ts onRequestError) in the Supervisor's
+// Durable record of a server error (captured by Next.js, or a request a route answered with HTTP 500) in the Supervisor's
 // existing immutable ledger (supervisor_audit_events), keyed by trace id, so it can still be analysed after the
 // trace store's retention ends and joined to the model calls and Builder job of the same trace.
 // Stores the route and a redacted error only: never the query string, headers, body or a stack trace.
@@ -31,12 +31,21 @@ function digestOf(error: unknown): string | null {
   return typeof digest === 'string' && digest ? digest.slice(0, 80) : null
 }
 
+/**
+ * A Vercel preview or development deployment shares the Production database, but its errors belong to unmerged code:
+ * they stay on their traces and never become Supervisor incidents that repair Production.
+ */
+export function recordsSupervisorErrors(vercelEnv: string | undefined = process.env.VERCEL_ENV): boolean {
+  return !vercelEnv || vercelEnv === 'production'
+}
+
 export function createPlatformRequestErrorRecorder(db: RequestErrorLedger, now: () => number = Date.now) {
   const lastRecorded = new Map<string, number>()
   return async function recordPlatformRequestError(input: PlatformRequestError): Promise<'recorded' | 'throttled'> {
     const at = input.at ?? new Date(now())
     const pathname = String(input.path || '').split(/[?#]/, 1)[0].slice(0, 300) || '/'
-    const routePath = String(input.routePath || pathname).slice(0, 300)
+    // onRequestError names the route file (/app/api/x/route), the request span names the route (/app/api/x): one key.
+    const routePath = String(input.routePath || pathname).replace(/\/(?:route|page)$/, '').slice(0, 300) || '/'
     const { code, message } = sanitizeError(input.error)
     const fingerprint = `${routePath}|${code}|${message.slice(0, 120)}`
     const previous = lastRecorded.get(fingerprint)

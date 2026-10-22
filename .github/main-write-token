@@ -1,2 +1,2 @@
-base_sha=0fdf5362900f247727cf11e81ae27ae2d9171275
-branch=feat/platform-observability-20261022
+base_sha=81641510fe1cacee1fae8f7ab6dce60f88b3a985
+branch=fix/cache-metrics-current-main-20261022

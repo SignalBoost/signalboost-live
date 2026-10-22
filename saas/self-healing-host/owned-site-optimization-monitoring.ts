@@ -1,6 +1,6 @@
-import type { Observer, ProviderObservationContext } from '@/lib/supervisor/execution-contracts'
-import { incidentSchema, type SupervisorIncident } from '@/lib/supervisor/incident-schema'
-import { PUBLIC_BRAND } from '@/lib/public-brand'
+import type { Observer, ProviderObservationContext } from '../lib/supervisor/execution-contracts.ts'
+import { incidentSchema, type SupervisorIncident } from '../lib/supervisor/incident-schema.ts'
+import { PUBLIC_BRAND } from '../lib/public-brand.ts'
 import type { NativeMonitoringCollector } from './native-monitoring-runtime.ts'
 
 const OWNED_SITE_PROBE = 'owned-site-optimization'
@@ -32,6 +32,21 @@ type OptimizationReport = {
 type ReportScalar = string | number | boolean
 
 export const OWNED_SITE_OPTIMIZATION_PROBE = OWNED_SITE_PROBE
+
+/**
+ * Findings a bounded repository change can fix (response headers, document metadata, markup). Workload and latency
+ * measurements (many_scripts, many_stylesheets, large_html, slow/moderate_response) and the CTA content check stay in
+ * the report but do not become repair incidents. Production 2026-10-22: many_scripts alone (a Next.js App Router page
+ * carries many framework <script> elements) was queued as a repair 11 times in 3 hours; every attempt ran about 20
+ * minutes and ended in builder_turn_timeout.
+ */
+export const REPAIRABLE_OPTIMIZATION_FINDINGS: ReadonlySet<string> = new Set([
+  'missing_csp', 'missing_hsts', 'missing_nosniff', 'not_https',
+  'missing_compression', 'missing_cache_header',
+  'missing_title', 'title_length', 'missing_description', 'description_length', 'missing_viewport',
+  'missing_canonical', 'h1_count', 'robots_noindex', 'missing_social_meta',
+  'images_missing_alt', 'missing_html_lang', 'missing_lazy_images',
+])
 export const OWNED_SITE_OPTIMIZATION_FINDINGS_ERROR = OWNED_SITE_FINDINGS
 export const OWNED_SITE_OPTIMIZATION_PROBE_FAILED_ERROR = OWNED_SITE_PROBE_FAILED
 
@@ -191,12 +206,14 @@ export function ownedSiteOptimizationMonitoringCollector(options: {
         })]
       }
 
-      const findings = safeFindings(payload.findings)
+      const reported = safeFindings(payload.findings)
+      const findings = reported.filter(finding => REPAIRABLE_OPTIMIZATION_FINDINGS.has(String(finding.code)))
+      const advisoryCodes = reported.filter(finding => !REPAIRABLE_OPTIMIZATION_FINDINGS.has(String(finding.code))).map(finding => String(finding.code))
       if (!findings.length) return []
       const score = boundedNumber(payload.summary?.score)
-      const high = boundedNumber(payload.summary?.high)
-      const medium = boundedNumber(payload.summary?.medium)
-      const low = boundedNumber(payload.summary?.low)
+      const high = findings.filter(finding => finding.severity === 'high').length
+      const medium = findings.filter(finding => finding.severity === 'medium').length
+      const low = findings.filter(finding => finding.severity === 'low').length
       const findingCodes = findings.map(finding => String(finding.code))
       return [makeIncident({
         context,
@@ -204,7 +221,7 @@ export function ownedSiteOptimizationMonitoringCollector(options: {
         code: OWNED_SITE_FINDINGS,
         severity: high > 0 ? 'critical' : 'warning',
         message: `The owned iTMounts site has ${findings.length} Website Optimizer finding(s) requiring remediation.`,
-        summary: `Score ${score}; high ${high}; medium ${medium}; low ${low}; findings: ${findingCodes.join(', ')}.`,
+        summary: `Score ${score}; repairable high ${high}; medium ${medium}; low ${low}; findings: ${findingCodes.join(', ')}${advisoryCodes.length ? `; advisory (not repaired): ${advisoryCodes.join(', ')}` : ''}.`,
         report: {
           ok: true,
           httpStatus: response.status,
@@ -213,6 +230,7 @@ export function ownedSiteOptimizationMonitoringCollector(options: {
           medium,
           low,
           findingCodes: findingCodes.join(','),
+          advisoryCodes: advisoryCodes.join(','),
           findings,
         },
       })]

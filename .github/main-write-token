@@ -1,2 +1,2 @@
-base_sha=91156659685f63925a98a2c7ee4662f9dae7aea0
-branch=fix/builder-v2-nine-verification-fixtures-20261022
+base_sha=13638336f3a040d7d8e257e1f2e391199facd136
+branch=fix/builder-v2-timeout-gate-manifest-assertion-20261022

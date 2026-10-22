@@ -268,8 +268,14 @@ export async function executeSignalBoostRepositoryRepair(input: {
     // feature/implementation work has no legitimate failing baseline to manufacture, so it runs
     // through the same repository workspace/runner but must still mutate source and pass fresh
     // task-specific verification before BuilderToolLoop can return success.
-    let selectedProofCommand = engineeringTask ? null : discoverRepositoryRepairProofCommand(target, (await durableSession.listFiles(input.workspaceId)).map(file => file.path))
-    if (!engineeringTask && !selectedProofCommand && typeof durableSession.searchFiles === 'function') {
+    // A deployed-platform task with explicit failing-test evidence is a repair, not a
+    // greenfield feature. It must use the same host-owned fail/edit/pass controller.
+    const engineeringRepair = engineeringTask
+      && target.pathHints.some(path => /^(?:saas\/)?tests?\/.+\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(path))
+      && target.failureEvidence.some(line => /(?:assertionerror|failed|not ok|exit code|error:)/i.test(line))
+    const needsRepairProof = !engineeringTask || engineeringRepair
+    let selectedProofCommand = needsRepairProof ? discoverRepositoryRepairProofCommand(target, (await durableSession.listFiles(input.workspaceId)).map(file => file.path)) : null
+    if (needsRepairProof && !selectedProofCommand && typeof durableSession.searchFiles === 'function') {
       // The reported failure may name a symbol or diagnostic but not its test path.
       // Search actual repository contents; do not pick an arbitrary passing suite.
       const terms = [...target.symbolHints, ...target.failureEvidence.flatMap(line =>
@@ -285,12 +291,12 @@ export async function executeSignalBoostRepositoryRepair(input: {
       }
       if (matches.size === 1) selectedProofCommand = `node --experimental-strip-types --test ${[...matches][0]}`
     }
-    const proofController = engineeringTask ? null : createRepositoryRepairProofController({
+    const proofController = needsRepairProof ? createRepositoryRepairProofController({
       ai: governedAi,
       workspace: durableSession,
       runner: repositoryRunner,
       proofCommand: selectedProofCommand,
-    })
+    }) : null
 
     const result = await new BuilderToolLoop(
       proofController?.ai ?? governedAi,

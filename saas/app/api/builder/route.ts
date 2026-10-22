@@ -74,7 +74,15 @@ export function builderProgressSnapshot(job: Pick<BuilderJobRecord, 'checkpoint'
   const stdout = recent?.output?.stdout || ''
   const passCount = Number(/(?:^|\\n)\\s*(?:#|ℹ)\\s+pass\\s+(\\d+)/.exec(stdout)?.[1] || 0)
   const failCount = Number(/(?:^|\\n)\\s*(?:#|ℹ)\\s+fail\\s+(\\d+)/.exec(stdout)?.[1] || 0)
+  const lastActivityMs = Date.parse(job.updatedAt)
+  const ageSeconds = Number.isFinite(lastActivityMs) ? Math.max(0, Math.floor((Date.now() - lastActivityMs) / 1000)) : null
+  const capacityWait = typeof job.metadata.builderCapacityDeferredReason === 'string'
+  const needsAttention = ageSeconds !== null && ageSeconds >= 120 && !capacityWait
+    && (job.status === 'running' || job.status === 'paused')
   return {
+    activityAgeSeconds: ageSeconds,
+    needsAttention,
+    attentionReason: needsAttention ? 'No recorded Builder activity for at least two minutes; examine the durable job status.' : null,
     phase: job.checkpoint?.verificationPending === true ? 'verification'
       : job.status === 'queued' ? 'queued' : job.status === 'paused' ? 'checkpointed' : 'model',
     lastActivityAt: job.updatedAt,

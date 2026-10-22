@@ -24,6 +24,7 @@ import { after, NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { BUILDER_CERTIFICATION_CASES, type BuilderCertificationCaseId } from '@/lib/builder/certification'
 import { BUILDER_CERTIFICATION_FIXTURES } from '@/lib/builder/certification-fixtures'
+import { BUILDER_LEVEL4_OBJECTIVE } from '@/lib/builder/level4-certification'
 import { enqueueBuilderJob } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
@@ -38,9 +39,10 @@ function noStore(body: unknown, init?: ResponseInit) {
   return response
 }
 
-const CASE_IDS = new Set(BUILDER_CERTIFICATION_CASES.map(entry => entry.id))
+const LEVEL4_CASE_ID = 'builder_v2_end_to_end_reliability_v1' as const
+const CASE_IDS = new Set<string>([...BUILDER_CERTIFICATION_CASES.map(entry => entry.id), LEVEL4_CASE_ID])
 
-function isCertificationCaseId(value: unknown): value is BuilderCertificationCaseId {
+function isCertificationCaseId(value: unknown): value is BuilderCertificationCaseId | typeof LEVEL4_CASE_ID {
   return typeof value === 'string' && CASE_IDS.has(value as BuilderCertificationCaseId)
 }
 
@@ -62,11 +64,14 @@ export async function GET() {
   return noStore({
     ok: true,
     summary,
-    cases: BUILDER_CERTIFICATION_CASES.map(entry => ({
-      ...entry,
-      objective: BUILDER_CERTIFICATION_FIXTURES[entry.id].objective,
-      seededFiles: BUILDER_CERTIFICATION_FIXTURES[entry.id].seed.map(file => file.path),
-    })),
+    cases: [
+      ...BUILDER_CERTIFICATION_CASES.map(entry => ({
+        ...entry,
+        objective: BUILDER_CERTIFICATION_FIXTURES[entry.id].objective,
+        seededFiles: BUILDER_CERTIFICATION_FIXTURES[entry.id].seed.map(file => file.path),
+      })),
+      { id: LEVEL4_CASE_ID, level: 4, purpose: 'Live multi-file Builder V2 reliability probe; passing a job does not grant certification without external checkpoint and PR proof.', objective: BUILDER_LEVEL4_OBJECTIVE, seededFiles: [] },
+    ],
     note: 'POST { caseId } runs one case against the live Builder model. Poll /api/builder?jobId= for the result.',
   })
 }
@@ -79,11 +84,14 @@ export async function POST(request: Request) {
   if (!isCertificationCaseId(body.caseId)) {
     return noStore({
       error: 'builder_certification_case_required',
-      cases: BUILDER_CERTIFICATION_CASES.map(entry => entry.id),
+      cases: [...BUILDER_CERTIFICATION_CASES.map(entry => entry.id), LEVEL4_CASE_ID],
     }, { status: 400 })
   }
 
-  const fixture = BUILDER_CERTIFICATION_FIXTURES[body.caseId]
+  const isLevel4 = body.caseId === LEVEL4_CASE_ID
+  const fixture = isLevel4
+    ? { objective: BUILDER_LEVEL4_OBJECTIVE, seed: [] as readonly { path: string; content: string }[] }
+    : BUILDER_CERTIFICATION_FIXTURES[body.caseId]
   const userId = guard.ctx.userId
   if (!userId) return noStore({ error: 'Not signed in.' }, { status: 401 })
 
@@ -107,7 +115,9 @@ export async function POST(request: Request) {
     conversationId,
     objective: fixture.objective,
     jobKind: 'standard',
-    metadata: { certificationCaseId: body.caseId },
+    metadata: isLevel4
+      ? { level4Probe: true }
+      : { certificationCaseId: body.caseId },
     ownerAuthorized: true,
     runningReply: `Builder certification case ${body.caseId} is running as job ${jobId}.`,
   })
@@ -121,5 +131,6 @@ export async function POST(request: Request) {
     workspaceId,
     status: 'queued',
     poll: `/api/builder?jobId=${jobId}`,
+    ...(isLevel4 ? { certification: 'pending_independent_evidence', note: 'This live probe never grants Level 4. Validate failure→repair→pass, checkpoint continuation and revision-bound PR evidence separately.' } : {}),
   }, { status: 202 })
 }

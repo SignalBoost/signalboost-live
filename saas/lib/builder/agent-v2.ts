@@ -695,8 +695,8 @@ export class BuilderV2Agent {
                 ? { tool: 'edit_file', reason: 'Repair the last failing command before rerunning the unchanged revision' }
                 : checklist.commands.length && (!/^npm(?:\\s|$)/.test(checklist.commands[0].trim()) || knownFiles.includes('package.json'))
                   ? { tool: 'run_tests', command: checklist.commands[0] }
-                  : { tool: 'write_file', path: knownFiles.includes('package.json') ? 'index.js' : 'package.json',
-                    instruction: 'No runnable verification command exists for the current workspace. Create the source and project manifest required by the objective before requesting npm test; do not repeat list_files.' },
+                  : { tool: 'write_file',
+                    instruction: 'No runnable verification command exists for the current workspace. Create the source files and, only when the objective is an npm project, its package.json before requesting npm test; do not repeat list_files.' },
             // Everything else is verified; only comments describing the repaired planted defect remain (later keys win).
             ...(defectNotes.length ? {
               staleDefectComments: defectNotes,

@@ -1,2 +1,2 @@
-base_sha=4e6439fdee99186bb2237e0ae7b7aac1e592a90c
-branch=fix/builder-v2-proactive-progress-20261021
+base_sha=1fcfb998e6ed5b22389efc30a203c8f9f1da9ea9
+branch=fix/builder-progress-stall-and-test-counts-20261021

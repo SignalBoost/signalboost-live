@@ -6,6 +6,7 @@ import { stripTypeScriptTypes } from 'node:module'
 import { PGlite } from '@electric-sql/pglite'
 import { BuilderBudgetError, builderBudgetedModelFetch, quoteDeepInfraRequest, readBuilderRunLimits, withBuilderInferenceBudget } from '../lib/builder/inference-budget.ts'
 import { createBuilderInferenceBudgetStore } from '../lib/builder/inference-budget-store.ts'
+import { currentTraceId, currentTraceparent, markActiveSpanFailed } from '../lib/observability/tracing.ts'
 
 const migration = readFileSync(new URL('../supabase/migrations/20261019201138_builder_inference_run_budget.sql', import.meta.url), 'utf8')
 const endpoint = 'https://api.deepinfra.com/v1/openai/chat/completions'
@@ -20,10 +21,10 @@ test('the production enqueue boundary persists server-parsed limits and refuses 
   let sent: any = null
   const source = stripTypeScriptTypes(readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8'))
     .replace(/^import[^\n]*\n/gm, '').replace(/^export\s+/gm, '')
-  const enqueue = new Function('createClient', 'readBuilderRunLimits', 'MAX_WORK_SLICES',
+  const enqueue = new Function('createClient', 'readBuilderRunLimits', 'MAX_WORK_SLICES', 'currentTraceId', 'currentTraceparent', 'markActiveSpanFailed',
     `${source}\nreturn enqueueBuilderJob`)(() => ({ rpc: async (_: string, args: any) => {
       sent = args; return { data: { job_id: uid, history_message_id: uid }, error: null }
-    } }), readBuilderRunLimits, 24)
+    } }), readBuilderRunLimits, 24, currentTraceId, currentTraceparent, markActiveSpanFailed)
   const beforeUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const beforeKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.invalid'

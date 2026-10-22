@@ -1,3 +1,5 @@
+import { builderNodeTestCommand } from './node-test-command.ts'
+
 export type BuilderProjectContext = Readonly<{
   manifestPath: string | null
   packageManager: 'npm' | 'pnpm' | 'yarn' | 'bun' | null
@@ -21,7 +23,7 @@ function testCommand(manager: BuilderProjectContext['packageManager'], scripts: 
   // A hardcoded `node --test a.ts b.ts …` suite cannot be aimed with `npm test -- file`.
   // Point at one staged test file or the model OOMs the sandbox (exit 137).
   if (/\bnode\s+--test\s+\S+\s+\S+/.test(script) && testFiles.length > 0) {
-    return `node --experimental-strip-types --test ${testFiles[0]}`
+    return builderNodeTestCommand(testFiles[0])
   }
   if (script) {
     if (manager === 'pnpm') return 'pnpm test'
@@ -43,12 +45,12 @@ export function normalizeBuilderSandboxCommand(command: string, files: readonly 
   next = next.replace(/^(?:cd\s+(?:\/home\/user\/repos\/saas|\/vercel\/path0\/saas|\/tmp\/cos-builder|\/tmp\/cos-signalboost-repair\/saas)\/?\s*&&\s*)+/i, '')
   const aimed = next.match(/^npm\s+(?:run\s+)?test\s+--\s+(\S+)/i)
   if (aimed && /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(aimed[1])) {
-    return `node --experimental-strip-types --test ${aimed[1]}`
+    return builderNodeTestCommand(aimed[1])
   }
   if (/^npm\s+(?:run\s+)?test\s*$/i.test(next)) {
     if (discoverBuilderProjectContext(files).recommendedTestCommand === 'npm test') return next
     const proof = pickProofTest(files)
-    if (proof) return `node --experimental-strip-types --test ${proof}`
+    if (proof) return builderNodeTestCommand(proof)
   }
   return next
 }

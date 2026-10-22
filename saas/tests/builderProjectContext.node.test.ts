@@ -29,13 +29,13 @@ test('a hardcoded node --test suite recommends one staged file, not npm test', (
     { path: 'package-lock.json' },
     { path: 'tests/advisoryDiagnosisPolicy.node.test.ts' },
   ])
-  assert.equal(context.recommendedTestCommand, 'node --experimental-strip-types --test tests/advisoryDiagnosisPolicy.node.test.ts')
+  assert.equal(context.recommendedTestCommand, 'node --experimental-transform-types --test tests/advisoryDiagnosisPolicy.node.test.ts')
 })
 
 test('bare npm test becomes one staged proof file', () => {
   assert.equal(
     normalizeBuilderSandboxCommand('npm test', [{ path: 'tests/builderAsyncJobs.node.test.ts' }]),
-    'node --experimental-strip-types --test tests/builderAsyncJobs.node.test.ts',
+    'node --experimental-transform-types --test tests/builderAsyncJobs.node.test.ts',
   )
 })
 
@@ -49,7 +49,7 @@ test('preserves a real package test script instead of silently replacing its pro
 test('rewrites aimed npm test and foreign cd prefixes for the sandbox', () => {
   assert.equal(
     normalizeBuilderSandboxCommand('cd /home/user/repos/saas && npm test -- tests/advisoryDiagnosisPolicy.node.test.ts'),
-    'node --experimental-strip-types --test tests/advisoryDiagnosisPolicy.node.test.ts',
+    'node --experimental-transform-types --test tests/advisoryDiagnosisPolicy.node.test.ts',
   )
 })
 

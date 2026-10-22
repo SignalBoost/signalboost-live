@@ -13,8 +13,8 @@ import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import { evaluateRegressionGate, isBuilderTestRunnerCommand } from '../lib/builder/regression-gate.ts'
 
 const OBJECTIVE = 'Fix the power stabilization release gate so the advisory diagnosis answer is correct.'
-const PROOF = 'node --experimental-strip-types --test regression/gate.node.test.ts'
-const NEW_PROOF = 'node --experimental-strip-types --test regression/advisory.node.test.ts'
+const PROOF = 'node --experimental-transform-types --test regression/gate.node.test.ts'
+const NEW_PROOF = 'node --experimental-transform-types --test regression/advisory.node.test.ts'
 const NOT_REPRODUCED_STEP = 'does not reproduce the reported defect'
 
 async function seededWorkspace() {

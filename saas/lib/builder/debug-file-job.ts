@@ -8,6 +8,7 @@ import type {
   BuilderToolTrace,
   BuilderWorkspacePort,
 } from './contracts.ts'
+import { BUILDER_NODE_TYPESCRIPT } from './node-test-command.ts'
 
 const DEBUG_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:does not work|doesn't work|broken|failing|throws?)\b/i
 const CODE_EXTENSION = /\.(?:c?js|mjs|cts|mts|ts|py)$/i
@@ -49,7 +50,7 @@ function normalizePath(value: unknown): string {
 function debugCommand(path: string): Omit<DebugFilePlan, 'files'> | null {
   if (/\.py$/i.test(path)) return Object.freeze({ path, command: `python3 ${shellQuote(path)}`, runtime: 'python3' })
   if (/\.(?:ts|mts|cts)$/i.test(path)) {
-    return Object.freeze({ path, command: `node --experimental-strip-types ${shellQuote(path)}`, runtime: 'node' })
+    return Object.freeze({ path, command: `${BUILDER_NODE_TYPESCRIPT} ${shellQuote(path)}`, runtime: 'node' })
   }
   if (/\.(?:c?js|mjs)$/i.test(path)) return Object.freeze({ path, command: `node ${shellQuote(path)}`, runtime: 'node' })
   return null

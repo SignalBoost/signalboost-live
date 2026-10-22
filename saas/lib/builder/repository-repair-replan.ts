@@ -1,6 +1,7 @@
 import { normalizeBuilderSandboxCommand } from './project-context.ts'
 import type { SignalBoostRepositoryRepairFreshness } from './repository-repair-freshness.ts'
 import type { SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
+import { builderNodeTestCommand } from './node-test-command.ts'
 
 export type SupersededRepositoryRepairReplan = Readonly<{
   target: SignalBoostRepositoryRepairTarget
@@ -23,7 +24,7 @@ function failingTestPaths(target: SignalBoostRepositoryRepairTarget): readonly s
  */
 export function repositoryRepairRevalidationProofCommand(target: SignalBoostRepositoryRepairTarget): string | null {
   const failingTests = failingTestPaths(target)
-  if (failingTests.length) return `node --experimental-strip-types --test ${failingTests.join(' ')}`
+  if (failingTests.length) return builderNodeTestCommand(failingTests.join(' '))
   const command = String(target.failedCommand || '').trim()
   return command ? normalizeBuilderSandboxCommand(command) : null
 }

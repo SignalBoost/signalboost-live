@@ -106,7 +106,7 @@ test('Platform Engineer normalizes model run commands and forces exact failed te
   const importAt = repair.indexOf('normalizeBuilderSandboxCommand')
   const targetedAt = repair.indexOf('function targetedRepositoryCommand', importAt)
   const broadAt = repair.indexOf('/^npm\\s+(?:run\\s+)?test', targetedAt)
-  const exactNodeAt = repair.indexOf('node --experimental-strip-types --test', targetedAt)
+  const exactNodeAt = repair.indexOf("builderNodeTestCommand(failingTests.join(' '))", targetedAt)
   const runnerAt = repair.indexOf('const repositoryRunner: BuilderRunnerPort', exactNodeAt)
   const normalizeAt = repair.indexOf('const command = targetedRepositoryCommand(runInput.command, target)', runnerAt)
   const loopAt = repair.indexOf('repositoryRunner,', normalizeAt)

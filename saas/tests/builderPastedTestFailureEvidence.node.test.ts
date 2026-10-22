@@ -11,7 +11,7 @@ import { signalBoostDeployedRepairTarget } from '../lib/builder/repository-repai
 import { repositoryRepairProofCommand } from '../lib/builder/repository-repair-proof-controller.ts'
 
 const DEPLOYED = { commitSha: 'a'.repeat(40), branch: 'main' }
-const PINNED = 'node --experimental-strip-types --test tests/agentGateway.node.test.ts'
+const PINNED = 'node --experimental-transform-types --test tests/agentGateway.node.test.ts'
 const proofFor = (evidence: string) => {
   const target = signalBoostDeployedRepairTarget(evidence, DEPLOYED, { ownerRepairWithoutSource: true })
   return target ? repositoryRepairProofCommand(target) : 'no-target'

@@ -504,7 +504,7 @@ export class BuilderV2Agent {
     // empty workspace only creates an ENOENT receipt, not useful defect proof.
     const missingNpmManifest = (command: string): boolean =>
       /^npm(?:\s|$)/.test(command.trim()) && !knownFiles.includes('package.json')
-    const hostVerificationDue = () => !checklist.commands.some(missingNpmManifest) && checklist.files.length > 0
+    const hostVerificationDue = () => checklist.files.length > 0
       && missingFiles().length === 0 && checklist.commands.length > 0 && syntaxErrors.size === 0
       && checklist.commands.some(command => !latestCommandRun(command))
       && !currentRevisionRuns().some(step => !step.ok)

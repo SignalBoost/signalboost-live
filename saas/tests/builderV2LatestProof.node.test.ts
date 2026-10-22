@@ -28,6 +28,7 @@ test('later successful smoke test cannot hide the failed full-suite command', ()
 test('a failed V2 test after success invalidates the in-memory verified revision', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   const commands = [
+    { type: 'tool', action: { tool: 'write_file', path: 'package.json', content: '{"scripts":{"test":"node --test"}}' } },
     { type: 'tool', action: { tool: 'write_file', path: 'index.js', content: 'module.exports=1' } },
     { type: 'tool', action: { tool: 'run_tests', command: 'npm test' } },
     { type: 'tool', action: { tool: 'run_tests', command: 'npm test' } },
@@ -40,10 +41,29 @@ test('a failed V2 test after success invalidates the in-memory verified revision
     return { exitCode: runs === 1 ? 0 : 1, stdout: '', stderr: 'failure', timedOut: false }
   } }
   const result = await new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, runner), workspace)
-    .run({ workspaceId: 'v2-last-proof', objective: 'Create index.js and run npm test.', maxSteps: 6 })
+    .run({ workspaceId: 'v2-last-proof', objective: 'Create index.js and run npm test.', maxSteps: 8 })
   // The first passing host receipt completes this one-command objective.
   // The model cannot trigger another redundant test to revoke finished work.
   assert.equal(result.ok, true)
   assert.equal(runs, 1)
+  assert.equal(result.reason, 'verified')
+})
+
+test('empty workspace cannot run npm test until a package manifest exists', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  let modelCall = 0
+  let runnerCalls = 0
+  const ai = { async generate() {
+    modelCall++
+    if (modelCall === 1) return JSON.stringify({ type: 'tool', action: { tool: 'run_tests', command: 'npm test' } })
+    if (modelCall === 2) return JSON.stringify({ type: 'tool', action: { tool: 'write_file',
+      path: 'package.json', content: '{"scripts":{"test":"node --test"}}' } })
+    return JSON.stringify({ type: 'finish', summary: 'done' })
+  } }
+  const runner = { async run() { runnerCalls++; return { exitCode: 0, stdout: 'ℹ pass 1\\nℹ fail 0\\n', stderr: '', timedOut: false } } }
+  const result = await new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, runner), workspace)
+    .run({ workspaceId: 'missing-manifest', objective: 'Create package.json. Run npm test.', maxSteps: 8 })
+  assert.equal(result.ok, true)
+  assert.equal(runnerCalls, 1, 'only the post-manifest npm command may execute')
   assert.equal(result.reason, 'verified')
 })

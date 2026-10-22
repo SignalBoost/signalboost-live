@@ -561,7 +561,7 @@ test('inline commands preserve quoted punctuation and exclude quoted instruction
 test('verified completion is evaluated before repeated inspection exhaustion', () => {
   const source = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
   const completion = source.indexOf('progress.satisfied && pendingOrder.length === 0 && chunks.size === 0')
-  const guard = source.indexOf('if (!missingBuildDeliverables && deniedInspections >= 4)')
+  const guard = source.indexOf('if (!missingBuildDeliverables && deniedInspections >= inspectionLimit)')
   assert.ok(completion > 0 && guard > completion, 'completed evidence-backed jobs must not fail on redundant read refusals')
-  assert.match(source, /deniedInspections >= 4/, 'the finite anti-loop stop remains enforced')
+  assert.match(source, /const inspectionLimit = repairObjective && latestFailedRunIndex >= 0 \? 8 : 4/, 'the finite anti-loop stop remains enforced')
 })

@@ -9,9 +9,10 @@ test('historical acceptance endpoint is user-scoped and read-only', () => {
   assert.match(get, /getBuilderJobForUser\(jobId, access\.userId\)/)
   const branch = get.slice(get.indexOf("url.searchParams.get('report') === 'acceptance'"), get.indexOf('return noStore({\n        ...(job.result'))
   assert.match(branch, /builderAcceptanceReport\(/)
-  assert.match(branch, /saved\.receipts/)
-  assert.match(branch, /saved\.acceptanceLedger/)
-  assert.match(branch, /saved\.finalProof/)
+  // The saved job result is read with or without optional chaining (#4754 wrote saved?.acceptanceLedger).
+  assert.match(branch, /saved\??\.receipts/)
+  assert.match(branch, /saved\??\.acceptanceLedger/)
+  assert.match(branch, /saved\??\.finalProof/)
   assert.match(branch, /readOnly: true/)
   assert.doesNotMatch(branch, /runBuilderJob\(|enqueueBuilderJob\(|createBuilderCodingAiPort\(|finishBuilderJob\(/)
 })

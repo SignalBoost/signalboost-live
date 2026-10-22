@@ -25,6 +25,8 @@ const tests = [
   'tests/builderV2IsolatedPublication.node.test.ts',
   'tests/builderAcceptanceSpecContract.node.test.ts',
   'tests/builderPlantedDefectNotes.node.test.ts',
+  'tests/builderHistoricalAcceptanceReport.node.test.ts',
+  'tests/builderDurableProgress.node.test.ts',
   // Builder V2 repair and interface reconciliation regression coverage.
   'tests/builderV2InterfaceMismatches.node.test.ts',
   'tests/builderV2RepairReadCeiling.node.test.ts',

@@ -19,7 +19,8 @@ export function serverErrorFromSpan(span: ReadableSpan): PlatformRequestError | 
   if (Number(attributes['http.status_code']) !== 500) return null
   const method = String(attributes['http.method'] || 'GET')
   const route = String(attributes['next.route'] || attributes['http.route'] || '')
-  const path = String(attributes['http.target'] || route || '/')
+  // Query and fragment never leave the request (they can carry emails, searches or tokens).
+  const path = String(attributes['http.target'] || route || '/').split(/[?#]/, 1)[0] || '/'
   const error = new Error(`${method} ${route || path} responded 500 Internal Server Error`)
   error.name = 'http_500'
   return {

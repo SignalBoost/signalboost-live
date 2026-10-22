@@ -35,7 +35,7 @@ function digestOf(error: unknown): string | null {
  * A Vercel preview or development deployment shares the Production database, but its errors belong to unmerged code:
  * they stay on their traces and never become Supervisor incidents that repair Production.
  */
-export function recordsSupervisorErrors(vercelEnv: string | undefined = process.env.VERCEL_ENV): boolean {
+export function recordsSupervisorErrors(vercelEnv: string | undefined): boolean {
   return !vercelEnv || vercelEnv === 'production'
 }
 

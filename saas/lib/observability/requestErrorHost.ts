@@ -14,7 +14,7 @@ let recorder: ReturnType<typeof createPlatformRequestErrorRecorder> | null = nul
 
 /** One recorder for both sources, so a request is recorded once and the storm bound is shared. */
 async function record(input: PlatformRequestError): Promise<void> {
-  if (!recordsSupervisorErrors()) return
+  if (!recordsSupervisorErrors(process.env.VERCEL_ENV)) return
   try {
     recorder ??= createPlatformRequestErrorRecorder(getAdminSupabase())
     await recorder(input)

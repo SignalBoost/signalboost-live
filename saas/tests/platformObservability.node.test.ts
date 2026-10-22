@@ -213,8 +213,13 @@ test('a request a route answered with HTTP 500 itself is recorded; deliberate 50
     'http.target': '/api/builder?token=SECRET', 'next.route': '/api/builder', ...extra })
   const handled = serverErrorFromSpan(request(500))!
   assert.deepEqual({ path: handled.path, method: handled.method, routePath: handled.routePath, routeType: handled.routeType, traceId: handled.traceId },
-    { path: '/api/builder?token=SECRET', method: 'POST', routePath: '/app/api/builder', routeType: 'response', traceId: 'd'.repeat(32) })
+    { path: '/api/builder', method: 'POST', routePath: '/app/api/builder', routeType: 'response', traceId: 'd'.repeat(32) })
   assert.equal((handled.error as Error).name, 'http_500')
+  // Before route resolution there is no route: the message falls back to the path, still without its query.
+  const unrouted = serverErrorFromSpan(request(500, { 'next.route': undefined, 'http.target': '/search?email=private@example.test&q=private-search#x' }))!
+  assert.equal(unrouted.path, '/search')
+  assert.equal((unrouted.error as Error).message, 'POST /search responded 500 Internal Server Error')
+  assert.equal(JSON.stringify(unrouted).includes('private'), false)
   for (const ignored of [request(503), request(502), request(504), request(200),
     span(SpanKind.CLIENT, { 'next.span_type': 'BaseServer.handleRequest', 'http.status_code': 500 }),
     span(SpanKind.SERVER, { 'next.span_type': 'AppRender.getBodyResult', 'http.status_code': 500 })]) {
@@ -243,5 +248,5 @@ test('a request a route answered with HTTP 500 itself is recorded; deliberate 50
 
 test('only Production errors reach the Supervisor: a preview deployment shares the database but not the repair loop', () => {
   assert.deepEqual(['production', undefined, 'preview', 'development'].map(env => recordsSupervisorErrors(env)), [true, true, false, false])
-  assert.match(read('../lib/observability/requestErrorHost.ts'), /async function record\(input: PlatformRequestError\): Promise<void> \{\n\s*if \(!recordsSupervisorErrors\(\)\) return/)
+  assert.match(read('../lib/observability/requestErrorHost.ts'), /async function record\(input: PlatformRequestError\): Promise<void> \{\n\s*if \(!recordsSupervisorErrors\(process\.env\.VERCEL_ENV\)\) return/)
 })

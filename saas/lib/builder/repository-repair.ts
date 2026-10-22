@@ -272,7 +272,10 @@ export async function executeSignalBoostRepositoryRepair(input: {
     // A deployed-platform task with explicit failing-test evidence is a repair, not a
     // greenfield feature. It must use the same host-owned fail/edit/pass controller.
     const engineeringRepair = engineeringTask
-      && target.pathHints.some(path => /^(?:saas\/)?tests?\/.+\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(path))
+      && (
+        target.pathHints.some(path => /^(?:saas\/)?tests?\/.+\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(path))
+        || target.failureEvidence.some(line => /(?:saas\/)?tests?\/[A-Za-z0-9_.\/-]+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)/i.test(line))
+      )
       && target.failureEvidence.some(line => /(?:assertionerror|failed|not ok|exit code|error:)/i.test(line))
     const needsRepairProof = !engineeringTask || engineeringRepair
     let selectedProofCommand = needsRepairProof ? discoverRepositoryRepairProofCommand(target, (await durableSession.listFiles(input.workspaceId)).map(file => file.path)) : null

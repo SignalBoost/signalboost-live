@@ -365,3 +365,10 @@ test('repository repair selects a single literal failing test from recorded CI e
     failureEvidence: ['FAIL tests/../unsafe.node.test.ts'],
   }), null)
 })
+
+test('deployed engineering repair honors test paths in failure evidence, not only path hints', () => {
+  const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+  assert.match(repair, /target\.failureEvidence\.some\(line => \/\(\?:saas/)
+  assert.match(repair, /const needsRepairProof = !engineeringTask \|\| engineeringRepair/)
+  assert.match(repair, /const proofController = needsRepairProof \? createRepositoryRepairProofController/)
+})

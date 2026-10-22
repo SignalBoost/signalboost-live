@@ -14,7 +14,7 @@ export type BuilderPlaywrightCliLiveAcceptanceResult = Readonly<{
     pageBodiesStored: false
     credentialsStored: false
     browserEvidenceStored: false
-    sandboxDestroyed: true
+    sandboxDestroyed: boolean
   }>
 }>
 
@@ -55,6 +55,7 @@ export async function runBuilderPlaywrightCliLiveAcceptance(input: { targetUrl?:
     },
   })
 
+  let sandboxDestroyed = false
   try {
     const capability = await port.capabilities()
     checks.push(Object.freeze({
@@ -110,10 +111,15 @@ export async function runBuilderPlaywrightCliLiveAcceptance(input: { targetUrl?:
       detail: bounded(error instanceof Error ? error.message : 'unknown_error', 200),
     }))
   } finally {
-    await port.close().catch(() => undefined)
+    try {
+      await port.close()
+      sandboxDestroyed = true
+    } catch {
+      checks.push(Object.freeze({ name: 'sandbox_cleanup', passed: false, detail: 'sandbox_stop_failed' }))
+    }
   }
 
-  const ok = checks.length >= 6 && checks.every(check => check.passed)
+  const ok = sandboxDestroyed && checks.length >= 6 && checks.every(check => check.passed)
   return Object.freeze({
     ok,
     schemaVersion: 'builder-playwright-cli-live-acceptance-v2',
@@ -122,7 +128,7 @@ export async function runBuilderPlaywrightCliLiveAcceptance(input: { targetUrl?:
       pageBodiesStored: false,
       credentialsStored: false,
       browserEvidenceStored: false,
-      sandboxDestroyed: true,
+      sandboxDestroyed,
     }),
   })
 }

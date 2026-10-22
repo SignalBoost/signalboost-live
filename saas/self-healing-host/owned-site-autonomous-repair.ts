@@ -142,8 +142,11 @@ function platformRequestErrorObjective(incident: SupervisorIncident, diagnosis: 
   const traceIds = Array.isArray(incident.metadata?.traceIds) ? incident.metadata.traceIds.map(String).slice(0, 5) : []
   return [
     `Fix the SignalBoost platform server error detected by the Self-Healing Supervisor on ${PUBLIC_BRAND.siteUrl}.`,
-    `Failing route: ${routePath} (${metadataText(incident, 'routeType', 20) || 'route'}), ${Number(incident.metadata?.occurrences) || 1} uncaught error(s) between ${metadataText(incident, 'firstSeen', 40)} and ${metadataText(incident, 'lastSeen', 40)}.`,
+    `Failing route: ${routePath} (${metadataText(incident, 'routeType', 20) || 'route'}), ${Number(incident.metadata?.occurrences) || 1} server error(s) between ${metadataText(incident, 'firstSeen', 40)} and ${metadataText(incident, 'lastSeen', 40)}.`,
     `Recorded error (secrets redacted): ${metadataText(incident, 'requestErrorCode', 80)}: ${metadataText(incident, 'requestErrorMessage')}`,
+    ...(metadataText(incident, 'requestErrorCode', 80) === 'http_500'
+      ? ['The route caught a failure and answered HTTP 500 itself, so no exception text was recorded: find where it answers 500 and the failure that leads there.']
+      : []),
     `Trace ids for this error: ${traceIds.join(', ') || 'none recorded'}. Their spans and the provider_inference_usage rows with the same correlation_id show the steps of each failing request.`,
     `Repository starting point (inspect first, not exclusive): the Next.js route at saas${routePath} (its route.ts, page.tsx or layout.tsx) and the modules it imports.`,
     `Supervisor diagnosis: ${scopedDiagnosis(diagnosis, 'platform-request-error')}`,

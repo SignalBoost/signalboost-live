@@ -283,7 +283,12 @@ The platform is traced on the OpenTelemetry standard:
 Durable trace records (no new tables):
 - `provider_inference_usage.correlation_id` holds the trace id for every model call that has no correlation id of its own.
 - `builder_jobs.metadata.traceId` and `traceparent`: each work slice continues the trace of the request that queued the job (`builder.job.slice` → `builder.model.generate` / `builder.tool` / `builder.publish.isolated`).
-- `supervisor_audit_events` with `event_type = 'platform_request_error'` holds each uncaught server error. It is recorded by `onRequestError`, redacted, has no query string, is keyed by trace id, and is bounded per instance.
+- `supervisor_audit_events` with `event_type = 'platform_request_error'` holds each server error, keyed by trace id, with secrets redacted, no query string, and a per-instance bound. Two sources write it:
+  - errors Next.js captures (`onRequestError`);
+  - requests a route answered with HTTP 500 itself (`serverErrorSpanProcessor`, error code `http_500`).
+- 502/503/504 are deliberate fail-closed answers and are not recorded.
+- Only Production records them (`VERCEL_ENV`). Preview deployments share the database, but their errors belong to unmerged code.
+- The SDK records every request (`always_on`). What Vercel keeps and bills is still decided by the project's sampling rules.
 
 Supervisor ownership:
 - `self-healing-host/platform-request-error-monitoring.ts` turns those errors into native incidents, one per route + error, at most 3 per cycle.

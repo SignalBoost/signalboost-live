@@ -1,2 +1,2 @@
-base_sha=5fd38260b1ab47338627b22b298cb0517d396535
-branch=fix/builder-proof-stale-regression-20261022
+base_sha=b768a5fb8922fd1a5962f36b9939ee64304ece4c
+branch=feat/observability-handled-500-20261022

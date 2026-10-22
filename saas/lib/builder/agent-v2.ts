@@ -681,6 +681,16 @@ export class BuilderV2Agent {
             workspaceId: options.workspaceId,
             workspaceFiles: knownFiles,
             missingRequiredFiles: missingFiles(),
+            // A resumed idle slice must not send the identical prompt that made
+            // the model emit only list_files/finish again. This recovery signal
+            // is checkpoint-derived, and never counts as a tool or proof receipt.
+            ...(saved?.idleSlices ? { continuationRecovery: {
+              idleSlices: saved.idleSlices,
+              instruction: missingFiles().length
+                ? 'Previous slices did not create source. Do not list files or finish. Write the named missingRequiredFiles now using complete write_file tool actions.'
+                : 'Previous slices produced no successful verification. Do not list files or finish. Inspect the last failure and perform the next executable edit or required proof.',
+            } } : {}),
+
             // Live todo list from host receipts (as Cursor and Windsurf keep a plan the user sees), never from model claims.
             todo: (() => {
               const acceptance = builderV2Acceptance(options.objective, knownFiles, steps)

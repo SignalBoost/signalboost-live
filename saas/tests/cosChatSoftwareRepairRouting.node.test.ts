@@ -145,6 +145,12 @@ test('a pasted log with no request is evidence for diagnosis, never a repair req
   // Asking for the repair still is one, with or without the log.
   assert.equal(isSoftwareRepairRequest(`Fix this build failure:\n${PASTED_VERCEL_FAILURE}`), true)
   assert.equal(isSoftwareRepairRequest('the build fails on main, fix it'), true)
+  // Codex on #4815: the person's own words around the log decide, not only the narrow log-repair phrasing.
+  for (const request of ['Fix my app:', 'debug my Python script', 'resolve the build failure', 'my website is broken after the last deploy']) {
+    assert.equal(isSoftwareRepairRequest(`${request}\n${PASTED_VERCEL_FAILURE}`), true, request)
+    assert.equal(isSoftwareRepairRequest(`${PASTED_VERCEL_FAILURE}\n${request}`), true, request)
+  }
+  assert.equal(isSoftwareRepairRequest(`here is the log\n${PASTED_VERCEL_FAILURE}`), false)
   // With no repair request the browser ingress answers with the diagnosis and its repair offer.
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.ok(route.indexOf('if (softwareSpecialist)') < route.indexOf('if (operationalEvidence && !hasSourceAttachment)'))

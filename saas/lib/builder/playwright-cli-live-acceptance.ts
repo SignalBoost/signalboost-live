@@ -14,7 +14,7 @@ export type BuilderPlaywrightCliLiveAcceptanceResult = Readonly<{
     pageBodiesStored: false
     credentialsStored: false
     browserEvidenceStored: false
-    sandboxDestroyed: true
+    sandboxDestroyed: boolean
   }>
 }>
 

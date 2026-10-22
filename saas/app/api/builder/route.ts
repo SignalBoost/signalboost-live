@@ -83,7 +83,8 @@ export function builderProgressSnapshot(job: Pick<BuilderJobRecord, 'checkpoint'
     activityAgeSeconds: ageSeconds,
     needsAttention,
     attentionReason: needsAttention ? 'No recorded Builder activity for at least two minutes; examine the durable job status.' : null,
-    phase: job.checkpoint?.verificationPending === true ? 'verification'
+    phase: job.status === 'succeeded' ? 'completed' : job.status === 'failed' || job.status === 'stopped' ? 'failed'
+      : job.checkpoint?.verificationPending === true ? 'verification'
       : job.status === 'queued' ? 'queued' : job.status === 'paused' ? 'checkpointed' : 'model',
     lastActivityAt: job.updatedAt,
     claimGeneration: job.claimGeneration,

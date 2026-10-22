@@ -518,6 +518,10 @@ export class BuilderV2Agent {
       const commands = testOnlyPrefix
         ? [failedCommand!, ...checklist.commands.filter(command => command !== failedCommand)] : checklist.commands
       for (const command of commands) {
+        // Do not execute an npm script against an uninitialized project. ENOENT
+        // is not evidence of an application regression and cannot prove completion.
+        if (/^npm\\s+(?:run\\s+)?(?:test|build|start|lint|typecheck)(?:\\s|$)/i.test(command)
+          && !knownFiles.includes('package.json')) return null
         if (latestCommandRun(command)?.ok) continue
         if (latestCommandRun(command) && !latestCommandRun(command)?.ok) return null
         if (steps.length >= BUILDER_V2_MAX_RECEIPTS) return null
@@ -819,6 +823,14 @@ export class BuilderV2Agent {
           lastReceipt = JSON.stringify({ ok: false, tool: action.tool,
             error: 'builder_write_content_conflict', path: action.path,
             message: 'Read the existing file before overwriting it.' })
+          break
+        }
+        if (action.tool === 'run_tests'
+          && /^npm\\s+(?:run\\s+)?(?:test|build|start|lint|typecheck)(?:\\s|$)/i.test(action.command)
+          && !knownFiles.includes('package.json')) {
+          lastReceipt = JSON.stringify({ ok: false, tool: action.tool,
+            error: 'builder_missing_package_manifest',
+            message: 'No package.json exists in this workspace. Create or import the actual project manifest and sources before running npm scripts; do not treat ENOENT as a failing application test.' })
           break
         }
         const receipt = await this.dispatcher.dispatch(options.workspaceId, action,

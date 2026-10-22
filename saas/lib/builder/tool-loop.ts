@@ -651,9 +651,17 @@ export class BuilderToolLoop {
       if (testOnlyChange && pendingOrder.length === 0 && chunks.size === 0) {
         return { ok: true, answer: testOnlyChange, trace }
       }
-      // Completed, evidence-backed work must win over redundant inspection refusals.
-      // Incomplete work still fails closed at the same four-refusal ceiling.
-      if (!missingBuildDeliverables && deniedInspections >= 4) return { ok: false, error: 'builder_repeated_inspection_blocked: inspect a different file or run verification', trace }
+      // A reproduced repair is about to enter mutation-only recovery (below). Do not
+      // terminate it at the generic four-refusal inspection limit before that recovery
+      // can generate a targeted edit. Keep a finite eight-refusal hard stop for repair
+      // jobs; no further read/list/search commands become available during recovery.
+      // Non-repair work retains the original four-refusal ceiling.
+      const inspectionLimit = repairObjective && latestFailedRunIndex >= 0 ? 8 : 4
+      if (!missingBuildDeliverables && deniedInspections >= inspectionLimit) return {
+        ok: false,
+        error: 'builder_repeated_inspection_blocked: mutation-only recovery exhausted; preserve failed proof and inspected source for diagnosis',
+        trace,
+      }
       // A model can alternate list_files and read_file to evade a last-tool-only
       // restriction. Keep every repeated inspection unavailable until a write/edit
       // changes the workspace and resets the inspection state.

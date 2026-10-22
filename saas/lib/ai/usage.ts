@@ -33,14 +33,15 @@ export function prefixCacheStats(usage: {
   cache_creation_input_tokens?: number
   prompt_tokens?: number
   prompt_tokens_details?: { cached_tokens?: number }
+  input_tokens_details?: { cached_tokens?: number }
 } | null | undefined) {
   const nonnegative = (value: unknown) =>
     typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0
   if (!usage) return { inputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, hitRate: 0 }
-  const openAi = typeof usage.prompt_tokens === 'number'
-  const cacheReadTokens = nonnegative(openAi ? usage.prompt_tokens_details?.cached_tokens : usage.cache_read_input_tokens)
+  const openAi = typeof usage.prompt_tokens === 'number' || typeof usage.input_tokens_details?.cached_tokens === 'number'
+  const cacheReadTokens = nonnegative(openAi ? (usage.prompt_tokens_details?.cached_tokens ?? usage.input_tokens_details?.cached_tokens) : usage.cache_read_input_tokens)
   const cacheWriteTokens = openAi ? 0 : nonnegative(usage.cache_creation_input_tokens)
-  const inputTokens = openAi ? nonnegative(usage.prompt_tokens) : nonnegative(usage.input_tokens) + cacheReadTokens + cacheWriteTokens
+  const inputTokens = openAi ? nonnegative(usage.prompt_tokens ?? usage.input_tokens) : nonnegative(usage.input_tokens) + cacheReadTokens + cacheWriteTokens
   const boundedRead = Math.min(inputTokens, cacheReadTokens)
   return {
     inputTokens,

@@ -2,7 +2,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { portableBrandName } from '@/lib/portable/companyIdentity'
 import { NextRequest, NextResponse } from 'next/server'
-import { cachedSystem, recordUsage } from '@/lib/ai/usage'
+import { cachedSystem, prefixCacheStats, recordUsage } from '@/lib/ai/usage'
 import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
 import { getAccess } from '@/lib/auth/access'
 import { getLivePricing } from '@/lib/ai/tools/getPricing'
@@ -1833,6 +1833,17 @@ ${ev.summary}`
           // so external-user token cost can be attributed/billed/throttled.
           // Fire-and-forget + resilient: never blocks or breaks the reply.
           if (msg && (msg as any).usage) {
+            if (process.env.COS_PREFIX_CACHE_METRICS === '1') {
+              const cache = prefixCacheStats((msg as any).usage)
+              console.info('[cos] prefix_cache_usage', {
+                feature: isPrivileged ? 'support.chief-of-staff' : 'support.concierge',
+                model,
+                inputTokens: cache.inputTokens,
+                cacheReadTokens: cache.cacheReadTokens,
+                cacheWriteTokens: cache.cacheWriteTokens,
+                hitRate: cache.hitRate,
+              })
+            }
             void recordUsage({
               userId,
               feature: isPrivileged ? 'support.chief-of-staff' : 'support.concierge',

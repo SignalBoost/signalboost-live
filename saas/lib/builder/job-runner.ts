@@ -644,8 +644,15 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         totalElapsedMs: Math.max(0, Date.now() - Date.parse(job.createdAt)),
         failure: publicationError || acceptance.failureCode || finalProof.failureCode || reason,
       }) : null
+      const commandsProven = (cycle.result?.steps ?? []).filter(step => step.tool === 'run_tests' && step.ok)
+        .map(step => String((step.output as { requestedCommand?: unknown } | undefined)?.requestedCommand ?? '')).filter(Boolean)
+      const syntaxOnly = commandsProven.length > 0
+        && commandsProven.every(command => /^node\\s+(?:--check|-c)\\s+/i.test(command.trim()))
+      const proofDescription = syntaxOnly
+        ? 'Builder V2 passed a JavaScript syntax check only; runtime behavior and defect repair were not verified.'
+        : 'Builder V2 verified the workspace with recorded host test execution.'
       const reply = acceptanceReport ? historyReply(acceptanceReport, job.workspaceId, files) : historyReply(success
-        ? `Builder V2 verified the workspace with recorded host test execution. ${cycle.result?.summary || ''}${publicationReport}${budgetReport}`
+        ? `${proofDescription} ${syntaxOnly ? '' : (cycle.result?.summary || '')}${publicationReport}${budgetReport}`
         : `Builder V2 could not complete verification: ${publicationError || acceptance.failureCode || finalProof.failureCode || reason}\n\n${progress}${publicationReport}${budgetReport}`, job.workspaceId, files)
       await finishBuilderJob({
         jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,

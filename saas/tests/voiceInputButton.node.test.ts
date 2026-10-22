@@ -26,3 +26,10 @@ test('manual typing during dictation is not overwritten by subsequent transcript
   assert.match(buttonSource, /lastDictatedValueRef\.current = nextValue/)
   assert.match(buttonSource, /onChange\(nextValue\)/)
 })
+
+test('voice transcript respects phrase boundaries and CJK composition', () => {
+  assert.match(buttonSource, /segment = event\.results\[i\]\[0\]\?\.transcript\?\.trim\(\)/)
+  assert.match(buttonSource, /segments\.join\(cjk \? '' : ' '\)/)
+  assert.match(buttonSource, /lang === 'ja' \|\| lang === 'ko'/)
+  assert.match(buttonSource, /onChange\(nextValue\)/)
+})

@@ -19,10 +19,9 @@ import { isOperationalLogEvidence } from '@/lib/ai/cos/pastedOperationalLog'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { extractBuilderSourceFiles, planDebugFileJob } from '@/lib/builder/debug-file-job'
 import { enqueueBuilderJob } from '@/lib/builder/job-store'
-import { readBuilderEvidenceJob, getBuilderJobForUser } from '@/lib/builder/job-store'
-import { startApprovedIsolatedPublication } from '@/lib/builder/collaborate-approval'
-import { assistanceCopy, COLLABORATE_APPROVAL_STARTED, COLLABORATE_SOURCE_CHANGED, DEFAULT_ASSISTANCE_MODE, isAssistanceApproval, normalizeAssistanceMode, ASSISTANCE_MODE_METADATA_KEY, type AssistanceMode } from '@/lib/ai/cos/assistanceMode'
-import { getAdminSupabase } from '@/utils/supabase/server'
+import { readBuilderEvidenceJob } from '@/lib/builder/job-store'
+import { DEFAULT_ASSISTANCE_MODE, normalizeAssistanceMode, type AssistanceMode } from '@/lib/ai/cos/assistanceMode'
+import { storedAssistanceMode as storedAssistanceModeFor } from '@/lib/ai/cos/assistanceModeServer'
 import { builderEvidenceReply, isBuilderEvidenceRequest, isBuilderProjectQuestion } from '@/lib/builder/execution-evidence'
 import { runBuilderJob } from '@/lib/builder/job-runner'
 import {
@@ -421,44 +420,10 @@ async function tryCosSoftwareSpecialistLegacy(
   }, { status: 202 })
 }
 
-/** The assistance mode the signed-in user saved on their account (chosen in any chat; follows them to every device). */
+/** The saved mode of whoever is asking (see assistanceModeServer). */
 async function storedAssistanceMode(): Promise<AssistanceMode | null> {
   const access = await getAccess().catch(() => null)
-  if (!access?.userId || !UUID.test(access.userId)) return null
-  try {
-    const { data } = await getAdminSupabase().auth.admin.getUserById(access.userId)
-    return normalizeAssistanceMode(data?.user?.user_metadata?.[ASSISTANCE_MODE_METADATA_KEY])
-  } catch {
-    return null
-  }
-}
-
-/** "go" after a Work with me pause: start the publish-only job, or null when nothing in this conversation is waiting. */
-async function approvePausedPublication(input: CosSoftwareSpecialistRequest): Promise<NextResponse | null> {
-  const access = await getAccess().catch(() => null)
-  const userId = access?.userId || ''
-  const conversationId = conversationIdFrom(input.body)
-  if (!UUID.test(userId) || !conversationId) return null
-  const language = resolveResponseLanguage(String(input.objective || ''), input.body?.context?.language)
-  const outcome = await startApprovedIsolatedPublication({
-    userId, conversationId, responseLanguage: language,
-    runningReply: assistanceCopy(COLLABORATE_APPROVAL_STARTED, language),
-    readLatestJob: readBuilderEvidenceJob,
-    fingerprint: readBuilderWorkspaceFingerprint,
-    enqueue: enqueueBuilderJob,
-    jobExists: async (jobId, owner) => Boolean(await getBuilderJobForUser(jobId, owner)),
-  }).catch(() => null)
-  if (!outcome || outcome.kind === 'none') return null
-  if (outcome.kind === 'source_changed') return NextResponse.json({
-    reply: assistanceCopy(COLLABORATE_SOURCE_CHANGED, language), source: 'cos-builder-approval-source-changed',
-    execution_allowed: false, external_action_taken: false, ...softwareSpecialistFields('software.verify'),
-  }, { status: 409 })
-  after(async () => { await runBuilderJob(outcome.jobId, userId) })
-  return NextResponse.json({
-    reply: assistanceCopy(COLLABORATE_APPROVAL_STARTED, language), source: 'cos-builder-approved-publication',
-    jobId: outcome.jobId, workspaceId: outcome.workspaceId, status: 'queued',
-    execution_allowed: true, external_action_taken: false, ...softwareSpecialistFields('software.build'),
-  }, { status: 202 })
+  return storedAssistanceModeFor(access?.userId)
 }
 
 /**
@@ -477,13 +442,6 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   const sourceAttached = hasSourceAttachment(context)
   const mediaAttached = hasImageOrPdfAttachment(input.body)
   const requestedMode = normalizeAssistanceMode(input.body?.assistanceMode ?? input.body?.context?.assistanceMode)
-  // Work with me: the user's "go" (in any supported language) publishes work Builder verified and paused. Never in
-  // Guide me (Codex on #4765): a user who switched to Guide me cannot trigger an external action with a "yes".
-  if (isAssistanceApproval(objective)
-    && (requestedMode ?? await storedAssistanceMode() ?? DEFAULT_ASSISTANCE_MODE) !== 'guide') {
-    const approved = await approvePausedPublication(input)
-    if (approved) return approved
-  }
   const specialistRelevant = sourceAttached
     || mediaAttached
     || isSoftwareRepairRequest(objective)

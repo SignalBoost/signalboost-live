@@ -266,6 +266,10 @@ export function conciergeBuilderRequest(body: unknown): { endpoint: '/api/builde
   const attachmentMimeTypes = attachments.map(attachment => String(attachment?.mimeType || attachment?.type || ''))
   const objective = latestUserText(record)
   if (!objective || !isConciergeBuilderObjective(objective, { attachmentNames, attachmentMimeTypes })) return null
+  // Guide me never starts Builder: COS explains instead. Every other mode travels with the job (Production
+  // 2026-10-22: this shortcut dropped the mode, so a Work with me job published without asking).
+  const assistanceMode = typeof record.context?.assistanceMode === 'string' ? record.context.assistanceMode : ''
+  if (assistanceMode === 'guide') return null
 
   const files: Array<{ path: string; content: string }> = []
   if (attachments.length) {
@@ -292,7 +296,9 @@ export function conciergeBuilderRequest(body: unknown): { endpoint: '/api/builde
   if (!conversationId) return null
   return {
     endpoint: '/api/builder',
-    body: { objective, conversationId, files },
+    body: { objective, conversationId, files,
+      ...(assistanceMode ? { assistanceMode } : {}),
+      ...(typeof record.context?.language === 'string' ? { language: record.context.language } : {}) },
   }
 }
 

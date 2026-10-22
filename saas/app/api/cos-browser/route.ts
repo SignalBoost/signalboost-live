@@ -1,5 +1,8 @@
 // saas/app/api/cos-browser/route.ts
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
+import { isAssistanceApproval } from '@/lib/ai/cos/assistanceMode'
+import { approvePausedPublication } from '@/lib/builder/collaborate-approval-server'
+import { runBuilderJob } from '@/lib/builder/job-runner'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
 import { POST as artifactPost } from '@/app/api/artifacts/route'
 import { POST as visualPost } from '@/app/api/visuals/route'
@@ -66,6 +69,8 @@ function isSignalBoostDeploymentContext(req: NextRequest): boolean {
  * canonical browser ingress so every externally delivered Concierge reply is covered, including
  * Software Specialist status replies returned before ordinary answer synthesis.
  */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 async function publicConciergePresentation(response: Response): Promise<NextResponse> {
   const headers = new Headers(response.headers)
   headers.delete('content-length')
@@ -192,6 +197,23 @@ async function executeBrowserTurn(req: NextRequest) {
   // the bounded editor immediately on BOTH Concierge and Assistant so the homepage cannot spend
   // ~30 seconds on unrelated semantic classifiers before the edit model call.
   // A request to repair software is never a text edit, even when it opens with "Fix the …".
+  // Work with me: the user's "go" publishes the work Builder verified and paused in this conversation. It acts as the
+  // signed-in user, as /api/builder did when it started that job; on the public Concierge everything else stays in
+  // public scope. Production 2026-10-22: a plain "go" never reached the approval, which only the Software Specialist
+  // (consulted for software requests, without identity on Concierge) could see. Never in Guide me.
+  if (body?.context?.assistanceMode === 'collaborate' && isAssistanceApproval(prompt)) {
+    const approver = await getAccess().catch(() => null)
+    const approvalConversationId = String(body?.context?.conversationId || '')
+    const approval = approver?.userId && UUID_PATTERN.test(approvalConversationId)
+      ? await approvePausedPublication({ userId: approver.userId, conversationId: approvalConversationId, language }).catch(() => null)
+      : null
+    if (approval) {
+      if (approval.jobId) after(async () => { await runBuilderJob(approval.jobId, approver!.userId!) })
+      const response = NextResponse.json(approval.payload, { status: approval.status })
+      return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
+    }
+  }
+
   const softwareRepairRequest = isSoftwareRepairRequest(prompt)
   const directTextTransformation = softwareRepairRequest ? null : detectDirectTextTransformation(prompt)
   const directTextHasAttachments = hasAttachments

@@ -116,7 +116,6 @@ test('every chat offers the selector and sends the remembered mode; the server h
   assert.match(hook, /supabase\.auth\.updateUser\(\{ data: \{ \[ASSISTANCE_MODE_METADATA_KEY\]: next \} \}\)/)
   const specialist = read('lib/ai/cos/softwareSpecialist.ts')
   assert.match(specialist, /requestedMode \?\? await storedAssistanceMode\(\) \?\? DEFAULT_ASSISTANCE_MODE/)
-  assert.ok(specialist.indexOf('if (isAssistanceApproval(objective))') < specialist.indexOf('if (!specialistRelevant) return null', specialist.indexOf('export async function tryCosSoftwareSpecialist(')))
 })
 
 // Codex on #4765 (P1): holding only the immediate merge was not enough; the durable merge continuation (cron) would
@@ -146,10 +145,12 @@ test('a Work with me repair PR is never merged by the durable merge continuation
   assert.match(read('lib/builder/repository-repair.ts'), /holdMerge: input\.holdMerge === true,\n\s*\}\)/)
 })
 
-// Codex on #4765 (P1): a "yes" in Guide me must never publish paused work.
-test('an approval is honoured only outside Guide me, using the saved mode when the request carries none', () => {
-  const specialist = read('lib/ai/cos/softwareSpecialist.ts')
-  assert.match(specialist, /if \(isAssistanceApproval\(objective\)\n\s*&& \(requestedMode \?\? await storedAssistanceMode\(\) \?\? DEFAULT_ASSISTANCE_MODE\) !== 'guide'\) \{\n\s*const approved = await approvePausedPublication\(input\)/)
+// Codex on #4765 (P1): a "yes" in Guide me must never publish paused work. Since 2026-10-22 approvals are answered by
+// the chat endpoint, only for a Work with me request (tests/builderAssistanceModeTransport).
+test('an approval is honoured only in Work with me', () => {
+  const route = read('app/api/cos-browser/route.ts')
+  assert.match(route, /if \(body\?\.context\?\.assistanceMode === 'collaborate' && isAssistanceApproval\(prompt\)\)/)
+  assert.doesNotMatch(read('lib/ai/cos/softwareSpecialist.ts'), /approvePausedPublication/)
 })
 
 // Codex on #4765 (P2): one browser, two accounts — each keeps its own mode.

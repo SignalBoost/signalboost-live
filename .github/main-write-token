@@ -1,2 +1,2 @@
-base_sha=1fcfb998e6ed5b22389efc30a203c8f9f1da9ea9
-branch=fix/builder-progress-stall-and-test-counts-20261021
+base_sha=0e5466f5679e78d5887061ee15ae50a814ae51b2
+branch=fix/builder-stale-planted-defect-comment-20261021

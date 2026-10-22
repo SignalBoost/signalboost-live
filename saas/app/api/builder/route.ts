@@ -65,6 +65,34 @@ function cleanFiles(value: unknown): DebugFileInput[] {
   }))
 }
 
+/** Surface V2's persisted receipts to the customer without disclosing source content or model context. */
+export function builderProgressSnapshot(job: Pick<BuilderJobRecord, 'checkpoint' | 'status' | 'updatedAt' | 'claimGeneration' | 'metadata'>) {
+  const checkpoint = job.checkpoint as unknown as { version?: number; steps?: readonly { tool?: string; ok?: boolean; changed?: boolean; output?: { stdout?: string; exitCode?: number; requestedCommand?: string } }[]; revision?: number; modelCalls?: number } | null
+  const v2 = checkpoint?.version === 2 && Array.isArray(checkpoint.steps)
+  const steps = v2 ? checkpoint!.steps! : []
+  const recent = [...steps].reverse().find(step => step.tool === 'run_tests')
+  const stdout = recent?.output?.stdout || ''
+  const passCount = Number(/(?:^|\\n)\\s*(?:#|ℹ)\\s+pass\\s+(\\d+)/.exec(stdout)?.[1] || 0)
+  const failCount = Number(/(?:^|\\n)\\s*(?:#|ℹ)\\s+fail\\s+(\\d+)/.exec(stdout)?.[1] || 0)
+  return {
+    phase: job.checkpoint?.verificationPending === true ? 'verification'
+      : job.status === 'queued' ? 'queued' : job.status === 'paused' ? 'checkpointed' : 'model',
+    lastActivityAt: job.updatedAt,
+    claimGeneration: job.claimGeneration,
+    filesWritten: v2 ? steps.filter(step => step.changed && (step.tool === 'write_file' || step.tool === 'edit_file')).length
+      : job.checkpoint?.workingFiles?.length ?? null,
+    workRounds: v2 ? steps.length : job.checkpoint?.workRounds ?? null,
+    modelCalls: v2 ? checkpoint?.modelCalls ?? null : null,
+    modelTimeoutDeferrals: Number(job.metadata.builderCapacityDeferrals || 0),
+    queueReason: typeof job.metadata.builderCapacityDeferredReason === 'string'
+      ? job.metadata.builderCapacityDeferredReason : null,
+    lastTest: v2 && recent
+      ? { passed: recent.ok === true, exitCode: recent.output?.exitCode ?? null, testsPassed: passCount, testsFailed: failCount,
+          command: recent.output?.requestedCommand || null }
+      : (() => { const run = [...(job.checkpoint?.trace || [])].reverse().find(item => item.toolId === 'run'); const output = run?.output as { exitCode?: number; stdout?: string } | undefined; const stdout = output?.stdout || ''; return run ? { passed: run.ok, exitCode: output?.exitCode ?? null, testsPassed: Number(/(?:^|\\n)\\s*(?:#|ℹ)\\s+pass\\s+(\\d+)/.exec(stdout)?.[1] || 0), testsFailed: Number(/(?:^|\\n)\\s*(?:#|ℹ)\\s+fail\\s+(\\d+)/.exec(stdout)?.[1] || 0) } : null })(),
+  }
+}
+
 function runningReply(jobId: string): string {
   return `COS Builder is running job ${jobId}. Progress and the final result are durable in History; the action will not be replayed.`
 }
@@ -114,18 +142,7 @@ export async function GET(request: Request) {
           workspaceId: job.workspaceId,
           conversationId: job.conversationId,
           status: job.status,
-          progress: {
-            phase: job.checkpoint?.verificationPending === true ? 'verification'
-              : job.status === 'queued' ? 'queued' : job.status === 'paused' ? 'checkpointed' : 'model',
-            lastActivityAt: job.updatedAt,
-            claimGeneration: job.claimGeneration,
-            filesWritten: job.checkpoint?.workingFiles?.length ?? null,
-            workRounds: job.checkpoint?.workRounds ?? null,
-            modelTimeoutDeferrals: Number(job.metadata.builderCapacityDeferrals || 0),
-            queueReason: typeof job.metadata.builderCapacityDeferredReason === 'string'
-              ? job.metadata.builderCapacityDeferredReason : null,
-            lastTest: (() => { const run = [...(job.checkpoint?.trace || [])].reverse().find(item => item.toolId === 'run'); const output = run?.output as { exitCode?: number; stdout?: string } | undefined; const stdout = output?.stdout || ''; return run ? { passed: run.ok, exitCode: output?.exitCode ?? null, testsPassed: Number(/(?:^|\n)\s*(?:#|ℹ)\s+pass\s+(\d+)/.exec(stdout)?.[1] || 0), testsFailed: Number(/(?:^|\n)\s*(?:#|ℹ)\s+fail\s+(\d+)/.exec(stdout)?.[1] || 0) } : null })(),
-          },
+          progress: builderProgressSnapshot(job),
           reply: job.status === 'queued' && job.metadata.builderCapacityDeferredReason === 'builder_runpod_primary_busy'
             ? 'Queued — waiting for model capacity. Builder will resume this saved job automatically.'
             : job.status === 'paused' && job.checkpoint?.verificationPending === true

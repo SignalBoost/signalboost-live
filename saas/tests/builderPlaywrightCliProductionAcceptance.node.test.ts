@@ -23,6 +23,14 @@ test('Production Playwright acceptance is production-only and CRON_SECRET gated'
   assert.match(cron, /builder_playwright_cli_production_acceptance/)
 })
 
+test('Preview Playwright acceptance is authenticated before creating a billable sandbox', () => {
+  assert.match(preview, /VERCEL_ENV !== 'preview'/)
+  assert.match(preview, /CRON_SECRET/)
+  assert.match(preview, /request\.headers\.get\('authorization'\)/)
+  assert.match(preview, /status: 401/)
+  assert.ok(preview.indexOf("status: 401") < preview.indexOf("runBuilderPlaywrightCliLiveAcceptance()"))
+})
+
 test('Preview and Production use the same live acceptance implementation', () => {
   assert.match(preview, /runBuilderPlaywrightCliLiveAcceptance/)
   assert.match(cron, /runBuilderPlaywrightCliLiveAcceptance/)

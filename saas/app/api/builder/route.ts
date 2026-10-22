@@ -1,3 +1,7 @@
+import { builderAcceptanceReport } from '@/lib/builder/acceptance-report'
+import type { BuilderV2Receipt } from '@/lib/builder/agent-v2-dispatcher'
+import type { BuilderAcceptanceLedger } from '@/lib/builder/acceptance-ledger'
+import type { BuilderFinalProof } from '@/lib/builder/final-proof'
 import { selectBuilderProject, builderProjectBlockedReply, isNewBuilderProjectObjective } from '@/lib/builder/project-continuity'
 import { builderRepositoryTarget, importBuilderRepository, builderRepositoryErrorReply } from '@/lib/builder/repository-import'
 // saas/app/api/builder/route.ts
@@ -128,6 +132,29 @@ export async function GET(request: Request) {
               ? 'Files written — verifying changes. Builder will continue automatically.'
             : job.status === 'paused' ? 'Builder saved its progress and will continue automatically. Verification is not complete yet.' : runningReply(job.id),
         }, { status: 202 })
+      }
+      // Read-only historical acceptance presentation. Does not invoke runBuilderJob,
+      // enqueue a job, mutate history, or purchase inference.
+      if (url.searchParams.get('report') === 'acceptance') {
+        const saved = job.result as Record<string, unknown> | null
+        const ledger = saved?.acceptanceLedger as BuilderAcceptanceLedger | undefined
+        const proof = saved?.finalProof as BuilderFinalProof | undefined
+        const receipts = Array.isArray(saved?.receipts) ? saved.receipts as BuilderV2Receipt[] : []
+        if (!ledger || !proof || !Array.isArray(saved?.files)) {
+          return noStore({ error: 'builder_acceptance_evidence_unavailable', jobId: job.id }, { status: 409 })
+        }
+        const elapsed = Math.max(0, Date.parse(job.finishedAt || '') - Date.parse(job.createdAt))
+        const reply = builderAcceptanceReport({
+          jobId: job.id, files: (saved.files as unknown[]).filter((x): x is string => typeof x === 'string'),
+          receipts, ledger, proof,
+          publication: saved.isolatedPublication && typeof saved.isolatedPublication === 'object'
+            ? saved.isolatedPublication as Record<string, unknown> : null,
+          inferenceBudget: saved.inferenceBudget && typeof saved.inferenceBudget === 'object'
+            ? saved.inferenceBudget as { accountedInferenceUsd: number; pendingReservationUsd: number } : null,
+          totalElapsedMs: Number.isFinite(elapsed) ? elapsed : 0,
+          failure: job.error || null,
+        })
+        return noStore({ jobId: job.id, status: job.status, reply, report: reply, readOnly: true })
       }
       return noStore({
         ...(job.result || {}),

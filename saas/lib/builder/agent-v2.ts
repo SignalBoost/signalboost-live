@@ -693,7 +693,10 @@ export class BuilderV2Agent {
                 instruction: 'Reconcile every entry in interfaceMismatches: one edit_file per module in one tools reply.' }
               : steps.slice(steps.findLastIndex(step => step.changed) + 1).some(step => step.tool === 'run_tests' && !step.ok)
                 ? { tool: 'edit_file', reason: 'Repair the last failing command before rerunning the unchanged revision' }
-                : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },
+                : checklist.commands.length && (!/^npm(?:\\s|$)/.test(checklist.commands[0].trim()) || knownFiles.includes('package.json'))
+                  ? { tool: 'run_tests', command: checklist.commands[0] }
+                  : { tool: 'write_file', path: knownFiles.includes('package.json') ? 'index.js' : 'package.json',
+                    instruction: 'No runnable verification command exists for the current workspace. Create the source and project manifest required by the objective before requesting npm test; do not repeat list_files.' },
             // Everything else is verified; only comments describing the repaired planted defect remain (later keys win).
             ...(defectNotes.length ? {
               staleDefectComments: defectNotes,

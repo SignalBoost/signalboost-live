@@ -1,2 +1,2 @@
-base_sha=8bca6b5fdb7b08f86c1a27131df9691a80dd9cf9
-branch=fix/builder-stale-progress-report-tests-20261021
+base_sha=280f84f242d2503f183c6db4d1ec5cff7ad7146f
+branch=fix/builder-preview-browser-auth-20261021

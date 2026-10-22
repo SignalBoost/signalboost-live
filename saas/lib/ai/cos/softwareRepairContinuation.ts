@@ -18,7 +18,14 @@ export function pendingOwnerSoftwareRepair(messages: readonly unknown[], latestP
   if (last?.role !== 'user' || last.content !== latestPrompt) return null
   const prior = history.at(-2)
   if (prior?.role !== 'assistant' || !SOURCE_REQUEST.test(prior.content)) return null
-  const earlier = history.slice(0, -2).filter(message => message.role === 'user')
-  const request = earlier.at(-1)?.content?.trim() || ''
-  return request && isSoftwareRepairRequest(request) ? request.slice(0, 4000) : null
+  // The user may have answered a preceding source-request prompt with "fix it"
+  // before saying "go". Traverse only the nearby consecutive repair confirmations;
+  // do not revive an unrelated old task from the chat history.
+  const earlier = history.slice(0, -2).filter(message => message.role === 'user').slice(-4)
+  for (let index = earlier.length - 1; index >= 0; index--) {
+    const request = earlier[index].content.trim()
+    if (isSoftwareRepairRequest(request)) return request.slice(0, 4000)
+    if (!FOLLOW_UP.test(request)) return null
+  }
+  return null
 }

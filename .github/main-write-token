@@ -1,2 +1,2 @@
-base_sha=eabfacabd26a199c31dea45c69b4bbf5f86e467a
-branch=fix/builder-readonly-progress-rebased-20261021
+base_sha=314960aab125a53d8a8b6b460192ced39dd2bc95
+branch=fix/builder-terminal-progress-phase-20261021

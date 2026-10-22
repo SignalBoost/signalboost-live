@@ -15,6 +15,7 @@ import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProve
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { tryCosSoftwareSpecialist } from '@/lib/ai/cos/softwareSpecialist'
+import { pendingOwnerSoftwareRepair } from '@/lib/ai/cos/softwareRepairContinuation'
 import {
   analyzeOperationalLog,
   compactOperationalLogForRepair,
@@ -215,7 +216,8 @@ async function executeBrowserTurn(req: NextRequest) {
     }
   }
 
-  const softwareRepairRequest = isSoftwareRepairRequest(prompt)
+  const ownerRepairFollowup = pendingOwnerSoftwareRepair(messages, prompt)
+  const softwareRepairRequest = isSoftwareRepairRequest(prompt) || Boolean(ownerRepairFollowup)
   const directTextTransformation = softwareRepairRequest ? null : detectDirectTextTransformation(prompt)
   const directTextHasAttachments = hasAttachments
   if (directTextTransformation && !directTextHasAttachments) {
@@ -323,6 +325,8 @@ async function executeBrowserTurn(req: NextRequest) {
   // COS decides that software work belongs to the Software Specialist. From that point onward the
   // Software Specialist owns Builder/Platform Engineer lifecycle. Repository authority follows the
   // authenticated owner identity, never the mouth that carried the request.
+  const specialistObjective = authenticatedOwner && isSignalBoostDeploymentContext(req) && ownerRepairFollowup
+    ? ownerRepairFollowup : operationalPrompt || prompt
   const shouldConsultSoftwareSpecialist = hasSourceAttachment || explicitOperationalRepair
     || softwareRepairRequest
     || isConciergeBuilderObjective(prompt, routingContext)
@@ -333,7 +337,7 @@ async function executeBrowserTurn(req: NextRequest) {
     ? authenticatedOwner
       ? await tryCosSoftwareSpecialist({
           body,
-          objective: operationalPrompt || prompt,
+          objective: specialistObjective,
           surface: browserSurface,
           allowRepositoryRepair: ownerSoftwareAuthority.allowRepositoryRepair && (!operationalEvidence || explicitOperationalRepair),
           signalBoostDeploymentContext: isSignalBoostDeploymentContext(req),
@@ -342,13 +346,13 @@ async function executeBrowserTurn(req: NextRequest) {
       : browserSurface === 'assistant'
         ? await tryCosSoftwareSpecialist({
             body,
-            objective: operationalPrompt || prompt,
+            objective: specialistObjective,
             surface: 'assistant',
             allowRepositoryRepair: false,
             signalBoostDeploymentContext: false,
             deployment,
           })
-        : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => tryCosSoftwareSpecialist({ body, objective: operationalPrompt || prompt, surface: 'concierge', allowRepositoryRepair: false, signalBoostDeploymentContext: false, deployment })))
+        : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => tryCosSoftwareSpecialist({ body, objective: specialistObjective, surface: 'concierge', allowRepositoryRepair: false, signalBoostDeploymentContext: false, deployment })))
     : null
   if (softwareSpecialist) {
     return browserSurface === 'concierge'

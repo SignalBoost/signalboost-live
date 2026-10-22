@@ -1,2 +1,2 @@
-base_sha=0e5466f5679e78d5887061ee15ae50a814ae51b2
-branch=fix/builder-stale-planted-defect-comment-20261021
+base_sha=eabfacabd26a199c31dea45c69b4bbf5f86e467a
+branch=fix/builder-readonly-progress-rebased-20261021

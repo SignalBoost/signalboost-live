@@ -102,8 +102,28 @@ export default function VoiceInputButton({
       // Browser engines may omit spaces between finalized recognition segments.
       // CJK scripts do not require spaces between successive segments.
       const cjk = lang === 'ja' || lang === 'ko'
-      const transcript = segments.join(cjk ? '' : ' ')
-      const separator = baseValueRef.current && transcript && !cjk ? ' ' : ''
+      const spokenPunctuation: Partial<Record<VoiceLang, readonly [string, string][]>> = {
+        en: [['new paragraph', '\n\n'], ['new line', '\n'], ['comma', ','], ['period', '.'], ['question mark', '?']],
+        es: [['nueva línea', '\n'], ['coma', ','], ['punto', '.'], ['signo de interrogación', '?']],
+        pt: [['nova linha', '\n'], ['vírgula', ','], ['ponto', '.']],
+        pl: [['nowa linia', '\n'], ['przecinek', ','], ['kropka', '.']],
+        ru: [['новая строка', '\n'], ['запятая', ','], ['точка', '.']],
+        de: [['neue zeile', '\n'], ['komma', ','], ['punkt', '.']],
+        fr: [['nouvelle ligne', '\n'], ['virgule', ','], ['point', '.']],
+        it: [['nuova riga', '\n'], ['virgola', ','], ['punto', '.']],
+        ja: [['改行', '\n'], ['読点', '、'], ['句点', '。']],
+        ko: [['줄 바꿈', '\n'], ['쉼표', ','], ['마침표', '.']],
+        ar: [['سطر جديد', '\n'], ['فاصلة', '،'], ['نقطة', '.']],
+      }
+      // Format complete spoken punctuation commands only; never reinterpret code fragments.
+      const formatted = segments.reduce((output, segment) => {
+        const command = spokenPunctuation[lang]?.find(([phrase]) => phrase === segment.toLocaleLowerCase().trim())?.[1]
+        if (command === undefined) return output + (output && !cjk && !output.endsWith('\n') ? ' ' : '') + segment
+        if (command.startsWith('\n')) return output.trimEnd() + command
+        return output.trimEnd() + command
+      }, '')
+      const transcript = formatted
+      const separator = baseValueRef.current && transcript && !cjk && !transcript.startsWith('\n') ? ' ' : ''
       const nextValue = `${baseValueRef.current}${separator}${transcript}`
       lastDictatedValueRef.current = nextValue
       onChange(nextValue)

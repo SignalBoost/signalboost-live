@@ -354,7 +354,7 @@
     },
     {
       "path": "/api/cron/builder-playwright-cli-live-acceptance",
-      "schedule": "*/5 * * * *"
+      "schedule": "17 7 * * *"
     },
     {
       "path": "/api/cron/playwright-mcp-live-acceptance",

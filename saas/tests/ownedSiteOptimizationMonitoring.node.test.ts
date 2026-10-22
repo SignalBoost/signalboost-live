@@ -49,6 +49,22 @@ test('owned-site optimizer findings become one pre-authorized supervisor inciden
   assert.equal(incidents[0].metadata.nativeProbe, 'owned-site-optimization')
   assert.equal(incidents[0].metadata.recoveryPreauthorized, true)
   assert.equal(incidents[0].metadata.ownedPlatform, true)
+  // Only repairable findings drive the repair; the workload measurement stays visible as advisory.
+  assert.equal((incidents[0].metadata.report as any).findingCodes, 'missing_csp,missing_hsts')
+  assert.equal((incidents[0].metadata.report as any).advisoryCodes, 'many_scripts')
+})
+
+test('a report with only workload or content measurements queues no repair (Production 2026-10-22: many_scripts x11)', async () => {
+  for (const codes of [['many_scripts'], ['many_scripts', 'large_html', 'moderate_response', 'missing_cta']]) {
+    const collector = ownedSiteOptimizationMonitoringCollector({
+      apiBaseUrl: 'https://deployment.example',
+      fetchImpl: (async () => new Response(JSON.stringify({
+        ok: true, finalUrl: 'https://itmounts.com/', summary: { score: 92, findings: codes.length, high: 0, medium: codes.length, low: 0 },
+        findings: codes.map(code => ({ code, category: 'performance', severity: 'medium', value: 38 })),
+      }), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch,
+    })
+    assert.deepEqual(await collector.observer.observe(context), [], codes.join(','))
+  }
 })
 
 test('healthy owned-site optimizer report produces no incident', async () => {

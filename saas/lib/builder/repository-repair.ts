@@ -22,6 +22,7 @@ import type { StateSnapshotPort } from '@/lib/portable/state-snapshot-port'
 import { retrieveValidatedCognitiveSkills } from '@/lib/ai/cos/cognitiveSkillContext'
 import { recordVerifiedCognitiveProductionOutcome } from '@/lib/ai/cos/cognitiveProductionOutcome'
 import { verifiedBuilderCognitiveApplication } from './cognitive-application.ts'
+import { builderNodeTestCommand } from './node-test-command.ts'
 
 export type SignalBoostRepositoryRepairExecution = Readonly<{
   status: number
@@ -114,7 +115,7 @@ function targetedRepositoryCommand(command: string, target: SignalBoostRepositor
   // sandbox. If the failed build identified exact tests, never allow a broad npm test to replace
   // that evidence; execute those tests directly even if the model asked for the broad script.
   if (failingTests.length > 0 && /^npm\s+(?:run\s+)?test(?:\s|$)/i.test(normalized)) {
-    return `node --experimental-strip-types --test ${failingTests.join(' ')}`
+    return builderNodeTestCommand(failingTests.join(' '))
   }
   const recordedProof = recordedBuildProofCommand(target)
   // When the log has no failing test file, the recorded Vercel gate/prebuild command is the proof.
@@ -289,7 +290,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
           if (/^(?:tests|test)\/.+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(candidate)) matches.add(candidate)
         }
       }
-      if (matches.size === 1) selectedProofCommand = `node --experimental-strip-types --test ${[...matches][0]}`
+      if (matches.size === 1) selectedProofCommand = builderNodeTestCommand([...matches][0])
     }
     const proofController = needsRepairProof ? createRepositoryRepairProofController({
       ai: governedAi,

@@ -92,7 +92,7 @@ test('superseded repair evidence is repinned to immutable current head with a na
   assert.match(replan.objective, new RegExp(`Commit: ${current}`))
   assert.match(replan.objective, new RegExp(reported))
   assert.match(replan.objective, /Reproduce the same failure on this verified current head before any edit/)
-  assert.equal(repositoryRepairRevalidationProofCommand(replan.target), 'node --experimental-strip-types --test tests/fullAssistantConciergeIngress.node.test.ts')
+  assert.equal(repositoryRepairRevalidationProofCommand(replan.target), 'node --experimental-transform-types --test tests/fullAssistantConciergeIngress.node.test.ts')
 })
 
 test('Software Specialist treats branch advance as replan, not terminal user delegation', () => {

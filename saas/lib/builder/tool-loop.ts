@@ -20,6 +20,7 @@ import { BUILDER_REASONING_GUIDANCE } from './user-guidance.ts'
 import { detectContractOscillation, formatContractOscillation } from './contract-oscillation.ts'
 import { builderVerificationOrder, pendingBuilderVerificationOrder, verificationOrderGuidance, isVerificationProtectedPath } from './verification-order.ts'
 import { applySearchReplace } from './edit-match.ts'
+import { builderNodeTestCommand } from './node-test-command.ts'
 
 type ToolAction = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> }
 type Action = ToolAction | { type: 'answer'; answer: string }
@@ -1088,7 +1089,7 @@ export class BuilderToolLoop {
             ?? trace.find(item => isExecutedBuilderRun(item) && !item.ok)?.input.command
           const proofCommand = (typeof observedFailedCommand === 'string' ? observedFailedCommand : '')
             || (projectContext.manifestPath ? projectContext.recommendedTestCommand : '')
-            || (proofFile ? `node --experimental-strip-types --test ${proofFile.path}` : '')
+            || (proofFile ? builderNodeTestCommand(proofFile.path) : '')
             || projectContext.recommendedTestCommand || ''
           const proofIdx = trace
             .map((item, index) => ({ item, index }))
@@ -1325,7 +1326,7 @@ export class BuilderToolLoop {
           if (!command) {
             const proof = files.find(file => /builderAsyncJobs|builderDebugFileJob|builderRoutingStrict/.test(file.path))
               || files.find(file => /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(file.path))
-            command = proof ? `node --experimental-strip-types --test ${proof.path}` : 'node --experimental-strip-types --test'
+            command = proof ? builderNodeTestCommand(proof.path) : builderNodeTestCommand('')
           }
           // Only the host may attest a requested/executed-command alias; discard model-supplied aliases.
           action.input = { command, ...(requestedCommand && requestedCommand !== command ? { requestedCommand } : {}) }

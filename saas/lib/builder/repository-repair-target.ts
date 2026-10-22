@@ -385,7 +385,7 @@ export function signalBoostRepositoryRepairObjective(target: SignalBoostReposito
     // Stated as a completion condition, not a hint, because a module-not-found failure has no
     // failing test to reproduce: the only proof is that the file exists and imports cleanly.
     target.missingModuleHints.length
-      ? `MISSING MODULES — the build could not resolve these imports, which means these files do not exist: ${target.missingModuleHints.join(', ')}. Create each one. Infer its required exports from every file that imports it and from any migration or schema it maps to; read those importers before writing. The repair is NOT complete while any of these paths is still absent, even if another proof command passes. Prove each with a command that actually imports it, for example \`node --experimental-strip-types -e "import('./<path>').then(()=>console.log('resolved'))"\`.`
+      ? `MISSING MODULES — the build could not resolve these imports, which means these files do not exist: ${target.missingModuleHints.join(', ')}. Create each one. Infer its required exports from every file that imports it and from any migration or schema it maps to; read those importers before writing. The repair is NOT complete while any of these paths is still absent, even if another proof command passes. Prove each with a command that actually imports it, for example \`node --experimental-transform-types -e "import('./<path>').then(()=>console.log('resolved'))"\`.`
       : '',
     engineering ? `Owner task:\n${target.rawLog}` : '',
     `Failure evidence:\n${evidence}`,

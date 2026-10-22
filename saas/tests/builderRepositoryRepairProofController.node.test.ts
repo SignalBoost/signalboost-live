@@ -113,10 +113,10 @@ test('repository proof selection preserves the exact build and narrows explicit 
   assert.equal(repositoryRepairProofCommand({
     pathHints: ['saas/tests/builderToolLoop.node.test.ts'],
     failedCommand: 'npm test',
-  }), 'node --experimental-strip-types --test tests/builderToolLoop.node.test.ts')
+  }), 'node --experimental-transform-types --test tests/builderToolLoop.node.test.ts')
 
   assert.equal(repositoryRepairProofCommand({ pathHints: [], failedCommand: 'npm test' }), null)
-  assert.equal(repositoryRepairProofCommand({ pathHints: ['saas/tests/builderV2NewProjectHandoff.node.test.ts'], failedCommand: 'npm test' }), 'node --experimental-strip-types --test tests/builderV2NewProjectHandoff.node.test.ts')
+  assert.equal(repositoryRepairProofCommand({ pathHints: ['saas/tests/builderV2NewProjectHandoff.node.test.ts'], failedCommand: 'npm test' }), 'node --experimental-transform-types --test tests/builderV2NewProjectHandoff.node.test.ts')
   assert.equal(repositoryRepairProofCommand({ pathHints: [], failedCommand: 'git log --oneline -15' }), null)
 })
 
@@ -217,7 +217,7 @@ test('proof discovery chooses a unique test related to explicitly named source',
   assert.equal(discoverRepositoryRepairProofCommand(target, [
     'tests/agentGateway.node.test.ts',
     'tests/project-continuity.test.ts',
-  ]), 'node --experimental-strip-types --test tests/project-continuity.test.ts')
+  ]), 'node --experimental-transform-types --test tests/project-continuity.test.ts')
   assert.equal(discoverRepositoryRepairProofCommand({ pathHints: [], failedCommand: 'npm test' }, [
     'tests/agentGateway.node.test.ts',
   ]), null)
@@ -353,7 +353,7 @@ test('repository repair selects a single literal failing test from recorded CI e
     pathHints: [],
     failedCommand: 'npm test',
     failureEvidence: ['FAIL saas/tests/platformObservability.node.test.ts: expected valid trace'],
-  }), 'node --experimental-strip-types --test tests/platformObservability.node.test.ts')
+  }), 'node --experimental-transform-types --test tests/platformObservability.node.test.ts')
   assert.equal(repositoryRepairProofCommand({
     pathHints: [],
     failedCommand: 'npm test',

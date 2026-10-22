@@ -1,6 +1,7 @@
 import type { BuilderAiPort, BuilderRunnerPort, BuilderWorkspacePort } from './contracts.ts'
 import type { SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
 import { isBuilderTestRunnerCommand } from './regression-gate.ts'
+import { builderNodeTestCommand } from './node-test-command.ts'
 
 export type RepositoryRepairProofController = Readonly<{
   ai: BuilderAiPort
@@ -29,7 +30,7 @@ export function repositoryRepairProofCommand(target: Pick<SignalBoostRepositoryR
     .map(path => path.replace(/^saas\//, ''))
     .filter(path => /^(?:tests|test)\/.+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(path))
     .slice(0, 4)
-  if (failingTests.length) return `node --experimental-strip-types --test ${failingTests.join(' ')}`
+  if (failingTests.length) return builderNodeTestCommand(failingTests.join(' '))
 
   // Provider/CI failure excerpts often name the failing test but omit it from
   // structured pathHints. Extract only literal test paths, never shell syntax.
@@ -40,7 +41,7 @@ export function repositoryRepairProofCommand(target: Pick<SignalBoostRepositoryR
       .map(match => match[0].replace(/^saas\//, ''))
       .filter(path => !path.includes('..'))
   )]
-  if (evidenceTests.length === 1) return `node --experimental-strip-types --test ${evidenceTests[0]}`
+  if (evidenceTests.length === 1) return builderNodeTestCommand(evidenceTests[0])
 
 
   // A Vercel build that already reached TypeScript has supplied a much narrower reproducible
@@ -77,7 +78,7 @@ export function discoverRepositoryRepairProofCommand(
     .filter(path => stems.some(stem => path.split('/').pop()!.toLowerCase().includes(stem)))
   // Ambiguous matches must not silently choose an unrelated passing suite.
   if (candidates.length !== 1) return null
-  return `node --experimental-strip-types --test ${candidates[0]}`
+  return builderNodeTestCommand(candidates[0])
 }
 
 // Before a defect is reproduced only reproduction may be written: a regression test, or the lock file

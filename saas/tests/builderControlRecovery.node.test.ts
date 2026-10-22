@@ -246,7 +246,7 @@ test('Builder executes real reproduce and verify commands when the model answers
   await workspace.writeFile(workspaceId, sourcePath, 'const flag = false')
 
   let runs = 0
-  const expectedCommand = `node --experimental-strip-types --test ${testPath}`
+  const expectedCommand = `node --experimental-transform-types --test ${testPath}`
   const runner: BuilderRunnerPort = {
     async run(input) {
       runs += 1
@@ -292,7 +292,7 @@ test('Builder stops truthfully when the discovered regression proof passes and n
   const testPath = 'tests/builderAsyncJobs.node.test.ts'
   await workspace.writeFile(workspaceId, testPath, 'assert.equal(true, true)')
 
-  const expectedCommand = `node --experimental-strip-types --test ${testPath}`
+  const expectedCommand = `node --experimental-transform-types --test ${testPath}`
   let runs = 0
   const runner: BuilderRunnerPort = {
     async run(input) {

@@ -1,3 +1,4 @@
+import { builderAcceptanceReport } from './acceptance-report.ts'
 import { builderFinalProof } from './final-proof.ts'
 import { builderAcceptanceLedger } from './acceptance-ledger.ts'
 import type { BuilderLoopCheckpoint } from './checkpoint.ts'
@@ -525,7 +526,14 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       })
       const success = finalProof.passed
       const publicationReport = publication ? `\n\nIsolated publication: ${JSON.stringify(publication)}` : ''
-      const reply = historyReply(success
+      const wantsAcceptanceReport = /(?:Calculator API|final acceptance report|end-to-end acceptance test)/i.test(job.objective)
+      const acceptanceReport = wantsAcceptanceReport ? builderAcceptanceReport({
+        jobId: job.id, files, receipts: cycle.result?.steps ?? [], ledger: acceptance,
+        proof: finalProof, publication, inferenceBudget,
+        totalElapsedMs: Math.max(0, Date.now() - Date.parse(job.createdAt)),
+        failure: publicationError || acceptance.failureCode || finalProof.failureCode || reason,
+      }) : null
+      const reply = acceptanceReport ? historyReply(acceptanceReport, job.workspaceId, files) : historyReply(success
         ? `Builder V2 verified the workspace with recorded host test execution. ${cycle.result?.summary || ''}${publicationReport}${budgetReport}`
         : `Builder V2 could not complete verification: ${publicationError || acceptance.failureCode || finalProof.failureCode || reason}\n\n${progress}${publicationReport}${budgetReport}`, job.workspaceId, files)
       await finishBuilderJob({

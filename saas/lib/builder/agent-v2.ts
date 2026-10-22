@@ -184,11 +184,12 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
   // Explicit repair/debug objectives require at least one non-syntax host command
   // after the final change. Preserve syntax-only completion for tasks asking only
   // for syntax validation or for code that is supplied without a repair request.
-  const behavioralRepairRequested = /\\b(?:fix|repair|debug|resolve|correct|regression|bug|broken|failing|failure)\\b/i.test(objective)
-    && !/\\b(?:syntax[- ]only|only\\s+(?:check|verify|validate)\\s+syntax)\\b/i.test(objective)
+  const behavioralRepairRequested = /\b(?:fix|repair|debug|resolve|correct|regression|bug|broken|failing|failure)\b/i.test(objective)
+    && !/\b(?:syntax[- ]only|only\s+(?:check|verify|validate)\s+syntax)\b/i.test(objective)
   const behavioralProof = passing.some(output => {
     const command = String(output?.requestedCommand ?? output?.executedCommand ?? '').trim()
-    return command.length > 0 && !/^node\\s+(?:--check|-c)\\s+/i.test(command)
+    // A version query, install, echo, or syntax check does not prove repaired behavior.
+    return /^(?:node\s+(?:--test(?:\s|$)|[^-\s][^\s]*\.[cm]?js(?:\s|$))|(?:npm|pnpm|yarn|bun)\s+(?:(?:run\s+)?test(?:\s|$)|run\s+[^\s]*(?:test|spec)[^\s]*(?:\s|$))|python3?\s+[^\s]*(?:test|spec)[^\s]*\.py(?:\s|$)|npx\s+playwright\s+test(?:\s|$))/i.test(command)
   })
   // Browser-dependent tasks require a host browser receipt for the requested URL
   // after the last source mutation. A green unit suite cannot substitute for UI proof.

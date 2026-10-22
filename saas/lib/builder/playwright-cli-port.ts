@@ -315,7 +315,7 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
     const sandbox = this.sandbox
     this.sandbox = null
     if (!sandbox) return
-    await sandbox.stop().catch(() => undefined)
+    await sandbox.stop()
   }
 }
 

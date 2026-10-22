@@ -7,6 +7,7 @@ import {InMemoryBuilderWorkspace} from '../lib/builder/workspace.ts'
 test('24 resumed slices do not accept a failed suite or corrupt a checkpoint',async()=>{
  const ws=new InMemoryBuilderWorkspace()
  const id='twenty-four-slices'
+ await ws.writeFile(id,'package.json',JSON.stringify({scripts:{test:'node --test'}}))
  await ws.writeFile(id,'test/orders.test.js',"const {createOrders}=require('../src/orders.js')\n")
  await ws.writeFile(id,'src/orders.js','module.exports = {}\n')
  const objective='Repair the OrderFlow implementation. Run npm test.'

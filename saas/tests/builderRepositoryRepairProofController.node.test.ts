@@ -353,7 +353,7 @@ test('repository repair selects a single literal failing test from recorded CI e
     pathHints: [],
     failedCommand: 'npm test',
     failureEvidence: ['FAIL saas/tests/platformObservability.node.test.ts: expected valid trace'],
-  }), 'node --experimental-strip-types --test tests/platformObservability.node.test.ts')
+  }), 'node --experimental-transform-types --test tests/platformObservability.node.test.ts')
   assert.equal(repositoryRepairProofCommand({
     pathHints: [],
     failedCommand: 'npm test',

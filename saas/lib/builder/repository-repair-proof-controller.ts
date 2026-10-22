@@ -41,7 +41,7 @@ export function repositoryRepairProofCommand(target: Pick<SignalBoostRepositoryR
       .map(match => match[0].replace(/^saas\//, ''))
       .filter(path => !path.includes('..'))
   )]
-  if (evidenceTests.length === 1) return `node --experimental-strip-types --test ${evidenceTests[0]}`
+  if (evidenceTests.length === 1) return builderNodeTestCommand(evidenceTests[0])
 
 
   // A Vercel build that already reached TypeScript has supplied a much narrower reproducible

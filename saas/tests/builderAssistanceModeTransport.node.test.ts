@@ -62,7 +62,7 @@ test('the chat endpoint answers a Work with me approval as the signed-in user, b
   const approval = turn.indexOf("if (body?.context?.assistanceMode === 'collaborate' && isAssistanceApproval(prompt))")
   assert.ok(approval > 0 && approval < turn.indexOf('withPublicDeliveryScope('), 'before public scoping')
   assert.ok(approval < turn.indexOf('const directTextTransformation'), 'before any other lane can claim "go"')
-  assert.match(turn, /await approvePausedPublication\(\{ userId: approver\.userId, conversationId: approvalConversationId, language \}\)/)
+  assert.match(turn, /await approvePausedWork\(\{ userId: approver\.userId, conversationId: approvalConversationId, language \}\)/)
   assert.match(turn, /return browserSurface === 'concierge' \? publicConciergePresentation\(response\) : response\n\s*\}\n\s*\}/)
 })
 

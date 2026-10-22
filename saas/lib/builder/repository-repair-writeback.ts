@@ -117,6 +117,30 @@ async function executableModesForChangedFiles(
  */
 export const REPOSITORY_REPAIR_MERGE_HOLD_MARKER = 'Merge held for owner review (Work with me): COS never merges this pull request.'
 
+/**
+ * Owner's "go" on a Work with me repair: remove the merge hold from the repair PR, so the governed merge continuation
+ * may merge it under all its usual conditions. Only an open COS repair PR that carries the hold is changed; the change
+ * is confirmed by reading the PR back.
+ */
+export async function releaseRepositoryRepairMergeHold(input: {
+  pullRequestNumber: number
+  request?: RequestLike
+  token?: string
+}): Promise<'released' | 'not_held'> {
+  const token = String(input.token ?? process.env.GITHUB_WRITE_TOKEN ?? '').trim()
+  if (!token) throw new Error('builder_repository_write_not_configured')
+  if (!Number.isInteger(input.pullRequestNumber) || input.pullRequestNumber < 1) throw new Error('builder_repository_pull_request_invalid')
+  const request = input.request ?? fetch
+  const url = `${GITHUB_API}/pulls/${input.pullRequestNumber}`
+  const held = (pull: JsonRecord) => String(pull?.body || '').split(/\r?\n/).some(line => line.trim() === REPOSITORY_REPAIR_MERGE_HOLD_MARKER)
+  const pull = await requestJson(request, url, { method: 'GET', headers: headers(token) }, [200])
+  if (pull?.state !== 'open' || pull?.title !== 'COS Platform Engineer: verified repository repair' || !held(pull)) return 'not_held'
+  const body = String(pull.body).split(/\r?\n/).filter(line => line.trim() !== REPOSITORY_REPAIR_MERGE_HOLD_MARKER).join('\n').trimEnd()
+  await requestJson(request, url, { method: 'PATCH', headers: headers(token), body: JSON.stringify({ body }) }, [200])
+  if (held(await requestJson(request, url, { method: 'GET', headers: headers(token) }, [200]))) throw new Error('builder_repository_merge_hold_release_unconfirmed')
+  return 'released'
+}
+
 export async function publishSignalBoostRepositoryRepair(input: {
   target: SignalBoostRepositoryRepairTarget
   workspaceId: string

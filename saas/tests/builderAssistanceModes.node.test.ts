@@ -9,9 +9,11 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   ASSISTANCE_MODES, ASSISTANCE_MODE_ARIA, ASSISTANCE_MODE_DESCRIPTION, ASSISTANCE_MODE_LABEL, COLLABORATE_APPROVAL_STARTED,
-  COLLABORATE_MERGE_HELD, COLLABORATE_PUBLICATION_PAUSED, COLLABORATE_SOURCE_CHANGED, isAssistanceApproval, normalizeAssistanceMode,
+  COLLABORATE_MERGE_AUTOMERGE_OFF, COLLABORATE_MERGE_HELD, COLLABORATE_MERGE_RELEASED, COLLABORATE_PUBLICATION_PAUSED, COLLABORATE_SOURCE_CHANGED,
+  isAssistanceApproval, normalizeAssistanceMode,
 } from '../lib/ai/cos/assistanceMode.ts'
-import { approvalJobId, awaitingPublication, startApprovedIsolatedPublication } from '../lib/builder/collaborate-approval.ts'
+import { approvalJobId, awaitingPublication, awaitingRepositoryMerge, startApprovedIsolatedPublication } from '../lib/builder/collaborate-approval.ts'
+import { REPOSITORY_REPAIR_MERGE_HOLD_MARKER, releaseRepositoryRepairMergeHold } from '../lib/builder/repository-repair-writeback.ts'
 import { SUPPORTED_LANGUAGES } from '../lib/i18n/supportedLanguages.ts'
 import type { BuilderJobRecord } from '../lib/builder/job-store.ts'
 
@@ -19,6 +21,7 @@ const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.ur
 
 test('every mode label, description and message exists in all 11 languages', () => {
   const copies = [ASSISTANCE_MODE_ARIA, COLLABORATE_PUBLICATION_PAUSED, COLLABORATE_APPROVAL_STARTED, COLLABORATE_SOURCE_CHANGED, COLLABORATE_MERGE_HELD,
+    COLLABORATE_MERGE_RELEASED, COLLABORATE_MERGE_AUTOMERGE_OFF,
     ...ASSISTANCE_MODES.flatMap(mode => [ASSISTANCE_MODE_LABEL[mode], ASSISTANCE_MODE_DESCRIPTION[mode]])]
   for (const copy of copies) for (const lang of SUPPORTED_LANGUAGES) assert.ok(copy[lang]?.trim(), `${lang}: ${copy.en}`)
   assert.equal(normalizeAssistanceMode('collaborate'), 'collaborate')
@@ -150,7 +153,7 @@ test('a Work with me repair PR is never merged by the durable merge continuation
 test('an approval is honoured only in Work with me', () => {
   const route = read('app/api/cos-browser/route.ts')
   assert.match(route, /if \(body\?\.context\?\.assistanceMode === 'collaborate' && isAssistanceApproval\(prompt\)\)/)
-  assert.doesNotMatch(read('lib/ai/cos/softwareSpecialist.ts'), /approvePausedPublication/)
+  assert.doesNotMatch(read('lib/ai/cos/softwareSpecialist.ts'), /approvePausedWork/)
 })
 
 // Codex on #4765 (P2): one browser, two accounts — each keeps its own mode.
@@ -159,4 +162,49 @@ test('the browser cache is per user; only a signed-out choice moves to an accoun
   assert.match(hook, /const keyFor = \(userId: string \| null\) => userId \? `\$\{ASSISTANCE_MODE_STORAGE_KEY\}:\$\{userId\}` : ASSISTANCE_MODE_STORAGE_KEY/)
   assert.match(hook, /normalizeAssistanceMode\(data\?\.user\?\.user_metadata\?\.\[ASSISTANCE_MODE_METADATA_KEY\]\) \?\? read\(keyFor\(userId\)\)/)
   assert.match(hook, /write\(keyFor\(null\), null\)/, 'the visitor choice leaves the browser once migrated')
+})
+
+// Work with me on a live-site repair: the PR is created and held; the owner's "go" releases it to the governed merge
+// continuation (checks, danger classifier, checkpoint, Production health proof), which then merges and reconciles the
+// paused job. Before this, the owner had to merge on GitHub and the paused job was never reconciled.
+test('"go" releases a held live-site repair PR only for the owner\'s paused Work with me repair', () => {
+  const repair = job({ status: 'paused', metadata: { platformRepair: true, assistanceMode: 'collaborate' },
+    result: { repository_merge_pending: true, pull_request_number: 4800 } })
+  assert.deepEqual(awaitingRepositoryMerge(repair), { pullRequestNumber: 4800 })
+  assert.equal(awaitingRepositoryMerge({ ...repair, ownerAuthorized: false }), null)
+  assert.equal(awaitingRepositoryMerge({ ...repair, metadata: { platformRepair: true } }), null, 'Handle it for me repairs are not held')
+  assert.equal(awaitingRepositoryMerge({ ...repair, status: 'succeeded' }), null)
+  assert.equal(awaitingRepositoryMerge({ ...repair, result: { repository_merge_pending: false, pull_request_number: 4800 } }), null)
+  // A held repair keeps merge_allowed, so the database pauses the job as merge-pending until the continuation merges it.
+  assert.match(read('lib/builder/repository-repair.ts'), /merge_allowed: autoMergeEnabled\(\),/)
+  const server = read('lib/builder/collaborate-approval-server.ts')
+  assert.ok(server.indexOf("BUILDER_AUTO_MERGE_ENABLED") < server.indexOf('releaseRepositoryRepairMergeHold('), 'with auto-merge off the hold is kept and the owner is told')
+})
+
+function githubPull(options: { state?: string; held?: boolean; stillHeldAfterPatch?: boolean } = {}) {
+  const body = ['Owner-authorized Platform Engineer repair.', '', 'Pinned base: `' + 'a'.repeat(40) + '`', ...(options.held === false ? [] : ['', REPOSITORY_REPAIR_MERGE_HOLD_MARKER])].join('\n')
+  let current = body
+  const calls: Array<{ method: string; body: any }> = []
+  const request = (async (_url: string, init?: RequestInit) => {
+    const method = init?.method || 'GET'
+    calls.push({ method, body: init?.body ? JSON.parse(String(init.body)) : null })
+    if (method === 'PATCH') { if (!options.stillHeldAfterPatch) current = JSON.parse(String(init!.body)).body; return Response.json({}) }
+    return Response.json({ state: options.state ?? 'open', title: 'COS Platform Engineer: verified repository repair', body: current })
+  }) as any
+  return { calls, request }
+}
+
+test('releasing the hold edits only an open held repair PR and is confirmed by reading it back', async () => {
+  const held = githubPull()
+  assert.equal(await releaseRepositoryRepairMergeHold({ pullRequestNumber: 4800, token: 't', request: held.request }), 'released')
+  const patch = held.calls.find(call => call.method === 'PATCH')!
+  assert.doesNotMatch(patch.body.body, /Merge held/)
+  assert.match(patch.body.body, /^Owner-authorized Platform Engineer repair\./, 'the continuation marker stays')
+  for (const options of [{ held: false }, { state: 'closed' }]) {
+    const other = githubPull(options)
+    assert.equal(await releaseRepositoryRepairMergeHold({ pullRequestNumber: 4800, token: 't', request: other.request }), 'not_held')
+    assert.ok(!other.calls.some(call => call.method === 'PATCH'))
+  }
+  await assert.rejects(releaseRepositoryRepairMergeHold({ pullRequestNumber: 4800, token: 't', request: githubPull({ stillHeldAfterPatch: true }).request }),
+    /merge_hold_release_unconfirmed/)
 })

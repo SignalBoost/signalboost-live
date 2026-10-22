@@ -1,2 +1,2 @@
-base_sha=3693e8c36f8e5fdfff4a41a4f2001ef55483b50e
-branch=fix/builder-v2-behavioral-gate-current-main-20261022
+base_sha=c10e18cad4786f8ef2b4fb3f8642b5669cadc4c8
+branch=fix/builder-idle-diagnostics-20261022

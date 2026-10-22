@@ -15,6 +15,15 @@ export function awaitingPublication(job: BuilderJobRecord | null): AwaitingPubli
     ? { action: 'isolated_publication', fingerprint: awaiting.fingerprint } : null
 }
 
+/** A Work with me live-site repair waiting for the owner: PR created, merge held, job paused until it merges. */
+export function awaitingRepositoryMerge(job: BuilderJobRecord | null): Readonly<{ pullRequestNumber: number }> | null {
+  const result = (job?.result ?? {}) as { repository_merge_pending?: unknown; pull_request_number?: unknown }
+  const pullRequestNumber = Number(result.pull_request_number)
+  return job?.status === 'paused' && job.ownerAuthorized === true && job.metadata.platformRepair === true
+    && job.metadata.assistanceMode === 'collaborate' && result.repository_merge_pending === true
+    && Number.isInteger(pullRequestNumber) && pullRequestNumber > 0 ? { pullRequestNumber } : null
+}
+
 /** One approval job per paused job: a repeated "go" (or a resent request) finds the same job instead of publishing twice. */
 export function approvalJobId(sourceJobId: string): string {
   const hex = createHash('sha256').update(`builder-approved-publication:${sourceJobId}`).digest('hex')

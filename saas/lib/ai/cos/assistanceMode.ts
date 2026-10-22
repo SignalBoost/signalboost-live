@@ -92,15 +92,45 @@ export const COLLABORATE_SOURCE_CHANGED: Copy = {
 
 /** Owner repository repair in Work with me: the pull request is created but not merged. */
 export const COLLABORATE_MERGE_HELD: Copy = {
-  en: 'You are in Work with me mode, so I did not merge it. Review the pull request and merge it on GitHub when you are satisfied.',
-  es: 'Estás en el modo Trabajemos juntos, así que no lo fusioné. Revisa el pull request y fusiónalo en GitHub cuando estés conforme.',
-  pt: 'Você está no modo Trabalhe comigo, então não fiz o merge. Revise o pull request e faça o merge no GitHub quando estiver satisfeito.',
-  pl: 'Jesteś w trybie Pracuj ze mną, więc go nie scaliłem. Przejrzyj pull request i scal go na GitHubie, gdy będziesz zadowolony.',
-  ru: 'Вы в режиме «Работаем вместе», поэтому я не выполнил слияние. Просмотрите pull request и выполните слияние на GitHub, когда будете довольны.',
-  de: 'Sie sind im Modus „Mit mir arbeiten“, daher habe ich nicht gemergt. Prüfen Sie den Pull Request und mergen Sie ihn auf GitHub, wenn Sie zufrieden sind.',
-  fr: 'Vous êtes en mode Travaillons ensemble ; je n’ai donc pas fusionné. Relisez la pull request et fusionnez-la sur GitHub quand elle vous convient.',
-  it: 'Sei nella modalità Lavoriamo insieme, quindi non ho eseguito il merge. Rivedi la pull request ed eseguine il merge su GitHub quando sei soddisfatto.',
-  ja: '「一緒に作業」モードのため、マージしていません。プルリクエストを確認し、問題なければ GitHub でマージしてください。',
-  ko: '“함께 작업” 모드이므로 병합하지 않았습니다. 풀 리퀘스트를 검토한 뒤 만족하시면 GitHub에서 병합해 주세요.',
-  ar: 'أنت في وضع «اعمل معي»، لذلك لم أدمجه. راجع طلب السحب وادمجه على GitHub عندما تكون راضيًا.',
+  en: 'You are in Work with me mode, so I did not merge it. Review the pull request, then reply “go” to let the governed merge proceed (it still waits for GitHub checks and the safety checks), or merge it yourself on GitHub.',
+  es: 'Estás en el modo Trabajemos juntos, así que no lo fusioné. Revisa el pull request y responde «adelante» para que siga la fusión gobernada (aún espera las comprobaciones de GitHub y las de seguridad), o fusiónalo tú en GitHub.',
+  pt: 'Você está no modo Trabalhe comigo, então não fiz o merge. Revise o pull request e responda “pode seguir” para liberar o merge governado (ele ainda aguarda as verificações do GitHub e as de segurança), ou faça o merge você mesmo no GitHub.',
+  pl: 'Jesteś w trybie Pracuj ze mną, więc go nie scaliłem. Przejrzyj pull request i odpowiedz „dalej”, aby zezwolić na nadzorowane scalenie (nadal czeka ono na kontrole GitHuba i kontrole bezpieczeństwa), albo scal go sam na GitHubie.',
+  ru: 'Вы в режиме «Работаем вместе», поэтому я не выполнил слияние. Просмотрите pull request и ответьте «давай», чтобы разрешить контролируемое слияние (оно всё равно дождётся проверок GitHub и проверок безопасности), или выполните слияние сами на GitHub.',
+  de: 'Sie sind im Modus „Mit mir arbeiten“, daher habe ich nicht gemergt. Prüfen Sie den Pull Request und antworten Sie „los“, um den kontrollierten Merge freizugeben (er wartet weiterhin auf die GitHub- und Sicherheitsprüfungen), oder mergen Sie ihn selbst auf GitHub.',
+  fr: 'Vous êtes en mode Travaillons ensemble ; je n’ai donc pas fusionné. Relisez la pull request, puis répondez « vas-y » pour laisser la fusion encadrée se poursuivre (elle attend toujours les vérifications GitHub et de sécurité), ou fusionnez-la vous-même sur GitHub.',
+  it: 'Sei nella modalità Lavoriamo insieme, quindi non ho eseguito il merge. Rivedi la pull request e rispondi «vai» per consentire il merge controllato (attende comunque i controlli di GitHub e di sicurezza), oppure eseguilo tu su GitHub.',
+  ja: '「一緒に作業」モードのため、マージしていません。プルリクエストを確認し、「進めて」と返信すると管理されたマージが進みます（GitHub と安全性のチェックは引き続き必要です）。または GitHub でご自身でマージしてください。',
+  ko: '“함께 작업” 모드이므로 병합하지 않았습니다. 풀 리퀘스트를 검토한 뒤 “진행해”라고 답하면 관리형 병합이 진행됩니다(GitHub 및 안전 검사는 여전히 필요합니다). 또는 GitHub에서 직접 병합해 주세요.',
+  ar: 'أنت في وضع «اعمل معي»، لذلك لم أدمجه. راجع طلب السحب ثم أجب بـ «تابع» للسماح بالدمج الخاضع للضوابط (سيظل ينتظر فحوص GitHub وفحوص الأمان)، أو ادمجه بنفسك على GitHub.',
+}
+
+/** Owner's "go" on a held live-site repair: the hold is released to the governed merge continuation. */
+export const COLLABORATE_MERGE_RELEASED: Copy = {
+  en: 'Approved. I released the hold on the pull request. The governed merge now proceeds on its own once GitHub checks pass and the safety checks clear; Builder reports success only after the merged commit is proven healthy in Production.',
+  es: 'Aprobado. Liberé la retención del pull request. La fusión gobernada continúa sola cuando pasen las comprobaciones de GitHub y las de seguridad; Builder solo informará éxito cuando el commit fusionado esté comprobado en Producción.',
+  pt: 'Aprovado. Liberei a retenção do pull request. O merge governado prossegue sozinho quando as verificações do GitHub passarem e as de segurança forem aprovadas; o Builder só relata sucesso depois que o commit mesclado for comprovado em Produção.',
+  pl: 'Zatwierdzone. Zdjąłem blokadę z pull requesta. Nadzorowane scalenie nastąpi samo, gdy przejdą kontrole GitHuba i kontrole bezpieczeństwa; Builder zgłosi sukces dopiero, gdy scalony commit zostanie potwierdzony w Produkcji.',
+  ru: 'Одобрено. Я снял удержание с pull request. Контролируемое слияние выполнится само, когда пройдут проверки GitHub и проверки безопасности; Builder сообщит об успехе только после подтверждения слитого коммита в Production.',
+  de: 'Genehmigt. Ich habe die Sperre des Pull Requests aufgehoben. Der kontrollierte Merge läuft von selbst, sobald die GitHub- und Sicherheitsprüfungen bestanden sind; Builder meldet Erfolg erst, wenn der gemergte Commit in Production als gesund nachgewiesen ist.',
+  fr: 'Approuvé. J’ai levé le blocage de la pull request. La fusion encadrée se fera d’elle-même dès que les vérifications GitHub et de sécurité seront validées ; Builder ne signalera le succès qu’une fois le commit fusionné vérifié en Production.',
+  it: 'Approvato. Ho rimosso il blocco dalla pull request. Il merge controllato procede da solo quando i controlli di GitHub e di sicurezza vengono superati; Builder segnala il successo solo dopo che il commit unito è verificato in Produzione.',
+  ja: '承認しました。プルリクエストの保留を解除しました。GitHub と安全性のチェックに合格すると管理されたマージが自動で進み、マージされたコミットが本番で正常と確認されてから Builder が成功を報告します。',
+  ko: '승인되었습니다. 풀 리퀘스트의 보류를 해제했습니다. GitHub 및 안전 검사를 통과하면 관리형 병합이 자동으로 진행되며, 병합된 커밋이 프로덕션에서 정상으로 확인된 후에만 Builder가 성공을 보고합니다.',
+  ar: 'تمت الموافقة. رفعتُ التعليق عن طلب السحب. سيتم الدمج الخاضع للضوابط تلقائيًا بعد اجتياز فحوص GitHub وفحوص الأمان، ولن يُبلغ Builder بالنجاح إلا بعد التحقق من سلامة الالتزام المدمج في بيئة الإنتاج.',
+}
+
+/** Owner's "go" while automatic merging is switched off: nothing can merge on its own, so say so. */
+export const COLLABORATE_MERGE_AUTOMERGE_OFF: Copy = {
+  en: 'Automatic merging is switched off on this platform, so I cannot merge it for you. The pull request is ready: merge it on GitHub.',
+  es: 'La fusión automática está desactivada en esta plataforma, así que no puedo fusionarlo por ti. El pull request está listo: fusiónalo en GitHub.',
+  pt: 'O merge automático está desativado nesta plataforma, então não posso fazer o merge por você. O pull request está pronto: faça o merge no GitHub.',
+  pl: 'Automatyczne scalanie jest wyłączone na tej platformie, więc nie mogę go scalić za Ciebie. Pull request jest gotowy: scal go na GitHubie.',
+  ru: 'Автоматическое слияние на этой платформе отключено, поэтому я не могу выполнить его за вас. Pull request готов: выполните слияние на GitHub.',
+  de: 'Automatisches Mergen ist auf dieser Plattform ausgeschaltet, daher kann ich es nicht für Sie mergen. Der Pull Request ist bereit: mergen Sie ihn auf GitHub.',
+  fr: 'La fusion automatique est désactivée sur cette plateforme ; je ne peux donc pas fusionner pour vous. La pull request est prête : fusionnez-la sur GitHub.',
+  it: 'Il merge automatico è disattivato su questa piattaforma, quindi non posso eseguirlo per te. La pull request è pronta: esegui il merge su GitHub.',
+  ja: 'このプラットフォームでは自動マージがオフのため、代わりにマージできません。プルリクエストは準備できています。GitHub でマージしてください。',
+  ko: '이 플랫폼에서는 자동 병합이 꺼져 있어 대신 병합할 수 없습니다. 풀 리퀘스트가 준비되었으니 GitHub에서 병합해 주세요.',
+  ar: 'الدمج التلقائي متوقف على هذه المنصة، لذلك لا يمكنني دمجه نيابةً عنك. طلب السحب جاهز: ادمجه على GitHub.',
 }

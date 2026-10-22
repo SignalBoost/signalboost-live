@@ -72,8 +72,8 @@ export function builderProgressSnapshot(job: Pick<BuilderJobRecord, 'checkpoint'
   const steps = v2 ? checkpoint!.steps! : []
   const recent = [...steps].reverse().find(step => step.tool === 'run_tests')
   const stdout = recent?.output?.stdout || ''
-  const passCount = Number(/(?:^|\\n)\\s*(?:#|ℹ)\\s+pass\\s+(\\d+)/.exec(stdout)?.[1] || 0)
-  const failCount = Number(/(?:^|\\n)\\s*(?:#|ℹ)\\s+fail\\s+(\\d+)/.exec(stdout)?.[1] || 0)
+  const passCount = Number(/(?:^|\n)\s*(?:#|ℹ)\s+pass\s+(\d+)/.exec(stdout)?.[1] || 0)
+  const failCount = Number(/(?:^|\n)\s*(?:#|ℹ)\s+fail\s+(\d+)/.exec(stdout)?.[1] || 0)
   const lastActivityMs = Date.parse(job.updatedAt)
   const ageSeconds = Number.isFinite(lastActivityMs) ? Math.max(0, Math.floor((Date.now() - lastActivityMs) / 1000)) : null
   const capacityWait = typeof job.metadata.builderCapacityDeferredReason === 'string'
@@ -97,7 +97,7 @@ export function builderProgressSnapshot(job: Pick<BuilderJobRecord, 'checkpoint'
     lastTest: v2 && recent
       ? { passed: recent.ok === true, exitCode: recent.output?.exitCode ?? null, testsPassed: passCount, testsFailed: failCount,
           command: recent.output?.requestedCommand || null }
-      : (() => { const run = [...(job.checkpoint?.trace || [])].reverse().find(item => item.toolId === 'run'); const output = run?.output as { exitCode?: number; stdout?: string } | undefined; const stdout = output?.stdout || ''; return run ? { passed: run.ok, exitCode: output?.exitCode ?? null, testsPassed: Number(/(?:^|\\n)\\s*(?:#|ℹ)\\s+pass\\s+(\\d+)/.exec(stdout)?.[1] || 0), testsFailed: Number(/(?:^|\\n)\\s*(?:#|ℹ)\\s+fail\\s+(\\d+)/.exec(stdout)?.[1] || 0) } : null })(),
+      : (() => { const run = [...(job.checkpoint?.trace || [])].reverse().find(item => item.toolId === 'run'); const output = run?.output as { exitCode?: number; stdout?: string } | undefined; const stdout = output?.stdout || ''; return run ? { passed: run.ok, exitCode: output?.exitCode ?? null, testsPassed: Number(/(?:^|\n)\s*(?:#|ℹ)\s+pass\s+(\d+)/.exec(stdout)?.[1] || 0), testsFailed: Number(/(?:^|\n)\s*(?:#|ℹ)\s+fail\s+(\d+)/.exec(stdout)?.[1] || 0) } : null })(),
   }
 }
 

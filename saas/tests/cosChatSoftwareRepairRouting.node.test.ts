@@ -151,6 +151,14 @@ test('a pasted log with no request is evidence for diagnosis, never a repair req
     assert.equal(isSoftwareRepairRequest(`${PASTED_VERCEL_FAILURE}\n${request}`), true, request)
   }
   assert.equal(isSoftwareRepairRequest(`here is the log\n${PASTED_VERCEL_FAILURE}`), false)
+  // Codex on #4818: output copied without Vercel timestamps is still log output, not the person's request.
+  const untimestamped = PASTED_VERCEL_FAILURE.split('\n').map(line => line.replace(/^\d{2}:\d{2}:\d{2}\.\d{3}\s+/, '')).join('\n')
+  const codexExample = 'Running vercel build\n✖ failed host test preloads source\nError: Command "npm run build:production" exited with 1'
+  for (const log of [untimestamped, codexExample]) {
+    assert.equal(isSoftwareRepairRequest(log), false, log)
+    assert.equal(repairAwaitingSource(log), false, log)
+    assert.equal(isSoftwareRepairRequest(`Fix my app:\n${log}`), true, log)
+  }
   // With no repair request the browser ingress answers with the diagnosis and its repair offer.
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.ok(route.indexOf('if (softwareSpecialist)') < route.indexOf('if (operationalEvidence && !hasSourceAttachment)'))

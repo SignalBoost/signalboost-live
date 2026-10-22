@@ -18,10 +18,12 @@ const EDIT_COMMAND = /^\s*(?:edit|rewrite|proofread|polish|translate|correct)\b/
 // The repair is aimed at the prose itself: "fix the typos in …", "fix my email".
 const PROSE_REPAIR = /\b(?:fix|correct|repair)\s+(?:the\s+|my\s+|this\s+|these\s+|any\s+)?(?:grammar|spelling|typos?|punctuation|wording|phrasing|tone|email|e-mail|letter|message|text|sentence|paragraph|draft|translation)\b/i
 
-const TIMESTAMPED_LOG_LINE = /^\s*\d{2}:\d{2}:\d{2}\.\d{3}\s/
+// A line of tool output inside a pasted log, with or without a Vercel timestamp (Codex on #4818): test-runner marks,
+// "Error:" lines, build/clone/install progress, stack frames, npm diagnostics and a command's exit line.
+const LOG_OUTPUT_LINE = /^\s*(?:\d{2}:\d{2}:\d{2}\.\d{3}\s|[✖✔✓ℹ⚠]|(?:error|warning|warn|npm (?:err|warn)!?)(?:\[[^\]]*\])?:|(?:running|cloning|installing|restored|build machine|detected|retrieving)\b|>\s|at\s+\S+\s*\(|(?:not )?ok \d|#\s+(?:tests|pass|fail|suites)\b|command\b.*\bexited\b|node:internal\/)/i
 
 /**
- * The words the person wrote. Lines of a pasted timestamped log are evidence, not a request: a bare pasted log is
+ * The words the person wrote. Lines of a pasted log are evidence, not a request: a bare pasted log is
  * diagnosed and offered a repair the person must accept, while "Fix my app:" above the same log is still a repair
  * request. Production 2026-10-22: a pasted Vercel log ("failed", "Error", "build") read as a repair request, so
  * chat started a new-project Builder job in an empty workspace with the log as its specification; the model could
@@ -30,7 +32,7 @@ const TIMESTAMPED_LOG_LINE = /^\s*\d{2}:\d{2}:\d{2}\.\d{3}\s/
 function requestText(prompt: string): string {
   const text = String(prompt || '')
   if (!isOperationalLogEvidence(text)) return text
-  return text.split(/\r?\n/).filter(line => !TIMESTAMPED_LOG_LINE.test(line)).join('\n')
+  return text.split(/\r?\n/).filter(line => !LOG_OUTPUT_LINE.test(line)).join('\n')
 }
 
 export function isSoftwareRepairRequest(prompt: string): boolean {

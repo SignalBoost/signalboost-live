@@ -42,3 +42,13 @@ test('spoken punctuation recognizes all 11 language codes without submitting the
   assert.match(buttonSource, /onChange\(nextValue\)/)
   assert.doesNotMatch(buttonSource, /onSubmit\(|fetch\(/)
 })
+
+test('developer vocabulary is opt-in and preserves non-English dictation', () => {
+  assert.match(buttonSource, /const \[developerTerms, setDeveloperTerms\] = useState\(false\)/)
+  assert.match(buttonSource, /developerTerms && lang === 'en'/)
+  assert.match(buttonSource, /term \?\? segment/)
+  assert.match(buttonSource, /type="checkbox" checked=\{developerTerms\}/)
+  for (const term of ['JavaScript', 'TypeScript', 'Node.js', 'Next.js', 'GitHub', 'PostgreSQL']) {
+    assert.ok(buttonSource.includes(term), 'missing ' + term)
+  }
+})

@@ -58,6 +58,7 @@ export default function VoiceInputButton({
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const baseValueRef = useRef('')
   const lastDictatedValueRef = useRef<string | null>(null)
+  const [developerTerms, setDeveloperTerms] = useState(false)
 
   // Do not overwrite text the customer edits while recognition is active.
   useEffect(() => {
@@ -116,9 +117,19 @@ export default function VoiceInputButton({
         ar: [['سطر جديد', '\n'], ['فاصلة', '،'], ['نقطة', '.']],
       }
       // Format complete spoken punctuation commands only; never reinterpret code fragments.
+      // Explicitly opt in: never rewrite ordinary conversation or code by default.
+      const spokenDeveloperTerms: Record<string, string> = {
+        'javascript': 'JavaScript', 'typescript': 'TypeScript', 'node js': 'Node.js',
+        'next js': 'Next.js', 'react js': 'React', 'github': 'GitHub',
+        'vercel': 'Vercel', 'postgres sql': 'PostgreSQL', 'api': 'API',
+        'json': 'JSON', 'html': 'HTML', 'css': 'CSS', 'sql': 'SQL',
+      }
       const formatted = segments.reduce((output, segment) => {
         const command = spokenPunctuation[lang]?.find(([phrase]) => phrase === segment.toLocaleLowerCase().trim())?.[1]
-        if (command === undefined) return output + (output && !cjk && !output.endsWith('\n') ? ' ' : '') + segment
+        if (command === undefined) {
+          const term = developerTerms && lang === 'en' ? spokenDeveloperTerms[segment.toLocaleLowerCase().trim()] : undefined
+          return output + (output && !cjk && !output.endsWith('\n') ? ' ' : '') + (term ?? segment)
+        }
         if (command.startsWith('\n')) return output.trimEnd() + command
         return output.trimEnd() + command
       }, '')
@@ -162,6 +173,10 @@ export default function VoiceInputButton({
           <path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8" />
         </svg>
       </button>
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11 }} title="Optional: normalize recognized English developer terms">
+        <input type="checkbox" checked={developerTerms} onChange={event => setDeveloperTerms(event.target.checked)} />
+        Dev terms
+      </label>
       {error ? <span className="sr-only" role="status">{error}</span> : null}
     </>
   )

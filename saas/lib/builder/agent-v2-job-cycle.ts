@@ -74,9 +74,23 @@ export async function runBuilderV2JobCycle(input: {
       }
       persisted = checkpoint
     },
-  }).catch((error: unknown): BuilderV2Outcome => ({
-    ok: false, reason: error instanceof Error ? error.message : 'builder_v2_unknown_failure', steps: [],
-  }))
+  }).catch((error: unknown): BuilderV2Outcome => {
+    const reason = error instanceof Error ? error.message : 'builder_v2_unknown_failure'
+    // A transport failure can happen AFTER a host edit or verification receipt was saved.
+    // Preserve the fenced durable checkpoint instead of erasing the evidence and forcing a fresh run.
+    // Only known transient inference failures are resumable; authorization, lease and total-deadline
+    // failures retain their original terminal reason.
+    const transient = reason === BUILDER_TURN_TIMEOUT_ERROR
+      || reason === 'builder_model_round_timeout'
+      || reason === 'builder_turn_timeout'
+    return {
+      ok: false,
+      reason: transient ? 'builder_v2_model_unavailable' : reason,
+      ...(transient ? { summary: BUILDER_TURN_TIMEOUT_ERROR } : {}),
+      steps: persisted?.steps ?? [],
+      ...(persisted ? { checkpoint: persisted } : {}),
+    }
+  })
   if (leaseLost || result.reason === 'builder_v2_claim_stale') return {
     status: 'lost_lease', result, reason: 'builder_v2_claim_stale',
   }

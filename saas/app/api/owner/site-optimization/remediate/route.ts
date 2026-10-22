@@ -193,7 +193,7 @@ async function statusResponse(owner: OwnerIdentity) {
       ok: true,
       status: 'fixed',
       target: PUBLIC_BRAND.siteUrl,
-      message: 'Fixed ✅ — the governed repair merged and the protected Production recheck found no Website Optimizer findings.',
+      message: 'Fixed ✅ — the governed repair merged and the protected Production recheck found no repairable Website Optimizer findings. Workload measurements (script count, page size, response time) are advisory and not repaired automatically.',
     })
   }
 
@@ -202,7 +202,7 @@ async function statusResponse(owner: OwnerIdentity) {
     ok: false,
     status: 'verification_failed',
     target: PUBLIC_BRAND.siteUrl,
-    message: 'The repair merged, but Production still has Website Optimizer findings. It is not fixed yet.',
+    message: 'The repair merged, but Production still has repairable Website Optimizer findings. It is not fixed yet.',
     report: verification.incidents[0]?.metadata?.report ?? null,
   }, { status: 409 })
 }

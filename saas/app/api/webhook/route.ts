@@ -186,14 +186,14 @@ async function handleCreditTopup(
       metadata: session.metadata,
       email: session.customer_email,
     })
-    return NextResponse.json({ received: true, warning: 'no userId' })
+    return NextResponse.json({ error: 'credit_topup_user_unresolved' }, { status: 422 })
   }
 
   const raw = session.metadata?.creditAmount
   const credits = Number.parseInt(String(raw ?? ''), 10)
   if (!Number.isInteger(credits) || credits <= 0 || credits > 100000) {
     console.error(`Webhook ${type}: invalid creditAmount`, { raw, sessionId: session.id })
-    return NextResponse.json({ received: true, warning: 'invalid creditAmount' })
+    return NextResponse.json({ error: 'credit_topup_amount_invalid' }, { status: 422 })
   }
 
   const rpc = type === 'audit_credit_topup' ? 'increment_audit_credits' : 'increment_render_credits'

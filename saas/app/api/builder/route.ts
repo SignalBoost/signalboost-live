@@ -26,6 +26,7 @@ import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase
 import { builderExecutionAdmissionBlocker } from '@/lib/builder/execution-admission'
 import { isExplicitIsolatedProjectBuild } from '@/lib/builder/isolated-project-intent'
 import { wantsIsolatedPublication } from '@/lib/builder/isolated-publication'
+import { readPendingApproval } from '@/lib/ai/cos/assistanceMode'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -149,6 +150,9 @@ export async function GET(request: Request) {
         if (!observeOnly && builderPollMayResume(job) && !selfHealingCapacityJob(job) && await builderSoleResumableJob(job.id)) {
           after(async () => { await runBuilderJob(job.id, access.userId) })
         }
+        // A paused job waiting for the user (Work with me: merge held) answers with its own reply and approval marker,
+        // so chat stops following it and shows the approval card instead of "will continue automatically".
+        const approval = job.status === 'paused' && readPendingApproval(job.result) ? job.result : null
         return noStore({
           jobId: job.id,
           workspaceId: job.workspaceId,
@@ -156,7 +160,9 @@ export async function GET(request: Request) {
           status: job.status,
           ...(observeOnly ? { readOnly: true } : {}),
           progress: builderProgressSnapshot(job),
-          reply: job.status === 'queued' && job.metadata.builderCapacityDeferredReason === 'builder_runpod_primary_busy'
+          ...(approval ? { awaitingApproval: approval.awaitingApproval } : {}),
+          reply: approval && typeof approval.reply === 'string' && approval.reply ? approval.reply
+            : job.status === 'queued' && job.metadata.builderCapacityDeferredReason === 'builder_runpod_primary_busy'
             ? 'Queued — waiting for model capacity. Builder will resume this saved job automatically.'
             : job.status === 'paused' && job.checkpoint?.verificationPending === true
               ? 'Files written — verifying changes. Builder will continue automatically.'

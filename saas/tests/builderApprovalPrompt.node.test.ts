@@ -74,5 +74,9 @@ test('every chat shows the card under its latest reply and the button sends the 
   assert.match(prompt, /onClick=\{\(\) => onApprove\(word\)\}/)
   // Both kinds of pause carry the marker the card reads.
   assert.match(read('lib/builder/job-runner.ts'), /awaitingApproval: \{ action: 'isolated_publication', fingerprint/)
+  // The status poll returns the held job's marker and its own reply, not "will continue automatically".
+  const route = read('app/api/builder/route.ts')
+  assert.match(route, /const approval = job\.status === 'paused' && readPendingApproval\(job\.result\) \? job\.result : null/)
+  assert.match(route, /\.\.\.\(approval \? \{ awaitingApproval: approval\.awaitingApproval \} : \{\}\),\n\s*reply: approval && typeof approval\.reply === 'string' && approval\.reply \? approval\.reply/)
   assert.match(read('lib/builder/repository-repair.ts'), /input\.holdMerge === true && writeback\.stage === 'pr_created' && writeback\.pullRequestNumber\n\s*\? \{ awaitingApproval: \{ action: 'repository_merge'/)
 })

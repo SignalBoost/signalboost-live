@@ -1,2 +1,2 @@
-base_sha=683a93d47508ac78e4f47cf7a3a5d2d93bbedbe0
-branch=fix/cos-no-false-missing-input-fallback-20261022
+base_sha=6070828b7f2cc9bf61b33996b67a37fc8bc8370f
+branch=fix/cos-passive-log-not-repair-request-20261022

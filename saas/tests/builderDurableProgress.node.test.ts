@@ -18,5 +18,6 @@ test('polling exposes saved progress, without replaying jobs or leaking raw test
   // the scheduler's admission rule and the generation-fenced claim (tests/builderPollResume.node.test.ts).
   assert.doesNotMatch(get, /enqueueBuilderJob|enqueueSignalBoostRepositoryRepairJob/)
   assert.equal(get.split('after(async').length - 1, 1)
-  assert.match(get, /if \(builderPollMayResume\(job\) && !selfHealingCapacityJob\(job\) && await builderSoleResumableJob\(job\.id\)\) \{\s*after\(async \(\) => \{ await runBuilderJob\(job\.id, access\.userId\) \}\)/)
+  // #4759: an observeOnly poll never resumes; every other poll keeps the same admission rule.
+  assert.match(get, /if \((?:!observeOnly && )?builderPollMayResume\(job\) && !selfHealingCapacityJob\(job\) && await builderSoleResumableJob\(job\.id\)\) \{\s*after\(async \(\) => \{ await runBuilderJob\(job\.id, access\.userId\) \}\)/)
 })

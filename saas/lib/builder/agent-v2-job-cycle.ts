@@ -31,7 +31,9 @@ function passedOnCurrentRevision(steps: readonly BuilderV2Receipt[]): Set<string
   for (const receipt of steps.slice(steps.findLastIndex(step => step.changed) + 1)) {
     if (receipt.tool !== 'run_tests') continue
     const command = String((receipt.output as { requestedCommand?: unknown } | undefined)?.requestedCommand ?? '')
-    if (receipt.ok) passed.add(command)
+    const output = receipt.output as { exitCode?: unknown; timedOut?: unknown } | undefined
+    // A positive receipt without host execution proof must never earn a continuation.
+    if (receipt.ok && output?.exitCode === 0 && output?.timedOut === false) passed.add(command)
     else passed.delete(command)
   }
   return passed

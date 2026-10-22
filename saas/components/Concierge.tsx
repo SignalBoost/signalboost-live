@@ -15,6 +15,8 @@ import BuilderFilePreviews from '@/components/BuilderFilePreviews'
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 import VoiceInputButton from '@/components/VoiceInputButton'
 import AssistanceModeSelector from '@/components/AssistanceModeSelector'
+import ApprovalPrompt from '@/components/ApprovalPrompt'
+import { readPendingApproval, type PendingApproval } from '@/lib/ai/cos/assistanceMode'
 import { useAssistanceMode } from '@/lib/ai/cos/useAssistanceMode'
 import { CONCIERGE_RESUME_KEYS, forgetResumeId, loadResumableConversation, readResumeId, rememberResumeId } from '@/lib/concierge/conversationResume'
 
@@ -30,6 +32,8 @@ type Message = {
   suggestedFollowups?: string[]
   builderWorkspaceId?: string
   builderFiles?: string[]
+  /** A Builder job waiting for the user's approval (Work with me); shown as an approval card. */
+  approval?: PendingApproval
   visualPreviewUrl?: string
   visualFilename?: string
 }
@@ -404,6 +408,7 @@ export default function Concierge() {
           ...(suggestedFollowups.length === 2 ? { suggestedFollowups } : {}),
           ...(builderWorkspaceId && builderFiles.length ? { builderWorkspaceId, builderFiles } : {}),
           ...(visualPreviewUrl ? { visualPreviewUrl, visualFilename } : {}),
+          ...(readPendingApproval(data) ? { approval: readPendingApproval(data)! } : {}),
         },
       ])
     } catch {
@@ -524,6 +529,9 @@ export default function Concierge() {
                       <button type="button" disabled={loading} onClick={() => ask('Give me that result as a PDF file.')} className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[11px] text-cyan-200 hover:bg-cyan-300/20 disabled:opacity-50">{t(dict, 'concierge.pdfFormat')}</button>
                     </div>
                     </>
+                  ) : null}
+                  {message.role === 'assistant' && message.approval && index === visibleMessages.length - 1 ? (
+                    <ApprovalPrompt approval={message.approval} lang={activeLang} disabled={loading} onApprove={word => ask(word)} />
                   ) : null}
                   {message.role === 'assistant' && message.suggestedFollowups?.length === 2 ? (
                     <div className="mt-3 border-t border-white/10 pt-2.5">

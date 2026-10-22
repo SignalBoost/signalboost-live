@@ -26,6 +26,8 @@ import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/age
 import { boundComposerIntake } from '@/lib/ai/cos/composerIntakeBound'
 import VoiceInputButton from '@/components/VoiceInputButton'
 import AssistanceModeSelector from '@/components/AssistanceModeSelector'
+import ApprovalPrompt from '@/components/ApprovalPrompt'
+import { readPendingApproval } from '@/lib/ai/cos/assistanceMode'
 import { useAssistanceMode } from '@/lib/ai/cos/useAssistanceMode'
 import { safeDeliveredVisual } from '@/lib/concierge/deliveredVisual'
 import { CONCIERGE_RESUME_KEYS, forgetResumeId, loadResumableConversation, pairResumedTurns, readResumeId, rememberResumeId } from '@/lib/concierge/conversationResume'
@@ -280,7 +282,7 @@ export default function Home() {
       const visualFilename = structuredVisual?.filename || 'visual.png'
       const imagePath = builderFiles.find((path) => IMAGE_FILE_RE.test(path)) || ''
       const visualPreviewUrl = structuredVisual?.previewUrl || builderPreviewUrl(builderWorkspaceId, imagePath)
-      return { reply, suggestedFollowups, builderWorkspaceId, builderFiles, visualPreviewUrl, visualFilename }
+      return { reply, suggestedFollowups, builderWorkspaceId, builderFiles, visualPreviewUrl, visualFilename, approval: readPendingApproval(payload) }
     }
 
     try {
@@ -306,6 +308,7 @@ export default function Home() {
         ...(result.builderWorkspaceId && result.builderFiles.length ? { builderWorkspaceId: result.builderWorkspaceId, builderFiles: result.builderFiles } : {}),
         ...(result.visualPreviewUrl ? { visualPreviewUrl: result.visualPreviewUrl } : {}),
         ...(result.visualPreviewUrl ? { visualFilename: result.visualFilename } : {}),
+        ...(result.approval ? { approval: result.approval } : {}),
       }])
       setPendingRequest('')
       setQuestion('')
@@ -454,6 +457,9 @@ export default function Home() {
                         <button type="button" disabled={loading} onClick={() => void ask('Give me that result as a PDF file.')} className="secondary-button text-xs disabled:opacity-50">{t(dict, 'concierge.pdfFormat')}</button>
                       </div>
                       </>
+                    ) : null}
+                    {index === turns.length - 1 && turn.approval ? (
+                      <ApprovalPrompt approval={turn.approval} lang={lang} disabled={loading} onApprove={(word) => void ask(word)} />
                     ) : null}
                     {turn.suggestedFollowups?.length === 2 ? (
                       <div className="mt-3 border-t border-white/10 pt-2.5">

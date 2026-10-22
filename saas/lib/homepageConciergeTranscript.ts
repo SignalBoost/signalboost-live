@@ -8,6 +8,8 @@ export type ConciergeTranscriptTurn = {
   /** Safe owner-scoped URL or same-response anonymous trial data URL. */
   visualPreviewUrl?: string
   visualFilename?: string
+  /** A Builder job waiting for the user's approval (Work with me); shown as an approval card. */
+  approval?: { action: 'isolated_publication' | 'repository_merge' }
 }
 
 export function transcriptMessages(turns: ConciergeTranscriptTurn[], pendingRequest: string) {

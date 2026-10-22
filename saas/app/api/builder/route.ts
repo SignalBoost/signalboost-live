@@ -7,6 +7,8 @@ import { builderRepositoryTarget, importBuilderRepository, builderRepositoryErro
 // saas/app/api/builder/route.ts
 import { after, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
+import { resolveAssistanceMode } from '@/lib/ai/cos/assistanceModeServer'
+import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isOperationalLogEvidence, isPastedOperationalLog } from '@/lib/ai/cos/pastedOperationalLog'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
@@ -260,6 +262,13 @@ export async function POST(request: Request) {
     if (!UUID.test(conversationId)) return noStore({ error: 'Invalid conversation id.' }, { status: 400 })
     const requestedJobId = String(body?.jobId || '').trim()
     if (requestedJobId && !UUID.test(requestedJobId)) return noStore({ error: 'Invalid job id.' }, { status: 400 })
+    // Work with me pauses the job before anything leaves Builder's sandbox; the worker reads this from the job.
+    // Guide me is decided before Builder is called (chat sends it to COS instead); an explicit Run Builder runs.
+    const assistanceMode = await resolveAssistanceMode(body?.assistanceMode, access.userId)
+    const modeMetadata = {
+      ...(assistanceMode === 'collaborate' ? { assistanceMode } : {}),
+      responseLanguage: resolveResponseLanguage(objective, body?.language),
+    }
     if (requestedJobId) {
       const existing = await getBuilderJobForUser(requestedJobId, access.userId)
       if (existing) return requestedJobReply(existing)
@@ -322,6 +331,7 @@ export async function POST(request: Request) {
           objective,
           target: platformRepairTarget,
           ...(requestedJobId ? { jobId: requestedJobId } : {}),
+          ...modeMetadata,
         })
       } catch (error) {
         return requestedJobReply(await requestedJobOrThrow(requestedJobId, access.userId, error))
@@ -401,6 +411,7 @@ export async function POST(request: Request) {
             objective,
             target: ownerRepairTarget,
             ...(requestedJobId ? { jobId: requestedJobId } : {}),
+            ...modeMetadata,
           })
         } catch (error) {
           return requestedJobReply(await requestedJobOrThrow(requestedJobId, access.userId, error))
@@ -507,10 +518,12 @@ export async function POST(request: Request) {
                 passiveLogEvidence,
                 repositoryAuthority: false,
                 ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
+                ...modeMetadata,
                 builderEngine: 'v2',
               }
             : { ...(project.context ? { projectContext: project.context } : {}),
                 ...(continuationWorkspace ? { requiresExistingSource: true } : {}),
+                ...modeMetadata,
                 builderEngine: 'v2' },
         ownerAuthorized: access.isOwner === true,
         runningReply: reply,

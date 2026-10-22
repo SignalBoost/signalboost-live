@@ -656,6 +656,9 @@ export class BuilderToolLoop {
       // can generate a targeted edit. Keep a finite eight-refusal hard stop for repair
       // jobs; no further read/list/search commands become available during recovery.
       // Non-repair work retains the original four-refusal ceiling.
+      const latestFailedRunIndex = trace.reduce((latest, item, index) => (
+        item.toolId === 'run' && !item.ok && !/^(?:builder_repeated_tool_call:|builder_repository_broad_test_blocked)/.test(String(item.error || '')) ? index : latest
+      ), -1)
       const inspectionLimit = repairObjective && latestFailedRunIndex >= 0 ? 8 : 4
       if (!missingBuildDeliverables && deniedInspections >= inspectionLimit) return {
         ok: false,
@@ -671,9 +674,6 @@ export class BuilderToolLoop {
       const readSource = readSourceSection(trace, lastWorkspaceChange)
       // Only a run that executed is a failure. A run rejected as a repeat executed nothing; counting it restarted the
       // repair window, so the inspections and refusals after the real failure were forgotten every round.
-      const latestFailedRunIndex = trace.reduce((latest, item, index) => (
-        item.toolId === 'run' && !item.ok && !/^(?:builder_repeated_tool_call:|builder_repository_broad_test_blocked)/.test(String(item.error || '')) ? index : latest
-      ), -1)
       const repairTraceAfterFailure = latestFailedRunIndex >= 0 ? trace.slice(latestFailedRunIndex + 1) : []
       const repairMutationAfterFailure = repairTraceAfterFailure.some(item => item.ok
         && (item.toolId === 'write_file' || item.toolId === 'edit_file'))

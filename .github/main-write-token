@@ -1,2 +1,2 @@
-base_sha=314960aab125a53d8a8b6b460192ced39dd2bc95
-branch=fix/builder-terminal-progress-phase-20261021
+base_sha=8bca6b5fdb7b08f86c1a27131df9691a80dd9cf9
+branch=fix/builder-stale-progress-report-tests-20261021

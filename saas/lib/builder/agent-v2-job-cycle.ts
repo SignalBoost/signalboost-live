@@ -26,7 +26,7 @@ export type BuilderV2JobCycle = Readonly<{
 }>
 
 /** Commands whose latest run after the last file change passed. */
-function passedOnCurrentRevision(steps: readonly BuilderV2Receipt[]): Set<string> {
+export function passedOnCurrentRevision(steps: readonly BuilderV2Receipt[]): Set<string> {
   const passed = new Set<string>()
   for (const receipt of steps.slice(steps.findLastIndex(step => step.changed) + 1)) {
     if (receipt.tool !== 'run_tests') continue

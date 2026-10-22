@@ -17,8 +17,11 @@ const saas = fileURLToPath(new URL('..', import.meta.url))
 const run = (command: string) => {
   const [bin, ...args] = command.split(' ')
   // A child started inside a test reports to this runner instead of printing, unless it runs as its own suite.
+  // NODE_OPTIONS is dropped so only the flags on the command line decide (npm sets --experimental-transform-types
+  // there for npm scripts, which would hide the difference this test proves).
   const env = { ...process.env }
   delete env.NODE_TEST_CONTEXT
+  delete env.NODE_OPTIONS
   return spawnSync(bin === 'node' ? process.execPath : bin, args, { cwd: saas, encoding: 'utf8', timeout: 120_000, env })
 }
 
@@ -28,7 +31,9 @@ test('the incident target now gets a proof that runs the real test instead of fa
 
   const now = run(proof!)
   assert.equal(now.status, 0, now.stdout + now.stderr)
-  assert.match(now.stdout, /# fail 0/)
+  // The exit code is the proof; the summary only shows tests really ran (TAP "# pass 6" or spec "ℹ pass 6").
+  assert.match(now.stdout, /(?:#|ℹ) pass [1-9]\d*/)
+  assert.match(now.stdout, /(?:#|ℹ) fail 0/)
 
   // The command Builder used before: the runner itself fails on TypeScript-only syntax, before any test runs.
   const before = run('node --experimental-strip-types --test tests/platformObservability.node.test.ts')

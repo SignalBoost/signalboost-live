@@ -44,6 +44,7 @@ const tests = [
   'tests/builderV2RepairCapability.node.test.ts',
   'tests/builderV2CheckpointConsistency.node.test.ts',
   'tests/builderV2RuntimeRepair.node.test.ts',
+  'tests/builderV2MissingManifestAdmission.node.test.ts',
   'tests/builderRepairInspectionRecoveryGate.node.test.ts',
   'tests/builderRepairInspectionInitialization.node.test.ts',
   'tests/builderRepositoryBaselineAuthority.node.test.ts',

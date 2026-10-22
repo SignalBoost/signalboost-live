@@ -18,3 +18,11 @@ test('voice input is available in both Concierge composers', () => {
   assert.match(assistantSource, /<VoiceInputButton[\s\S]*?value=\{input\}[\s\S]*?onChange=\{setInput\}/)
   assert.match(homepageSource, /<VoiceInputButton[\s\S]*?value=\{question\}[\s\S]*?onChange=\{setQuestion\}/)
 })
+
+test('manual typing during dictation is not overwritten by subsequent transcripts', () => {
+  assert.match(buttonSource, /lastDictatedValueRef\.current !== null/)
+  assert.match(buttonSource, /value === lastDictatedValueRef\.current/)
+  assert.match(buttonSource, /recognitionRef\.current\?\.abort\(\)/)
+  assert.match(buttonSource, /lastDictatedValueRef\.current = nextValue/)
+  assert.match(buttonSource, /onChange\(nextValue\)/)
+})

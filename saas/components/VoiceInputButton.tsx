@@ -57,6 +57,15 @@ export default function VoiceInputButton({
   const [error, setError] = useState('')
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const baseValueRef = useRef('')
+  const lastDictatedValueRef = useRef<string | null>(null)
+
+  // Do not overwrite text the customer edits while recognition is active.
+  useEffect(() => {
+    if (!listening || lastDictatedValueRef.current === null || value === lastDictatedValueRef.current) return
+    recognitionRef.current?.abort()
+    recognitionRef.current = null
+    setListening(false)
+  }, [value, listening])
 
   useEffect(() => {
     setSupported(Boolean(window.SpeechRecognition || window.webkitSpeechRecognition))
@@ -79,6 +88,7 @@ export default function VoiceInputButton({
 
     setError('')
     baseValueRef.current = value.trimEnd()
+    lastDictatedValueRef.current = value
     const recognition = new Recognition()
     recognition.continuous = true
     recognition.interimResults = true
@@ -87,7 +97,9 @@ export default function VoiceInputButton({
       let transcript = ''
       for (let i = 0; i < event.results.length; i += 1) transcript += event.results[i][0]?.transcript || ''
       const separator = baseValueRef.current && transcript.trim() ? ' ' : ''
-      onChange(`${baseValueRef.current}${separator}${transcript.trimStart()}`)
+      const nextValue = `${baseValueRef.current}${separator}${transcript.trimStart()}`
+      lastDictatedValueRef.current = nextValue
+      onChange(nextValue)
     }
     recognition.onerror = event => {
       if (event.error !== 'aborted' && event.error !== 'no-speech') {

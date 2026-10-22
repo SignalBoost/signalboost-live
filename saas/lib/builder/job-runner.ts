@@ -14,7 +14,7 @@ import { builderInferenceBudgetSummary, createBuilderInferenceBudgetStore, readB
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
-import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, requeueBuilderContinuationCycle, readBuilderWorkspaceFingerprint, getBuilderJobForUser, type BuilderJobRecord } from './job-store.ts'
+import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, requeueBuilderContinuationCycle, readBuilderWorkspaceFingerprint, getBuilderJobForUser, peekBuilderJob, type BuilderJobRecord } from './job-store.ts'
 import { MAX_WORK_SLICES, builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport, builderJobOverTotalDeadline, BUILDER_JOB_TOTAL_DEADLINE_MS } from './work-budget.ts'
 import { builderContractObjective, builderTaskContract, builderTaskProgress } from './task-contract.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
@@ -45,6 +45,7 @@ import { formatBuilderEpisodesForPrompt, recordBuilderEpisode, retrieveBuilderEp
 import { recordBuilderCompetencyGap } from './competency-gap.ts'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { assistanceCopy, COLLABORATE_PUBLICATION_PAUSED, COLLABORATE_SOURCE_CHANGED } from '../ai/cos/assistanceMode.ts'
+import { markActiveSpanFailed, withSpan, withTraceparent } from '../observability/tracing.ts'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
@@ -351,13 +352,29 @@ type IsolatedPublicationOutcome = { publication: Record<string, unknown> | null;
  * endpoint checked, then the merge. Shared by Handle it for me (right after verification) and Work with me (after
  * the user's "go"), so both run the same code.
  */
-async function publishIsolatedJobFiles(input: {
+type IsolatedPublicationInput = {
   job: BuilderJobRecord
   files: readonly string[]
   workspace: { readFile(workspaceId: string, path: string): Promise<{ path: string; content: string; updatedAt: number } | null> }
   signal: AbortSignal
   deadlineAt: number
-}): Promise<IsolatedPublicationOutcome> {
+}
+
+/** One span for the whole publication; repository, PR, preview and merge HTTP calls are its child fetch spans. */
+function publishIsolatedJobFiles(input: IsolatedPublicationInput): Promise<IsolatedPublicationOutcome> {
+  return withSpan('builder.publish.isolated', { 'builder.job_id': input.job.id, 'builder.files': input.files.length }, async span => {
+    const outcome = await publishIsolatedJobFilesUntraced(input)
+    const publication = outcome.publication ?? {}
+    span.setAttributes({
+      'builder.publish.preview_status': String(publication.status ?? 'none'),
+      'builder.publish.merged': typeof publication.mergeCommitSha === 'string',
+    })
+    if (outcome.publicationError) markActiveSpanFailed(outcome.publicationError)
+    return outcome
+  })
+}
+
+async function publishIsolatedJobFilesUntraced(input: IsolatedPublicationInput): Promise<IsolatedPublicationOutcome> {
   const { job } = input
   let publication: Record<string, unknown> | null = null
   try {
@@ -1018,6 +1035,17 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
  * (Next.js after() snapshots that context); its only clock is this Harness deadline.
  */
 export async function runBuilderJob(jobId: string, userId: string): Promise<void> {
+  // Every work slice continues the trace of the request that queued the job, so one trace id covers the chat
+  // message, each slice, every model call and tool step, publication and the job's failure.
+  const queued = await peekBuilderJob(jobId, userId).catch(() => null)
+  return withTraceparent(queued?.metadata.traceparent, () => withSpan('builder.job.slice', {
+    'builder.job_id': jobId,
+    'builder.job_kind': queued?.jobKind ?? 'unknown',
+    'builder.platform_repair': queued?.metadata.platformRepair === true,
+  }, () => runBuilderJobInHarness(jobId, userId)))
+}
+
+function runBuilderJobInHarness(jobId: string, userId: string): Promise<void> {
   return runWithoutTurnDeadline(() => withHostProductionHarnessIngress({
     objective: `Execute durable Builder job ${jobId}`,
     portableId: 'cos-builder',

@@ -1,5 +1,6 @@
 // saas/lib/ai/localInferenceUsage.ts
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { currentTraceId } from '../observability/tracing.ts'
 
 export type LocalInferenceUsageContext = Readonly<{
   feature: string
@@ -90,7 +91,9 @@ export async function recordLocalInferenceUsage(record: LocalInferenceUsageRecor
     provider: clean(record.provider, 80) || 'unknown',
     model: clean(record.model, 300) || 'unknown',
     feature: clean(record.context.feature, 120) || 'unattributed',
-    correlation_id: clean(record.context.correlationId, 240),
+    // A caller's own correlation id wins; otherwise the platform trace id joins this call to its request, its errors
+    // and its Builder job.
+    correlation_id: clean(record.context.correlationId, 240) ?? currentTraceId(),
     agent_id: clean(record.context.agentId, 180),
     purpose: clean(record.context.purpose, 120),
     route_owner: record.routeOwner || null,

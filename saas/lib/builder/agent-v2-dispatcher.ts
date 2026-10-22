@@ -3,6 +3,7 @@ import { builderSyntaxError } from './syntax-check.ts'
 import { applySearchReplace } from './edit-match.ts'
 import { checkBuilderInferenceDeadline } from './inference-budget.ts'
 import { withBuilderExecutionHooks, type BuilderExecutionHook } from './execution-hooks.ts'
+import { withSpan } from '../observability/tracing.ts'
 
 /**
  * Model-independent tool execution for Builder V2. No model-generated result can
@@ -59,6 +60,23 @@ export class BuilderV2Dispatcher {
    * against content it never saw does not.
    */
   async dispatch(workspaceId: string, action: BuilderV2Action, options: Readonly<{ seenContent?: string }> = {}): Promise<BuilderV2Receipt> {
+    // One span per tool step: the tool, its host outcome and, for commands, the real exit code. A failing step is an
+    // attribute, not a span error: failing tests are expected while Builder debugs. No paths, content or command
+    // output leave the receipt.
+    return withSpan('builder.tool', { 'builder.tool': action.tool }, async span => {
+      const receipt = await this.dispatchUntraced(workspaceId, action, options)
+      const exitCode = (receipt.output as { exitCode?: unknown } | undefined)?.exitCode
+      span.setAttributes({
+        'builder.tool.ok': receipt.ok,
+        'builder.tool.changed': receipt.changed,
+        ...(typeof exitCode === 'number' ? { 'builder.tool.exit_code': exitCode } : {}),
+        ...(receipt.error ? { 'builder.tool.error': receipt.error.slice(0, 200) } : {}),
+      })
+      return receipt
+    })
+  }
+
+  private async dispatchUntraced(workspaceId: string, action: BuilderV2Action, options: Readonly<{ seenContent?: string }>): Promise<BuilderV2Receipt> {
     if (!workspaceId.trim()) return { tool: action.tool, ok: false, changed: false, error: 'builder_workspace_required' }
     return this.serialized(workspaceId, async () => {
       checkBuilderInferenceDeadline()

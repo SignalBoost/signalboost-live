@@ -1,5 +1,7 @@
 // saas/lib/observability/agentTrace.ts
 import { randomUUID } from 'node:crypto'
+import { trace } from '@opentelemetry/api'
+import { currentTraceId } from './tracing.ts'
 
 export const AGENT_TRACE_SCHEMA = 'itmounts-agent-trace-v1' as const
 
@@ -67,6 +69,14 @@ export function agentTraceEvent(input:Omit<AgentTraceEvent,'schemaVersion'|'even
   })
 }
 
+/** Logged, and added to the active platform trace so agent events sit inside the request's spans. */
 export function emitAgentTrace(event:AgentTraceEvent):void{
-  console.info('[itmounts-agent-trace]',JSON.stringify(event))
+  const otelTraceId=currentTraceId()
+  trace.getActiveSpan()?.addEvent(`agent.${event.kind}`,{
+    'agent.trace_id':event.traceId,'agent.name':event.name,'agent.status':event.status,
+    ...(event.model?{'agent.model':event.model}:{}),
+    ...(event.durationMs!==undefined?{'agent.duration_ms':event.durationMs}:{}),
+    ...(event.errorCode?{'agent.error_code':event.errorCode}:{}),
+  })
+  console.info('[itmounts-agent-trace]',JSON.stringify(otelTraceId?{...event,otelTraceId}:event))
 }

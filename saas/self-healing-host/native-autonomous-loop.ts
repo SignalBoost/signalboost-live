@@ -15,8 +15,10 @@ import { nativeIncidentToNormalized as normalizeNativeIncident } from './native-
 import {
   enqueueOwnedSiteCybersecurityRepair,
   enqueueOwnedSiteOptimizationRepair,
+  enqueuePlatformRequestErrorRepair,
   isOwnedSiteCybersecurityIncident,
   isOwnedSiteOptimizationIncident,
+  isPlatformRequestErrorIncident,
 } from './owned-site-autonomous-repair.ts'
 import {
   enqueueUniversityDistillationRepair,
@@ -116,13 +118,18 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
     // editing, opens a PR, runs CI, and relies on governed merge/deployment verification.
     const optimizerIncident = isOwnedSiteOptimizationIncident(incident)
     const cybersecurityIncident = isOwnedSiteCybersecurityIncident(incident)
+    // Uncaught platform server errors (instrumentation.ts) are first-party Production evidence too: the Supervisor
+    // owns their repair through the same Platform Engineer pipeline.
+    const requestErrorIncident = isPlatformRequestErrorIncident(incident)
     const universityDistillationIncident = isUniversityDistillationRepairableIncident(incident)
-    if (optimizerIncident || cybersecurityIncident) {
+    if (optimizerIncident || cybersecurityIncident || requestErrorIncident) {
       try {
         const repair = optimizerIncident
           ? await enqueueOwnedSiteOptimizationRepair(incident, diagnostic.diagnosis)
-          : await enqueueOwnedSiteCybersecurityRepair(incident, diagnostic.diagnosis)
-        const surface = optimizerIncident ? 'Website Optimizer' : 'Cybersecurity Preview'
+          : cybersecurityIncident
+            ? await enqueueOwnedSiteCybersecurityRepair(incident, diagnostic.diagnosis)
+            : await enqueuePlatformRequestErrorRepair(incident, diagnostic.diagnosis)
+        const surface = optimizerIncident ? 'Website Optimizer' : cybersecurityIncident ? 'Cybersecurity Preview' : 'platform request error'
         const action = repair.disposition === 'queued'
           ? `Autonomous owned-site ${surface} repair job ${repair.jobId} was queued for Platform Engineer execution.`
           : repair.disposition === 'already_active'

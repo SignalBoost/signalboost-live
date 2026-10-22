@@ -17,6 +17,11 @@ import {
   OWNED_SITE_CYBERSECURITY_PROBE_FAILED_ERROR,
 } from './owned-site-cybersecurity-monitoring.ts'
 import { OWNED_SITE_REPAIR_RETRY_SUPPRESSION_MS, ownedSiteRepairBlocker } from './owned-site-repair-dedupe.ts'
+import {
+  PLATFORM_REQUEST_ERROR_CODE,
+  PLATFORM_REQUEST_ERROR_PROBE,
+  platformRequestErrorScope,
+} from './platform-request-error-monitoring.ts'
 
 const OPTIMIZER_STARTING_PATHS = Object.freeze([
   'saas/app/api/public/site-optimization/route.ts',
@@ -40,7 +45,7 @@ const CYBERSECURITY_STARTING_PATHS = Object.freeze([
 const DIAGNOSTIC_TRANSPORT_FAILURE = /automated diagnosis was unavailable|diagnostic timed out|invalid json payload|generation_config|response_schema|additionalproperties|cannot find field|cos-primary:|gemini:/i
 
 type RepairDisposition = 'queued' | 'already_active' | 'recently_attempted'
-type OwnedRepairKind = 'website-optimizer' | 'cybersecurity-preview'
+type OwnedRepairKind = 'website-optimizer' | 'cybersecurity-preview' | 'platform-request-error'
 
 export type OwnedSiteAutonomousRepairResult = Readonly<{
   disposition: RepairDisposition
@@ -65,7 +70,12 @@ function stringArray(value: unknown): string[] {
 }
 
 function kindLabel(kind: OwnedRepairKind): string {
-  return kind === 'website-optimizer' ? 'Website Optimizer' : 'Cybersecurity Preview'
+  return kind === 'website-optimizer' ? 'Website Optimizer'
+    : kind === 'cybersecurity-preview' ? 'Cybersecurity Preview' : 'platform request error'
+}
+
+function metadataText(incident: SupervisorIncident, key: string, max = 600): string {
+  return String(incident.metadata?.[key] ?? '').trim().slice(0, max)
 }
 
 function scopedDiagnosis(value: string, kind: OwnedRepairKind): string {
@@ -92,6 +102,14 @@ export function isOwnedSiteCybersecurityIncident(incident: SupervisorIncident): 
     || incident.errorCode === OWNED_SITE_CYBERSECURITY_PROBE_FAILED_ERROR
 }
 
+export function isPlatformRequestErrorIncident(incident: SupervisorIncident): boolean {
+  return incident.metadata?.nativeProbe === PLATFORM_REQUEST_ERROR_PROBE
+    && incident.metadata?.ownedPlatform === true
+    && incident.metadata?.recoveryPreauthorized === true
+    && incident.errorCode === PLATFORM_REQUEST_ERROR_CODE
+    && metadataText(incident, 'routePath').startsWith('/')
+}
+
 async function resolveOwnerUserId(): Promise<string> {
   const admin = getAdminSupabase()
   for (let page = 1; page <= 10; page += 1) {
@@ -112,12 +130,31 @@ async function resolveOwnerUserId(): Promise<string> {
 
 function remediationKey(incident: SupervisorIncident, kind: OwnedRepairKind): string {
   const report = reportFrom(incident)
-  const codes = stringArray(report.findingCodes).sort().join(',') || incident.errorCode || 'unknown'
+  const codes = kind === 'platform-request-error'
+    ? platformRequestErrorScope(metadataText(incident, 'routePath'), metadataText(incident, 'requestErrorCode'))
+    : stringArray(report.findingCodes).sort().join(',') || incident.errorCode || 'unknown'
   const revision = String(process.env.VERCEL_GIT_COMMIT_SHA || '').trim().toLowerCase() || 'unknown'
   return `${revision}:${kind}:${codes}`.slice(0, 500)
 }
 
+function platformRequestErrorObjective(incident: SupervisorIncident, diagnosis: string): string {
+  const routePath = metadataText(incident, 'routePath', 200)
+  const traceIds = Array.isArray(incident.metadata?.traceIds) ? incident.metadata.traceIds.map(String).slice(0, 5) : []
+  return [
+    `Fix the SignalBoost platform server error detected by the Self-Healing Supervisor on ${PUBLIC_BRAND.siteUrl}.`,
+    `Failing route: ${routePath} (${metadataText(incident, 'routeType', 20) || 'route'}), ${Number(incident.metadata?.occurrences) || 1} uncaught error(s) between ${metadataText(incident, 'firstSeen', 40)} and ${metadataText(incident, 'lastSeen', 40)}.`,
+    `Recorded error (secrets redacted): ${metadataText(incident, 'requestErrorCode', 80)}: ${metadataText(incident, 'requestErrorMessage')}`,
+    `Trace ids for this error: ${traceIds.join(', ') || 'none recorded'}. Their spans and the provider_inference_usage rows with the same correlation_id show the steps of each failing request.`,
+    `Repository starting point (inspect first, not exclusive): the Next.js route at saas${routePath} (its route.ts, page.tsx or layout.tsx) and the modules it imports.`,
+    `Supervisor diagnosis: ${scopedDiagnosis(diagnosis, 'platform-request-error')}`,
+    'Reproduce the failure before editing (a test that calls the failing code path with the recorded conditions). Inspect ONBOARD.md and the current repository first. Repair the root cause; never swallow, hide or stop recording the error to make it disappear.',
+    'If the error comes from an external provider outage or a missing configuration value rather than from repository code, make no code change and report the verified blocker.',
+    'Run the narrowest relevant tests plus the production build gates required by the repository.',
+  ].join('\n')
+}
+
 function objectiveFor(incident: SupervisorIncident, diagnosis: string, kind: OwnedRepairKind): string {
+  if (kind === 'platform-request-error') return platformRequestErrorObjective(incident, diagnosis)
   const report = reportFrom(incident)
   const codes = stringArray(report.findingCodes)
   const score = Number(report.score)
@@ -162,14 +199,17 @@ async function findExistingAttempt(key: string, kind: OwnedRepairKind): Promise<
   const { data: recent, error: recentError } = await admin
     .from('builder_jobs')
     .select('id,status,created_at,updated_at,metadata')
-    .eq('status', 'succeeded')
+    .in('status', kind === 'platform-request-error' ? ['succeeded', 'failed'] : ['succeeded'])
     .gte('created_at', since)
     .contains('metadata', { selfHealingOwnedSite: true, selfHealingSource: kind })
     .order('created_at', { ascending: false })
     .limit(50)
   if (recentError) throw new Error(`self_healing_builder_recent_lookup_failed:${recentError.message}`)
 
-  return ownedSiteRepairBlocker({ rows: [...(active || []), ...(recent || [])], key, nowMs: Date.now() })
+  return ownedSiteRepairBlocker({
+    rows: [...(active || []), ...(recent || [])], key, nowMs: Date.now(),
+    suppressAfterFailure: kind === 'platform-request-error',
+  })
 }
 
 async function enqueueOwnedSiteRepair(
@@ -177,9 +217,9 @@ async function enqueueOwnedSiteRepair(
   diagnosis: string,
   kind: OwnedRepairKind,
 ): Promise<OwnedSiteAutonomousRepairResult> {
-  const authorized = kind === 'website-optimizer'
-    ? isOwnedSiteOptimizationIncident(incident)
-    : isOwnedSiteCybersecurityIncident(incident)
+  const authorized = kind === 'website-optimizer' ? isOwnedSiteOptimizationIncident(incident)
+    : kind === 'cybersecurity-preview' ? isOwnedSiteCybersecurityIncident(incident)
+    : isPlatformRequestErrorIncident(incident)
   if (!authorized) throw new Error('owned_site_repair_incident_not_authorized')
 
   const key = remediationKey(incident, kind)
@@ -231,4 +271,11 @@ export async function enqueueOwnedSiteCybersecurityRepair(
   diagnosis: string,
 ): Promise<OwnedSiteAutonomousRepairResult> {
   return enqueueOwnedSiteRepair(incident, diagnosis, 'cybersecurity-preview')
+}
+
+export async function enqueuePlatformRequestErrorRepair(
+  incident: SupervisorIncident,
+  diagnosis: string,
+): Promise<OwnedSiteAutonomousRepairResult> {
+  return enqueueOwnedSiteRepair(incident, diagnosis, 'platform-request-error')
 }

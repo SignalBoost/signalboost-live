@@ -110,3 +110,14 @@ test('a repair of absent code asks for it; a build or inline code goes to Builde
     'Can you build me a todo app and fix any failing tests?',
   ]) assert.equal(repairAwaitingSource(prompt), false, prompt.slice(0, 60))
 })
+
+test('authenticated platform owner receives an explicit repository routing blocker, not an upload request', () => {
+  const specialist = readFileSync(new URL('../lib/ai/cos/softwareSpecialist.ts', import.meta.url), 'utf8')
+  const ownerBranch = specialist.indexOf('if (access?.isOwner && access.userId) return NextResponse.json({')
+  const genericFallback = specialist.indexOf('reply: SOURCE_REQUEST_REPLY[resolveResponseLanguage')
+  assert.ok(ownerBranch > 0 && genericFallback > ownerBranch)
+  assert.match(specialist, /source: 'cos-builder-repository-routing-blocked'/)
+  assert.match(specialist, /Repository repair was not authorized on this COS route/)
+  assert.match(specialist, /The repository repair target could not be established/)
+  assert.match(specialist, /execution_allowed: false/)
+})

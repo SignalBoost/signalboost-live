@@ -500,7 +500,11 @@ export class BuilderV2Agent {
         ? { ok: true, reason: 'verified', summary: 'Every required command passed on the host after the latest source change.', steps, checkpoint: await snapshot() }
         : null
     }
-    const hostVerificationDue = () => checklist.files.length > 0
+    // npm test and npm run require a package manifest. Running them in a fresh
+    // empty workspace only creates an ENOENT receipt, not useful defect proof.
+    const missingNpmManifest = (command: string): boolean =>
+      /^npm(?:\s|$)/.test(command.trim()) && !knownFiles.includes('package.json')
+    const hostVerificationDue = () => !checklist.commands.some(missingNpmManifest) && checklist.files.length > 0
       && missingFiles().length === 0 && checklist.commands.length > 0 && syntaxErrors.size === 0
       && checklist.commands.some(command => !latestCommandRun(command))
       && !currentRevisionRuns().some(step => !step.ok)
@@ -521,6 +525,7 @@ export class BuilderV2Agent {
         if (latestCommandRun(command)?.ok) continue
         if (latestCommandRun(command) && !latestCommandRun(command)?.ok) return null
         if (steps.length >= BUILDER_V2_MAX_RECEIPTS) return null
+        if (missingNpmManifest(command)) return null
         const action: BuilderV2Action = { tool: 'run_tests', command }
         const receipt = await this.dispatcher.dispatch(options.workspaceId, action)
         record(action, receipt)
@@ -789,6 +794,15 @@ export class BuilderV2Agent {
             })
             break
           }
+        }
+        if (action.tool === 'run_tests' && missingNpmManifest(action.command)) {
+          // This is a missing project input, not a failed test. Do not send
+          // npm into a directory without package.json or count it as proof.
+          if (++repeats >= REPEAT_LIMIT) return { ok: false, reason: 'builder_v2_missing_project_manifest', summary: 'npm verification requires package.json; the workspace did not contain one.', steps, checkpoint: await snapshot() }
+          lastReceipt = JSON.stringify({ ok: false, error: 'builder_v2_missing_project_manifest',
+            message: 'Cannot run npm commands without package.json in this workspace. Create the manifest when building a new npm project, or select a verification command appropriate for the existing source. Do not repeat npm test before the manifest exists.',
+            command: action.command })
+          break
         }
         const signature = JSON.stringify(action)
         // A failed required suite is deterministic for an unchanged source revision.

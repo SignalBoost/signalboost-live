@@ -1,2 +1,2 @@
-base_sha=5cb269f74f333e17c1f6517d87df3cbcc9c9a3ff
-branch=fix/optimizer-advisory-findings-20261022
+base_sha=c5580a1ca06a5f6d98a269890706e3e26572a98b
+branch=fix/builder-v2-idle-prompt-recovery-20261022

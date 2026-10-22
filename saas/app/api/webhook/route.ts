@@ -173,12 +173,6 @@ async function handleCreditTopup(
   eventId: string | undefined,
   type: 'audit_credit_topup' | 'render_credit_topup',
 ): Promise<NextResponse> {
-  const fresh = await claimStripeEvent(supabase, eventId)
-  if (!fresh) {
-    console.log(`Webhook ${type}: event already processed — skipping`, eventId)
-    return NextResponse.json({ received: true, deduped: true })
-  }
-
   const userId = await resolveTopupUserId(supabase, session, type)
   if (!userId) {
     console.error(`Webhook ${type}: no userId found`, {
@@ -194,6 +188,12 @@ async function handleCreditTopup(
   if (!Number.isInteger(credits) || credits <= 0 || credits > 100000) {
     console.error(`Webhook ${type}: invalid creditAmount`, { raw, sessionId: session.id })
     return NextResponse.json({ error: 'credit_topup_amount_invalid' }, { status: 422 })
+  }
+
+  const fresh = await claimStripeEvent(supabase, eventId)
+  if (!fresh) {
+    console.log(`Webhook ${type}: event already processed — skipping`, eventId)
+    return NextResponse.json({ received: true, deduped: true })
   }
 
   const rpc = type === 'audit_credit_topup' ? 'increment_audit_credits' : 'increment_render_credits'

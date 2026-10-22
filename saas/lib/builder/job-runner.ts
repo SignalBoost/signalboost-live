@@ -582,12 +582,20 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         // rather than re-queueing the same checkpoint indefinitely.
         if (idleSlices >= 3) {
           const reason = 'builder_v2_continuation_no_progress'
-          const reply = historyReply(`Builder V2 stopped after three consecutive work slices without a new tool receipt or source revision. No verification was completed. The workspace is preserved.\n\n${progress}${budgetReport}`, job.workspaceId, files)
+          // Report why the agent paused, not only the idle-slice watchdog. Never expose
+          // model output/source text from lastReceipt to the user-facing job result.
+          const underlyingReason = cycle.result.reason
+          const failureCategory = underlyingReason === 'builder_v2_model_unavailable' ? 'model_unavailable'
+            : underlyingReason === 'builder_v2_step_budget' ? 'step_budget_exhausted'
+            : underlyingReason === 'builder_v2_cancelled' ? 'slice_cancelled'
+            : 'agent_stalled'
+          const stallDiagnostic = { underlyingReason, failureCategory, idleSlices, newToolReceipts: current.steps.length - (previous?.steps.length ?? 0), revisionChanged: current.revision > (previous?.revision ?? 0) }
+          const reply = historyReply(`Builder V2 stopped after three consecutive work slices without a source revision or passing host verification. Cause: ${failureCategory} (${underlyingReason}). No verification was completed. The workspace is preserved.\n\n${progress}${budgetReport}`, job.workspaceId, files)
           await finishBuilderJob({
             jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
             status: 'failed', reply, error: reason,
             result: { jobId: job.id, workspaceId: job.workspaceId, status: 'failed',
-              reply, files, engine: 'v2', receipts: cycle.result.steps, ...(inferenceBudget ? { inferenceBudget } : {}) },
+              reply, files, engine: 'v2', receipts: cycle.result.steps, stallDiagnostic, ...(inferenceBudget ? { inferenceBudget } : {}) },
           })
           return
         }

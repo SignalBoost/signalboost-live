@@ -1,2 +1,2 @@
-base_sha=90066a9655ab905b7f29290cb7951f8821722b71
-branch=feat/voice-dictation-preserve-edits-20261022
+base_sha=cf29a269a75870cf427cbb498cb84ebc18fdacbe
+branch=fix/voice-transcript-spacing-20261022

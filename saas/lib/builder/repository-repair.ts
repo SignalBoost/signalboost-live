@@ -1,3 +1,4 @@
+import { assistanceCopy, COLLABORATE_MERGE_HELD } from '../ai/cos/assistanceMode.ts'
 import { builderRunSourceEvidence } from './source-evidence.ts'
 import { builderPendingWriteEvidence } from './evidence-events.ts'
 // lib/builder/repository-repair.ts
@@ -152,6 +153,9 @@ export async function executeSignalBoostRepositoryRepair(input: {
    * attemptSignalBoostRepositoryAutoMerge refuses on — the lane stays PR-only.
    */
   snapshotPort?: StateSnapshotPort | null
+  /** Work with me: create the pull request but never merge it; the owner reviews and merges. */
+  holdMerge?: boolean
+  responseLanguage?: unknown
 }): Promise<SignalBoostRepositoryRepairExecution | null> {
   if (input.ownerAuthorized !== true) {
     return Object.freeze({
@@ -386,7 +390,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
     // refuses itself on a danger category or a missing/unrestorable checkpoint. A refusal here
     // changes nothing: the PR stays open for human review, exactly as before.
     let autoMerge: AutoMergeResult | null = null
-    if (autoMergeEnabled() && writeback.stage === 'pr_created' && writeback.pullRequestNumber) {
+    if (autoMergeEnabled() && input.holdMerge !== true && writeback.stage === 'pr_created' && writeback.pullRequestNumber) {
       autoMerge = await attemptSignalBoostRepositoryAutoMerge({
         files: changes.files,
         patch: changes.patch,
@@ -441,7 +445,9 @@ export async function executeSignalBoostRepositoryRepair(input: {
         ? `A verified patch was created from pinned commit ${target.fullCommitSha}, and repository write-back began but stopped after ${writeback.stage}${writeback.commitSha ? ` at commit ${writeback.commitSha}` : ''}${writeback.branch ? ` on branch ${writeback.branch}` : ''}${writeback.error ? ` (${writeback.error})` : ''}. Nothing was merged or deployed.`
         : `A reviewable patch was created from pinned commit ${target.fullCommitSha}. Repository write-back was not taken${writeback.error ? ` (${writeback.error})` : ''}. Nothing was merged or deployed.`
 
-    const finalReply = `${result.answer}\n\n${writebackReply}${autoMergeReply}`.trim()
+    const heldReply = input.holdMerge === true && writeback.stage === 'pr_created' && writeback.pullRequestNumber
+      ? ` ${assistanceCopy(COLLABORATE_MERGE_HELD, input.responseLanguage)}` : ''
+    const finalReply = `${result.answer}\n\n${writebackReply}${autoMergeReply}${heldReply}`.trim()
     try {
       await workspace.writeFile(input.workspaceId, BUILDER_RESULT_TEXT_PATH, `${finalReply}\n`)
       files = (await workspace.listFiles(input.workspaceId)).map(file => file.path)

@@ -366,10 +366,14 @@ test('a refused or unconfirmed merge fails the job instead of being reported as 
 
 test('the owner job succeeds only once the merge is confirmed', () => {
   const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
-  const lane = runner.slice(runner.indexOf('if (verified && acceptance.passed && requiresPublication)'), runner.indexOf('await finishBuilderJob(', runner.indexOf('if (verified && acceptance.passed && requiresPublication)')))
-  assert.match(lane, /if \(!job\.ownerAuthorized\) throw new Error\('builder_isolated_publication_not_authorized'\)/)
-  assert.ok(lane.indexOf('verifyIsolatedPreview(') < lane.indexOf('mergeVerifiedIsolatedPullRequest('), 'merge only after the preview')
-  assert.match(lane, /previewVerified: preview\.status === 'verified'/)
+  // Publication runs in one shared function for Handle it for me and for Work with me after "go".
+  const publish = runner.slice(runner.indexOf('async function publishIsolatedJobFiles('), runner.indexOf('async function runApprovedIsolatedPublication('))
+  assert.match(publish, /if \(!job\.ownerAuthorized\) throw new Error\('builder_isolated_publication_not_authorized'\)/)
+  assert.ok(publish.indexOf('verifyIsolatedPreview(') < publish.indexOf('mergeVerifiedIsolatedPullRequest('), 'merge only after the preview')
+  assert.match(publish, /previewVerified: preview\.status === 'verified'/)
+  const laneStart = runner.indexOf('if (verified && acceptance.passed && requiresPublication)')
+  const lane = runner.slice(laneStart, runner.indexOf('const success = finalProof.passed', laneStart) + 40)
+  assert.match(lane, /await publishIsolatedJobFiles\(\{/)
   assert.match(lane, /const finalProof = builderFinalProof\(/)
   assert.match(lane, /const success = finalProof\.passed/)
 })

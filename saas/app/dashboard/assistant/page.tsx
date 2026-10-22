@@ -9,6 +9,8 @@ import { uiText } from '@/lib/i18n/uiText'
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findRecoveredAssistantReply } from '@/lib/ai/cos/assistantTransportRecovery'
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 import VoiceInputButton from '@/components/VoiceInputButton'
+import AssistanceModeSelector from '@/components/AssistanceModeSelector'
+import { useAssistanceMode } from '@/lib/ai/cos/useAssistanceMode'
 import AgentDiagnosticsPanel, { splitOwnerDiagnostic, type AgentDiagnostics } from '@/components/AgentDiagnosticsPanel'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
@@ -173,6 +175,7 @@ export default function AssistantPage() {
   const [messages, setMessages] = useState<Msg[]>([])
   const [feedbackByMessage, setFeedbackByMessage] = useState<Record<number, FeedbackUiState>>({})
   const [input, setInput] = useState('')
+  const [assistanceMode, setAssistanceMode] = useAssistanceMode()
   useEffect(() => {
     const prompt = new URLSearchParams(window.location.search).get('prompt')?.trim()
     if (prompt) setInput(prompt.slice(0, 8000))
@@ -354,7 +357,7 @@ export default function AssistantPage() {
           body: {
             messages: apiMessages,
             attachments: attachments.length ? attachments : undefined,
-            context: { language: lang, currentPage: '/dashboard/assistant', conversationId },
+            context: { language: lang, currentPage: '/dashboard/assistant', conversationId, assistanceMode },
           },
         })
         const data: any = streamed.data
@@ -727,6 +730,9 @@ export default function AssistantPage() {
             disabled={loading}
             style={{ flexShrink: 0, width: 42, height: 42, borderRadius: 12, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.15)', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,.75)' }}
           />
+
+          <AssistanceModeSelector mode={assistanceMode} onChange={setAssistanceMode} lang={l} disabled={loading}
+            style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.15)', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, opacity: loading ? 0.5 : 1 }} />
 
           {/* Text input */}
           <textarea

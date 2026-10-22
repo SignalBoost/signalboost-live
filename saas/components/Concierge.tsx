@@ -14,6 +14,8 @@ import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import BuilderFilePreviews from '@/components/BuilderFilePreviews'
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 import VoiceInputButton from '@/components/VoiceInputButton'
+import AssistanceModeSelector from '@/components/AssistanceModeSelector'
+import { useAssistanceMode } from '@/lib/ai/cos/useAssistanceMode'
 import { CONCIERGE_RESUME_KEYS, forgetResumeId, loadResumableConversation, readResumeId, rememberResumeId } from '@/lib/concierge/conversationResume'
 
 type SupportedLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
@@ -131,6 +133,7 @@ export default function Concierge() {
   const [messages, setMessages] = useState<Message[]>([])
   const [feedbackByMessage, setFeedbackByMessage] = useState<Record<number, FeedbackUiState>>({})
   const [input, setInput] = useState('')
+  const [assistanceMode, setAssistanceMode] = useAssistanceMode()
   const [loading, setLoading] = useState(false)
   const [activity, setActivity] = useState<AgentProgressEvent | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -367,7 +370,7 @@ export default function Concierge() {
               // midnight UTC could land on the wrong calendar day (deterministicUtilities
               // defaults to UTC when none is supplied) — caught Aug 12 testing from
               // Nicaragua, UTC-6, where UTC had already rolled to the next day locally.
-              context: { currentPage: pathname, language: activeLang, conversationId: conversationIdRef.current, utilityReport: utilityContext, cosMode: 'silent_background_planning', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+              context: { currentPage: pathname, language: activeLang, conversationId: conversationIdRef.current, utilityReport: utilityContext, cosMode: 'silent_background_planning', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, assistanceMode },
             }
       const data = artifactRequest
         ? await fetch('/api/artifacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal, body: JSON.stringify(requestBody) }).then(res => res.json())
@@ -606,6 +609,8 @@ export default function Concierge() {
                 disabled={loading}
                 className="flex h-[42px] w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/6 text-white outline-hidden transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-300 aria-pressed:border-red-400/60 aria-pressed:bg-red-500/20 aria-pressed:text-red-200 disabled:cursor-not-allowed disabled:opacity-40"
               />
+              <AssistanceModeSelector mode={assistanceMode} onChange={setAssistanceMode} lang={activeLang} disabled={loading}
+                className="flex h-[42px] w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/6 text-white outline-hidden transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40" />
               <textarea
                 ref={inputRef}
                 aria-label={t(dict, 'concierge.placeholder')}

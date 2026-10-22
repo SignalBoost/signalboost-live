@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { BUILDER_LEVEL4_OBJECTIVE, evaluateBuilderLevel4 } from '../lib/builder/level4-certification.ts'
@@ -51,4 +52,15 @@ test('missing checkpoint continuation cannot certify',()=>{
   const data=valid()
   const outcome=evaluateBuilderLevel4({...data,checkpointBefore:undefined})
   assert.ok(outcome.reasons.includes('checkpoint_continuation_unverified'))
+})
+
+
+test('owner Level 4 endpoint dispatches a real V2 job without granting certification',()=>{
+  const source = readFileSync(new URL('../app/api/admin/builder-certification/route.ts',import.meta.url),'utf8')
+  assert.match(source,/await requireOwner\(\)/)
+  assert.match(source,/LEVEL4_CASE_ID = 'builder_v2_end_to_end_reliability_v1'/)
+  assert.match(source,/level4Probe: true, builderEngine: 'v2'/)
+  assert.match(source,/await enqueueBuilderJob\(\{/)
+  assert.match(source,/await runBuilderJob\(jobId, userId\)/)
+  assert.match(source,/certification: 'pending_independent_evidence'/)
 })

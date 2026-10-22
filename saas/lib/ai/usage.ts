@@ -21,6 +21,35 @@ export interface TokenUsage {
   cache_read_input_tokens?: number
 }
 
+/**
+ * Provider-neutral cache measurements. Only aggregate token counts are returned:
+ * never cache or log prompts, customer documents, tool results, or tenant IDs.
+ * Anthropic separates ordinary input from cache writes/reads; OpenAI includes
+ * cached tokens inside prompt_tokens. Missing fields mean unknown, not a hit.
+ */
+export function prefixCacheStats(usage: {
+  input_tokens?: number
+  cache_read_input_tokens?: number
+  cache_creation_input_tokens?: number
+  prompt_tokens?: number
+  prompt_tokens_details?: { cached_tokens?: number }
+} | null | undefined) {
+  const nonnegative = (value: unknown) =>
+    typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0
+  if (!usage) return { inputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, hitRate: 0 }
+  const openAi = typeof usage.prompt_tokens === 'number'
+  const cacheReadTokens = nonnegative(openAi ? usage.prompt_tokens_details?.cached_tokens : usage.cache_read_input_tokens)
+  const cacheWriteTokens = openAi ? 0 : nonnegative(usage.cache_creation_input_tokens)
+  const inputTokens = openAi ? nonnegative(usage.prompt_tokens) : nonnegative(usage.input_tokens) + cacheReadTokens + cacheWriteTokens
+  const boundedRead = Math.min(inputTokens, cacheReadTokens)
+  return {
+    inputTokens,
+    cacheReadTokens: boundedRead,
+    cacheWriteTokens,
+    hitRate: inputTokens > 0 ? boundedRead / inputTokens : 0,
+  }
+}
+
 export type SystemBlock = { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }
 
 /**

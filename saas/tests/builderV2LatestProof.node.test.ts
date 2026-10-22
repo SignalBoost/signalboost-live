@@ -27,6 +27,7 @@ test('later successful smoke test cannot hide the failed full-suite command', ()
 })
 test('a failed V2 test after success invalidates the in-memory verified revision', async () => {
   const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('v2-last-proof', 'package.json', '{"scripts":{"test":"node --test"}}')
   const commands = [
     { type: 'tool', action: { tool: 'write_file', path: 'index.js', content: 'module.exports=1' } },
     { type: 'tool', action: { tool: 'run_tests', command: 'npm test' } },

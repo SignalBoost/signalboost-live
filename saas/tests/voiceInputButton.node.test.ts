@@ -29,7 +29,16 @@ test('manual typing during dictation is not overwritten by subsequent transcript
 
 test('voice transcript respects phrase boundaries and CJK composition', () => {
   assert.match(buttonSource, /segment = event\.results\[i\]\[0\]\?\.transcript\?\.trim\(\)/)
-  assert.match(buttonSource, /segments\.join\(cjk \? '' : ' '\)/)
+  assert.match(buttonSource, /segments\.reduce\(\(output, segment\)/)
   assert.match(buttonSource, /lang === 'ja' \|\| lang === 'ko'/)
   assert.match(buttonSource, /onChange\(nextValue\)/)
+})
+
+test('spoken punctuation recognizes all 11 language codes without submitting the draft', () => {
+  for (const locale of ['en','es','pt','pl','ru','de','fr','it','ja','ko','ar']) {
+    assert.ok(buttonSource.includes(`${locale}: [[`), `missing ${locale} punctuation`)
+  }
+  assert.match(buttonSource, /command === undefined/)
+  assert.match(buttonSource, /onChange\(nextValue\)/)
+  assert.doesNotMatch(buttonSource, /onSubmit\(|fetch\(/)
 })

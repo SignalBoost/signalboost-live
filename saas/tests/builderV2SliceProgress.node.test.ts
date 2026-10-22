@@ -39,6 +39,7 @@ test('a resumed job gets a fresh slice budget instead of pausing forever once it
 
 test('ordinary debugging (failed run, reads, a missed edit) is not a stall', async () => {
   const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('d', 'package.json', JSON.stringify({ scripts: { test: 'node --test' } }))
   let runs = 0
   const runner: BuilderRunnerPort = { async run() {
     runs++
@@ -83,6 +84,7 @@ test('an identical action with no change since is answered from its receipt, the
 
 test('a long run with no change and no passing command pauses the slice with its checkpoint', async () => {
   const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('s', 'package.json', JSON.stringify({ scripts: { test: 'node --test' } }))
   const failing: BuilderRunnerPort = { async run() { return { exitCode: 1, stdout: '', stderr: 'boom', timedOut: false } } }
   const agent = new BuilderV2Agent({ async generate() { return tool({ tool: 'run_tests', command: 'npm test' }) } },
     new BuilderV2Dispatcher(workspace, failing), workspace)
@@ -116,6 +118,7 @@ test('a file the model has read can be rewritten; an unseen one cannot be overwr
 
 test('one unparseable reply is feedback; the build continues', async () => {
   const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('p', 'package.json', JSON.stringify({ scripts: { test: 'node --test' } }))
   const replies = scripted([
     'Sure! I will create the file now.',
     tool({ tool: 'write_file', path: 'index.js', content: 'module.exports = 1\n' }),
@@ -148,6 +151,7 @@ test('a model timeout pauses the job with its checkpoint instead of failing it',
 
 test('long builds checkpoint compact receipts that still validate on resume', async () => {
   const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('c', 'package.json', JSON.stringify({ scripts: { test: 'node --test' } }))
   const objective = 'Create the files and run npm test.'
   const big = 'x'.repeat(5_000)
   const first = scripted([
@@ -211,6 +215,7 @@ test('Codex review on #4595: a read-only slice followed by a model failure is no
 
 test('Codex review on #4597: rerunning an already-passing command before a model failure is not progress', async () => {
   const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('rr', 'package.json', JSON.stringify({ scripts: { test: 'node --test' } }))
   const objective = 'Create index.js and run npm test.'
   const first = scripted([
     tool({ tool: 'write_file', path: 'index.js', content: 'module.exports = 1\n' }),
@@ -239,6 +244,7 @@ test('Codex review on #4597: rerunning an already-passing command before a model
 
 test('Codex review on #4598: a newly passing required command before a model failure is progress', async () => {
   const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('nc', 'package.json', JSON.stringify({ scripts: { test: 'node --test' } }))
   const objective = 'Build app.\nCreate all 2 files:\n```text\napp/\n├── index.js\n└── README.md\n```\n## Mandatory verification\nExecute all two commands:\n```bash\nnpm test\nnode index.js\n```'
   const first = scripted([
     tool({ tool: 'write_file', path: 'index.js', content: 'module.exports = 1\n' }),
@@ -264,6 +270,7 @@ test('Codex review on #4598: a newly passing required command before a model fai
 
 test('Codex review on #4599: an ad-hoc passing command is not progress toward required commands', async () => {
   const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('ah', 'package.json', JSON.stringify({ scripts: { test: 'node --test' } }))
   const objective = 'Build app.\nCreate all 2 files:\n```text\napp/\n├── index.js\n└── README.md\n```\n## Mandatory verification\nExecute all two commands:\n```bash\nnpm test\nnode index.js\n```'
   const first = scripted([
     tool({ tool: 'write_file', path: 'index.js', content: 'module.exports = 1\n' }),

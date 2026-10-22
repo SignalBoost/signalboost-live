@@ -7,6 +7,7 @@ import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 
 test('failed host test preloads source and stops repeated read-only repair loops', async () => {
   const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('w','package.json','{"scripts":{"test":"node --test"}}')
   await workspace.writeFile('w','src/cart.js','module.exports = { calculateTotals() { return 0 } }')
   await workspace.writeFile('w','test/cart.test.js',"const { getTotal } = require('../src/cart')")
   await workspace.writeFile('w','src/catalog.js','module.exports = {}')
@@ -34,6 +35,7 @@ test('failed host test preloads source and stops repeated read-only repair loops
 
 test('failed inventory import is targeted for repair and verified by the host', async () => {
   const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('w', 'package.json', '{"scripts":{"test":"node --test"}}')
   await workspace.writeFile('w', 'src/inventory.js', 'module.exports = {}')
   await workspace.writeFile('w', 'test/inventory.test.js',
     "const { createInventory } = require('../src/inventory.js')\n")

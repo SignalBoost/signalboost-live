@@ -46,7 +46,9 @@ test('owner Website Optimizer exposes durable fixing, failure and independently 
   assert.match(route, /status: 'verifying'/)
   assert.match(route, /status: 'fixed'/)
   assert.match(route, /Fixed ✅/)
-  assert.match(route, /Production still has Website Optimizer findings\. It is not fixed yet\./)
+  // Advisory workload measurements never become repair incidents, so "fixed" claims only the repairable findings.
+  assert.match(route, /recheck found no repairable Website Optimizer findings\. Workload measurements .* are advisory and not repaired automatically\./)
+  assert.match(route, /Production still has repairable Website Optimizer findings\. It is not fixed yet\./)
   assert.match(route, /productionVerification\(\)/)
 
   assert.match(status, /method: 'GET'/)
@@ -60,7 +62,7 @@ test('owned-site repair targeting cannot be hijacked by diagnostic transport err
   const repair = read('../self-healing-host/owned-site-autonomous-repair.ts')
 
   assert.match(repair, /DIAGNOSTIC_TRANSPORT_FAILURE/)
-  assert.match(repair, /diagnostic-provider transport\/schema errors are not website defects/)
+  assert.match(repair, /diagnostic-provider transport\/schema errors are not owned-site defects/)
   assert.match(repair, /saas\/app\/api\/public\/site-optimization\/route\.ts/)
   assert.match(repair, /saas\/next\.config\.mjs/)
   assert.match(repair, /saas\/app\/layout\.tsx/)

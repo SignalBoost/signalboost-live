@@ -10,11 +10,13 @@ import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findRecoveredAssistantReply } from '@
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 import VoiceInputButton from '@/components/VoiceInputButton'
 import AssistanceModeSelector from '@/components/AssistanceModeSelector'
+import ApprovalPrompt from '@/components/ApprovalPrompt'
+import { readPendingApproval, type PendingApproval } from '@/lib/ai/cos/assistanceMode'
 import { useAssistanceMode } from '@/lib/ai/cos/useAssistanceMode'
 import AgentDiagnosticsPanel, { splitOwnerDiagnostic, type AgentDiagnostics } from '@/components/AgentDiagnosticsPanel'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
-type Msg = { role: 'user' | 'assistant'; content: string; sourceLanguage?: Lang; builderWorkspaceId?: string; builderFiles?: string[]; diagnostics?: AgentDiagnostics }
+type Msg = { role: 'user' | 'assistant'; content: string; sourceLanguage?: Lang; builderWorkspaceId?: string; builderFiles?: string[]; diagnostics?: AgentDiagnostics; approval?: PendingApproval }
 type FeedbackKind = 'positive' | 'negative' | 'correction'
 type FeedbackUiState = { status: 'idle' | 'saving' | 'saved' | 'error'; kind?: FeedbackKind; correctionOpen?: boolean; correction?: string }
 type ConvSummary = { id: string; title: string; summary: string; message_count: number; updated_at: string }
@@ -395,6 +397,7 @@ export default function AssistantPage() {
           sourceLanguage: l,
           ...(diagnostics ? { diagnostics } : {}),
           ...(builderWorkspaceId && builderFiles.length ? { builderWorkspaceId, builderFiles } : {}),
+          ...(readPendingApproval(data) ? { approval: readPendingApproval(data)! } : {}),
         }])
       } catch (err: any) {
         const aborted = err?.name === 'AbortError'
@@ -619,6 +622,9 @@ export default function AssistantPage() {
                           </a>
                         ))}
                       </div>
+                    ) : null}
+                    {msg.approval && i === messages.length - 1 ? (
+                      <ApprovalPrompt approval={msg.approval} lang={l} disabled={loading} onApprove={word => void send(word)} />
                     ) : null}
                     {(() => {
                       const feedback = feedbackByMessage[i] || { status: 'idle' as const }

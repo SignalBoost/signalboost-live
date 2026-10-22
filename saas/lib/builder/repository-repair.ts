@@ -495,6 +495,9 @@ export async function executeSignalBoostRepositoryRepair(input: {
         repair_branch: writeback.branch,
         repair_commit_sha: writeback.commitSha,
         pull_request_number: writeback.pullRequestNumber,
+        // Work with me: the PR exists and its merge is held for the owner's approval (shown as an approval card in chat).
+        ...(input.holdMerge === true && writeback.stage === 'pr_created' && writeback.pullRequestNumber
+          ? { awaitingApproval: { action: 'repository_merge', pullRequestNumber: writeback.pullRequestNumber } } : {}),
         pull_request_url: writeback.pullRequestUrl,
       },
     })

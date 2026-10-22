@@ -134,3 +134,56 @@ export const COLLABORATE_MERGE_AUTOMERGE_OFF: Copy = {
   ko: '이 플랫폼에서는 자동 병합이 꺼져 있어 대신 병합할 수 없습니다. 풀 리퀘스트가 준비되었으니 GitHub에서 병합해 주세요.',
   ar: 'الدمج التلقائي متوقف على هذه المنصة، لذلك لا يمكنني دمجه نيابةً عنك. طلب السحب جاهز: ادمجه على GitHub.',
 }
+
+// ── The visible approval request (2026-10-22, owner: "the only way I knew to say go was because you told me so") ──
+// A paused job records `awaitingApproval: { action }` on its result; every chat shows it as a card with a button that
+// sends the approval word in the user's language, so nobody needs to know a magic word.
+export type ApprovalAction = 'isolated_publication' | 'repository_merge'
+export type PendingApproval = Readonly<{ action: ApprovalAction }>
+
+export function readPendingApproval(payload: unknown): PendingApproval | null {
+  const action = (payload as { awaitingApproval?: { action?: unknown } } | null)?.awaitingApproval?.action
+  return action === 'isolated_publication' || action === 'repository_merge' ? { action } : null
+}
+
+/** What the approve button sends: a whole-message approval accepted by isAssistanceApproval. */
+export const APPROVAL_WORD: Copy = { en: 'go', es: 'adelante', pt: 'pode seguir', pl: 'dalej', ru: 'давай', de: 'los', fr: 'vas-y', it: 'vai', ja: '進めて', ko: '진행해', ar: 'تابع' }
+
+export const APPROVAL_TITLE: Copy = { en: 'Waiting for your approval', es: 'Esperando tu aprobación', pt: 'Aguardando sua aprovação', pl: 'Czeka na Twoją zgodę', ru: 'Ожидает вашего одобрения', de: 'Wartet auf Ihre Freigabe', fr: 'En attente de votre approbation', it: 'In attesa della tua approvazione', ja: 'あなたの承認を待っています', ko: '승인을 기다리는 중', ar: 'بانتظار موافقتك' }
+
+export const APPROVAL_BODY: Readonly<Record<ApprovalAction, Copy>> = {
+  isolated_publication: {
+    en: 'The work is verified in the private sandbox and nothing has left it. Approving creates the repository, opens and merges the pull request, deploys the preview and checks the live endpoint.',
+    es: 'El trabajo está verificado en el entorno privado y nada ha salido de él. Al aprobar se crea el repositorio, se abre y fusiona el pull request, se despliega la vista previa y se comprueba el endpoint en vivo.',
+    pt: 'O trabalho está verificado no ambiente privado e nada saiu dele. Ao aprovar, o repositório é criado, o pull request é aberto e mesclado, a prévia é implantada e o endpoint ao vivo é verificado.',
+    pl: 'Praca jest zweryfikowana w prywatnej piaskownicy i nic jej nie opuściło. Zatwierdzenie utworzy repozytorium, otworzy i scali pull request, wdroży podgląd i sprawdzi działający endpoint.',
+    ru: 'Работа проверена в закрытой песочнице, и ничего не вышло наружу. Одобрение создаст репозиторий, откроет и сольёт pull request, развернёт превью и проверит работающий endpoint.',
+    de: 'Die Arbeit ist in der privaten Sandbox geprüft, und nichts hat sie verlassen. Mit der Freigabe werden das Repository erstellt, der Pull Request geöffnet und gemergt, die Vorschau bereitgestellt und der Live-Endpunkt geprüft.',
+    fr: 'Le travail est vérifié dans le bac à sable privé et rien n’en est sorti. L’approbation crée le dépôt, ouvre et fusionne la pull request, déploie l’aperçu et vérifie l’endpoint en ligne.',
+    it: 'Il lavoro è verificato nella sandbox privata e non ne è uscito nulla. Approvando si crea il repository, si apre e si unisce la pull request, si distribuisce l’anteprima e si verifica l’endpoint attivo.',
+    ja: '作業は非公開のサンドボックスで検証済みで、まだ何も外に出ていません。承認すると、リポジトリの作成、プルリクエストの作成とマージ、プレビューのデプロイ、稼働中のエンドポイントの確認を行います。',
+    ko: '작업은 비공개 샌드박스에서 검증되었으며 아직 아무것도 밖으로 나가지 않았습니다. 승인하면 저장소를 만들고, 풀 리퀘스트를 열어 병합하고, 미리보기를 배포하고, 실제 엔드포인트를 확인합니다.',
+    ar: 'تم التحقق من العمل في البيئة المعزولة الخاصة ولم يخرج منها أي شيء. بالموافقة يُنشأ المستودع ويُفتح طلب السحب ويُدمج وتُنشر المعاينة ويُفحص نقطة النهاية الحية.',
+  },
+  repository_merge: {
+    en: 'The fix is in a pull request that has not been merged. Approving releases it to the governed merge, which still waits for GitHub checks and the safety checks, then proves the result in Production.',
+    es: 'La corrección está en un pull request que no se ha fusionado. Al aprobar se libera a la fusión gobernada, que aún espera las comprobaciones de GitHub y de seguridad, y luego verifica el resultado en Producción.',
+    pt: 'A correção está em um pull request que não foi mesclado. Ao aprovar, ele é liberado para o merge governado, que ainda aguarda as verificações do GitHub e de segurança e depois comprova o resultado em Produção.',
+    pl: 'Poprawka jest w pull requeście, który nie został scalony. Zatwierdzenie przekaże go do nadzorowanego scalenia, które nadal czeka na kontrole GitHuba i bezpieczeństwa, a potem potwierdzi wynik w Produkcji.',
+    ru: 'Исправление находится в pull request, который ещё не слит. Одобрение передаст его контролируемому слиянию, которое всё равно дождётся проверок GitHub и безопасности, а затем подтвердит результат в Production.',
+    de: 'Die Korrektur liegt in einem Pull Request, der noch nicht gemergt ist. Mit der Freigabe geht er an den kontrollierten Merge, der weiterhin auf GitHub- und Sicherheitsprüfungen wartet und das Ergebnis dann in Production nachweist.',
+    fr: 'Le correctif se trouve dans une pull request non fusionnée. L’approbation la confie à la fusion encadrée, qui attend toujours les vérifications GitHub et de sécurité, puis vérifie le résultat en Production.',
+    it: 'La correzione è in una pull request non ancora unita. Approvando la si affida al merge controllato, che attende comunque i controlli di GitHub e di sicurezza e poi verifica il risultato in Produzione.',
+    ja: '修正はまだマージされていないプルリクエストにあります。承認すると管理されたマージに引き渡され、GitHub と安全性のチェックを待ってから本番で結果を確認します。',
+    ko: '수정 사항은 아직 병합되지 않은 풀 리퀘스트에 있습니다. 승인하면 관리형 병합으로 넘어가며, GitHub 및 안전 검사를 기다린 뒤 프로덕션에서 결과를 확인합니다.',
+    ar: 'الإصلاح موجود في طلب سحب لم يُدمج بعد. بالموافقة يُحال إلى الدمج الخاضع للضوابط، الذي سيظل ينتظر فحوص GitHub وفحوص الأمان، ثم يتحقق من النتيجة في بيئة الإنتاج.',
+  },
+}
+
+export const APPROVAL_BUTTON: Readonly<Record<ApprovalAction, Copy>> = {
+  isolated_publication: { en: 'Approve and publish', es: 'Aprobar y publicar', pt: 'Aprovar e publicar', pl: 'Zatwierdź i opublikuj', ru: 'Одобрить и опубликовать', de: 'Freigeben und veröffentlichen', fr: 'Approuver et publier', it: 'Approva e pubblica', ja: '承認して公開', ko: '승인하고 게시', ar: 'موافقة ونشر' },
+  repository_merge: { en: 'Approve the merge', es: 'Aprobar la fusión', pt: 'Aprovar o merge', pl: 'Zatwierdź scalenie', ru: 'Одобрить слияние', de: 'Merge freigeben', fr: 'Approuver la fusion', it: 'Approva il merge', ja: 'マージを承認', ko: '병합 승인', ar: 'الموافقة على الدمج' },
+}
+
+/** Under the button: the same approval can be typed. {word} is APPROVAL_WORD in that language. */
+export const APPROVAL_HINT: Copy = { en: 'Or reply “{word}”.', es: 'O responde «{word}».', pt: 'Ou responda “{word}”.', pl: 'Lub odpowiedz „{word}”.', ru: 'Или ответьте «{word}».', de: 'Oder antworten Sie „{word}“.', fr: 'Ou répondez « {word} ».', it: 'Oppure rispondi «{word}».', ja: '「{word}」と返信しても承認できます。', ko: '또는 “{word}”라고 답해도 됩니다.', ar: 'أو أجب بـ «{word}».' }

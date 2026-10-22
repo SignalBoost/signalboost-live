@@ -1,4 +1,5 @@
 import { isConciergeBuilderObjective, structuredApplicationBuild } from './cosReasoningRolePolicy.ts'
+import { readPendingApproval } from './assistanceMode.ts'
 import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMessage } from './operator-progress.ts'
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findDurableCosTurnReply, findRecoveredAssistantTurn, type RecoveredAssistantTurn } from './assistantTransportRecovery.ts'
 import { planResearchTask } from './researchBudget.ts'
@@ -594,6 +595,8 @@ export async function postWithAgentProgress(args: {
       report('running', 'Builder is still durable; the status response was incomplete, so COS is retrying the read-only status check.')
       continue
     }
+    // A job paused for the user's approval is waiting on them, not on Builder: show it now (approval card).
+    if (readPendingApproval(data)) break
     if (poll.status === 202 || ['queued', 'running', 'paused'].includes(String(data?.status || ''))) continue
     const terminalSucceeded = isVerifiedBuilderTerminal(data, poll.ok)
     report('complete', repairRequest

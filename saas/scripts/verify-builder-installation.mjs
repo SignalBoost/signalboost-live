@@ -41,6 +41,22 @@ export function verifyBuilderInstallation(root) {
     'Job cycle must persist checkpoint')
   check('host-side test proof', /builderV2Acceptance/.test(agent) && /run_tests/.test(agent),
     'Builder only accepts real host test receipts')
+  const browser = read('lib/builder/playwright-cli-port.ts')
+  const browserAcceptance = read('lib/builder/playwright-cli-live-acceptance.ts')
+  check('browser harness present', /class VercelSandboxPlaywrightCliPort/.test(browser) &&
+    /createBuilderPlaywrightCliPort/.test(browser), 'Playwright CLI port must be implemented')
+  check('browser sandbox isolation', /networkPolicy:\s*['"]deny-all['"]/.test(browser) &&
+    /updateNetworkPolicy\(\{ allow:/.test(browser) && /allowedHosts\(this\.origins\)/.test(browser),
+    'Browser sandbox must begin deny-all and narrow egress to approved origins')
+  check('browser access control', /ownerAuthorized:\s*boolean/.test(browser) &&
+    /builder_browser_cli_not_authorized/.test(browser) && /exactAllowedUrl/.test(browser),
+    'Browser actions require owner authorization and approved URLs')
+  check('browser cleanup', /async close\(\)/.test(browser) && /sandbox\.stop\(\)/.test(browser) &&
+    /finally\s*\{[\s\S]*?port\.close\(\)/.test(browserAcceptance),
+    'Browser sandbox must stop and live acceptance must clean up in finally')
+  check('browser host acceptance', /runBuilderPlaywrightCliLiveAcceptance/.test(browserAcceptance) &&
+    /console_diagnostics/.test(browserAcceptance) && /network_diagnostics/.test(browserAcceptance),
+    'Live acceptance must check browser, console and network')
   return { ok: failures.length === 0, scope: 'repository-static-only', checks, failures,
     productionVerified: false }
 }

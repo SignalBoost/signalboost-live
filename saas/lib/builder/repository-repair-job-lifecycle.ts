@@ -220,6 +220,8 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
     ...previous,
     status: 'succeeded',
     repository_merge_pending: false,
+    // The held merge is decided: chat must not offer to approve it any more.
+    awaitingApproval: null,
     merge_taken: true,
     merge_refused_reason: null,
     merge_evidence: input.mergeEvidence || 'governed_worker',
@@ -307,6 +309,8 @@ export async function failBuilderRepositoryRepairAfterSupersededBase(input: {
     ...previous,
     status: 'failed',
     repository_merge_pending: false,
+    // The held merge is decided: chat must not offer to approve it any more.
+    awaitingApproval: null,
     merge_taken: false,
     merge_commit_sha: null,
     merge_base_branch: input.baseBranch,
@@ -451,6 +455,8 @@ export async function failBuilderRepositoryRepairAfterMergedDeployment(input: {
     ...previous,
     status: 'failed',
     repository_merge_pending: false,
+    // The held merge is decided: chat must not offer to approve it any more.
+    awaitingApproval: null,
     merge_taken: true,
     merge_commit_sha: input.mergeCommitSha,
     error: input.error,

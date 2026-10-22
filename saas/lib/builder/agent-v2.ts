@@ -180,6 +180,16 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
     const fail = /(?:^|\n)\s*(?:#|ℹ)\s+fail\s+(\d+)/.exec(stdout)
     return pass && (!fail || fail[1] === '0') ? Number(pass[1]) : 0
   }))
+  // A syntax check proves that JavaScript parses, not that a requested repair works.
+  // Explicit repair/debug objectives require at least one non-syntax host command
+  // after the final change. Preserve syntax-only completion for tasks asking only
+  // for syntax validation or for code that is supplied without a repair request.
+  const behavioralRepairRequested = /\\b(?:fix|repair|debug|resolve|correct|regression|bug|broken|failing|failure)\\b/i.test(objective)
+    && !/\\b(?:syntax[- ]only|only\\s+(?:check|verify|validate)\\s+syntax)\\b/i.test(objective)
+  const behavioralProof = passing.some(output => {
+    const command = String(output?.requestedCommand ?? output?.executedCommand ?? '').trim()
+    return command.length > 0 && !/^node\\s+(?:--check|-c)\\s+/i.test(command)
+  })
   // Browser-dependent tasks require a host browser receipt for the requested URL
   // after the last source mutation. A green unit suite cannot substitute for UI proof.
   const browserMatch = /(?:browser|playwright|visual)[^\n]{0,160}?(https:\/\/[^\s),]+)/i.exec(objective)
@@ -203,7 +213,7 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
     isProvenBrowserAction(navigation) && isProvenBrowserAction(latestSnapshot)
   )
   return {
-    satisfied: latestRunPassed && browserSatisfied && missingFiles.length === 0
+    satisfied: latestRunPassed && browserSatisfied && (!behavioralRepairRequested || behavioralProof) && missingFiles.length === 0
       && pendingCommands.length === 0 && testsPassed >= contract.minimumTests,
     missingFiles, pendingCommands, minimumTests: contract.minimumTests, testsPassed,
     pendingBrowser: browserTarget && !browserSatisfied ? browserTarget : null,

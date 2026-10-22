@@ -116,7 +116,7 @@ export async function POST(request: Request) {
     objective: fixture.objective,
     jobKind: 'standard',
     metadata: isLevel4
-      ? { level4Probe: true }
+      ? { level4Probe: true, builderEngine: 'v2' }
       : { certificationCaseId: body.caseId },
     ownerAuthorized: true,
     runningReply: `Builder certification case ${body.caseId} is running as job ${jobId}.`,

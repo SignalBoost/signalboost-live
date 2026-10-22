@@ -151,6 +151,7 @@ export async function GET(request: Request) {
           workspaceId: job.workspaceId,
           conversationId: job.conversationId,
           status: job.status,
+          ...(observeOnly ? { readOnly: true } : {}),
           progress: builderProgressSnapshot(job),
           reply: job.status === 'queued' && job.metadata.builderCapacityDeferredReason === 'builder_runpod_primary_busy'
             ? 'Queued — waiting for model capacity. Builder will resume this saved job automatically.'

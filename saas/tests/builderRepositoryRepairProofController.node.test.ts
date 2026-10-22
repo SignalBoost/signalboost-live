@@ -347,3 +347,21 @@ test('deployed engineering repairs with recorded failing tests cannot bypass the
   assert.match(source, /const proofController = needsRepairProof \? createRepositoryRepairProofController/)
   assert.match(source, /proofController\?\.runner \?\? repositoryRunner/)
 })
+
+test('repository repair selects a single literal failing test from recorded CI evidence', () => {
+  assert.equal(repositoryRepairProofCommand({
+    pathHints: [],
+    failedCommand: 'npm test',
+    failureEvidence: ['FAIL saas/tests/platformObservability.node.test.ts: expected valid trace'],
+  }), 'node --experimental-strip-types --test tests/platformObservability.node.test.ts')
+  assert.equal(repositoryRepairProofCommand({
+    pathHints: [],
+    failedCommand: 'npm test',
+    failureEvidence: ['FAIL tests/first.node.test.ts and tests/second.node.test.ts'],
+  }), null)
+  assert.equal(repositoryRepairProofCommand({
+    pathHints: [],
+    failedCommand: 'npm test',
+    failureEvidence: ['FAIL tests/../unsafe.node.test.ts'],
+  }), null)
+})

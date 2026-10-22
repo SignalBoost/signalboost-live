@@ -21,6 +21,7 @@ const tests = [
   'tests/builderRunSubmitRecovery.node.test.ts',
   'tests/builderTitledSpecificationRouting.node.test.ts',
   'tests/cosChatSoftwareRepairRouting.node.test.ts',
+  'tests/cosOwnerRepairFollowupRouting.node.test.ts',
   'tests/chatBuilderJobFollow.node.test.ts',
   'tests/builderV2IsolatedPublication.node.test.ts',
   'tests/builderAcceptanceSpecContract.node.test.ts',

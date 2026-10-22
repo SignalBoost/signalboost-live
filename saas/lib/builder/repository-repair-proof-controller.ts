@@ -31,6 +31,18 @@ export function repositoryRepairProofCommand(target: Pick<SignalBoostRepositoryR
     .slice(0, 4)
   if (failingTests.length) return `node --experimental-strip-types --test ${failingTests.join(' ')}`
 
+  // Provider/CI failure excerpts often name the failing test but omit it from
+  // structured pathHints. Extract only literal test paths, never shell syntax.
+  // An ambiguous set is deliberately not selected as a proof.
+  const evidenceText = Array.isArray(target.failureEvidence) ? target.failureEvidence.join('\n') : ''
+  const evidenceTests = [...new Set(
+    [...evidenceText.matchAll(/(?:saas\/)?tests?\/[A-Za-z0-9_.\/-]+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)/g)]
+      .map(match => match[0].replace(/^saas\//, ''))
+      .filter(path => !path.includes('..'))
+  )]
+  if (evidenceTests.length === 1) return `node --experimental-strip-types --test ${evidenceTests[0]}`
+
+
   // A Vercel build that already reached TypeScript has supplied a much narrower reproducible
   // compiler failure than the complete 2,500+ test/gate command. Reproduce that compiler boundary
   // directly so Platform Engineer spends its bounded repair window editing and verifying source,

@@ -7,6 +7,7 @@ import { builderWorkspaceInterfaceRepairs, builderWorkspaceModuleInterfaces, typ
 import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
 import { BUILDER_JOB_MODEL_CALL_BUDGET } from './work-budget.ts'
 import { builderFailurePaths, builderFailureImports } from './failure-context.ts'
+import { objectivePlantsDefect, plantedDefectCandidate, plantedDefectNotes, type PlantedDefectNote } from './planted-defect-notes.ts'
 
 /**
  * Whole-job receipt bound. `maxSteps` is the per-slice budget; a resumed job gets a fresh slice budget on top of
@@ -480,9 +481,22 @@ export class BuilderV2Agent {
       const output = step.output as { requestedCommand?: unknown; executedCommand?: unknown } | undefined
       return output?.requestedCommand === command || output?.executedCommand === command
     })
+    // A job asked to plant a defect cannot finish while delivered source still describes that defect: once repaired,
+    // the comment is false (production 2026-10-21, builder-969cca68…: "intentionally contains a bug" shipped).
+    const plantsDefect = objectivePlantsDefect(options.objective)
+    const staleDefectNotes = async (): Promise<PlantedDefectNote[]> => {
+      if (!plantsDefect || !this.workspace) return []
+      const sources = []
+      // Every delivered source file, never a prefix of the listing (Codex on #4756: 60 assets hid src/ entirely).
+      for (const path of knownFiles.filter(plantedDefectCandidate)) {
+        const file = await this.workspace.readFile(options.workspaceId, path)
+        if (file) sources.push({ path, content: file.content.slice(0, 200_000) })
+      }
+      return plantedDefectNotes(sources)
+    }
     const verifiedNow = async (): Promise<BuilderV2Outcome | null> => {
       const acceptance = builderV2Acceptance(options.objective, knownFiles, steps)
-      return acceptance.satisfied && missingFiles().length === 0
+      return acceptance.satisfied && missingFiles().length === 0 && (await staleDefectNotes()).length === 0
         ? { ok: true, reason: 'verified', summary: 'Every required command passed on the host after the latest source change.', steps, checkpoint: await snapshot() }
         : null
     }
@@ -645,6 +659,9 @@ export class BuilderV2Agent {
       }
       if (stubbed) continue
       const working = await workingSet(interfaceRepairs.map(repair => repair.module))
+      // Only once the build is otherwise verified: earlier, the planted defect may legitimately still be present.
+      const defectNotes = !missingFiles().length && builderV2Acceptance(options.objective, knownFiles, steps).satisfied
+        ? await staleDefectNotes() : []
       if (this.modelCalls >= this.modelCallBudget) {
         return { ok: false, reason: 'builder_v2_model_call_budget_exhausted', summary: 'Whole-job model-call budget reached.', steps, checkpoint: await snapshot() }
       }
@@ -672,6 +689,12 @@ export class BuilderV2Agent {
               : steps.slice(steps.findLastIndex(step => step.changed) + 1).some(step => step.tool === 'run_tests' && !step.ok)
                 ? { tool: 'edit_file', reason: 'Repair the last failing command before rerunning the unchanged revision' }
                 : { tool: 'run_tests', command: checklist.commands[0] ?? 'npm test' },
+            // Everything else is verified; only comments describing the repaired planted defect remain (later keys win).
+            ...(defectNotes.length ? {
+              staleDefectComments: defectNotes,
+              nextRecommendedAction: { tool: 'tools', actions: [...new Set(defectNotes.map(note => note.path))].slice(0, 4).map(path => ({ tool: 'edit_file', path })),
+                instruction: 'The defect is repaired and every command passes, but staleDefectComments still describe the planted bug. Edit only those comments: remove them or describe the correct behaviour. Do not change code or tests. The host reruns the commands afterwards.' },
+            } : {}),
             instruction: interfaceRepairs.length
               ? 'interfaceMismatches lists every place a test disagrees with its source module, found by reading the files: a name the module does not export, a method its class does not define, a constructor or factory called with the wrong number of arguments, a chained method that does not return this, or a module mutating a field on the copy returned by a getter in another module (so the change is lost). Fix all of them in this reply, one edit_file per module: add the missing export (keep the existing ones) or method, give the parameter a default or accept the arguments the tests pass, return this from the chained method, and for a mutated copy either return the stored object from the getter or make the caller use the update method of the owning module; change a test only if the objective names the API the source already has. Each exportStatement is the exact current text, usable as the edit_file search. Host verification runs after your edits.'
               : currentFailure()
@@ -730,14 +753,16 @@ export class BuilderV2Agent {
         const listed = await this.dispatcher.dispatch(options.workspaceId, { tool: 'list_files' })
         const files = Array.isArray(listed.output) ? listed.output.map(file => String((file as { path?: unknown }).path)) : []
         const acceptance = builderV2Acceptance(options.objective, files, steps)
-        if (verified && acceptance.satisfied) return { ok: true, reason: 'verified', steps, summary: decision.summary }
+        const defectComments = verified && acceptance.satisfied ? await staleDefectNotes() : []
+        if (verified && acceptance.satisfied && defectComments.length === 0) return { ok: true, reason: 'verified', steps, summary: decision.summary }
         // An early or unverified finish is feedback, not the end of the build: the model receives the exact unmet
         // checklist and keeps working. Not a receipt, so counters rebuilt from receipts on resume stay valid.
         // Bounded so a model that keeps claiming completion ends with the unmet checklist instead of looping.
         const error = verified ? 'builder_v2_checklist_incomplete' : 'builder_v2_unverified_completion'
         if (++checklistRejections >= REJECTION_LIMIT) return { ok: false, reason: error, steps, checkpoint: await snapshot() }
         lastReceipt = JSON.stringify({ tool: 'finish', ok: false, error, ...acceptance,
-          next: acceptance.missingFiles.length ? ['write_file'] : acceptance.pendingBrowser ? ['browser_cli', 'edit_file', 'run_tests'] : ['run_tests', 'edit_file'] }).slice(0, 20_000)
+          ...(defectComments.length ? { staleDefectComments: defectComments } : {}),
+          next: defectComments.length ? ['edit_file'] : acceptance.missingFiles.length ? ['write_file'] : acceptance.pendingBrowser ? ['browser_cli', 'edit_file', 'run_tests'] : ['run_tests', 'edit_file'] }).slice(0, 20_000)
         continue
       }
       // Execute the reply's actions in order. The first failed or repeated action ends the batch, so later actions

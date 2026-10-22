@@ -1,4 +1,5 @@
 import type { BuilderV2Receipt } from './agent-v2-dispatcher.ts'
+import { objectivePlantsDefect } from './planted-defect-notes.ts'
 
 export type BuilderCommandEvidence = Readonly<{
   command: string
@@ -55,7 +56,7 @@ export function builderAcceptanceLedger(
     }
   })
   const initialFailureReproduced = runs.some(run => !run.passed && run.receiptIndex < latestSourceChangeIndex)
-  const requiresBugReproduction = /\b(?:introduce|initially implement)\b[\s\S]{0,180}\b(?:bug|defective|incorrect)\b/i.test(objective)
+  const requiresBugReproduction = objectivePlantsDefect(objective)
   const passed = commands.every(command => command.passed) && (!requiresBugReproduction || initialFailureReproduced)
   const failureCode = !passed
     ? commands.some(command => !command.passed) ? 'builder_acceptance_required_command_unverified'

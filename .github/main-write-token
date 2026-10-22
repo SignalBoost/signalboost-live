@@ -1,2 +1,2 @@
-base_sha=0f16d8910607ffae3ede4d2007656d2db549d507
-branch=fix/optimizer-advisory-verification-20261022
+base_sha=683a93d47508ac78e4f47cf7a3a5d2d93bbedbe0
+branch=fix/cos-no-false-missing-input-fallback-20261022

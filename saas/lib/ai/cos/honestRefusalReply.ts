@@ -421,6 +421,11 @@ export function buildHonestRefusalReply(args: { prompt: string; language?: strin
     return `${needs} ${diagnosis.next} ${diagnosis.final}`
   }
 
-  if (keys.length === 0) return `${copy.opening} ${copy.generic}`
+  // No demonstrably missing input: never pretend the user omitted something.
+  // In particular, an owner following up on a Builder job may already have
+  // supplied its objective, files and authorization in an earlier turn.
+  if (keys.length === 0) return language === 'en'
+    ? 'I could not complete that request reliably. I have not established that you need to supply anything else, and I will not claim the task was completed.'
+    : copy.generic
   return `${copy.opening} ${copy.needsLead} ${joinList(labels, language)}. ${copy.assumptions}`
 }

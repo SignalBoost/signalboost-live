@@ -23,12 +23,12 @@ test('never names an input the prompt already supplied', () => {
   assert.deepEqual(missingInputKeys(withEverything), [])
 })
 
-test('a fully specified prompt falls back to the generic offer, not a false list', () => {
+test('a fully specified prompt reports incomplete work without alleging missing details', () => {
   const reply = buildHonestRefusalReply({
     prompt: 'Over 1000 hours a 1280 kW cluster moves 12 TB every 6 hours at $0.04 per GB over a 100 Gbps link. Break-even cost?',
     language: 'en',
   })
-  assert.match(reply, /narrow the question/)
+  assert.match(reply, /could not complete that request reliably/)
   assert.ok(!/I need\b/.test(reply))
 })
 
@@ -82,4 +82,10 @@ test('empty and junk prompts are safe', () => {
 test('at most four inputs are named, so the reply stays short', () => {
   const keys = missingInputKeys('Calculate the break-even cost and sizing for this migration.')
   assert.ok(keys.length <= 4)
+})
+
+test('Builder follow-up with no missing concrete input is not sent back for scoping', () => {
+  const reply = buildHonestRefusalReply({ prompt: 'Continue the Builder V2 repair job from its saved workspace and run the required verification.', language: 'en' })
+  assert.doesNotMatch(reply, /narrow the question|which parts matter most|one more concrete input|standard assumptions/i)
+  assert.match(reply, /will not claim the task was completed/)
 })

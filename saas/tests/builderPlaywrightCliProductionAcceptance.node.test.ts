@@ -43,4 +43,7 @@ test('Preview and Production use the same live acceptance implementation', () =>
   assert.match(preview, /runBuilderPlaywrightCliLiveAcceptance/)
   assert.match(cron, /runBuilderPlaywrightCliLiveAcceptance/)
   assert.match(vercel, /\/api\/cron\/builder-playwright-cli-live-acceptance/)
+  const config = JSON.parse(vercel)
+  const job = config.crons.find((entry: { path: string }) => entry.path === '/api/cron/builder-playwright-cli-live-acceptance')
+  assert.equal(job?.schedule, '17 7 * * *', 'billable browser smoke check must run daily, not every five minutes')
 })

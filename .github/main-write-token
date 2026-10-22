@@ -1,2 +1,2 @@
-base_sha=a7b5e34d658219c1506045837406b7d33c71a337
-branch=fix/cos-builder-owner-source-fallback-20261022
+base_sha=0ad0622cf102f8a6430d57aadfab7dad9fe02998
+branch=fix/builder-tool-loop-tdz-20261022

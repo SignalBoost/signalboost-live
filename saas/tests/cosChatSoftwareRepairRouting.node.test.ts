@@ -52,7 +52,7 @@ test('"Fix the …" software requests are never taken by the fast text-edit lane
 
 test('chat ingress sends a repair request to the Software Specialist before any edit, authoring or identity lane', () => {
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /const softwareRepairRequest = isSoftwareRepairRequest\(prompt\)\s*\n\s*const directTextTransformation = softwareRepairRequest \? null : detectDirectTextTransformation\(prompt\)/)
+  assert.match(route, /const softwareRepairRequest = isSoftwareRepairRequest\(prompt\) \|\| Boolean\(ownerRepairFollowup\)\s*\n\s*const directTextTransformation = softwareRepairRequest \? null : detectDirectTextTransformation\(prompt\)/)
   assert.match(route, /isAuthoringObjectiveWithoutLiveLookup\(prompt\)\s*\n\s*&& !softwareRepairRequest/)
   assert.match(route, /browserSurface === 'concierge' && !softwareRepairRequest && !isConciergeBuilderObjective/)
   assert.match(route, /shouldConsultSoftwareSpecialist = hasSourceAttachment \|\| explicitOperationalRepair\s*\n\s*\|\| softwareRepairRequest/)

@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import { createRepositoryRepairProofController, discoverRepositoryRepairProofCommand, repositoryRepairProofCommand } from '../lib/builder/repository-repair-proof-controller.ts'
@@ -335,4 +336,14 @@ test('production 2026-10-15: blocked npm test plus an unrelated passing test con
   assert.equal(result.ok, true, result.ok ? '' : result.error)
   assert.equal(controlled.proofCommand, 'node --test tests/app.test.js')
   assert.equal((await workspace.readFile('prod', 'lib/app.js'))?.content, 'module.exports = "fixed"')
+})
+
+test('deployed engineering repairs with recorded failing tests cannot bypass the host proof controller', () => {
+  const source = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+  assert.match(source, /const engineeringRepair = engineeringTask/)
+  assert.match(source, /target\.pathHints\.some\(path =>/)
+  assert.match(source, /target\.failureEvidence\.some\(line =>/)
+  assert.match(source, /const needsRepairProof = !engineeringTask \|\| engineeringRepair/)
+  assert.match(source, /const proofController = needsRepairProof \? createRepositoryRepairProofController/)
+  assert.match(source, /proofController\?\.runner \?\? repositoryRunner/)
 })

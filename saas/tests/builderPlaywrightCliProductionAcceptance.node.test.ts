@@ -15,6 +15,14 @@ test('Playwright live acceptance exercises the complete deterministic diagnostic
   assert.doesNotMatch(helper, /stdout:|stderr:/)
 })
 
+test('Sandbox cleanup failure cannot be reported as verified destruction', () => {
+  assert.match(helper, /let sandboxDestroyed = false/)
+  assert.match(helper, /sandboxDestroyed = true/)
+  assert.match(helper, /name: 'sandbox_cleanup', passed: false/)
+  assert.match(helper, /const ok = sandboxDestroyed &&/)
+  assert.doesNotMatch(helper, /sandboxDestroyed: true/)
+})
+
 test('Production Playwright acceptance is production-only and CRON_SECRET gated', () => {
   assert.match(cron, /VERCEL_ENV !== 'production'/)
   assert.match(cron, /CRON_SECRET/)

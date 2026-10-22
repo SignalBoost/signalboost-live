@@ -94,10 +94,17 @@ export default function VoiceInputButton({
     recognition.interimResults = true
     recognition.lang = VOICE_INPUT_COPY[lang].locale
     recognition.onresult = event => {
-      let transcript = ''
-      for (let i = 0; i < event.results.length; i += 1) transcript += event.results[i][0]?.transcript || ''
-      const separator = baseValueRef.current && transcript.trim() ? ' ' : ''
-      const nextValue = `${baseValueRef.current}${separator}${transcript.trimStart()}`
+      const segments: string[] = []
+      for (let i = 0; i < event.results.length; i += 1) {
+        const segment = event.results[i][0]?.transcript?.trim()
+        if (segment) segments.push(segment)
+      }
+      // Browser engines may omit spaces between finalized recognition segments.
+      // CJK scripts do not require spaces between successive segments.
+      const cjk = lang === 'ja' || lang === 'ko'
+      const transcript = segments.join(cjk ? '' : ' ')
+      const separator = baseValueRef.current && transcript && !cjk ? ' ' : ''
+      const nextValue = `${baseValueRef.current}${separator}${transcript}`
       lastDictatedValueRef.current = nextValue
       onChange(nextValue)
     }

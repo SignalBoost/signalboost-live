@@ -138,11 +138,12 @@ export async function GET(request: Request) {
     try {
       const job = await getBuilderJobForUser(jobId, access.userId)
       if (!job) return noStore({ error: 'Builder job not found.' }, { status: 404 })
+      const observeOnly = url.searchParams.get('observeOnly') === 'true'
       if (job.status === 'queued' || job.status === 'running' || job.status === 'paused') {
         // The person watching resumes their paused checkpoint now instead of waiting for the next scheduler tick.
         // Only when nothing is running and no other checkpoint waits, so polls never add a second job to the model slot;
         // the generation-fenced claim lets only one poll start it.
-        if (builderPollMayResume(job) && !selfHealingCapacityJob(job) && await builderSoleResumableJob(job.id)) {
+        if (!observeOnly && builderPollMayResume(job) && !selfHealingCapacityJob(job) && await builderSoleResumableJob(job.id)) {
           after(async () => { await runBuilderJob(job.id, access.userId) })
         }
         return noStore({
@@ -150,6 +151,7 @@ export async function GET(request: Request) {
           workspaceId: job.workspaceId,
           conversationId: job.conversationId,
           status: job.status,
+          ...(observeOnly ? { readOnly: true } : {}),
           progress: builderProgressSnapshot(job),
           reply: job.status === 'queued' && job.metadata.builderCapacityDeferredReason === 'builder_runpod_primary_busy'
             ? 'Queued — waiting for model capacity. Builder will resume this saved job automatically.'
@@ -157,6 +159,17 @@ export async function GET(request: Request) {
               ? 'Files written — verifying changes. Builder will continue automatically.'
             : job.status === 'paused' ? 'Builder saved its progress and will continue automatically. Verification is not complete yet.' : runningReply(job.id),
         }, { status: 202 })
+      }
+      // Read-only progress readback from the same durable receipts used to verify completed jobs.
+      // In particular it never invokes the automatic paused-job resume path.
+      if (observeOnly) {
+        const receipts = Array.isArray(job.result?.receipts) ? job.result.receipts : []
+        const budget = job.result?.inferenceBudget as { modelCallCount?: number } | undefined
+        const checkpoint = { version: 2, steps: receipts, modelCalls: budget?.modelCallCount } as unknown as BuilderJobRecord['checkpoint']
+        return noStore({
+          jobId: job.id, status: job.status, readOnly: true,
+          progress: builderProgressSnapshot({ ...job, checkpoint }),
+        })
       }
       // Read-only historical acceptance presentation. Does not invoke runBuilderJob,
       // enqueue a job, mutate history, or purchase inference.

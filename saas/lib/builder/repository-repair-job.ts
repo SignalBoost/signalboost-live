@@ -65,6 +65,9 @@ export async function enqueueSignalBoostRepositoryRepairJob(input: {
   target: SignalBoostRepositoryRepairTarget
   /** Browser-generated id for this request, so a resent request finds this job instead of creating another. */
   jobId?: string
+  /** The requester's assistance mode and reply language, carried to the worker (Work with me holds the merge). */
+  assistanceMode?: string
+  responseLanguage?: string
 }): Promise<Readonly<{ jobId: string; workspaceId: string; reply: string }>> {
   // Current-state preflight is mandatory before repository authority is exercised. A stale commit
   // is not a terminal user task failure: it is a Software Specialist replanning event. The
@@ -110,6 +113,8 @@ export async function enqueueSignalBoostRepositoryRepairJob(input: {
       reportedCommitSha: targetFreshness.reportedCommitSha,
       currentBranchHeadSha: targetFreshness.currentBranchHeadSha,
       ...(stale ? { supersededFromCommitSha: targetFreshness.reportedCommitSha } : {}),
+      ...(input.assistanceMode ? { assistanceMode: input.assistanceMode } : {}),
+      ...(input.responseLanguage ? { responseLanguage: input.responseLanguage } : {}),
     },
     ownerAuthorized: true,
     runningReply: reply,

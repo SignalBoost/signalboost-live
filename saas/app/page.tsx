@@ -25,6 +25,8 @@ import BuilderFilePreviews from '@/components/BuilderFilePreviews'
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 import { boundComposerIntake } from '@/lib/ai/cos/composerIntakeBound'
 import VoiceInputButton from '@/components/VoiceInputButton'
+import AssistanceModeSelector from '@/components/AssistanceModeSelector'
+import { useAssistanceMode } from '@/lib/ai/cos/useAssistanceMode'
 import { safeDeliveredVisual } from '@/lib/concierge/deliveredVisual'
 import { CONCIERGE_RESUME_KEYS, forgetResumeId, loadResumableConversation, pairResumedTurns, readResumeId, rememberResumeId } from '@/lib/concierge/conversationResume'
 
@@ -54,6 +56,7 @@ export default function Home() {
   const c = (key: string) => t(dict, `homepage.concierge.${key}`)
   const copy = getConciergeTranscriptCopy(lang)
   const [question, setQuestion] = useState('')
+  const [assistanceMode, setAssistanceMode] = useAssistanceMode()
   const [turns, setTurns] = useState<ConciergeTranscriptTurn[]>([])
   const [savedChats, setSavedChats] = useState<Array<{ id: string; title: string; updated_at: string; message_count?: number }>>([])
   const [savedChatsOpen, setSavedChatsOpen] = useState(true)
@@ -257,6 +260,7 @@ export default function Home() {
             currentPage: '/',
             conversationId: conversationIdRef.current,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            assistanceMode,
           },
         }
       const payload = artifactRequest
@@ -534,6 +538,7 @@ export default function Home() {
             disabled={loading}
             className="attach-button voice-button"
           />
+          <AssistanceModeSelector mode={assistanceMode} onChange={setAssistanceMode} lang={lang} disabled={loading} className="attach-button" />
           <textarea
             value={question}
             onChange={(event) => setQuestion(event.target.value)}

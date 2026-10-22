@@ -14,7 +14,7 @@ import { builderInferenceBudgetSummary, createBuilderInferenceBudgetStore, readB
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
-import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, requeueBuilderContinuationCycle, readBuilderWorkspaceFingerprint, type BuilderJobRecord } from './job-store.ts'
+import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, requeueBuilderContinuationCycle, readBuilderWorkspaceFingerprint, getBuilderJobForUser, type BuilderJobRecord } from './job-store.ts'
 import { MAX_WORK_SLICES, builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport, builderJobOverTotalDeadline, BUILDER_JOB_TOTAL_DEADLINE_MS } from './work-budget.ts'
 import { builderContractObjective, builderTaskContract, builderTaskProgress } from './task-contract.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
@@ -44,6 +44,7 @@ import { workingAgentKnowledgeBlock } from '@/lib/ai/cos/workingAgentKnowledge'
 import { formatBuilderEpisodesForPrompt, recordBuilderEpisode, retrieveBuilderEpisodes } from './episodic-memory.ts'
 import { recordBuilderCompetencyGap } from './competency-gap.ts'
 import { getAdminSupabase } from '@/utils/supabase/server'
+import { assistanceCopy, COLLABORATE_PUBLICATION_PAUSED, COLLABORATE_SOURCE_CHANGED } from '../ai/cos/assistanceMode.ts'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
@@ -343,6 +344,115 @@ async function withBuilderSliceDeadline<T>(operation: () => Promise<T>, timeoutM
  * Execute one already-enqueued Builder job. The atomic claim makes duplicate invocations harmless;
  * the browser never replays POST and polling GET has no execution authority.
  */
+type IsolatedPublicationOutcome = { publication: Record<string, unknown> | null; publicationError: string | null }
+
+/**
+ * Publish host-verified workspace files: repository, pull request, a preview of the exact commit with the requested
+ * endpoint checked, then the merge. Shared by Handle it for me (right after verification) and Work with me (after
+ * the user's "go"), so both run the same code.
+ */
+async function publishIsolatedJobFiles(input: {
+  job: BuilderJobRecord
+  files: readonly string[]
+  workspace: { readFile(workspaceId: string, path: string): Promise<{ path: string; content: string; updatedAt: number } | null> }
+  signal: AbortSignal
+  deadlineAt: number
+}): Promise<IsolatedPublicationOutcome> {
+  const { job } = input
+  let publication: Record<string, unknown> | null = null
+  try {
+    // Isolated publication uses only an owner-authorized server credential. It is never
+    // inferred from model text or from a customer's provider connection.
+    if (!job.ownerAuthorized) throw new Error('builder_isolated_publication_not_authorized')
+    const token = process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN || ''
+    const owner = process.env.BUILDER_ISOLATED_GITHUB_OWNER || ''
+    const vercelToken = process.env.VERCEL_TOKEN || ''
+    const projectId = process.env.BUILDER_ISOLATED_VERCEL_PROJECT_ID || ''
+    if (!token || !owner || !vercelToken || !projectId) throw new Error('builder_isolated_publication_not_configured')
+    if (Date.now() >= input.deadlineAt) throw new Error('builder_isolated_publication_deadline_exceeded')
+    const contents = await Promise.all(input.files.map(path => input.workspace.readFile(job.workspaceId, path)))
+    if (contents.some(file => !file)) throw new Error('builder_isolated_workspace_file_missing')
+    const preparedFiles = isolatedDeploymentFiles(contents.filter((file): file is NonNullable<typeof file> => Boolean(file)))
+    const published = await publishVerifiedIsolatedProject({
+      owner, jobKey: job.id,
+      newRepository: /\bcreate\s+(?:a\s+)?new\s+private\s+(?:GitHub\s+)?repository\b/i.test(job.objective),
+      token, files: preparedFiles,
+      verified: true, authorized: true, signal: input.signal,
+      deadlineAt: input.deadlineAt,
+    })
+    publication = { ...published }
+    const preview = await verifyIsolatedPreview({
+      token: vercelToken, projectId, repository: published.repository,
+      commitSha: published.commitSha, files: preparedFiles, objective: job.objective,
+      deadlineAt: input.deadlineAt,
+      signal: input.signal,
+    })
+    publication = { ...published, ...preview }
+    // This lane is owner-only (checked above): the owner's job ends merged, not as a PR left for him.
+    const merged = await mergeVerifiedIsolatedPullRequest({
+      token, repository: published.repository, pullRequestNumber: published.pullRequestNumber,
+      commitSha: published.commitSha, previewVerified: preview.status === 'verified',
+      signal: input.signal, deadlineAt: input.deadlineAt,
+    })
+    publication = { ...published, ...preview, ...merged }
+    return { publication, publicationError: null }
+  } catch (error) {
+    return { publication, publicationError: error instanceof Error ? error.message : 'builder_isolated_publication_failed' }
+  }
+}
+
+/**
+ * Work with me, after the user's "go": publish the work a previous job verified and paused, without any model call.
+ * The approval is bound to that job and to the exact files it verified; any change since then refuses publication.
+ */
+async function runApprovedIsolatedPublication(job: BuilderJobRecord, totalDeadlineMs: number): Promise<void> {
+  const workspace = createSupabaseBuilderWorkspace(job.userId)
+  const source = await getBuilderJobForUser(String(job.metadata.approvedPublicationOf), job.userId)
+  const saved = (source?.result ?? null) as Record<string, any> | null
+  const awaiting = saved?.awaitingApproval as { action?: string; fingerprint?: string } | undefined
+  if (!workspace || !source || source.workspaceId !== job.workspaceId || source.status !== 'succeeded'
+    || awaiting?.action !== 'isolated_publication' || !saved?.acceptanceLedger || !Array.isArray(saved.files)) {
+    await terminalFailure(job, 'builder_approval_source_unavailable')
+    return
+  }
+  const files = (saved.files as unknown[]).filter((path): path is string => typeof path === 'string')
+  if (await readBuilderWorkspaceFingerprint(job.userId, job.workspaceId) !== awaiting.fingerprint
+    || awaiting.fingerprint !== job.metadata.approvedWorkspaceFingerprint) {
+    const reply = historyReply(assistanceCopy(COLLABORATE_SOURCE_CHANGED, job.metadata.responseLanguage), job.workspaceId, files)
+    await finishBuilderJob({ jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration, status: 'failed', reply,
+      error: 'builder_approval_source_changed', result: { jobId: job.id, workspaceId: job.workspaceId, status: 'failed', reply, files, engine: 'v2' } })
+    return
+  }
+  const controller = new AbortController()
+  const deadlineAt = Date.parse(job.createdAt) + totalDeadlineMs
+  const timer = setTimeout(() => controller.abort(new Error('builder_isolated_publication_deadline_exceeded')), Math.max(0, deadlineAt - Date.now()))
+  timer.unref?.()
+  const { publication, publicationError } = await publishIsolatedJobFiles({ job, files, workspace, signal: controller.signal, deadlineAt })
+    .finally(() => clearTimeout(timer))
+  const acceptance = saved.acceptanceLedger as ReturnType<typeof builderAcceptanceLedger>
+  const inferenceBudget = saved.inferenceBudget && typeof saved.inferenceBudget === 'object' ? saved.inferenceBudget : null
+  // Execution time is the machine's: the verifying job plus this one. Time spent waiting for the person is not counted.
+  const elapsedMs = Math.max(0, Date.parse(source.finishedAt || source.updatedAt) - Date.parse(source.createdAt))
+    + Math.max(0, Date.now() - Date.parse(job.createdAt))
+  const finalProof = builderFinalProof({
+    objective: job.objective, workspaceVerified: true, acceptance, publication, publicationError,
+    budget: inferenceBudget ? { ...(inferenceBudget as any), elapsedMs } : null, requiresPublication: true,
+  })
+  const failure = publicationError || finalProof.failureCode
+  const report = builderAcceptanceReport({
+    jobId: job.id, files, receipts: Array.isArray(saved.receipts) ? saved.receipts : [], ledger: acceptance,
+    proof: finalProof, publication, inferenceBudget: inferenceBudget as any, totalElapsedMs: elapsedMs, failure,
+  })
+  const reply = historyReply(report, job.workspaceId, files)
+  await finishBuilderJob({
+    jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
+    status: finalProof.passed ? 'succeeded' : 'failed', reply, error: finalProof.passed ? null : failure,
+    result: { jobId: job.id, workspaceId: job.workspaceId, status: finalProof.passed ? 'succeeded' : 'failed', reply, files,
+      engine: 'v2', receipts: saved.receipts ?? [], acceptanceLedger: acceptance, finalProof, approvedFromJobId: source.id,
+      ...(publication ? { isolatedPublication: publication } : {}), ...(inferenceBudget ? { inferenceBudget } : {}) },
+  })
+}
+
 async function runBuilderJobInsideHarness(jobId: string, userId: string): Promise<void> {
   let job: BuilderJobRecord | null = null
   let lastTrace: readonly BuilderToolTrace[] = []
@@ -390,6 +500,10 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       const totalDeadlineMs = runLimits?.maxElapsedMs ?? BUILDER_JOB_TOTAL_DEADLINE_MS
       if (builderJobOverTotalDeadline(job.createdAt, Date.now(), totalDeadlineMs)) {
         await terminalFailure(job, 'builder_v2_total_deadline_exceeded')
+        return
+      }
+      if (typeof job.metadata.approvedPublicationOf === 'string') {
+        await runApprovedIsolatedPublication(job, totalDeadlineMs)
         return
       }
       const workspace = createSupabaseBuilderWorkspace(job.userId)
@@ -479,44 +593,23 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       let publication: Record<string, unknown> | null = null
       let publicationError: string | null = null
       if (verified && acceptance.passed && requiresPublication) {
-        try {
-          // Isolated publication uses only an owner-authorized server credential. It is never
-          // inferred from model text or from a customer's provider connection.
-          if (!job.ownerAuthorized) throw new Error('builder_isolated_publication_not_authorized')
-          const token = process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN || ''
-          const owner = process.env.BUILDER_ISOLATED_GITHUB_OWNER || ''
-          const vercelToken = process.env.VERCEL_TOKEN || ''
-          const projectId = process.env.BUILDER_ISOLATED_VERCEL_PROJECT_ID || ''
-          if (!token || !owner || !vercelToken || !projectId) throw new Error('builder_isolated_publication_not_configured')
-          if (builderJobOverTotalDeadline(job.createdAt, Date.now(), totalDeadlineMs)) throw new Error('builder_isolated_publication_deadline_exceeded')
-          const contents = await Promise.all(files.map(path => workspace.readFile(job.workspaceId, path)))
-          if (contents.some(file => !file)) throw new Error('builder_isolated_workspace_file_missing')
-          const preparedFiles = isolatedDeploymentFiles(contents.filter((file): file is NonNullable<typeof file> => Boolean(file)))
-          const published = await publishVerifiedIsolatedProject({
-            owner, jobKey: job.id,
-            newRepository: /\bcreate\s+(?:a\s+)?new\s+private\s+(?:GitHub\s+)?repository\b/i.test(job.objective),
-            token, files: preparedFiles,
-            verified: true, authorized: true, signal: deadlineController.signal,
-            deadlineAt: Date.parse(job.createdAt) + totalDeadlineMs,
+        // Work with me: the work is verified in the sandbox; nothing leaves it until the user says "go".
+        if (job.metadata.assistanceMode === 'collaborate') {
+          const fingerprint = await readBuilderWorkspaceFingerprint(job.userId, job.workspaceId)
+          const reply = historyReply(`${assistanceCopy(COLLABORATE_PUBLICATION_PAUSED, job.metadata.responseLanguage)}\n\n${progress}${budgetReport}`, job.workspaceId, files)
+          await finishBuilderJob({
+            jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
+            status: 'succeeded', reply, error: null,
+            result: { jobId: job.id, workspaceId: job.workspaceId, status: 'awaiting_approval',
+              reply, files, engine: 'v2', receipts: cycle.result?.steps ?? [], acceptanceLedger: acceptance,
+              awaitingApproval: { action: 'isolated_publication', fingerprint, requestedAt: new Date().toISOString() },
+              ...(inferenceBudget ? { inferenceBudget } : {}) },
           })
-          publication = { ...published }
-          const preview = await verifyIsolatedPreview({
-            token: vercelToken, projectId, repository: published.repository,
-            commitSha: published.commitSha, files: preparedFiles, objective: job.objective,
-            deadlineAt: Date.parse(job.createdAt) + totalDeadlineMs,
-            signal: deadlineController.signal,
-          })
-          publication = { ...published, ...preview }
-          // This lane is owner-only (checked above): the owner's job ends merged, not as a PR left for him.
-          const merged = await mergeVerifiedIsolatedPullRequest({
-            token, repository: published.repository, pullRequestNumber: published.pullRequestNumber,
-            commitSha: published.commitSha, previewVerified: preview.status === 'verified',
-            signal: deadlineController.signal, deadlineAt: Date.parse(job.createdAt) + totalDeadlineMs,
-          })
-          publication = { ...published, ...preview, ...merged }
-        } catch (error) {
-          publicationError = error instanceof Error ? error.message : 'builder_isolated_publication_failed'
+          return
         }
+        ;({ publication, publicationError } = await publishIsolatedJobFiles({
+          job, files, workspace, signal: deadlineController.signal, deadlineAt: Date.parse(job.createdAt) + totalDeadlineMs,
+        }))
       }
       const finalProof = builderFinalProof({
         objective: job.objective, workspaceVerified: verified, acceptance,
@@ -592,6 +685,8 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           : {}),
         // Null when Vercel credentials are absent, which auto-merge refuses on.
         snapshotPort: builderAutoMergeSnapshotPort(),
+        holdMerge: job.metadata.assistanceMode === 'collaborate',
+        responseLanguage: job.metadata.responseLanguage,
       })
       if (!execution) {
         await terminalFailure(job, 'builder_repository_repair_target_unavailable')

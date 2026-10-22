@@ -19,7 +19,10 @@ import { isOperationalLogEvidence } from '@/lib/ai/cos/pastedOperationalLog'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { extractBuilderSourceFiles, planDebugFileJob } from '@/lib/builder/debug-file-job'
 import { enqueueBuilderJob } from '@/lib/builder/job-store'
-import { readBuilderEvidenceJob } from '@/lib/builder/job-store'
+import { readBuilderEvidenceJob, getBuilderJobForUser } from '@/lib/builder/job-store'
+import { startApprovedIsolatedPublication } from '@/lib/builder/collaborate-approval'
+import { assistanceCopy, COLLABORATE_APPROVAL_STARTED, COLLABORATE_SOURCE_CHANGED, DEFAULT_ASSISTANCE_MODE, isAssistanceApproval, normalizeAssistanceMode, ASSISTANCE_MODE_METADATA_KEY, type AssistanceMode } from '@/lib/ai/cos/assistanceMode'
+import { getAdminSupabase } from '@/utils/supabase/server'
 import { builderEvidenceReply, isBuilderEvidenceRequest, isBuilderProjectQuestion } from '@/lib/builder/execution-evidence'
 import { runBuilderJob } from '@/lib/builder/job-runner'
 import {
@@ -113,6 +116,12 @@ function runningReply(jobId: string): string {
   return `COS Software Specialist is running Builder job ${jobId}. Progress and the final result are durable in History; the action will not be replayed.`
 }
 
+/** The resolved assistance mode and reply language, carried on the Builder job for its worker. */
+function builderModeMetadata(body: any, prompt: string): { assistanceMode?: AssistanceMode; responseLanguage: string } {
+  const mode = normalizeAssistanceMode(body?.assistanceMode)
+  return { ...(mode ? { assistanceMode: mode } : {}), responseLanguage: resolveResponseLanguage(prompt, body?.context?.language) }
+}
+
 async function enqueueRepositoryRepair(input: {
   body: any
   objective: string
@@ -128,6 +137,7 @@ async function enqueueRepositoryRepair(input: {
     conversationId,
     objective,
     target: input.target,
+    ...builderModeMetadata(input.body, input.objective),
   })
   if (input.signal?.aborted) return NextResponse.json({
     reply: 'COS Software Specialist stopped before starting repository repair because its Harness deadline expired.',
@@ -378,6 +388,7 @@ async function tryCosSoftwareSpecialistLegacy(
         : { productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null, ...(project.context ? { projectContext: project.context } : {}),
             // The claimed worker re-reads the existing workspace before any edit (same rule as /api/builder).
             ...(project.context && !stagedFiles.length ? { requiresExistingSource: true } : {}),
+            ...builderModeMetadata(input.body, rawObjective),
             builderEngine: 'v2' },
       ownerAuthorized: access?.isOwner === true,
       runningReply: reply,
@@ -410,6 +421,46 @@ async function tryCosSoftwareSpecialistLegacy(
   }, { status: 202 })
 }
 
+/** The assistance mode the signed-in user saved on their account (chosen in any chat; follows them to every device). */
+async function storedAssistanceMode(): Promise<AssistanceMode | null> {
+  const access = await getAccess().catch(() => null)
+  if (!access?.userId || !UUID.test(access.userId)) return null
+  try {
+    const { data } = await getAdminSupabase().auth.admin.getUserById(access.userId)
+    return normalizeAssistanceMode(data?.user?.user_metadata?.[ASSISTANCE_MODE_METADATA_KEY])
+  } catch {
+    return null
+  }
+}
+
+/** "go" after a Work with me pause: start the publish-only job, or null when nothing in this conversation is waiting. */
+async function approvePausedPublication(input: CosSoftwareSpecialistRequest): Promise<NextResponse | null> {
+  const access = await getAccess().catch(() => null)
+  const userId = access?.userId || ''
+  const conversationId = conversationIdFrom(input.body)
+  if (!UUID.test(userId) || !conversationId) return null
+  const language = resolveResponseLanguage(String(input.objective || ''), input.body?.context?.language)
+  const outcome = await startApprovedIsolatedPublication({
+    userId, conversationId, responseLanguage: language,
+    runningReply: assistanceCopy(COLLABORATE_APPROVAL_STARTED, language),
+    readLatestJob: readBuilderEvidenceJob,
+    fingerprint: readBuilderWorkspaceFingerprint,
+    enqueue: enqueueBuilderJob,
+    jobExists: async (jobId, owner) => Boolean(await getBuilderJobForUser(jobId, owner)),
+  }).catch(() => null)
+  if (!outcome || outcome.kind === 'none') return null
+  if (outcome.kind === 'source_changed') return NextResponse.json({
+    reply: assistanceCopy(COLLABORATE_SOURCE_CHANGED, language), source: 'cos-builder-approval-source-changed',
+    execution_allowed: false, external_action_taken: false, ...softwareSpecialistFields('software.verify'),
+  }, { status: 409 })
+  after(async () => { await runBuilderJob(outcome.jobId, userId) })
+  return NextResponse.json({
+    reply: assistanceCopy(COLLABORATE_APPROVAL_STARTED, language), source: 'cos-builder-approved-publication',
+    jobId: outcome.jobId, workspaceId: outcome.workspaceId, status: 'queued',
+    execution_allowed: true, external_action_taken: false, ...softwareSpecialistFields('software.build'),
+  }, { status: 202 })
+}
+
 /**
  * Public COS-owned Software Specialist seam.
  *
@@ -425,9 +476,14 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   const context = routingContext(input.body)
   const sourceAttached = hasSourceAttachment(context)
   const mediaAttached = hasImageOrPdfAttachment(input.body)
-  // Guidance-only requests must not enqueue Builder or mutate a repository.
-  // The default remains autonomous for existing clients; collaboration requires consent.
-  const assistanceMode = input.body?.assistanceMode ?? input.body?.context?.assistanceMode
+  const requestedMode = normalizeAssistanceMode(input.body?.assistanceMode ?? input.body?.context?.assistanceMode)
+  // Work with me: the user's "go" (in any supported language) publishes work Builder verified and paused. Never in
+  // Guide me (Codex on #4765): a user who switched to Guide me cannot trigger an external action with a "yes".
+  if (isAssistanceApproval(objective)
+    && (requestedMode ?? await storedAssistanceMode() ?? DEFAULT_ASSISTANCE_MODE) !== 'guide') {
+    const approved = await approvePausedPublication(input)
+    if (approved) return approved
+  }
   const specialistRelevant = sourceAttached
     || mediaAttached
     || isSoftwareRepairRequest(objective)
@@ -442,16 +498,13 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
 
   if (!specialistRelevant) return null
 
+  // The mode this request asked for, else the one the user saved on their account, else Handle it for me.
+  const assistanceMode: AssistanceMode = requestedMode ?? await storedAssistanceMode() ?? DEFAULT_ASSISTANCE_MODE
+  // Guide me: COS explains; Builder runs nothing and no repository is touched.
   if (assistanceMode === 'guide') return null
-  if (assistanceMode === 'collaborate') {
-    return NextResponse.json({
-      reply: 'I can prepare and explain the proposed code changes. To authorize Builder to make changes, switch to Handle it for me. Repository access remains separately permissioned.',
-      source: 'cos-builder-approval-required',
-      assistanceMode: 'collaborate',
-      execution_allowed: false,
-      external_action_taken: false,
-      ...softwareSpecialistFields('software.guide'),
-    })
+  // Work with me runs Builder in its sandbox and stops before anything leaves it (enforced by the worker).
+  if (input.body?.assistanceMode !== assistanceMode) {
+    return tryCosSoftwareSpecialist({ ...input, body: { ...(input.body ?? {}), assistanceMode } })
   }
 
   const admissionBlocker = builderExecutionAdmissionBlocker(objective)

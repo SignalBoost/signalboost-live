@@ -9,10 +9,12 @@ test('guidance mode does not enqueue or admit software execution', () => {
   const admission = specialist.indexOf('const admissionBlocker = builderExecutionAdmissionBlocker(objective)', guide)
   assert.ok(guide > 0 && admission > guide)
 })
-test('collaboration mode returns approval-required without running Builder', () => {
-  assert.match(specialist, /if \(assistanceMode === 'collaborate'\)/)
-  assert.match(specialist, /source: 'cos-builder-approval-required'/)
-  assert.match(specialist, /execution_allowed: false/)
+// Work with me (2026-10-21): Builder now works and verifies in its sandbox; the worker stops before anything leaves
+// it and the user's "go" publishes. The old reply only told the user to switch modes (tests/builderAssistanceModes).
+test('collaboration mode carries the mode to the Builder worker instead of refusing', () => {
+  assert.doesNotMatch(specialist, /source: 'cos-builder-approval-required'/)
+  assert.match(specialist, /return tryCosSoftwareSpecialist\(\{ \.\.\.input, body: \{ \.\.\.\(input\.body \?\? \{\}\), assistanceMode \} \}\)/)
+  assert.match(specialist, /\.\.\.builderModeMetadata\(input\.body, rawObjective\)/)
 })
 test('autonomous mode retains existing Builder delegation path', () => {
   assert.match(specialist, /await enqueueBuilderJob\(/)

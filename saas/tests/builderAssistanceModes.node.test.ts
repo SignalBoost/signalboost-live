@@ -118,3 +118,44 @@ test('every chat offers the selector and sends the remembered mode; the server h
   assert.match(specialist, /requestedMode \?\? await storedAssistanceMode\(\) \?\? DEFAULT_ASSISTANCE_MODE/)
   assert.ok(specialist.indexOf('if (isAssistanceApproval(objective))') < specialist.indexOf('if (!specialistRelevant) return null', specialist.indexOf('export async function tryCosSoftwareSpecialist(')))
 })
+
+// Codex on #4765 (P1): holding only the immediate merge was not enough; the durable merge continuation (cron) would
+// later merge the held PR. The hold is now written into the PR, and the continuation never selects such a PR.
+test('a Work with me repair PR is never merged by the durable merge continuation', async () => {
+  const { completePendingRepositoryRepairMerges } = await import('../lib/builder/repository-repair-merge-continuation.ts')
+  const { REPOSITORY_REPAIR_MERGE_HOLD_MARKER } = await import('../lib/builder/repository-repair-writeback.ts')
+  const pr = (number: number, held: boolean) => ({
+    number, title: 'COS Platform Engineer: verified repository repair',
+    body: ['Owner-authorized Platform Engineer repair.', '', `Pinned base: \`${'a'.repeat(40)}\``, ...(held ? ['', REPOSITORY_REPAIR_MERGE_HOLD_MARKER] : [])].join('\n'),
+    base: { ref: 'main' }, head: { ref: `cos/platform-repair-${'b'.repeat(8)}-abc`, sha: 'c'.repeat(40), repo: { full_name: 'SignalBoost/signalboost-live' } },
+  })
+  const previous = process.env.BUILDER_AUTO_MERGE_ENABLED
+  process.env.BUILDER_AUTO_MERGE_ENABLED = 'true'
+  try {
+    const run = (pulls: unknown[]) => completePendingRepositoryRepairMerges({
+      token: 'test', deadlineAtMs: Date.now() + 60_000,
+      request: (async (url: string) => String(url).includes('/pulls?state=open') ? Response.json(pulls) : Response.json({ message: 'stop' }, { status: 500 })) as any,
+    })
+    assert.equal((await run([pr(7, true)])).candidates, 0, 'held PR is not a merge candidate')
+    assert.equal((await run([pr(8, false)])).candidates, 1, 'an ordinary repair PR still is')
+  } finally {
+    if (previous === undefined) delete process.env.BUILDER_AUTO_MERGE_ENABLED
+    else process.env.BUILDER_AUTO_MERGE_ENABLED = previous
+  }
+  assert.match(read('lib/builder/repository-repair-writeback.ts'), /\.\.\.\(input\.holdMerge === true \? \['', REPOSITORY_REPAIR_MERGE_HOLD_MARKER\] : \[\]\)/)
+  assert.match(read('lib/builder/repository-repair.ts'), /holdMerge: input\.holdMerge === true,\n\s*\}\)/)
+})
+
+// Codex on #4765 (P1): a "yes" in Guide me must never publish paused work.
+test('an approval is honoured only outside Guide me, using the saved mode when the request carries none', () => {
+  const specialist = read('lib/ai/cos/softwareSpecialist.ts')
+  assert.match(specialist, /if \(isAssistanceApproval\(objective\)\n\s*&& \(requestedMode \?\? await storedAssistanceMode\(\) \?\? DEFAULT_ASSISTANCE_MODE\) !== 'guide'\) \{\n\s*const approved = await approvePausedPublication\(input\)/)
+})
+
+// Codex on #4765 (P2): one browser, two accounts — each keeps its own mode.
+test('the browser cache is per user; only a signed-out choice moves to an account, once', () => {
+  const hook = read('lib/ai/cos/useAssistanceMode.ts')
+  assert.match(hook, /const keyFor = \(userId: string \| null\) => userId \? `\$\{ASSISTANCE_MODE_STORAGE_KEY\}:\$\{userId\}` : ASSISTANCE_MODE_STORAGE_KEY/)
+  assert.match(hook, /normalizeAssistanceMode\(data\?\.user\?\.user_metadata\?\.\[ASSISTANCE_MODE_METADATA_KEY\]\) \?\? read\(keyFor\(userId\)\)/)
+  assert.match(hook, /write\(keyFor\(null\), null\)/, 'the visitor choice leaves the browser once migrated')
+})

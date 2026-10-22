@@ -385,6 +385,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
       workspaceId: input.workspaceId,
       files: changes.files,
       patch: changes.patch,
+      holdMerge: input.holdMerge === true,
     })
     // Auto-merge is attempted ONLY on a real published PR, only behind the env flag, and it
     // refuses itself on a danger category or a missing/unrestorable checkpoint. A refusal here

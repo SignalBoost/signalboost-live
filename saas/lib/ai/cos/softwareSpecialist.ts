@@ -477,8 +477,10 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   const sourceAttached = hasSourceAttachment(context)
   const mediaAttached = hasImageOrPdfAttachment(input.body)
   const requestedMode = normalizeAssistanceMode(input.body?.assistanceMode ?? input.body?.context?.assistanceMode)
-  // Work with me: the user's "go" (in any supported language) publishes work Builder verified and paused.
-  if (isAssistanceApproval(objective)) {
+  // Work with me: the user's "go" (in any supported language) publishes work Builder verified and paused. Never in
+  // Guide me (Codex on #4765): a user who switched to Guide me cannot trigger an external action with a "yes".
+  if (isAssistanceApproval(objective)
+    && (requestedMode ?? await storedAssistanceMode() ?? DEFAULT_ASSISTANCE_MODE) !== 'guide') {
     const approved = await approvePausedPublication(input)
     if (approved) return approved
   }

@@ -2,6 +2,7 @@ import { attemptSignalBoostRepositoryAutoMerge, evaluateAutoMergeDangerCategory,
 import { watchMergedDeployment } from './repository-merge-watch.ts'
 import type { StateSnapshotPort } from '../portable/state-snapshot-port.ts'
 import type { MergeWatchOutcome } from './repository-merge-watch.ts'
+import { REPOSITORY_REPAIR_MERGE_HOLD_MARKER } from './repository-repair-writeback.ts'
 
 const GITHUB_API = 'https://api.github.com/repos/SignalBoost/signalboost-live'
 export const REPOSITORY_REPAIR_AUTOMERGE_MARKER = 'Owner-authorized Platform Engineer repair.'
@@ -80,6 +81,7 @@ function isCandidate(value: any): boolean {
   return Number.isInteger(number) && number > 0
     && title === REPAIR_TITLE
     && body.split(/\r?\n/).some(line => line.trim() === REPOSITORY_REPAIR_AUTOMERGE_MARKER)
+    && !body.split(/\r?\n/).some(line => line.trim() === REPOSITORY_REPAIR_MERGE_HOLD_MARKER)
     && SAFE_BRANCH.test(base)
     && base !== head
     && headRepo === 'SignalBoost/signalboost-live'

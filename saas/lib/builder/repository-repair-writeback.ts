@@ -111,6 +111,12 @@ async function executableModesForChangedFiles(
  * Partial mutations are reported honestly. If Git objects or a branch were created before a later
  * API call failed, repositoryWriteTaken remains true and the last completed stage is returned.
  */
+/**
+ * Work with me: the owner reviews and merges this repair. The hold is written into the PR itself, so the durable merge
+ * continuation (cron) never merges it either (Codex on #4765: an immediate-only hold was later merged by the cron).
+ */
+export const REPOSITORY_REPAIR_MERGE_HOLD_MARKER = 'Merge held for owner review (Work with me): COS never merges this pull request.'
+
 export async function publishSignalBoostRepositoryRepair(input: {
   target: SignalBoostRepositoryRepairTarget
   workspaceId: string
@@ -118,6 +124,8 @@ export async function publishSignalBoostRepositoryRepair(input: {
   patch: string
   request?: RequestLike
   token?: string
+  /** Work with me: mark the PR so neither the immediate merge nor the durable continuation ever merges it. */
+  holdMerge?: boolean
 }): Promise<RepositoryRepairWritebackResult> {
   const token = String(input.token ?? process.env.GITHUB_WRITE_TOKEN ?? '').trim()
   if (!token) return result({ error: 'builder_repository_write_not_configured' })
@@ -273,6 +281,7 @@ export async function publishSignalBoostRepositoryRepair(input: {
             '',
             'The repair was generated and proved in the network-denied repository sandbox.',
             'When governed auto-merge is enabled, the durable merge continuation may integrate this PR only after all checks are green, the danger classifier remains clear, and a restorable production checkpoint exists.',
+            ...(input.holdMerge === true ? ['', REPOSITORY_REPAIR_MERGE_HOLD_MARKER] : []),
           ].join('\n'),
           maintainer_can_modify: true,
         }),

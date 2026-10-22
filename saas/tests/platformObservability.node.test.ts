@@ -170,18 +170,17 @@ test('the Supervisor raises one incident per failing route + error, skips superv
   console.log('[proof] supervisor incident', JSON.stringify({ incidentId: top.incidentId, severity: top.severity, errorMessage: top.errorMessage, traceIds: top.metadata.traceIds }))
 
   // Repair path: request-error incidents go to the Platform Engineer repository repair; a failed repair is not retried
-  // every cycle, only after the suppression window (the other owned-site kinds keep their behaviour).
+  // every cycle, only after the suppression window (the same rule as every owned-site repair).
   const loop = read('../self-healing-host/native-autonomous-loop.ts')
   assert.match(loop, /const requestErrorIncident = isPlatformRequestErrorIncident\(incident\)/)
   assert.match(loop, /: await enqueuePlatformRequestErrorRepair\(incident, diagnostic\.diagnosis\)/)
   const repair = read('../self-healing-host/owned-site-autonomous-repair.ts')
-  assert.match(repair, /suppressAfterFailure: kind === 'platform-request-error'/)
+  assert.match(repair, /\.in\('status', \['succeeded', 'failed'\]\)/)
   assert.match(repair, /never swallow, hide or stop recording the error to make it disappear/)
   const failedRow = { id: 'job-f', status: 'failed', created_at: '2026-10-22T13:00:00Z', metadata: { selfHealingKey: 'rev1:platform-request-error:/app/api/a/route|TypeError' } }
   const key = 'rev2:platform-request-error:/app/api/a/route|TypeError'
   const nowMs = Date.parse('2026-10-22T14:05:00Z')
-  assert.deepEqual(ownedSiteRepairBlocker({ rows: [failedRow], key, nowMs, suppressAfterFailure: true }), { disposition: 'recently_attempted', jobId: 'job-f' })
-  assert.equal(ownedSiteRepairBlocker({ rows: [failedRow], key, nowMs }), null)
+  assert.deepEqual(ownedSiteRepairBlocker({ rows: [failedRow], key, nowMs }), { disposition: 'recently_attempted', jobId: 'job-f' })
 
   const cron = read('../app/api/cron/native-proactive-monitoring/route.ts')
   assert.match(cron, /platformRequestErrorMonitoringCollector\(\{ db \}\)/)

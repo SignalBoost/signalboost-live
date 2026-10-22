@@ -199,17 +199,14 @@ async function findExistingAttempt(key: string, kind: OwnedRepairKind): Promise<
   const { data: recent, error: recentError } = await admin
     .from('builder_jobs')
     .select('id,status,created_at,updated_at,metadata')
-    .in('status', kind === 'platform-request-error' ? ['succeeded', 'failed'] : ['succeeded'])
+    .in('status', ['succeeded', 'failed'])
     .gte('created_at', since)
     .contains('metadata', { selfHealingOwnedSite: true, selfHealingSource: kind })
     .order('created_at', { ascending: false })
     .limit(50)
   if (recentError) throw new Error(`self_healing_builder_recent_lookup_failed:${recentError.message}`)
 
-  return ownedSiteRepairBlocker({
-    rows: [...(active || []), ...(recent || [])], key, nowMs: Date.now(),
-    suppressAfterFailure: kind === 'platform-request-error',
-  })
+  return ownedSiteRepairBlocker({ rows: [...(active || []), ...(recent || [])], key, nowMs: Date.now() })
 }
 
 async function enqueueOwnedSiteRepair(

@@ -52,3 +52,12 @@ test('foreign repositories cannot acquire owned recovery authority', () => {
   assert.match(recovery, /!parsed\.branch \|\| parsed\.branch === BASE_BRANCH/)
   assert.match(recovery, /runResult\.data\.status !== 'approved'/)
 })
+
+test('a failed audit repair is not re-queued every monitoring cycle (Production 2026-10-22: 9 jobs in 3 hours)', () => {
+  const recovery = read('../lib/audit/ownedAuditRepositoryRecovery.ts')
+  assert.match(recovery, /const FAILED_RETRY_SUPPRESSION_MS = 6 \* 60 \* 60 \* 1000/)
+  assert.match(recovery, /disposition: 'recently_failed'/)
+  const engine = read('../self-healing-host/owned-audit-self-healing.ts')
+  const recent = engine.slice(engine.indexOf('async function existingEngineAttempt'))
+  assert.match(recent, /\.in\('status', \['succeeded', 'failed'\]\)\n\s*\.gte\('created_at', since\)/)
+})

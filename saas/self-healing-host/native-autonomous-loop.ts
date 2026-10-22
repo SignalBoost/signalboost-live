@@ -134,7 +134,7 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
           ? `Autonomous owned-site ${surface} repair job ${repair.jobId} was queued for Platform Engineer execution.`
           : repair.disposition === 'already_active'
             ? `Owned-site ${surface} repair job ${repair.jobId} is already active; duplicate execution was suppressed.`
-            : `Owned-site ${surface} repair job ${repair.jobId} already completed recently for this deployment/finding set; duplicate execution is temporarily suppressed while Production is re-observed.`
+            : `Owned-site ${surface} repair job ${repair.jobId} was attempted recently for this finding set (succeeded or failed); another attempt is suppressed for 6 hours while Production is re-observed.`
         results.push({
           incidentId: incident.incidentId,
           diagnosisConfidence: diagnostic.confidence_score,

@@ -163,7 +163,8 @@ async function existingEngineAttempt(admin: any, key: string): Promise<{ disposi
   const recent = await admin
     .from('builder_jobs')
     .select('id,status')
-    .eq('status', 'succeeded')
+    // A failed engine attempt also holds the retry for the window, as for University and owned-site repairs.
+    .in('status', ['succeeded', 'failed'])
     .gte('created_at', since)
     .contains('metadata', { selfHealingOwnedAudit: true, selfHealingKey: key })
     .order('created_at', { ascending: false })

@@ -46,12 +46,15 @@ test('different findings are a different repair', () => {
   assert.equal(ownedSiteRepairBlocker({ rows, key: key(NEW_REV), nowMs: now }), null)
 })
 
-test('a success within the suppression window counts across revisions; failures and old successes do not', () => {
+test('a success or a failure within the suppression window counts across revisions; older attempts do not', () => {
   const recent = row('ok', 'succeeded', key(OLD_REV), OWNED_SITE_REPAIR_RETRY_SUPPRESSION_MS - 60_000)
   assert.deepEqual(ownedSiteRepairBlocker({ rows: [recent], key: key(NEW_REV), nowMs: now }), { disposition: 'recently_attempted', jobId: 'ok' })
-  const stale = row('old-ok', 'succeeded', key(OLD_REV), OWNED_SITE_REPAIR_RETRY_SUPPRESSION_MS + 60_000)
+  // Production 2026-10-22: a failed repair did not count, so the same findings were re-queued every monitoring cycle.
   const failed = row('bad', 'failed', key(OLD_REV), 60_000)
-  assert.equal(ownedSiteRepairBlocker({ rows: [stale, failed], key: key(NEW_REV), nowMs: now }), null)
+  assert.deepEqual(ownedSiteRepairBlocker({ rows: [failed], key: key(NEW_REV), nowMs: now }), { disposition: 'recently_attempted', jobId: 'bad' })
+  const stale = row('old-ok', 'succeeded', key(OLD_REV), OWNED_SITE_REPAIR_RETRY_SUPPRESSION_MS + 60_000)
+  const staleFailed = row('old-bad', 'failed', key(OLD_REV), OWNED_SITE_REPAIR_RETRY_SUPPRESSION_MS + 60_000)
+  assert.equal(ownedSiteRepairBlocker({ rows: [stale, staleFailed], key: key(NEW_REV), nowMs: now }), null)
 })
 
 test('the newest active match is reported and active wins over recently succeeded', () => {

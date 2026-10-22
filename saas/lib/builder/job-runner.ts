@@ -526,7 +526,8 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       })
       const success = finalProof.passed
       const publicationReport = publication ? `\n\nIsolated publication: ${JSON.stringify(publication)}` : ''
-      const wantsAcceptanceReport = /(?:Calculator API|final acceptance report|end-to-end acceptance test)/i.test(job.objective)
+      // Any isolated publication gets a structured evidence report, not just a named sample application.
+      const wantsAcceptanceReport = requiresPublication || /\b(?:final acceptance report|end-to-end acceptance test)\b/i.test(job.objective)
       const acceptanceReport = wantsAcceptanceReport ? builderAcceptanceReport({
         jobId: job.id, files, receipts: cycle.result?.steps ?? [], ledger: acceptance,
         proof: finalProof, publication, inferenceBudget,

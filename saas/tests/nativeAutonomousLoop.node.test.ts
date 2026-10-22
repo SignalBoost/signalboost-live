@@ -34,7 +34,7 @@ test('Self-Healing inspects connector evidence and disables unattended mutation 
   assert.match(source, /aiSecuritySignal/)
   assert.match(source, /Automatic mutation is disabled for this incident cycle/)
   const securityGate = source.indexOf('if (aiSecuritySignal)')
-  const ownedRepair = source.indexOf('if (optimizerIncident || cybersecurityIncident)')
+  const ownedRepair = source.indexOf('if (optimizerIncident || cybersecurityIncident || requestErrorIncident)')
   const dispatch = source.indexOf('await dispatchRepairPlan({')
   assert.ok(securityGate >= 0 && ownedRepair > securityGate, 'security hold must precede owned-site repair')
   assert.ok(dispatch > securityGate, 'security hold must precede governed repair dispatch')

@@ -442,19 +442,24 @@ export class BuilderV2Agent {
       return out ? JSON.stringify({ command: out.requestedCommand, exitCode: out.exitCode,
         output: headAndTail(`${String(out.stdout ?? '')}\n${String(out.stderr ?? '')}`.trim(), FAILURE_OUTPUT_CHARS) }) : ''
     }
+    // Content the model has observed per path, for the read-before-overwrite rule (restored across claims below).
+    const seen = new Map<string, string>()
     // Reconstruct inspection history across claims. Otherwise each continuation repeats list_files
     // as if the previous slice never happened, consuming all 24 allowed claims.
     for (const receipt of steps.slice(steps.findLastIndex(item => item.changed) + 1)) {
       if (receipt.tool === 'list_files' && receipt.ok) {
         sinceChange.set(JSON.stringify({ tool: 'list_files' }), JSON.stringify(receipt).slice(0, 20_000))
       }
-      // Preserve observed reads across slices to prevent redundant inspect/read loops.
-      if (receipt.tool === 'read_file' && receipt.ok && typeof (receipt.output as { path?: unknown } | undefined)?.path === 'string') {
-        sinceChange.set(JSON.stringify({ tool: 'read_file', path: (receipt.output as { path: string }).path }), JSON.stringify(receipt).slice(0, 20_000))
+      // Preserve observed reads across slices to prevent redundant inspect/read loops, together with the content
+      // that was read: a read refused as a repeat must still count for the read-before-overwrite rule. Production
+      // 2026-10-22: the read was kept and its content dropped, so after resume the model could neither re-read nor
+      // rewrite src/cart.js and the job stalled. A read whose content was not kept may simply run again.
+      const read = receipt.output as { path?: unknown; content?: unknown } | undefined
+      if (receipt.tool === 'read_file' && receipt.ok && typeof read?.path === 'string' && typeof read.content === 'string') {
+        seen.set(read.path, read.content)
+        sinceChange.set(JSON.stringify({ tool: 'read_file', path: read.path }), JSON.stringify(receipt).slice(0, 20_000))
       }
     }
-    // Content the model has observed per path, for the read-before-overwrite rule.
-    const seen = new Map<string, string>()
     const record = (action: BuilderV2Action, receipt: BuilderV2Receipt) => {
       steps.push(receipt)
       if (receipt.changed && action.tool === 'write_file' && !knownFiles.includes(action.path)) knownFiles.push(action.path)

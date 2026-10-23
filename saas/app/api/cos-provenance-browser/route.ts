@@ -17,6 +17,7 @@ import { runWithTurnDeadline } from '@/lib/ai/cos/cosTurnBudget.ts'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy.ts'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory.ts'
 import { provenanceWithDeliveredVisual } from '@/lib/concierge/deliveredVisual.ts'
+import { assistanceCopy, COS_TURN_ACCEPTED } from '@/lib/ai/cos/assistanceMode'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -245,7 +246,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     // original public surface header in downstreamRequest(), so it cannot inherit owner privileges.
     if (access?.userId) {
       const turnId = crypto.randomUUID()
-      const runningReply = 'COS accepted this turn. The final response is durable in History and this request will not be replayed.'
+      const runningReply = assistanceCopy(COS_TURN_ACCEPTED, languageFrom(body))
       try {
         const { historyMessageId } = await enqueueDurableCosTurn({
           turnId,

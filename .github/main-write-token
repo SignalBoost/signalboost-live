@@ -1,2 +1,2 @@
-base_sha=a6c294ccc62d53ae6a8c165add098659dca8e585
-branch=fix/builder-resume-read-write-deadlock-20261022
+base_sha=bb762ce2cba9795937ee27aeaeb221cb21af9fd7
+branch=fix/plain-running-job-message-20261023

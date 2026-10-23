@@ -64,6 +64,9 @@ export default function DeveloperPage() {
   const [trace, setTrace] = useState<BuilderReply['trace']>([])
   const [error, setError] = useState('')
   const [certification, setCertification] = useState<CertificationSummary>({ earnedLevel: 0, attempts: 0 })
+  const [canRunCertification, setCanRunCertification] = useState(false)
+  const [certificationBusy, setCertificationBusy] = useState(false)
+  const [certificationMessage, setCertificationMessage] = useState('')
   const [running, setRunning] = useState(false)
   const [liveProgress, setLiveProgress] = useState<BuilderProgress | null>(null)
   const [activeJobId, setActiveJobId] = useState('')
@@ -126,6 +129,14 @@ export default function DeveloperPage() {
       setRunning(false)
     }
   }
+
+  useEffect(() => {
+    let active = true
+    fetch('/api/admin/builder-certification', { cache: 'no-store' })
+      .then(response => { if (active) setCanRunCertification(response.ok) })
+      .catch(() => { if (active) setCanRunCertification(false) })
+    return () => { active = false }
+  }, [])
 
   async function loadWorkspaces() {
     try {
@@ -205,6 +216,27 @@ export default function DeveloperPage() {
       setReply(`The connection to Builder was lost while job ${jobId} was running. The job continues on the server; reopen this workspace or check History for its result.`)
     }
     return null
+  }
+
+  async function startLevel4Certification() {
+    if (!canRunCertification || certificationBusy || running) return
+    setCertificationBusy(true)
+    setCertificationMessage('Submitting live Level 4 Builder test…')
+    try {
+      const response = await fetch('/api/admin/builder-certification', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ caseId: 'builder_v2_end_to_end_reliability_v1' }),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok || !result.jobId) throw new Error(result.error || 'Certification request failed')
+      // A queued job is not a passed certification. Link to the existing durable Builder workspace.
+      setCertificationMessage('Level 4 test queued. Job: ' + result.jobId + '. Open it in Builder History to inspect results.')
+      await loadWorkspaces()
+    } catch (error) {
+      setCertificationMessage(error instanceof Error ? error.message : 'Certification request failed')
+    } finally {
+      setCertificationBusy(false)
+    }
   }
 
   async function run() {
@@ -307,6 +339,13 @@ export default function DeveloperPage() {
           <h1 style={{ margin: '8px 0', fontSize: 'clamp(28px, 5vw, 44px)' }}>{c('title')}</h1>
           <p style={{ margin: 0, maxWidth: 700, color: '#94a3b8', lineHeight: 1.55 }}>{c('intro')}</p>
           <p style={{ margin: '8px 0 0', color: '#67e8f9', fontSize: 13 }}>{c('certification').replace('{level}', String(certification.earnedLevel)).replace('{attempts}', String(certification.attempts))}</p>
+          {canRunCertification && <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button type="button" onClick={startLevel4Certification} disabled={certificationBusy || running} style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid #0891b2', background: '#164e63', color: '#fff', cursor: 'pointer' }}>
+              {certificationBusy ? 'Submitting…' : 'Run Level 4 Builder test'}
+            </button>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Owner-only · Runs a live model job and may incur inference cost · Queued is not passed</span>
+          </div>}
+          {certificationMessage && <p role="status" style={{ fontSize: 13, color: '#67e8f9' }}>{certificationMessage}</p>}
         </header>
         <section style={{ border: '1px solid #1e293b', borderRadius: 18, background: '#0f172a', padding: 20, display: 'grid', gap: 14 }}>
           <label style={{ display: 'grid', gap: 8, fontWeight: 700 }}>

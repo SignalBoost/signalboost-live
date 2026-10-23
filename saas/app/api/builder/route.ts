@@ -427,7 +427,7 @@ export async function POST(request: Request) {
       }
     }
     const routingContext = { attachmentNames: files.map(file => file.path) }
-    if (!project.context && !repositoryTarget && !debugPlan && !logEvidence && !isConciergeBuilderObjective(objective, routingContext)
+    if (!project.context && !repositoryTarget && !debugPlan && !logEvidence && !newProjectRequested && !isConciergeBuilderObjective(objective, routingContext)
       && !(isExplicitIsolatedProjectBuild(objective) && wantsIsolatedPublication(objective))) {
       const reply = 'This request does not contain an executable coding or design objective with concrete source evidence. No Builder job was created and no code was run.'
       await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })

@@ -1,2 +1,2 @@
-base_sha=c10e18cad4786f8ef2b4fb3f8642b5669cadc4c8
-branch=fix/cos-log-request-text-20261022
+base_sha=75d72d92e05cee4ca2ccaeca1cd4873a4b79037f
+branch=fix/builder-admission-error-repair-20261022

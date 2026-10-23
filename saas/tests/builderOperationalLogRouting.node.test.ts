@@ -10,8 +10,8 @@ test('a pasted build log is admitted as a durable Builder job instead of a canne
   // reach the tool loop. The old synchronous template reply must not come back.
   assert.doesNotMatch(route, /operationalLogReply/)
   assert.doesNotMatch(route, /builder-operational-log-analysis/)
-  assert.match(route, /!debugPlan && !logEvidence && !isConciergeBuilderObjective\(objective, routingContext\)/)
-  const admission = route.indexOf('!logEvidence && !isConciergeBuilderObjective(objective, routingContext)')
+  assert.match(route, /!debugPlan && !logEvidence && !newProjectRequested && !isConciergeBuilderObjective\(objective, routingContext\)/)
+  const admission = route.indexOf('!logEvidence && !newProjectRequested && !isConciergeBuilderObjective(objective, routingContext)')
   const enqueue = route.indexOf('await enqueueBuilderJob({', admission)
   assert.ok(admission >= 0)
   assert.ok(enqueue > admission)

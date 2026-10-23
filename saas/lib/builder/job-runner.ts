@@ -44,7 +44,7 @@ import { workingAgentKnowledgeBlock } from '@/lib/ai/cos/workingAgentKnowledge'
 import { formatBuilderEpisodesForPrompt, recordBuilderEpisode, retrieveBuilderEpisodes } from './episodic-memory.ts'
 import { recordBuilderCompetencyGap } from './competency-gap.ts'
 import { getAdminSupabase } from '@/utils/supabase/server'
-import { assistanceCopy, COLLABORATE_PUBLICATION_PAUSED, COLLABORATE_SOURCE_CHANGED } from '../ai/cos/assistanceMode.ts'
+import { assistanceCopy, BUILDER_RESULT_CONTINUING, BUILDER_RESULT_DONE, BUILDER_RESULT_NOT_FINISHED, BUILDER_RESULT_STALLED, BUILDER_RESULT_SYNTAX_ONLY, COLLABORATE_PUBLICATION_PAUSED, COLLABORATE_SOURCE_CHANGED } from '../ai/cos/assistanceMode.ts'
 import { markActiveSpanFailed, withSpan, withTraceparent } from '../observability/tracing.ts'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
@@ -582,7 +582,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         // rather than re-queueing the same checkpoint indefinitely.
         if (idleSlices >= 3) {
           const reason = 'builder_v2_continuation_no_progress'
-          const reply = historyReply(`Builder V2 stopped after three consecutive work slices without a new tool receipt or source revision. No verification was completed. The workspace is preserved.\n\n${progress}${budgetReport}`, job.workspaceId, files)
+          const reply = historyReply(`${assistanceCopy(BUILDER_RESULT_STALLED, job.metadata.responseLanguage)}\n\n${progress}${budgetReport}`, job.workspaceId, files)
           await finishBuilderJob({
             jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
             status: 'failed', reply, error: reason,
@@ -592,7 +592,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           return
         }
         const checkpoint: BuilderV2Checkpoint = { ...current, idleSlices }
-        const reply = historyReply(`Builder V2 saved its progress and will continue automatically. Verification is not complete.\n\n${progress}${budgetReport}`, job.workspaceId, files)
+        const reply = historyReply(`${assistanceCopy(BUILDER_RESULT_CONTINUING, job.metadata.responseLanguage)}\n\n${progress}${budgetReport}`, job.workspaceId, files)
         const { data, error } = await db.rpc('pause_builder_job_slice', {
           p_job_id: job.id, p_user_id: job.userId, p_generation: job.claimGeneration,
           p_checkpoint: checkpoint, p_reply: reply,
@@ -648,12 +648,10 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         .map(step => String((step.output as { requestedCommand?: unknown } | undefined)?.requestedCommand ?? '')).filter(Boolean)
       const syntaxOnly = commandsProven.length > 0
         && commandsProven.every(command => /^node\\s+(?:--check|-c)\\s+/i.test(command.trim()))
-      const proofDescription = syntaxOnly
-        ? 'Builder V2 passed a JavaScript syntax check only; runtime behavior and defect repair were not verified.'
-        : 'Builder V2 verified the workspace with recorded host test execution.'
+      // A syntax check alone never reads as a working result (#4816). The failure code stays in the job's error column.
       const reply = acceptanceReport ? historyReply(acceptanceReport, job.workspaceId, files) : historyReply(success
-        ? `${proofDescription} ${syntaxOnly ? '' : (cycle.result?.summary || '')}${publicationReport}${budgetReport}`
-        : `Builder V2 could not complete verification: ${publicationError || acceptance.failureCode || finalProof.failureCode || reason}\n\n${progress}${publicationReport}${budgetReport}`, job.workspaceId, files)
+        ? `${assistanceCopy(syntaxOnly ? BUILDER_RESULT_SYNTAX_ONLY : BUILDER_RESULT_DONE, job.metadata.responseLanguage)}${publicationReport}${budgetReport}`
+        : `${assistanceCopy(BUILDER_RESULT_NOT_FINISHED, job.metadata.responseLanguage)}\n\n${progress}${publicationReport}${budgetReport}`, job.workspaceId, files)
       await finishBuilderJob({
         jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
         status: success ? 'succeeded' : 'failed', reply, error: success ? null : (publicationError || acceptance.failureCode || finalProof.failureCode || reason),

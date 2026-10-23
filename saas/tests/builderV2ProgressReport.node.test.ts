@@ -39,6 +39,8 @@ test('an early report lists missing files; a later change marks older results as
 test('the paused and final V2 replies both carry the report', () => {
   const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
   assert.match(runner, /const progress = builderV2ProgressReport\(job\.objective, files, cycle\.result\?\.steps \?\? \[\],\s+\{ current: job\.claimGeneration, max: MAX_WORK_SLICES \}\)/)
-  assert.match(runner, /Verification is not complete\.\\n\\n\$\{progress\}\$\{budgetReport\}`/)
-  assert.match(runner, /could not complete verification: \$\{publicationError \|\| acceptance\.failureCode \|\| finalProof\.failureCode \|\| reason\}\\n\\n\$\{progress\}\$\{publicationReport\}\$\{budgetReport\}`/)
+  assert.match(runner, /assistanceCopy\(BUILDER_RESULT_CONTINUING, job\.metadata\.responseLanguage\)\}\\n\\n\$\{progress\}\$\{budgetReport\}`/)
+  assert.match(runner, /assistanceCopy\(BUILDER_RESULT_NOT_FINISHED, job\.metadata\.responseLanguage\)\}\\n\\n\$\{progress\}\$\{publicationReport\}\$\{budgetReport\}`/)
+  // The exact failure code is diagnosis data: it stays in the job's error column, not the person's message.
+  assert.match(runner, /status: success \? 'succeeded' : 'failed', reply, error: success \? null : \(publicationError \|\| acceptance\.failureCode \|\| finalProof\.failureCode \|\| reason\)/)
 })

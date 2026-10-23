@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {builderV2IdleSliceCount} from '../lib/builder/agent-v2.ts'
+import {builderV2IdleSliceCount, builderV2DecimalAssertionMismatch} from '../lib/builder/agent-v2.ts'
 const base={version:2,workspaceId:'w',objectiveDigest:'o',workspaceDigest:'d',steps:[],revision:22,verifiedRevision:-1,unproductive:5,lastReceipt:''} as const
 test('V2 stops requeueing three consecutive empty slices',()=>{
  let prior:any={...base,idleSlices:0}
@@ -41,4 +41,23 @@ test('V2 idle continuation uses checkpoint-derived recovery guidance instead of 
   assert.match(source, /saved\?\.idleSlices \? \{ continuationRecovery:/)
   assert.match(source, /Do not list files or finish\. Write the named missingRequiredFiles/)
   assert.match(source, /continuationRecovery:[\s\S]*?idleSlices: saved\.idleSlices/)
+})
+
+test('V2 recovery escalates repeated failed tests instead of endlessly oscillating edits', () => {
+ const source = readFileSync(new URL('../lib/builder/agent-v2.ts', import.meta.url), 'utf8')
+ assert.match(source, /failedRuns >= 3/)
+ assert.match(source, /Repeated host test failures have already consumed multiple repair rounds/)
+ assert.match(source, /floating-point semantics/)
+})
+
+test('decimal assertion detector matches actual host error output, not literal backslash sequences', () => {
+ const output = [
+  'AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:',
+  '  + actual - expected',
+  '  + 0.3',
+  '  - 0.30000000000000004',
+ ].join('\n')
+ assert.equal(builderV2DecimalAssertionMismatch(output), true)
+ assert.equal(builderV2DecimalAssertionMismatch('AssertionError: + 4\\n- 5'), false)
+ assert.equal(builderV2DecimalAssertionMismatch('0.3 0.30000000000000004'), false)
 })

@@ -63,6 +63,14 @@ const SYSTEM_PROMPT = [
   'If the task explicitly requires browser verification of a URL, open that exact URL with browser_cli and then call browser_cli snapshot after your last source change, inspect any browser failure, repair it, then retest before finishing.',
 ].join('\n')
 
+/** Detect the numeric precision mismatch seen in a real failing Builder test.
+ * This is guidance only: a failing test never counts as accepted verification. */
+export function builderV2DecimalAssertionMismatch(diagnostic: string): boolean {
+  return diagnostic.includes('AssertionError')
+    && diagnostic.includes('0.30000000000000004')
+    && /(?:^|\n)\s*[+-]?\s*0\.3\s*$/m.test(diagnostic)
+}
+
 const hasSyntaxError = (receipt: BuilderV2Receipt) =>
   typeof (receipt.output as { syntaxError?: unknown } | undefined)?.syntaxError === 'string'
 
@@ -628,8 +636,14 @@ export class BuilderV2Agent {
         targets.push({ test: testPath, sources: [...new Set(sources)] })
       }
       const error = /(?:TypeError|ReferenceError|SyntaxError):[^\n]*/.exec(diagnostic)?.[0] ?? diagnostic.slice(0, 280)
-      return { error, targets, runtimeTargets,
-        instruction: 'Use the actual failing command, caller imports and source API to diagnose the failure. Prefer a targeted edit_file operation; avoid repeating read_file calls. Do not change tests merely to silence failures. Host verification runs after edits.' }
+      const failedRuns = steps.filter(step => step.tool === 'run_tests' && !step.ok).length
+      const decimalAssertion = builderV2DecimalAssertionMismatch(diagnostic)
+      return { error, targets, runtimeTargets, failedRuns,
+        instruction: failedRuns >= 3
+          ? 'Repeated host test failures have already consumed multiple repair rounds. Do not repeat the prior change strategy. Compare the exact assertion actual and expected with source behavior, including JavaScript floating-point semantics. Correct the root mismatch rather than oscillating code changes; change tests only if their assertion is demonstrably incorrect, never to suppress a legitimate failure. Host verification must pass after the final edit.'
+          : decimalAssertion
+            ? 'The failure may involve JavaScript floating-point representation. Check whether the test expectation matches the task contract and correct runtime arithmetic; avoid changing working math merely to satisfy a mistaken exact decimal expectation.'
+            : 'Use the actual failing command, caller imports and source API to diagnose the failure. Prefer a targeted edit_file operation; avoid repeating read_file calls. Do not change tests merely to silence failures. Host verification runs after edits.' }
     }
     for (let calls = 0; calls < maxSteps && steps.length < BUILDER_V2_MAX_RECEIPTS; calls++) {
       checkBuilderInferenceDeadline()

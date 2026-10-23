@@ -268,7 +268,8 @@ export function isOwnerRepairWithoutSource(input: {
     && (isRepairObjective(input.objective)
       // A bare Builder admission error is actionable platform failure evidence
       // only for the authenticated owner on the no-source repair lane.
-      || /^builder_objective_not_coding$/i.test(input.objective.trim()))
+      || /^builder_objective_not_coding$/i.test(input.objective.trim())
+      || /^This request does not contain an executable coding or design objective with concrete source evidence\. No Builder job was created and no code was run\.?$/i.test(input.objective.trim()))
 }
 
 export function signalBoostDeployedRepairTarget(

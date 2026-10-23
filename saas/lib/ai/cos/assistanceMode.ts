@@ -193,17 +193,17 @@ export const APPROVAL_HINT: Copy = { en: 'Or reply “{word}”.', es: 'O respon
 // code such as builder_v2_continuation_no_progress; the owner: "the users do not care what the Builder does in the
 // background, they want results". The exact failure code stays in the job's error column for diagnosis.
 export const BUILDER_RESULT_DONE: Copy = {
-  en: 'Done. Your project is built and its tests pass. Download the files below.',
-  es: 'Listo. Tu proyecto está creado y sus pruebas pasan. Descarga los archivos abajo.',
-  pt: 'Pronto. Seu projeto foi criado e os testes passaram. Baixe os arquivos abaixo.',
-  pl: 'Gotowe. Projekt jest zbudowany, a jego testy przechodzą. Pobierz pliki poniżej.',
-  ru: 'Готово. Проект создан, и его тесты проходят. Скачайте файлы ниже.',
-  de: 'Fertig. Ihr Projekt ist erstellt und die Tests laufen erfolgreich. Laden Sie die Dateien unten herunter.',
-  fr: 'Terminé. Votre projet est créé et ses tests réussissent. Téléchargez les fichiers ci-dessous.',
-  it: 'Fatto. Il progetto è pronto e i test passano. Scarica i file qui sotto.',
-  ja: '完了しました。プロジェクトが作成され、テストに合格しました。下のファイルをダウンロードしてください。',
-  ko: '완료했습니다. 프로젝트가 만들어졌고 테스트를 통과했습니다. 아래에서 파일을 내려받으세요.',
-  ar: 'تم. أُنشئ مشروعك ونجحت اختباراته. نزّل الملفات أدناه.',
+  en: 'Done. Your project is built and every check I ran passed. Download the files below.',
+  es: 'Listo. Tu proyecto está creado y todas las comprobaciones que ejecuté pasaron. Descarga los archivos abajo.',
+  pt: 'Pronto. Seu projeto foi criado e todas as verificações que executei passaram. Baixe os arquivos abaixo.',
+  pl: 'Gotowe. Projekt jest zbudowany i wszystkie uruchomione przeze mnie sprawdzenia przeszły. Pobierz pliki poniżej.',
+  ru: 'Готово. Проект создан, и все запущенные мной проверки пройдены. Скачайте файлы ниже.',
+  de: 'Fertig. Ihr Projekt ist erstellt und alle von mir ausgeführten Prüfungen waren erfolgreich. Laden Sie die Dateien unten herunter.',
+  fr: 'Terminé. Votre projet est créé et toutes les vérifications que j’ai lancées ont réussi. Téléchargez les fichiers ci-dessous.',
+  it: 'Fatto. Il progetto è pronto e tutti i controlli che ho eseguito sono riusciti. Scarica i file qui sotto.',
+  ja: '完了しました。プロジェクトが作成され、実行したすべてのチェックに合格しました。下のファイルをダウンロードしてください。',
+  ko: '완료했습니다. 프로젝트가 만들어졌고 실행한 모든 검사를 통과했습니다. 아래에서 파일을 내려받으세요.',
+  ar: 'تم. أُنشئ مشروعك ونجحت كل الفحوصات التي شغّلتها. نزّل الملفات أدناه.',
 }
 
 export const BUILDER_RESULT_SYNTAX_ONLY: Copy = {

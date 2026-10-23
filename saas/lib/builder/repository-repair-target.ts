@@ -264,7 +264,11 @@ export function isOwnerRepairWithoutSource(input: {
 }): boolean {
   return input.isOwner === true && !input.hasAttachedSource && !input.hasRepositoryImport
     && !input.workspaceHasFiles && !input.hasProjectContext
-    && !isExplicitIsolatedProjectBuild(input.objective) && isRepairObjective(input.objective)
+    && !isExplicitIsolatedProjectBuild(input.objective)
+    && (isRepairObjective(input.objective)
+      // A bare Builder admission error is actionable platform failure evidence
+      // only for the authenticated owner on the no-source repair lane.
+      || /^builder_objective_not_coding$/i.test(input.objective.trim()))
 }
 
 export function signalBoostDeployedRepairTarget(

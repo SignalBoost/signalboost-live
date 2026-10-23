@@ -7,7 +7,7 @@ const request = (objective: string, isOwner = true) => ({ objective, isOwner, ha
 
 test('owner pasted full Builder rejection is actionable platform failure evidence', () => {
   assert.equal(isOwnerRepairWithoutSource(request(message)), true)
-  assert.equal(isOwnerRepairWithoutSource(request(message.replace(/\\.$/, ''))), true)
+  assert.equal(isOwnerRepairWithoutSource(request(message.slice(0, -1))), true)
 })
 
 test('admission failure routing cannot bypass owner or project boundaries', () => {

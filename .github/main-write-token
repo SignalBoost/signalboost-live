@@ -1,2 +1,2 @@
-base_sha=4224be8eda6a40df6ff89ea16b4ab64cb8e82778
-branch=fix/builder-plain-result-messages-20261022
+base_sha=a6c294ccc62d53ae6a8c165add098659dca8e585
+branch=fix/builder-resume-read-write-deadlock-20261022

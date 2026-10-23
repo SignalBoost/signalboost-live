@@ -1,2 +1,2 @@
-base_sha=bb762ce2cba9795937ee27aeaeb221cb21af9fd7
-branch=fix/plain-running-job-message-20261023
+base_sha=af37ce2d255b45e9041e68d6211ce16330ffaef4
+branch=fix/builder-copied-transcript-guard-20261023

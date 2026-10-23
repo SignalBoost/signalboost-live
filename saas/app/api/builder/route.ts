@@ -262,6 +262,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     objective = readBuilderObjective(body).objective
+    const copiedTranscript = builderCopiedTranscriptBlocker(objective)
+    if (copiedTranscript) return noStore(copiedTranscript, { status: 422 })
     const admissionBlocker = builderExecutionAdmissionBlocker(objective)
     if (admissionBlocker) return noStore(admissionBlocker, { status: 422 })
     conversationId = String(body?.conversationId || '').trim() || crypto.randomUUID()

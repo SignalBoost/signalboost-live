@@ -64,6 +64,11 @@ export default function DeveloperPage() {
   const [trace, setTrace] = useState<BuilderReply['trace']>([])
   const [error, setError] = useState('')
   const [certification, setCertification] = useState<CertificationSummary>({ earnedLevel: 0, attempts: 0 })
+  const [canCertify, setCanCertify] = useState(false)
+  const [certJobId, setCertJobId] = useState('')
+  const [certBusy, setCertBusy] = useState(false)
+  const [certMessage, setCertMessage] = useState('')
+  const certSubmissionRef = useRef(false)
   const [running, setRunning] = useState(false)
   const [liveProgress, setLiveProgress] = useState<BuilderProgress | null>(null)
   const [activeJobId, setActiveJobId] = useState('')
@@ -94,6 +99,7 @@ export default function DeveloperPage() {
       sessionStorage.removeItem(BUILDER_HANDOFF_FILES_KEY)
     } catch { sessionStorage.removeItem(BUILDER_HANDOFF_FILES_KEY) }
     void loadWorkspaces()
+    void loadCertification()
     try {
       const saved = JSON.parse(localStorage.getItem(BUILDER_LAST_JOB_KEY) || 'null') as { jobId?: string; workspaceId?: string; conversationId?: string } | null
       if (saved?.jobId) {
@@ -124,6 +130,78 @@ export default function DeveloperPage() {
       setError(cause instanceof Error ? cause.message : 'Could not reload the last Builder job.')
     } finally {
       setRunning(false)
+    }
+  }
+
+  async function loadCertification() {
+    try {
+      const response = await fetch('/api/admin/builder-certification', { cache: 'no-store' })
+      if (!response.ok) return // Only the authenticated owner can see or run certification.
+      const data = await response.json()
+      setCanCertify(true)
+      if (typeof data.summary?.earnedLevel === 'number' && typeof data.summary?.attempts === 'number') {
+        setCertification(data.summary)
+      }
+      const savedId = sessionStorage.getItem('builder-level4-active-job-v1') || ''
+      if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(savedId)) setCertJobId(savedId)
+    } catch { /* Owner certification is optional; Builder remains available. */ }
+  }
+
+  useEffect(() => {
+    if (!certJobId) return
+    let disposed = false
+    const check = async () => {
+      try {
+        const response = await fetch(`/api/builder?jobId=${encodeURIComponent(certJobId)}&observeOnly=true`, { cache: 'no-store' })
+        const data = await response.json()
+        if (disposed) return
+        if (!response.ok) {
+          setCertMessage(data.error || 'Unable to read certification job.')
+          return
+        }
+        if (['succeeded', 'failed', 'cancelled', 'canceled'].includes(data.status)) {
+          setCertBusy(false)
+          setCertMessage(`Level 4 probe ${data.status}. Job ${certJobId}. This does not independently certify Level 4.`)
+          sessionStorage.removeItem('builder-level4-active-job-v1')
+          setCertJobId('')
+          void loadCertification()
+        } else {
+          setCertMessage(`Level 4 job ${certJobId}: ${data.status || 'running'} · ${data.progress?.phase || 'processing'}.`)
+        }
+      } catch {
+        if (!disposed) setCertMessage(`Unable to check job ${certJobId}. Its saved ID is preserved; do not submit another probe.`)
+      }
+    }
+    void check()
+    const timer = window.setInterval(() => { void check() }, 5000)
+    return () => { disposed = true; window.clearInterval(timer) }
+  }, [certJobId])
+
+  async function runLevel4Certification() {
+    if (!canCertify || certBusy || certJobId || certSubmissionRef.current) return
+    certSubmissionRef.current = true
+    setCertBusy(true)
+    setCertMessage('Submitting one live, potentially billable Level 4 Builder V2 probe…')
+    try {
+      const response = await fetch('/api/admin/builder-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ caseId: 'builder_v2_end_to_end_reliability_v1' }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.jobId) {
+        setCertMessage(data.error || `Certification request failed (HTTP ${response.status}).`)
+        setCertBusy(false)
+        return
+      }
+      sessionStorage.setItem('builder-level4-active-job-v1', data.jobId)
+      setCertJobId(data.jobId)
+      setCertMessage(`Level 4 job ${data.jobId} accepted. Monitoring saved progress without restarting it.`)
+    } catch {
+      setCertMessage('Certification submission response was lost. A job may have started; check Builder History before running another probe.')
+      // Fail closed rather than duplicate an expensive request after an unknown response.
+    } finally {
+      certSubmissionRef.current = false
     }
   }
 
@@ -307,6 +385,11 @@ export default function DeveloperPage() {
           <h1 style={{ margin: '8px 0', fontSize: 'clamp(28px, 5vw, 44px)' }}>{c('title')}</h1>
           <p style={{ margin: 0, maxWidth: 700, color: '#94a3b8', lineHeight: 1.55 }}>{c('intro')}</p>
           <p style={{ margin: '8px 0 0', color: '#67e8f9', fontSize: 13 }}>{c('certification').replace('{level}', String(certification.earnedLevel)).replace('{attempts}', String(certification.attempts))}</p>
+          {canCertify ? <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+            <button type="button" onClick={() => void runLevel4Certification()} disabled={certBusy || Boolean(certJobId)} style={{ ...secondaryButton, opacity: certBusy || certJobId ? .55 : 1 }}>Run Level 4 live certification</button>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Owner only · real model usage may incur costs · one probe per click</span>
+            {certMessage ? <p role="status" aria-live="polite" style={{ width: '100%', color: '#cbd5e1', fontSize: 13, margin: 0 }}>{certMessage}</p> : null}
+          </div> : null}
         </header>
         <section style={{ border: '1px solid #1e293b', borderRadius: 18, background: '#0f172a', padding: 20, display: 'grid', gap: 14 }}>
           <label style={{ display: 'grid', gap: 8, fontWeight: 700 }}>

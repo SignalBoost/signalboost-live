@@ -24,6 +24,7 @@ import {
 } from '@/lib/builder/request-contract'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { builderExecutionAdmissionBlocker } from '@/lib/builder/execution-admission'
+import { builderCopiedTranscriptBlocker } from '@/lib/builder/copied-transcript-guard'
 import { isExplicitIsolatedProjectBuild } from '@/lib/builder/isolated-project-intent'
 import { wantsIsolatedPublication } from '@/lib/builder/isolated-publication'
 import { assistanceCopy, BUILDER_RUNNING, readPendingApproval } from '@/lib/ai/cos/assistanceMode'

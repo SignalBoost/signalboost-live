@@ -42,3 +42,11 @@ test('V2 idle continuation uses checkpoint-derived recovery guidance instead of 
   assert.match(source, /Do not list files or finish\. Write the named missingRequiredFiles/)
   assert.match(source, /continuationRecovery:[\s\S]*?idleSlices: saved\.idleSlices/)
 })
+
+
+test('stalled V2 continuation names authoritative failed-test evidence and directs a code edit', () => {
+  const source = readFileSync(new URL('../lib/builder/agent-v2.ts', import.meta.url), 'utf8')
+  assert.match(source, /authoritative latestFailedTest is already supplied/)
+  assert.match(source, /Use activeRepair and openFiles to identify the implementation file, edit that file now/)
+  assert.match(source, /Do not repeat read_file of a path already present in openFiles/)
+})

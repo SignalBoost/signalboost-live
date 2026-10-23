@@ -4,10 +4,11 @@ import { replanSupersededRepositoryRepair, type SupersededRepositoryRepairReplan
 import type { SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
 import { VercelRepositoryRepairSession } from './vercel-repository-repair-session.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
+import { assistanceCopy, BUILDER_RUNNING } from '../ai/cos/assistanceMode.ts'
 import { currentCosHarnessIngress } from '@/platform-harness/adapters/cos-ingress'
 
-export function repositoryRepairRunningReply(jobId: string): string {
-  return `Platform Engineer is running job ${jobId} under Software Specialist control. Progress and the final result are durable in History; the action will not be replayed.`
+export function repositoryRepairRunningReply(language: unknown): string {
+  return assistanceCopy(BUILDER_RUNNING, language)
 }
 
 function shortSha(value: string | null | undefined): string {
@@ -93,7 +94,7 @@ export async function enqueueSignalBoostRepositoryRepairJob(input: {
     ? `Software Specialist found that the reported failure targets ${shortSha(targetFreshness.reportedCommitSha)} on ${target.branch}, while the verified current head is ${shortSha(targetFreshness.currentBranchHeadSha)}. It is revalidating the current head now and will continue automatically if the failure still reproduces.`
     : unverifiable
       ? `Software Specialist could not verify that ${shortSha(targetFreshness.reportedCommitSha)} is still a safe current head of ${target.branch}. Repository mutation remains blocked because current state could not be verified.`
-      : repositoryRepairRunningReply(jobId)
+      : repositoryRepairRunningReply(input.responseLanguage)
 
   await workspace.ensureWorkspace(workspaceId)
   await workspace.setObjective(workspaceId, objective)

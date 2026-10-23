@@ -20,7 +20,7 @@ import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase
 import { extractBuilderSourceFiles, planDebugFileJob } from '@/lib/builder/debug-file-job'
 import { enqueueBuilderJob } from '@/lib/builder/job-store'
 import { readBuilderEvidenceJob } from '@/lib/builder/job-store'
-import { DEFAULT_ASSISTANCE_MODE, normalizeAssistanceMode, type AssistanceMode } from '@/lib/ai/cos/assistanceMode'
+import { assistanceCopy, BUILDER_RUNNING, DEFAULT_ASSISTANCE_MODE, normalizeAssistanceMode, type AssistanceMode } from '@/lib/ai/cos/assistanceMode'
 import { storedAssistanceMode as storedAssistanceModeFor } from '@/lib/ai/cos/assistanceModeServer'
 import { builderEvidenceReply, isBuilderEvidenceRequest, isBuilderProjectQuestion } from '@/lib/builder/execution-evidence'
 import { runBuilderJob } from '@/lib/builder/job-runner'
@@ -111,8 +111,8 @@ const SOURCE_REQUEST_REPLY: Readonly<Record<SupportedLanguage, string>> = Object
   ar: 'يمكنني إصلاح ذلك. أرفق الملف أو الملفات المعنية، أو الصق الشيفرة هنا، أو أرسل رابط مستودع GitHub عام، وسأجد المشكلة وأصلحها وأشغّل الاختبارات ثم أعيد إليك الملفات المصحّحة.',
 })
 
-function runningReply(jobId: string): string {
-  return `COS Software Specialist is running Builder job ${jobId}. Progress and the final result are durable in History; the action will not be replayed.`
+function runningReply(language: unknown): string {
+  return assistanceCopy(BUILDER_RUNNING, language)
 }
 
 /** The resolved assistance mode and reply language, carried on the Builder job for its worker. */
@@ -376,7 +376,7 @@ async function tryCosSoftwareSpecialistLegacy(
   const jobId = crypto.randomUUID()
   const debugPlan = repositoryTarget ? null : planDebugFileJob(objective, stagedFiles)
   if (debugPlan) return NextResponse.json({ reply: 'Legacy Builder debug mode is retired. Use a fresh Builder V2 request.', execution_allowed: false, source: 'builder-v2-only' }, { status: 409 })
-  const reply = runningReply(jobId)
+  const reply = runningReply(resolveResponseLanguage(rawObjective, input.body?.context?.language))
   const specialistSkill = debugPlan ? 'software.repair' : 'software.build'
 
   try {

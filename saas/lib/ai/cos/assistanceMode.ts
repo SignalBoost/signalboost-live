@@ -261,3 +261,34 @@ export const BUILDER_RESULT_CONTINUING: Copy = {
   ko: '아직 작업 중입니다. 진행 상황이 저장되었으며 자동으로 계속합니다.',
   ar: 'ما زلت أعمل. التقدم محفوظ وسأتابع تلقائيًا.',
 }
+
+// While a Builder job runs. Production 2026-10-23: "COS Builder is running job … Progress and the final result are
+// durable in History; the action will not be replayed." The job id stays in the response data, not the sentence.
+export const BUILDER_RUNNING: Copy = {
+  en: 'I’m on it. You can leave this page; the result will appear in History.',
+  es: 'Estoy en ello. Puedes salir de esta página; el resultado aparecerá en el Historial.',
+  pt: 'Estou cuidando disso. Você pode sair desta página; o resultado aparecerá no Histórico.',
+  pl: 'Zajmuję się tym. Możesz opuścić tę stronę; wynik pojawi się w Historii.',
+  ru: 'Уже работаю. Можно уйти с этой страницы — результат появится в Истории.',
+  de: 'Ich kümmere mich darum. Sie können diese Seite verlassen; das Ergebnis erscheint im Verlauf.',
+  fr: 'Je m’en occupe. Vous pouvez quitter cette page ; le résultat apparaîtra dans l’Historique.',
+  it: 'Ci sto lavorando. Puoi lasciare questa pagina; il risultato apparirà nella Cronologia.',
+  ja: '対応中です。このページを離れても大丈夫です。結果は履歴に表示されます。',
+  ko: '작업 중입니다. 이 페이지를 떠나셔도 됩니다. 결과는 기록에 표시됩니다.',
+  ar: 'أعمل على ذلك. يمكنك مغادرة هذه الصفحة؛ ستظهر النتيجة في السجل.',
+}
+
+// A chat answer still being prepared after the browser request ended.
+export const COS_TURN_ACCEPTED: Copy = {
+  en: 'Got it. I’m working on your answer; it will appear here and in History.',
+  es: 'Entendido. Estoy preparando tu respuesta; aparecerá aquí y en el Historial.',
+  pt: 'Entendi. Estou preparando sua resposta; ela aparecerá aqui e no Histórico.',
+  pl: 'Rozumiem. Przygotowuję odpowiedź; pojawi się tutaj i w Historii.',
+  ru: 'Понял. Готовлю ответ — он появится здесь и в Истории.',
+  de: 'Verstanden. Ich arbeite an Ihrer Antwort; sie erscheint hier und im Verlauf.',
+  fr: 'Compris. Je prépare votre réponse ; elle apparaîtra ici et dans l’Historique.',
+  it: 'Ricevuto. Sto preparando la risposta; apparirà qui e nella Cronologia.',
+  ja: '承知しました。回答を準備しています。ここと履歴に表示されます。',
+  ko: '알겠습니다. 답변을 준비하고 있습니다. 여기와 기록에 표시됩니다.',
+  ar: 'تم. أُعدّ إجابتك الآن؛ ستظهر هنا وفي السجل.',
+}

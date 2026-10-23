@@ -190,7 +190,7 @@ test('saved workspace selection retrieves same-owner active job without a second
   assert.match(store, /\.eq\('user_id', input\.userId\)\.eq\('workspace_id', input\.workspaceId\)/)
   assert.match(route, /const previous = await readLatestBuilderWorkspaceJob/)
   assert.match(route, /previous\.status === 'paused'/)
-  assert.match(route, /resumable: true, reply: runningReply\(previous\.id\)/)
+  assert.match(route, /resumable: true, reply: runningReply\(previous\.metadata\.responseLanguage\)/)
   assert.match(page, /if \(data\.activeJobId\) void restoreJob\(data\.activeJobId\)/)
 })
 

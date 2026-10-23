@@ -9,6 +9,8 @@ import * as admission from '../lib/builder/execution-admission.ts'
 import * as requestContract from '../lib/builder/request-contract.ts'
 import * as isolatedIntent from '../lib/builder/isolated-project-intent.ts'
 import * as publication from '../lib/builder/isolated-publication.ts'
+import * as assistance from '../lib/ai/cos/assistanceMode.ts'
+const { BUILDER_RUNNING } = assistance
 
 const objective = readFileSync(new URL('./fixtures/builder-isolated-acceptance.txt', import.meta.url), 'utf8')
 const userId = '11111111-1111-4111-8111-111111111111'
@@ -55,6 +57,8 @@ function setup(owner: boolean, specialistResponse?: any, forceClassifierFalse = 
   const modules: Record<string, any> = {
     'next/server': { NextResponse, after: () => { calls.scheduled++ } },
     '@/lib/auth/access': { getAccess: async () => ({ userId, isOwner: owner }) },
+    // The person-facing progress sentence is real product copy, not an external port.
+    '@/lib/ai/cos/assistanceMode': { assistanceCopy: assistance.assistanceCopy, BUILDER_RUNNING: assistance.BUILDER_RUNNING },
     '@/lib/auth/publicAuditIdentity': { publicAuditUserId: () => userId, withPublicAuditIdentity: (_: any, work: any) => work() },
     '@/lib/auth/publicDeliveryScope': { withPublicDeliveryScope: (work: any) => work() },
     '@/lib/ai/cos/cosReasoningRolePolicy': forceClassifierFalse ? { ...roles, isConciergeBuilderObjective: () => false } : roles,
@@ -142,7 +146,8 @@ test('an admitted isolated build queues V2 once and carries the same job ID thro
   assert.equal(result.jobId, calls.jobs[0].jobId)
   assert.equal(result.workspaceId, calls.jobs[0].workspaceId)
   assert.notEqual(result.workspaceId, selectedWorkspace)
-  assert.match(result.reply, new RegExp(result.jobId))
+  // The job id travels in the response data; the person reads a plain progress sentence (Production 2026-10-23).
+  assert.equal(result.reply, BUILDER_RUNNING.en)
   assert.equal(result.orchestrator, undefined)
 })
 

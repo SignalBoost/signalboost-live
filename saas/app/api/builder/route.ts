@@ -26,7 +26,7 @@ import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase
 import { builderExecutionAdmissionBlocker } from '@/lib/builder/execution-admission'
 import { isExplicitIsolatedProjectBuild } from '@/lib/builder/isolated-project-intent'
 import { wantsIsolatedPublication } from '@/lib/builder/isolated-publication'
-import { readPendingApproval } from '@/lib/ai/cos/assistanceMode'
+import { assistanceCopy, BUILDER_RUNNING, readPendingApproval } from '@/lib/ai/cos/assistanceMode'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -47,7 +47,7 @@ function noStore(payload: unknown, init?: ResponseInit): NextResponse {
 function requestedJobReply(job: BuilderJobRecord): NextResponse {
   return noStore({
     jobId: job.id, workspaceId: job.workspaceId, conversationId: job.conversationId,
-    status: job.status, resumable: true, reply: runningReply(job.id),
+    status: job.status, resumable: true, reply: runningReply(job.metadata.responseLanguage),
   }, { status: 202 })
 }
 
@@ -105,8 +105,8 @@ export function builderProgressSnapshot(job: Pick<BuilderJobRecord, 'checkpoint'
   }
 }
 
-function runningReply(jobId: string): string {
-  return `COS Builder is running job ${jobId}. Progress and the final result are durable in History; the action will not be replayed.`
+function runningReply(language: unknown): string {
+  return assistanceCopy(BUILDER_RUNNING, language)
 }
 
 function objectiveFailureReply(code: BuilderObjectiveFailureCode): string {
@@ -166,7 +166,7 @@ export async function GET(request: Request) {
             ? 'Queued — waiting for model capacity. Builder will resume this saved job automatically.'
             : job.status === 'paused' && job.checkpoint?.verificationPending === true
               ? 'Files written — verifying changes. Builder will continue automatically.'
-            : job.status === 'paused' ? 'Builder saved its progress and will continue automatically. Verification is not complete yet.' : runningReply(job.id),
+            : job.status === 'paused' ? 'Builder saved its progress and will continue automatically. Verification is not complete yet.' : runningReply(job.metadata.responseLanguage),
         }, { status: 202 })
       }
       // Read-only progress readback from the same durable receipts used to verify completed jobs.
@@ -366,7 +366,7 @@ export async function POST(request: Request) {
       return noStore({
         jobId: project.activeJobId, workspaceId: project.workspaceId, conversationId,
         status: project.activeStatus || 'running',
-        resumable: true, reply: runningReply(project.activeJobId),
+        resumable: true, reply: runningReply(modeMetadata.responseLanguage),
       }, { status: 202 })
     }
     if (project.blocked) return noStore({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: 503 })
@@ -385,7 +385,7 @@ export async function POST(request: Request) {
         && (previous.status === 'queued' || previous.status === 'running' || previous.status === 'paused')) {
         return noStore({
           jobId: previous.id, workspaceId: previous.workspaceId, conversationId: previous.conversationId,
-          status: previous.status, resumable: true, reply: runningReply(previous.id),
+          status: previous.status, resumable: true, reply: runningReply(previous.metadata.responseLanguage),
         }, { status: 202 })
       }
     }
@@ -501,7 +501,7 @@ export async function POST(request: Request) {
     for (const file of files) await workspace.writeFile(workspaceId, file.path, file.content)
 
     const jobId = requestedJobId || crypto.randomUUID()
-    const reply = runningReply(jobId)
+    const reply = runningReply(modeMetadata.responseLanguage)
     try {
       await enqueueBuilderJob({
         jobId,

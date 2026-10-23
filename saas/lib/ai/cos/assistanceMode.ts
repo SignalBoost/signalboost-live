@@ -187,3 +187,77 @@ export const APPROVAL_BUTTON: Readonly<Record<ApprovalAction, Copy>> = {
 
 /** Under the button: the same approval can be typed. {word} is APPROVAL_WORD in that language. */
 export const APPROVAL_HINT: Copy = { en: 'Or reply “{word}”.', es: 'O responde «{word}».', pt: 'Ou responda “{word}”.', pl: 'Lub odpowiedz „{word}”.', ru: 'Или ответьте «{word}».', de: 'Oder antworten Sie „{word}“.', fr: 'Ou répondez « {word} ».', it: 'Oppure rispondi «{word}».', ja: '「{word}」と返信しても承認できます。', ko: '또는 “{word}”라고 답해도 됩니다.', ar: 'أو أجب بـ «{word}».' }
+
+// What a person reads when a Builder V2 job ends, in their language and without internal terms. Production
+// 2026-10-22: replies read "Builder V2 verified the workspace with recorded host test execution" or ended with a raw
+// code such as builder_v2_continuation_no_progress; the owner: "the users do not care what the Builder does in the
+// background, they want results". The exact failure code stays in the job's error column for diagnosis.
+export const BUILDER_RESULT_DONE: Copy = {
+  en: 'Done. Your project is built and every check I ran passed. Download the files below.',
+  es: 'Listo. Tu proyecto está creado y todas las comprobaciones que ejecuté pasaron. Descarga los archivos abajo.',
+  pt: 'Pronto. Seu projeto foi criado e todas as verificações que executei passaram. Baixe os arquivos abaixo.',
+  pl: 'Gotowe. Projekt jest zbudowany i wszystkie uruchomione przeze mnie sprawdzenia przeszły. Pobierz pliki poniżej.',
+  ru: 'Готово. Проект создан, и все запущенные мной проверки пройдены. Скачайте файлы ниже.',
+  de: 'Fertig. Ihr Projekt ist erstellt und alle von mir ausgeführten Prüfungen waren erfolgreich. Laden Sie die Dateien unten herunter.',
+  fr: 'Terminé. Votre projet est créé et toutes les vérifications que j’ai lancées ont réussi. Téléchargez les fichiers ci-dessous.',
+  it: 'Fatto. Il progetto è pronto e tutti i controlli che ho eseguito sono riusciti. Scarica i file qui sotto.',
+  ja: '完了しました。プロジェクトが作成され、実行したすべてのチェックに合格しました。下のファイルをダウンロードしてください。',
+  ko: '완료했습니다. 프로젝트가 만들어졌고 실행한 모든 검사를 통과했습니다. 아래에서 파일을 내려받으세요.',
+  ar: 'تم. أُنشئ مشروعك ونجحت كل الفحوصات التي شغّلتها. نزّل الملفات أدناه.',
+}
+
+export const BUILDER_RESULT_SYNTAX_ONLY: Copy = {
+  en: 'Your code is written and has no syntax errors, but it was not run, so it is not yet proven to work.',
+  es: 'Tu código está escrito y no tiene errores de sintaxis, pero no se ejecutó, así que aún no está comprobado que funcione.',
+  pt: 'Seu código foi escrito e não tem erros de sintaxe, mas não foi executado, então ainda não está comprovado que funciona.',
+  pl: 'Kod jest napisany i nie ma błędów składni, ale nie został uruchomiony, więc nie potwierdzono jeszcze, że działa.',
+  ru: 'Код написан и не содержит синтаксических ошибок, но он не запускался, поэтому его работа ещё не подтверждена.',
+  de: 'Ihr Code ist geschrieben und frei von Syntaxfehlern, wurde aber nicht ausgeführt; dass er funktioniert, ist noch nicht belegt.',
+  fr: 'Votre code est écrit et ne contient pas d’erreur de syntaxe, mais il n’a pas été exécuté : son bon fonctionnement n’est pas encore prouvé.',
+  it: 'Il codice è scritto e non ha errori di sintassi, ma non è stato eseguito, quindi non è ancora dimostrato che funzioni.',
+  ja: 'コードは作成され、構文エラーはありません。ただし実行していないため、動作はまだ確認されていません。',
+  ko: '코드는 작성되었고 구문 오류는 없지만, 실행하지 않았기 때문에 동작은 아직 확인되지 않았습니다.',
+  ar: 'كُتبت الشيفرة ولا توجد بها أخطاء في الصياغة، لكنها لم تُشغَّل، لذلك لم يثبت بعد أنها تعمل.',
+}
+
+export const BUILDER_RESULT_NOT_FINISHED: Copy = {
+  en: 'I could not finish this. What was done so far is saved below. Ask me to continue, or describe the result you want in more detail.',
+  es: 'No pude terminar esto. Lo hecho hasta ahora está guardado abajo. Pídeme que continúe o describe con más detalle el resultado que quieres.',
+  pt: 'Não consegui terminar isto. O que foi feito até agora está salvo abaixo. Peça para eu continuar ou descreva com mais detalhes o resultado que você quer.',
+  pl: 'Nie udało mi się tego dokończyć. Dotychczasowa praca jest zapisana poniżej. Poproś mnie o kontynuację albo opisz dokładniej oczekiwany wynik.',
+  ru: 'Мне не удалось это закончить. Уже сделанное сохранено ниже. Попросите меня продолжить или опишите нужный результат подробнее.',
+  de: 'Ich konnte das nicht abschließen. Das bisher Erledigte ist unten gespeichert. Bitten Sie mich weiterzumachen oder beschreiben Sie das gewünschte Ergebnis genauer.',
+  fr: 'Je n’ai pas pu terminer. Ce qui a été fait est enregistré ci-dessous. Demandez-moi de continuer ou décrivez plus précisément le résultat souhaité.',
+  it: 'Non sono riuscito a completarlo. Quanto fatto finora è salvato qui sotto. Chiedimi di continuare o descrivi meglio il risultato che vuoi.',
+  ja: '完了できませんでした。ここまでの作業は下に保存されています。続行を依頼するか、求める結果をもう少し詳しく教えてください。',
+  ko: '이 작업을 끝내지 못했습니다. 지금까지 한 작업은 아래에 저장되어 있습니다. 계속하라고 요청하시거나 원하는 결과를 더 자세히 설명해 주세요.',
+  ar: 'لم أتمكن من إنهاء هذا. ما أُنجز حتى الآن محفوظ أدناه. اطلب مني المتابعة أو صف النتيجة التي تريدها بتفصيل أكثر.',
+}
+
+export const BUILDER_RESULT_STALLED: Copy = {
+  en: 'I stopped because I was not making progress. What was done so far is saved below. Tell me more about what you want built and I will try again.',
+  es: 'Me detuve porque no estaba avanzando. Lo hecho hasta ahora está guardado abajo. Cuéntame más sobre lo que quieres construir y lo intentaré de nuevo.',
+  pt: 'Parei porque não estava avançando. O que foi feito até agora está salvo abaixo. Conte mais sobre o que você quer construir e tentarei de novo.',
+  pl: 'Zatrzymałem się, bo praca nie postępowała. Dotychczasowa praca jest zapisana poniżej. Opisz dokładniej, co mam zbudować, a spróbuję ponownie.',
+  ru: 'Я остановился, потому что работа не продвигалась. Уже сделанное сохранено ниже. Расскажите подробнее, что нужно создать, и я попробую снова.',
+  de: 'Ich habe angehalten, weil ich nicht vorankam. Das bisher Erledigte ist unten gespeichert. Beschreiben Sie genauer, was entstehen soll, dann versuche ich es erneut.',
+  fr: 'Je me suis arrêté car je n’avançais plus. Ce qui a été fait est enregistré ci-dessous. Dites-m’en plus sur ce que vous voulez créer et je réessaierai.',
+  it: 'Mi sono fermato perché non stavo facendo progressi. Quanto fatto finora è salvato qui sotto. Dimmi di più su cosa vuoi costruire e riproverò.',
+  ja: '作業が進まなかったため停止しました。ここまでの作業は下に保存されています。作りたいものをもう少し詳しく教えていただければ、もう一度試します。',
+  ko: '진전이 없어 작업을 멈췄습니다. 지금까지 한 작업은 아래에 저장되어 있습니다. 만들고 싶은 것을 더 자세히 알려 주시면 다시 시도하겠습니다.',
+  ar: 'توقفت لأنني لم أكن أحرز تقدمًا. ما أُنجز حتى الآن محفوظ أدناه. أخبرني بالمزيد عما تريد بناءه وسأحاول مجددًا.',
+}
+
+export const BUILDER_RESULT_CONTINUING: Copy = {
+  en: 'Still working. Progress is saved and I will continue automatically.',
+  es: 'Sigo trabajando. El progreso está guardado y continuaré automáticamente.',
+  pt: 'Ainda trabalhando. O progresso está salvo e continuarei automaticamente.',
+  pl: 'Nadal pracuję. Postęp jest zapisany i będę kontynuować automatycznie.',
+  ru: 'Работа продолжается. Прогресс сохранён, я продолжу автоматически.',
+  de: 'Ich arbeite noch. Der Fortschritt ist gespeichert und ich mache automatisch weiter.',
+  fr: 'Toujours en cours. La progression est enregistrée et je continuerai automatiquement.',
+  it: 'Sto ancora lavorando. I progressi sono salvati e continuerò automaticamente.',
+  ja: '作業中です。進捗は保存されており、自動的に続行します。',
+  ko: '아직 작업 중입니다. 진행 상황이 저장되었으며 자동으로 계속합니다.',
+  ar: 'ما زلت أعمل. التقدم محفوظ وسأتابع تلقائيًا.',
+}

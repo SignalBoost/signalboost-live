@@ -1,2 +1,2 @@
-base_sha=d1f7a8beb8fd5ca71fa878669f9d2509456e5054
-branch=fix/builder-admission-rejection-message-20261023
+base_sha=4224be8eda6a40df6ff89ea16b4ab64cb8e82778
+branch=fix/builder-plain-result-messages-20261022

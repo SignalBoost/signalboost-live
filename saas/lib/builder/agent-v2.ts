@@ -699,7 +699,7 @@ export class BuilderV2Agent {
               idleSlices: saved.idleSlices,
               instruction: missingFiles().length
                 ? 'Previous slices did not create source. Do not list files or finish. Write the named missingRequiredFiles now using complete write_file tool actions.'
-                : 'Previous slices produced no successful verification. Do not list files or finish. Inspect the last failure and perform the next executable edit or required proof.',
+                : 'Previous slices produced no successful verification. Do not list files or finish. The authoritative latestFailedTest is already supplied below: treat its failing assertions and missing-module paths as the current repair target. Use activeRepair and openFiles to identify the implementation file, edit that file now, and then rerun the failed command. Do not repeat read_file of a path already present in openFiles unless the file has changed.',
             } } : {}),
 
             // Live todo list from host receipts (as Cursor and Windsurf keep a plan the user sees), never from model claims.

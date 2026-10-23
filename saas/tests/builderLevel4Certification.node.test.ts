@@ -1,3 +1,4 @@
+import { isConciergeBuilderObjective } from '../lib/ai/cos/cosReasoningRolePolicy.ts'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -63,4 +64,10 @@ test('owner Level 4 endpoint dispatches a real V2 job without granting certifica
   assert.match(source,/await enqueueBuilderJob\(\{/)
   assert.match(source,/await runBuilderJob\(jobId, userId\)/)
   assert.match(source,/certification: 'pending_independent_evidence'/)
+})
+
+
+test('Level 4 coding objective clears the same strict intake as ordinary Builder jobs', () => {
+  assert.equal(isConciergeBuilderObjective(BUILDER_LEVEL4_OBJECTIVE), true)
+  assert.equal(isConciergeBuilderObjective('Tell me about a multi-file Builder project with four tests'), false)
 })

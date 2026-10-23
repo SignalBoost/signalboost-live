@@ -7,6 +7,7 @@ import { builderV2Acceptance, type BuilderV2Checkpoint } from './agent-v2.ts'
 import type { BuilderV2Receipt } from './agent-v2-dispatcher.ts'
 
 export const BUILDER_LEVEL4_OBJECTIVE = [
+  'Build a Node.js project with the following files and automated tests:',
   'Create these files:',
   'package.json',
   'src/catalog.js',

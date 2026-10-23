@@ -307,6 +307,7 @@ export default function DeveloperPage() {
           <h1 style={{ margin: '8px 0', fontSize: 'clamp(28px, 5vw, 44px)' }}>{c('title')}</h1>
           <p style={{ margin: 0, maxWidth: 700, color: '#94a3b8', lineHeight: 1.55 }}>{c('intro')}</p>
           <p style={{ margin: '8px 0 0', color: '#67e8f9', fontSize: 13 }}>{c('certification').replace('{level}', String(certification.earnedLevel)).replace('{attempts}', String(certification.attempts))}</p>
+          <a href="/admin/builder-certification" style={{ display: 'inline-block', marginTop: 8, color: '#67e8f9', fontSize: 13 }}>Owner: run Level 4 certification and view job status →</a>
         </header>
         <section style={{ border: '1px solid #1e293b', borderRadius: 18, background: '#0f172a', padding: 20, display: 'grid', gap: 14 }}>
           <label style={{ display: 'grid', gap: 8, fontWeight: 700 }}>

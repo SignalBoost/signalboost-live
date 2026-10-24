@@ -78,3 +78,31 @@ test('V2 route accepts an owned prior workspace and retains strict source checks
   assert.match(route, /await workspace\.listFiles\(workspaceId\)/)
   assert.match(route, /requiresExistingSource: true/)
 })
+
+test('LibraryFlow Objective heading opens a fresh workspace rather than continuing Calculator API', async () => {
+  const objective = [
+    'Objective',
+    'Build a complete Node.js application called LibraryFlow, a digital library management system with catalog, borrowing, returns, fines, and reporting.',
+    'Project structure',
+    'libraryflow/',
+    '├── package.json',
+    '├── README.md',
+    '├── index.js',
+    '├── src/catalog.js',
+    '├── src/borrow.js',
+    '└── test/catalog.test.js',
+    'Verification commands',
+    'npm test',
+  ].join('\n')
+  assert.equal(isNewBuilderProjectObjective(objective), true)
+  let lookedUp = false
+  const selected = await selectBuilderProject({ objective, userId, conversationId,
+    requestedWorkspaceId: previousWorkspace, hasNewSource: false, repositoryImport: false },
+    async () => { lookedUp = true; return previousJob })
+  assert.deepEqual(selected, {})
+  assert.equal(lookedUp, false)
+})
+
+test('Objective heading on existing-project feature stays a continuation', () => {
+  assert.equal(isNewBuilderProjectObjective('Objective\\nUpdate the existing LibraryFlow catalog to support ISBN search. Edit src/catalog.js and run npm test.'), false)
+})

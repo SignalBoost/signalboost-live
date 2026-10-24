@@ -540,4 +540,3 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
     </aside>}
   </>
 }
-}

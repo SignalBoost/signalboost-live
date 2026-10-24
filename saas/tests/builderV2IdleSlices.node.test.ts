@@ -69,5 +69,7 @@ test('Builder chat keeps pending results in the conversation and never reports p
   assert.doesNotMatch(running, /result will appear in History|resultado aparecerá en el Historial|resultado aparecerá no Histórico/)
   assert.match(running, /finished result will appear in this conversation/)
   // A follow that ends before the job is never a success; the person reads a plain line in their language.
-  assert.match(progress, /return \{ ok: false, status: 202, data: \{ \.\.\.data, reply: say\(PROGRESS_STILL_RUNNING\), incomplete: true \} \}/)
+  // The chat never turns an unfinished job into an answer: it keeps checking (more slowly) until the job ends.
+  assert.match(progress, /await wait\(slow \? BUILDER_JOB_SLOW_POLL_DELAY_MS : BUILDER_JOB_POLL_DELAY_MS, args\.signal\)/)
+  assert.doesNotMatch(progress, /incomplete: true/)
 })

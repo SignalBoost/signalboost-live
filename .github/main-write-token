@@ -1,2 +1,2 @@
-base_sha=ec08017093a48db7e9485a0cb19c9329f4d2943d
-branch=test/builder-harness-checkpoint-cycle-20261024
+base_sha=4ad97f3c1fa6fbcb3e6097c56c3bb9b94d6048ac
+branch=fix/builder-live-stop-control-20261024

@@ -56,8 +56,7 @@ test('Full Assistant source-backed coding remains owned by the server-side Softw
 
 test('Full Assistant durable Builder polling survives transient read-only transport losses', () => {
   assert.match(progressClient, /\/api\/builder\?jobId=/)
-  assert.match(progressClient, /Builder is still durable; a status check was lost/)
-  assert.match(progressClient, /without replaying the action/)
+  assert.match(progressClient, /report\('running', say\(PROGRESS_RECONNECTING\)\)\s*\n\s*continue/)
   assert.match(progressClient, /if \(!poll\.ok && poll\.status >= 500\)/)
   assert.match(progressClient, /source: 'assistant-transport-unconfirmed'/)
 })

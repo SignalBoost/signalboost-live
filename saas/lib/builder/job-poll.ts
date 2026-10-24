@@ -5,6 +5,8 @@
 // was still running on the server. Polling is read-only, so a lost check is retried on the next one; only a definite
 // answer from the server ends the wait.
 
+import { BUILDER_JOB_TOTAL_DEADLINE_MS } from './work-budget.ts'
+
 export type BuilderJobCheck<T> = Readonly<{ status: number; ok: boolean; data: T & { status?: string; error?: string } }>
 
 export type BuilderJobFollowOutcome<T> =
@@ -13,9 +15,10 @@ export type BuilderJobFollowOutcome<T> =
   | Readonly<{ kind: 'unreachable' }>
   | Readonly<{ kind: 'still_running' }>
 
-// A paused job resumes on the server's continuation schedule (every five minutes, at most four work slices), so the
-// page keeps following it for the whole lifetime of a job rather than giving up after a few minutes.
-export const BUILDER_JOB_FOLLOW_WINDOW_MS = 30 * 60_000
+// A paused job resumes on the server's continuation schedule, so the page keeps following it for the whole lifetime of a
+// job: its total deadline plus time to save the final result. Production 2026-10-23: the window was 30 minutes while a
+// job may run 60, so a long job's result never came back to the chat and the person was sent to History.
+export const BUILDER_JOB_FOLLOW_WINDOW_MS = BUILDER_JOB_TOTAL_DEADLINE_MS + 2 * 60_000
 export const BUILDER_JOB_POLL_DELAY_MS = 2_000
 // Consecutive checks that got no answer before the page says the connection is lost (about one minute).
 export const BUILDER_JOB_MAX_UNANSWERED_CHECKS = 30

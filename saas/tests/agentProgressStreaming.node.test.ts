@@ -25,7 +25,7 @@ test('progress transport follows the durable Builder job to its terminal result'
   assert.match(client, /\/api\/cos-browser/)
   assert.match(client, /\/api\/builder\?jobId=/)
   assert.match(client, /poll\.status === 202/)
-  assert.match(client, /COS Builder completed the job/)
+  assert.match(client, /say\(terminalSucceeded \? PROGRESS_DONE : PROGRESS_UNCONFIRMED\)/)
   assert.doesNotMatch(client, /\/api\/agent-progress/)
 })
 
@@ -36,7 +36,9 @@ test('the actual owner Assistant live path never exposes a transient fetch loss 
   assert.match(assistant, /target: 'cos'/)
     assert.match(client, /const endpoint = builderRequest\?\.endpoint \?\? '\/api\/cos-browser'/)
   assert.match(client, /source: 'assistant-transport-unconfirmed'/)
-  assert.match(client, /Builder is still durable; a status check was lost/)
+  // A lost status check is retried (read-only, never replaying the action) while the person sees a plain line.
+  assert.match(client, /report\('running', say\(PROGRESS_RECONNECTING\)\)\s*\n\s*continue/)
+  assert.doesNotMatch(client, /durable in History|checking durable progress|Builder is still durable/)
   assert.match(client, /if \(deliberateAbort\(error, args\.signal\)\) throw error/)
   assert.match(client, /if \(!poll\.ok && poll\.status >= 500\)/)
   assert.match(client, /continue/)

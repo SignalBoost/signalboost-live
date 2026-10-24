@@ -97,3 +97,12 @@ test('chat and the Developer page share one follow window', () => {
   assert.match(client, /const followUntil = Date\.now\(\) \+ BUILDER_JOB_FOLLOW_WINDOW_MS/)
   assert.doesNotMatch(client, /JOB_POLL_ATTEMPTS/)
 })
+
+test('chat follows a job for as long as the job may run, so the result comes back to the chat', async () => {
+  // Production 2026-10-23: the chat stopped following after 30 minutes while a job may run 60, and the person was told
+  // to look for the result in History.
+  const { BUILDER_JOB_TOTAL_DEADLINE_MS } = await import('../lib/builder/work-budget.ts')
+  assert.ok(BUILDER_JOB_FOLLOW_WINDOW_MS > BUILDER_JOB_TOTAL_DEADLINE_MS)
+  const { BUILDER_RUNNING } = await import('../lib/ai/cos/assistanceMode.ts')
+  for (const sentence of Object.values(BUILDER_RUNNING)) assert.doesNotMatch(sentence, /History|Historial|Histórico|Historii|Истори|Verlauf|Historique|Cronologia|履歴|기록|السجل/)
+})

@@ -321,9 +321,7 @@ async function executeBuilderFromConcierge(
   return responseFromPayload({
     ...payload,
     status: 'running',
-    reply: typeof payload.reply === 'string'
-      ? payload.reply
-      : `COS Builder is running job ${jobId}. The final result will appear in History.`,
+    reply: 'COS Builder is working. Live progress and the final result will be shown on this page.',
   }, 202, 'builder-job-running')
 }
 
@@ -368,9 +366,7 @@ async function executeOperationalRepairFromConcierge(
   return responseFromPayload({
     ...payload,
     status: 'running',
-    reply: typeof payload.reply === 'string'
-      ? payload.reply
-      : `COS Builder is running job ${jobId}. The final result will appear in History.`,
+    reply: 'COS is repairing the issue. Live progress and results will be shown on this page.',
   }, 202, 'operational-repair-running')
 }
 

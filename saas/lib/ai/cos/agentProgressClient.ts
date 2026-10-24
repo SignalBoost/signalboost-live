@@ -607,6 +607,6 @@ export async function postWithAgentProgress(args: {
 
   report('running', repairRequest
     ? operatorProgressMessage({ stage: 'durable', target: progressTarget, builder: true })
-    : 'COS Builder is still running; the final result remains durable in History')
-  return { ok: true, status: 202, data }
+    : 'COS Builder is still working. This conversation remains the place for the result; the current job has not finished.')
+  return { ok: false, status: 202, data: { ...data, reply: 'The project is still running. No verified final result is available yet.', incomplete: true } }
 }

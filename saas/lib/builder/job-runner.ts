@@ -9,7 +9,7 @@ import { builderRunSourceEvidence } from './source-evidence.ts'
 import { builderPendingWriteEvidence } from './evidence-events.ts'
 // lib/builder/job-runner.ts
 import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
-import { readBuilderRunLimits, withBuilderInferenceBudget } from './inference-budget.ts'
+import { readBuilderRunLimits, withBuilderInferenceBudget, withBuilderInferenceJob } from './inference-budget.ts'
 import { builderInferenceBudgetSummary, createBuilderInferenceBudgetStore, readBuilderInferenceBudgetReceipt } from './inference-budget-store.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import type { BuilderToolTrace } from './contracts.ts'
@@ -552,11 +552,11 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       }, browserPortV2), workspace)
       const cycle = await (async () => {
         try {
-          const executeCycle = () => withBuilderSliceDeadline(() => runBuilderV2JobCycle({
+          const executeCycle = () => withBuilderInferenceJob(job.id, () => withBuilderSliceDeadline(() => runBuilderV2JobCycle({
             jobId: job.id, claimGeneration: job.claimGeneration,
             store: createBuilderV2SupabaseLeaseStore(db, job.userId),
             agent: v2, maxSteps: 24, signal: deadlineController.signal,
-          }), BUILDER_SLICE_HARD_DEADLINE_MS)
+          }), BUILDER_SLICE_HARD_DEADLINE_MS))
           return runLimits
             ? await withBuilderInferenceBudget(createBuilderInferenceBudgetStore(db, job), Date.parse(job.createdAt) + totalDeadlineMs, executeCycle)
             : await executeCycle()

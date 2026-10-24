@@ -530,7 +530,7 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
 
   return <>
     {children}
-    {liveJob && <aside role="status" aria-live="polite" style={{ position: 'fixed', right: 20, bottom: 20, zIndex: 10000, width: 'min(410px, calc(100vw - 40px))', maxHeight: '55vh', overflowY: 'auto', padding: 14, border: '1px solid #334155', borderRadius: 12, background: '#0f172a', color: '#f8fafc', boxShadow: '0 8px 28px #0006', fontSize: 14 }}>
+    {liveJob && <aside role="status" aria-live="polite" style={{ position: 'fixed', insetInlineEnd: 20, bottom: 20, zIndex: 10000, width: 'min(410px, calc(100vw - 40px))', maxHeight: '55vh', overflowY: 'auto', padding: 14, border: '1px solid #334155', borderRadius: 12, background: '#0f172a', color: '#f8fafc', boxShadow: '0 8px 28px #0006', fontSize: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <strong>COS Builder · {liveJob.status === 'succeeded' ? 'Completed' : liveJob.status === 'failed' ? 'Needs attention' : liveJob.status === 'paused' ? 'Continuing' : 'Working'}</strong>
         <button type="button" aria-label="Dismiss Builder status" onClick={() => { setLiveJob(null); try { window.localStorage.removeItem(LIVE_BUILDER_KEY) } catch {} }} style={{ background: 'transparent', border: 0, color: 'inherit', cursor: 'pointer' }}>×</button>

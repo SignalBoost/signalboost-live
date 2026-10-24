@@ -1,2 +1,2 @@
-base_sha=bdd8452767efc3a45987ec2b8b7e0305862abf87
-branch=fix/harness-nested-parent-cancellation-20261024
+base_sha=b1e91ecfa88e3fd642e88b2d07a894cfb3827278
+branch=test/builder-harness-replay-invariants-20261024

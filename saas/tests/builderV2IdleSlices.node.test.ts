@@ -68,5 +68,6 @@ test('Builder chat keeps pending results in the conversation and never reports p
   const running = copy.slice(copy.indexOf('export const BUILDER_RUNNING: Copy = {'), copy.indexOf('export const COS_TURN_ACCEPTED: Copy = {'))
   assert.doesNotMatch(running, /result will appear in History|resultado aparecerá en el Historial|resultado aparecerá no Histórico/)
   assert.match(running, /finished result will appear in this conversation/)
-  assert.match(progress, /return \{ ok: false, status: 202, data: \{ \.\.\.data, reply: 'The project is still running/)
+  // A follow that ends before the job is never a success; the person reads a plain line in their language.
+  assert.match(progress, /return \{ ok: false, status: 202, data: \{ \.\.\.data, reply: say\(PROGRESS_STILL_RUNNING\), incomplete: true \} \}/)
 })

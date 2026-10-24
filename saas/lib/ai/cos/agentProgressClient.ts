@@ -1,5 +1,5 @@
 import { isConciergeBuilderObjective, structuredApplicationBuild } from './cosReasoningRolePolicy.ts'
-import { readPendingApproval } from './assistanceMode.ts'
+import { assistanceCopy, PROGRESS_DONE, PROGRESS_READY, PROGRESS_RECEIVED, PROGRESS_RECONNECTING, PROGRESS_STILL_RUNNING, PROGRESS_UNCONFIRMED, PROGRESS_WORKING, readPendingApproval } from './assistanceMode.ts'
 import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMessage } from './operator-progress.ts'
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findDurableCosTurnReply, findRecoveredAssistantTurn, type RecoveredAssistantTurn } from './assistantTransportRecovery.ts'
 import { planResearchTask } from './researchBudget.ts'
@@ -324,6 +324,8 @@ export async function postWithAgentProgress(args: {
   const progressTarget = args.target
   const builderActive = Boolean(builderRequest)
   const requestRecord = bodyRecord(requestBody)
+  // The person reads progress in their language and without internal terms; the final answer replaces it here.
+  const say = (copy: Parameters<typeof assistanceCopy>[0]) => assistanceCopy(copy, requestRecord?.context?.language)
   const researchRequest = requestRecord ? planResearchTask(latestUserText(requestRecord)) : null
   const boundedPublicTransport = args.target === 'concierge' && !builderRequest && !researchRequest
   const responseSignal = boundedPublicTransport
@@ -332,17 +334,13 @@ export async function postWithAgentProgress(args: {
 
   report('accepted', repairRequest
     ? operatorProgressMessage({ stage: 'accepted', target: progressTarget, builder: builderActive })
-    : args.target === 'cos' ? 'COS received the request' : 'Concierge received the request')
+    : say(PROGRESS_RECEIVED))
   report('running', repairRequest
     ? operatorProgressMessage({ stage: 'diagnosing', target: progressTarget, builder: builderActive })
-    : builderRequest
-      ? 'Request routed to COS Builder for executable verification'
-      : args.target === 'cos' ? 'COS is processing the request' : 'Concierge is consulting COS')
+    : say(PROGRESS_WORKING))
   const heartbeat = window.setInterval(() => report('running', repairRequest
     ? operatorProgressMessage({ stage: 'fixing', target: progressTarget, builder: builderActive })
-    : builderRequest
-      ? 'COS Builder is working in the isolated user workspace'
-      : 'Waiting for the COS response — connection active'), 2_000)
+    : say(PROGRESS_WORKING)), 2_000)
 
   // /api/cos-browser remains the canonical browser ingress. The explicit surface header prevents
   // a signed-in owner using the public homepage Concierge from inheriting private owner authority;
@@ -410,10 +408,10 @@ export async function postWithAgentProgress(args: {
           signal: args.signal,
         }) : null
         if (saved) {
-          report('complete', 'Recovered the completed COS answer from History')
+          report('complete', say(PROGRESS_READY))
           return { ok: true, status: 200, data: historyRecoveryData(saved) }
         }
-        report('complete', 'Concierge stopped waiting for the unavailable response')
+        report('complete', say(PROGRESS_UNCONFIRMED))
         return {
           ok: false,
           status: 504,
@@ -429,7 +427,7 @@ export async function postWithAgentProgress(args: {
       // The POST may have completed on the server even though the browser lost its response.
       // Keep reading History until the turn's deadline; never replay a possible action.
       if (historyWatchEligible) {
-        report('running', 'The connection to COS was interrupted — waiting for the saved answer in History (the request is not replayed)')
+        report('running', say(PROGRESS_RECONNECTING))
         const turn = await watched
         if (turn) outcome = { kind: 'history', turn }
       }
@@ -443,7 +441,7 @@ export async function postWithAgentProgress(args: {
     }
     if (outcome.kind === 'history') {
       fetchAbort.abort()
-      report('complete', 'Recovered the completed COS answer from History')
+      report('complete', say(PROGRESS_READY))
       return { ok: true, status: 200, data: historyRecoveryData(outcome.turn) }
     }
     if (outcome.kind === 'error') {
@@ -482,7 +480,7 @@ export async function postWithAgentProgress(args: {
       signal: args.signal,
     })
     if (saved) {
-      report('complete', 'Recovered the completed COS answer from History')
+      report('complete', say(PROGRESS_READY))
       return { ok: true, status: 200, data: historyRecoveryData(saved) }
     }
   }
@@ -492,7 +490,7 @@ export async function postWithAgentProgress(args: {
   if (turnId && data?.status === 'running' && conversationId) {
     const durablePollDeadlineMs = startedAt + COS_TURN_FOREGROUND_WAIT_MS
     while (Date.now() < durablePollDeadlineMs) {
-      report('running', 'COS accepted the turn durably — checking History for the completed response')
+      report('running', say(PROGRESS_WORKING))
       try {
         const remainingBeforeWaitMs = durablePollDeadlineMs - Date.now()
         if (remainingBeforeWaitMs <= 0) break
@@ -515,7 +513,7 @@ export async function postWithAgentProgress(args: {
           turnId,
         )
         if (!terminal) continue
-        report('complete', terminal.status === 'succeeded' ? 'COS completed the durable turn' : 'COS durable turn stopped without a verified response')
+        report('complete', say(terminal.status === 'succeeded' ? PROGRESS_DONE : PROGRESS_UNCONFIRMED))
         return {
           ok: terminal.status === 'succeeded',
           status: terminal.status === 'succeeded' ? 200 : 500,
@@ -536,7 +534,7 @@ export async function postWithAgentProgress(args: {
 
     // The durable worker may still finish later, but a running transport receipt must never become
     // the visible assistant answer. Return an explicit timeout envelope instead of the original 202.
-    report('complete', 'COS did not finish the durable turn inside the foreground response window')
+    report('complete', say(PROGRESS_STILL_RUNNING))
     return {
       ok: false,
       status: 504,
@@ -556,7 +554,7 @@ export async function postWithAgentProgress(args: {
   if (!jobId || !['queued', 'running'].includes(String(data?.status || ''))) {
     report('complete', repairRequest
       ? operatorProgressMessage({ stage: response.ok ? 'complete' : 'blocked', target: progressTarget, builder: builderActive })
-      : response.ok ? 'Response completed' : 'Request completed without a verified result')
+      : say(response.ok ? PROGRESS_DONE : PROGRESS_UNCONFIRMED))
     return { ok: response.ok, status: response.status, data }
   }
 
@@ -570,7 +568,7 @@ export async function postWithAgentProgress(args: {
   while (Date.now() < followUntil) {
     report('running', repairRequest
       ? operatorProgressMessage({ stage: 'fixing', target: progressTarget, builder: true })
-      : `COS Builder job ${String(data.status || 'running')} — checking durable progress`)
+      : say(PROGRESS_WORKING))
 
     let poll: Response
     try {
@@ -581,18 +579,18 @@ export async function postWithAgentProgress(args: {
       })
     } catch (error) {
       if (deliberateAbort(error, args.signal)) throw error
-      report('running', 'Builder is still durable; a status check was lost, so COS is retrying the read-only status check without replaying the action.')
+      report('running', say(PROGRESS_RECONNECTING))
       continue
     }
 
     if (!poll.ok && poll.status >= 500) {
-      report('running', 'Builder is still durable; the status endpoint was temporarily unavailable, so COS is retrying the read-only status check.')
+      report('running', say(PROGRESS_RECONNECTING))
       continue
     }
 
     data = await poll.json().catch(() => ({ error: 'builder_job_status_unavailable' }))
     if (data?.error === 'builder_job_status_unavailable') {
-      report('running', 'Builder is still durable; the status response was incomplete, so COS is retrying the read-only status check.')
+      report('running', say(PROGRESS_RECONNECTING))
       continue
     }
     // A job paused for the user's approval is waiting on them, not on Builder: show it now (approval card).
@@ -601,12 +599,12 @@ export async function postWithAgentProgress(args: {
     const terminalSucceeded = isVerifiedBuilderTerminal(data, poll.ok)
     report('complete', repairRequest
       ? operatorProgressMessage({ stage: terminalSucceeded ? 'verified' : 'blocked', target: progressTarget, builder: true })
-      : terminalSucceeded ? 'COS Builder completed the job' : 'COS Builder completed without a verified result')
+      : say(terminalSucceeded ? PROGRESS_DONE : PROGRESS_UNCONFIRMED))
     return { ok: terminalSucceeded, status: poll.status, data }
   }
 
   report('running', repairRequest
     ? operatorProgressMessage({ stage: 'durable', target: progressTarget, builder: true })
-    : 'COS Builder is still working. This conversation remains the place for the result; the current job has not finished.')
-  return { ok: false, status: 202, data: { ...data, reply: 'The project is still running. No verified final result is available yet.', incomplete: true } }
+    : say(PROGRESS_STILL_RUNNING))
+  return { ok: false, status: 202, data: { ...data, reply: say(PROGRESS_STILL_RUNNING), incomplete: true } }
 }

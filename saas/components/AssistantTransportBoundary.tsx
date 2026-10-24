@@ -8,6 +8,7 @@ import {
   type AssistantTransportLocale,
 } from '@/lib/ai/cos/assistantTransportClient'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { assistanceCopy, BUILDER_RUNNING } from '@/lib/ai/cos/assistanceMode'
 import { hasExplicitOperationalLogRepairIntent, isOperationalLogEvidence, isPastedOperationalLog } from '@/lib/ai/cos/pastedOperationalLog'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 
@@ -321,7 +322,7 @@ async function executeBuilderFromConcierge(
   return responseFromPayload({
     ...payload,
     status: 'running',
-    reply: 'COS Builder is working. Live progress and the final result will be shown on this page.',
+    reply: assistanceCopy(BUILDER_RUNNING, localeFromBody(body)),
   }, 202, 'builder-job-running')
 }
 
@@ -366,7 +367,7 @@ async function executeOperationalRepairFromConcierge(
   return responseFromPayload({
     ...payload,
     status: 'running',
-    reply: 'COS is repairing the issue. Live progress and results will be shown on this page.',
+    reply: assistanceCopy(BUILDER_RUNNING, localeFromBody(body)),
   }, 202, 'operational-repair-running')
 }
 

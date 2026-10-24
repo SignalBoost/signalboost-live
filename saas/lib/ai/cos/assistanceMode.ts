@@ -263,7 +263,8 @@ export const BUILDER_RESULT_CONTINUING: Copy = {
 }
 
 // While a Builder job runs. Production 2026-10-23: "COS Builder is running job … Progress and the final result are
-// durable in History; the action will not be replayed." The job id stays in the response data, not the sentence.
+// durable in History; the action will not be replayed." The chat follows the job and replaces this message with the
+// result, so nobody is sent to History (owner: "User should not have to look up in the history for results").
 export const BUILDER_RUNNING: Copy = {
   en: 'I’m working on your project. Progress and the finished result will appear in this conversation automatically.',
   es: 'Estoy trabajando en tu proyecto. El progreso y el resultado final aparecerán aquí, en esta conversación.',
@@ -280,15 +281,25 @@ export const BUILDER_RUNNING: Copy = {
 
 // A chat answer still being prepared after the browser request ended.
 export const COS_TURN_ACCEPTED: Copy = {
-  en: 'Got it. I’m working on your answer; it will appear here and in History.',
-  es: 'Entendido. Estoy preparando tu respuesta; aparecerá aquí y en el Historial.',
-  pt: 'Entendi. Estou preparando sua resposta; ela aparecerá aqui e no Histórico.',
-  pl: 'Rozumiem. Przygotowuję odpowiedź; pojawi się tutaj i w Historii.',
-  ru: 'Понял. Готовлю ответ — он появится здесь и в Истории.',
-  de: 'Verstanden. Ich arbeite an Ihrer Antwort; sie erscheint hier und im Verlauf.',
-  fr: 'Compris. Je prépare votre réponse ; elle apparaîtra ici et dans l’Historique.',
-  it: 'Ricevuto. Sto preparando la risposta; apparirà qui e nella Cronologia.',
-  ja: '承知しました。回答を準備しています。ここと履歴に表示されます。',
-  ko: '알겠습니다. 답변을 준비하고 있습니다. 여기와 기록에 표시됩니다.',
-  ar: 'تم. أُعدّ إجابتك الآن؛ ستظهر هنا وفي السجل.',
+  en: 'Got it. Your answer will appear here when it’s ready.',
+  es: 'Entendido. Tu respuesta aparecerá aquí cuando esté lista.',
+  pt: 'Entendi. Sua resposta aparecerá aqui quando estiver pronta.',
+  pl: 'Rozumiem. Odpowiedź pojawi się tutaj, gdy będzie gotowa.',
+  ru: 'Понял. Ответ появится здесь, когда будет готов.',
+  de: 'Verstanden. Ihre Antwort erscheint hier, sobald sie fertig ist.',
+  fr: 'Compris. Votre réponse apparaîtra ici dès qu’elle sera prête.',
+  it: 'Ricevuto. La risposta apparirà qui appena pronta.',
+  ja: '承知しました。準備ができ次第、回答をここに表示します。',
+  ko: '알겠습니다. 준비되면 답변이 여기에 표시됩니다.',
+  ar: 'تم. ستظهر إجابتك هنا عندما تكون جاهزة.',
 }
+
+// The live progress line under a chat answer. Production 2026-10-23: it read "checking durable progress", "Builder is
+// still durable; … retrying the read-only status check without replaying the action".
+export const PROGRESS_RECEIVED: Copy = { en: 'Got your request', es: 'Recibí tu solicitud', pt: 'Recebi sua solicitação', pl: 'Otrzymałem prośbę', ru: 'Запрос получен', de: 'Anfrage erhalten', fr: 'Demande reçue', it: 'Richiesta ricevuta', ja: 'リクエストを受け付けました', ko: '요청을 받았습니다', ar: 'تم استلام طلبك' }
+export const PROGRESS_WORKING: Copy = { en: 'Working on it…', es: 'Trabajando en ello…', pt: 'Trabalhando nisso…', pl: 'Pracuję nad tym…', ru: 'Работаю…', de: 'Wird bearbeitet…', fr: 'En cours…', it: 'Ci sto lavorando…', ja: '作業中…', ko: '작업 중…', ar: 'جارٍ العمل…' }
+export const PROGRESS_RECONNECTING: Copy = { en: 'Still working, reconnecting…', es: 'Sigo trabajando, reconectando…', pt: 'Ainda trabalhando, reconectando…', pl: 'Nadal pracuję, łączę ponownie…', ru: 'Работа идёт, переподключаюсь…', de: 'Läuft noch, verbinde erneut…', fr: 'Toujours en cours, reconnexion…', it: 'Ancora al lavoro, riconnessione…', ja: '作業中です。再接続しています…', ko: '작업 중입니다. 다시 연결하는 중…', ar: 'ما زال العمل جاريًا، تجري إعادة الاتصال…' }
+export const PROGRESS_DONE: Copy = { en: 'Done', es: 'Listo', pt: 'Pronto', pl: 'Gotowe', ru: 'Готово', de: 'Fertig', fr: 'Terminé', it: 'Fatto', ja: '完了', ko: '완료', ar: 'تم' }
+export const PROGRESS_UNCONFIRMED: Copy = { en: 'Finished, but the result could not be confirmed', es: 'Terminado, pero no se pudo confirmar el resultado', pt: 'Concluído, mas não foi possível confirmar o resultado', pl: 'Zakończono, ale nie udało się potwierdzić wyniku', ru: 'Завершено, но результат не удалось подтвердить', de: 'Fertig, aber das Ergebnis konnte nicht bestätigt werden', fr: 'Terminé, mais le résultat n’a pas pu être confirmé', it: 'Finito, ma non è stato possibile confermare il risultato', ja: '完了しましたが、結果を確認できませんでした', ko: '완료했지만 결과를 확인하지 못했습니다', ar: 'انتهى، لكن تعذّر تأكيد النتيجة' }
+export const PROGRESS_READY: Copy = { en: 'Your answer is ready', es: 'Tu respuesta está lista', pt: 'Sua resposta está pronta', pl: 'Odpowiedź jest gotowa', ru: 'Ответ готов', de: 'Ihre Antwort ist fertig', fr: 'Votre réponse est prête', it: 'La risposta è pronta', ja: '回答の準備ができました', ko: '답변이 준비되었습니다', ar: 'إجابتك جاهزة' }
+export const PROGRESS_STILL_RUNNING: Copy = { en: 'Still working; this is taking longer than usual. Keep this page open and the result will appear here.', es: 'Sigo trabajando; está tardando más de lo normal. Mantén esta página abierta y el resultado aparecerá aquí.', pt: 'Ainda trabalhando; está demorando mais que o normal. Mantenha esta página aberta e o resultado aparecerá aqui.', pl: 'Nadal pracuję; trwa to dłużej niż zwykle. Pozostaw tę stronę otwartą, a wynik pojawi się tutaj.', ru: 'Работа продолжается дольше обычного. Не закрывайте страницу — результат появится здесь.', de: 'Läuft noch; es dauert länger als üblich. Lassen Sie diese Seite geöffnet, dann erscheint das Ergebnis hier.', fr: 'Toujours en cours ; c’est plus long que d’habitude. Gardez cette page ouverte et le résultat apparaîtra ici.', it: 'Ancora al lavoro; sta richiedendo più del solito. Tieni aperta questa pagina e il risultato apparirà qui.', ja: '通常より時間がかかっています。このページを開いたままにしておくと、結果がここに表示されます。', ko: '평소보다 오래 걸리고 있습니다. 이 페이지를 열어 두시면 결과가 여기에 표시됩니다.', ar: 'ما زال العمل جاريًا ويستغرق وقتًا أطول من المعتاد. أبقِ هذه الصفحة مفتوحة وستظهر النتيجة هنا.' }

@@ -11,6 +11,7 @@ import {
   currentHarnessExecutionContext,
   harnessDeadlineRemainingMs,
   reserveHarnessProviderCostUsd,
+  settleHarnessProviderCostUsd,
 } from '../../platform-harness/runtime/execution-context.ts'
 
 export type LocalModelToolDefinition = Readonly<{
@@ -453,6 +454,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   let totalTokens: number | null = null
   let cachedPromptTokens: number | null = null
   let providerEstimatedCostUsd: number | null = null
+  let reservedCostUsd: number | null = null
   let text: string | null = null
   let fatalGovernanceError: Error | null = null
   let transportFailure: string | null = null
@@ -490,6 +492,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
         throw new Error('deepinfra_harness_cost_reservation_required')
       }
       reserveHarnessProviderCostUsd(reservation)
+      reservedCostUsd = reservation
     }
     // Independent University scoring needs a compact verdict rather than model scratch work.
     // Preserve the evaluator's one-call, strict-JSON contract even when the general reasoner is
@@ -641,6 +644,8 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
     clearTimeout(timeout)
     harnessContext?.signal.removeEventListener('abort', abortFromHarness)
     args.signal?.removeEventListener('abort', abortFromCaller)
+    // The run ceiling counts what the provider reported this call cost, not its upper-bound reservation.
+    if (reservedCostUsd !== null && providerEstimatedCostUsd !== null) settleHarnessProviderCostUsd(reservedCostUsd, providerEstimatedCostUsd)
     const latencyMs = Date.now() - startedAt
     const inferenceLatencyMs = inferenceStartedAt === null ? 0 : Math.max(0, Date.now() - inferenceStartedAt)
     const success = errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300

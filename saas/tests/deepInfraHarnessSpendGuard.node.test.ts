@@ -65,36 +65,60 @@ test('DeepInfra inside a cost-bounded host HarnessRun requires a pre-call reserv
   )
 })
 
-test('retries consume reserved budget and the second paid call fails closed before fetch',async()=>{
-  const priorFetch=globalThis.fetch
+function paidResponder(estimatedCost:number|undefined){
   let calls=0
-  globalThis.fetch=async()=>{
+  const fetch=async()=>{
     calls+=1
     return new Response(JSON.stringify({
       choices:[{message:{content:'ok'},finish_reason:'stop'}],
-      usage:{prompt_tokens:1,completion_tokens:1,total_tokens:2,estimated_cost:0.001},
+      usage:{prompt_tokens:1,completion_tokens:1,total_tokens:2,...(estimatedCost===undefined?{}:{estimated_cost:estimatedCost})},
     }),{status:200,headers:{'content-type':'application/json'}})
   }
+  return {fetch,calls:()=>calls}
+}
+
+const paidCall=()=>callLocalModel({
+  prompt:'fixture',maxTokens:16,persistUsage:false,maxEstimatedCostUsd:0.06,
+  usageContext:{feature:'cos_interactive_answer'},
+},CONFIG)
+
+function boundedRun(runId:string,operation:()=>Promise<void>){
+  return withHostProductionHarnessIngress({
+    objective:'bounded paid retries',portableId:'test',agentId:'test',role:'test',
+    capabilityId:'test.deepinfra',risk:'read',deadlineMs:5_000,maxToolCalls:6,maxConcurrency:1,
+    maxCostUsd:0.10,runId,
+  },operation)
+}
+
+test('without a reported cost the full reservation stays and the next paid call fails closed before fetch',async()=>{
+  const priorFetch=globalThis.fetch
+  const provider=paidResponder(undefined)
+  globalThis.fetch=provider.fetch as typeof fetch
   try{
-    await withHostProductionHarnessIngress({
-      objective:'bounded paid retries',portableId:'test',agentId:'test',role:'test',
-      capabilityId:'test.deepinfra',risk:'read',deadlineMs:5_000,maxToolCalls:3,maxConcurrency:1,
-      maxCostUsd:0.10,runId:'deepinfra-cost-bounded',
-    },async()=>{
-      const first=await callLocalModel({
-        prompt:'fixture',maxTokens:16,persistUsage:false,maxEstimatedCostUsd:0.06,
-        usageContext:{feature:'cos_interactive_answer'},
-      },CONFIG)
-      assert.equal(first,'ok')
-      await assert.rejects(
-        callLocalModel({
-          prompt:'fixture',maxTokens:16,persistUsage:false,maxEstimatedCostUsd:0.06,
-          usageContext:{feature:'cos_interactive_answer'},
-        },CONFIG),
-        /harness_provider_cost_budget_exceeded/,
-      )
+    await boundedRun('deepinfra-cost-unreported',async()=>{
+      assert.equal(await paidCall(),'ok')
+      await assert.rejects(paidCall(),/harness_provider_cost_budget_exceeded/)
     })
-    assert.equal(calls,1,'the denied retry must not reach DeepInfra')
+    assert.equal(provider.calls(),1,'the denied retry must not reach DeepInfra')
+  }finally{
+    globalThis.fetch=priorFetch
+  }
+})
+
+// Production 2026-10-24: Builder reserved $0.08 per call against $0.24 while calls cost about $0.02, so every
+// work slice stopped after 3 calls. A reported cost replaces the reservation; the ceiling still bounds real spend.
+test('a reported cost replaces the reservation and the ceiling bounds real spend',async()=>{
+  const priorFetch=globalThis.fetch
+  const provider=paidResponder(0.03)
+  globalThis.fetch=provider.fetch as typeof fetch
+  try{
+    await boundedRun('deepinfra-cost-reported',async()=>{
+      // 0.03 + 0.03 spent; each new call reserves 0.06 first: 0.06+0.06 > 0.10 refuses the third.
+      assert.equal(await paidCall(),'ok')
+      assert.equal(await paidCall(),'ok')
+      await assert.rejects(paidCall(),/harness_provider_cost_budget_exceeded/)
+    })
+    assert.equal(provider.calls(),2)
   }finally{
     globalThis.fetch=priorFetch
   }

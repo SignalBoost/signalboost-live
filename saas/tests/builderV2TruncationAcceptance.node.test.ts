@@ -29,7 +29,7 @@ test('a reply cut off at the output limit is preserved, executes only complete a
           'mock:localInferenceUsage.ts': 'export async function recordLocalInferenceUsage(){}',
           'mock:cosTurnBudget.ts': 'export function turnDeadlineRemainingMs(){return null}',
           'mock:modelRuntimeAssignment.ts': 'export async function tryAssignedPlatformModelTurn(){throw Error("unexpected")}',
-          'mock:execution-context.ts': 'export function currentHarnessExecutionContext(){return null};export function harnessDeadlineRemainingMs(){return null};export function reserveHarnessProviderCostUsd(){}',
+          'mock:execution-context.ts': 'export function currentHarnessExecutionContext(){return null};export function harnessDeadlineRemainingMs(){return null};export function reserveHarnessProviderCostUsd(){};export function settleHarnessProviderCostUsd(){}',
         };
         return modules[url] ? { format: 'module', source: modules[url], shortCircuit: true } : next(url, context);
       },

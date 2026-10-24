@@ -60,6 +60,20 @@ export function reserveHarnessProviderCostUsd(maxEstimatedCostUsd: number): Read
   })
 }
 
+/**
+ * Replace a call's reservation with the cost the provider reported for it. The ledger then holds what was actually
+ * spent, so the run ceiling bounds real spend instead of the sum of upper bounds. Production 2026-10-24: Builder
+ * calls reserved $0.08 each against a $0.24 ceiling while costing about $0.02, so every work slice stopped after
+ * 3 calls. Without a reported cost the full reservation stays.
+ */
+export function settleHarnessProviderCostUsd(reservedUsd: number, actualUsd: number): void {
+  const ledger = harnessExecutionScope.getStore()?.providerCostLedger
+  const reserved = Number(reservedUsd)
+  const actual = Number(actualUsd)
+  if (!ledger || !Number.isFinite(reserved) || reserved <= 0 || !Number.isFinite(actual) || actual < 0) return
+  ledger.reservedCostUsd = Math.max(0, Number((ledger.reservedCostUsd - reserved + actual).toFixed(6)))
+}
+
 export function withHarnessProviderCostBudget<T>(
   maxCostUsd: number,
   operation: () => Promise<T>,

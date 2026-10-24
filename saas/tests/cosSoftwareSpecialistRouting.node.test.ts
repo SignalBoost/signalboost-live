@@ -446,3 +446,13 @@ test('new application creation cannot be intercepted by missing-source repair pr
   const specialist = read('../lib/ai/cos/softwareSpecialist.ts')
   assert.match(specialist, /if \(repairAwaitingSource\(objective\) && !newProject && !designMatched/)
 })
+
+test('COS Software Specialist rejects copied past-turn transcripts before direct Builder delegation', () => {
+  const source = read('../lib/ai/cos/softwareSpecialist.ts')
+  assert.match(source, /builderCopiedTranscriptBlocker\(objective\)/)
+  const guard = source.indexOf('const copiedTranscript = builderCopiedTranscriptBlocker(objective)')
+  const admission = source.indexOf('const admissionBlocker = builderExecutionAdmissionBlocker(objective)')
+  assert.ok(guard > 0 && guard < admission, 'transcript guard must precede regular admission')
+  assert.match(source, /if \(copiedTranscript\) return NextResponse\.json\(/)
+  assert.match(source, /execution_allowed: false/)
+})

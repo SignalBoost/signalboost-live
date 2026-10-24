@@ -28,8 +28,8 @@ export function isNewBuilderProjectObjective(objective: string): boolean {
   // Product titles such as `COS Builder Stress Test — LibraryFlow` can precede the actual Objective label.
   // Only skip a short title and an explicit Objective heading, never an arbitrary prior instruction.
   const unwrapped = String(objective || '')
-    .replace(/^\s*[^\r\n]{1,120}(?:\r?\n)+\s*(?:\*\*)?Objective(?:\*\*)?\s*:?\s*(?:\r?\n)+/i, '')
-    .replace(/^\s*(?:\*\*)?Objective(?:\*\*)?\s*:?\s*(?:\r?\n)+/i, '')
+    .replace(/^[ \t]*[^\r\n]{1,120}\r?\n[ \t]*(?:\*\*)?Objective(?:\*\*)?[ \t]*:?[ \t]*\r?\n/i, '')
+    .replace(/^[ \t]*(?:\*\*)?Objective(?:\*\*)?[ \t]*:?[ \t]*\r?\n/i, '')
   const opening = openingDirective(unwrapped).replace(/[*_`,]/g, ' ').replace(/\s+/g, ' ')
   return isExplicitIsolatedProjectBuild(objective) || NEW_PROJECT.test(objective)
     || (CREATES_WHOLE_PROJECT.test(opening) && (isNewApplicationSpecification(unwrapped)

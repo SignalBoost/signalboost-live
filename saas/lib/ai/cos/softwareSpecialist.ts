@@ -245,7 +245,7 @@ async function tryCosSoftwareSpecialistLegacy(
     ...softwareSpecialistFields('software.verify'),
   })
 
-  if (input.allowRepositoryRepair && access?.isOwner && access.userId && !sourceAttached) {
+  if (!isNewBuilderProjectObjective(objective) && input.allowRepositoryRepair && access?.isOwner && access.userId && !sourceAttached) {
     const operationalEvidence = isOperationalLogEvidence(rawObjective)
     const exactTarget = operationalEvidence ? parseSignalBoostRepositoryRepairTarget(rawObjective) : null
     const ownerDeveloperLogSubmission = operationalEvidence

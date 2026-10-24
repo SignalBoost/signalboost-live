@@ -15,7 +15,7 @@ import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './contr
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
 import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, requeueBuilderContinuationCycle, readBuilderWorkspaceFingerprint, getBuilderJobForUser, peekBuilderJob, type BuilderJobRecord } from './job-store.ts'
-import { MAX_WORK_SLICES, builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport, builderJobOverTotalDeadline, BUILDER_JOB_TOTAL_DEADLINE_MS } from './work-budget.ts'
+import { MAX_WORK_SLICES, builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport, builderJobOverTotalDeadline, BUILDER_JOB_TOTAL_DEADLINE_MS, BUILDER_SLICE_MAX_STEPS } from './work-budget.ts'
 import { builderContractObjective, builderTaskContract, builderTaskProgress } from './task-contract.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { builderNextAction } from './user-guidance.ts'
@@ -555,7 +555,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           const executeCycle = () => withBuilderInferenceJob(job.id, () => withBuilderSliceDeadline(() => runBuilderV2JobCycle({
             jobId: job.id, claimGeneration: job.claimGeneration,
             store: createBuilderV2SupabaseLeaseStore(db, job.userId),
-            agent: v2, maxSteps: 24, signal: deadlineController.signal,
+            agent: v2, maxSteps: BUILDER_SLICE_MAX_STEPS, signal: deadlineController.signal,
           }), BUILDER_SLICE_HARD_DEADLINE_MS))
           return runLimits
             ? await withBuilderInferenceBudget(createBuilderInferenceBudgetStore(db, job), Date.parse(job.createdAt) + totalDeadlineMs, executeCycle)

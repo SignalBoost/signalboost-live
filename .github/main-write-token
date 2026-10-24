@@ -1,2 +1,2 @@
-base_sha=554a17920b2a000667571d7c4744688ce77896cb
-branch=fix/builder-slice-spend-ceiling-pauses-20261024
+base_sha=4558abb14b092bd055874e67bb1d57d207a95e68
+branch=fix/builder-v2-complete-failure-feedback-20261024

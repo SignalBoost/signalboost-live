@@ -1,2 +1,2 @@
-base_sha=229eeeb9fcb86ca581c5dd2fa93b1d895098ddb7
-branch=fix/builder-v2-runtime-method-repair-20261024
+base_sha=9ea9000487487cddb7d9edbe83ea3076af572a9a
+branch=fix/builder-inference-job-correlation-20261024

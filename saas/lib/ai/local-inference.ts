@@ -455,6 +455,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   let cachedPromptTokens: number | null = null
   let providerEstimatedCostUsd: number | null = null
   let reservedCostUsd: number | null = null
+  let reportedCostUsd: number | null = null
   let text: string | null = null
   let fatalGovernanceError: Error | null = null
   let transportFailure: string | null = null
@@ -600,6 +601,9 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
       totalTokens = nonNegativeNumber(data.usage?.total_tokens)
       cachedPromptTokens = nonNegativeNumber(data.usage?.prompt_tokens_details?.cached_tokens)
       providerEstimatedCostUsd = nonNegativeNumber(data.usage?.estimated_cost)
+      // Only a cost the provider actually reported as a number may replace the reservation: Number(null) is 0
+      // (Codex on #4863), and an unknown cost must keep the full reservation.
+      if (typeof data.usage?.estimated_cost === 'number') reportedCostUsd = providerEstimatedCostUsd
       const message = data.choices?.[0]?.message
       const content = message?.content
       toolCalls = Object.freeze((message?.tool_calls ?? []).flatMap(call => {
@@ -645,7 +649,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
     harnessContext?.signal.removeEventListener('abort', abortFromHarness)
     args.signal?.removeEventListener('abort', abortFromCaller)
     // The run ceiling counts what the provider reported this call cost, not its upper-bound reservation.
-    if (reservedCostUsd !== null && providerEstimatedCostUsd !== null) settleHarnessProviderCostUsd(reservedCostUsd, providerEstimatedCostUsd)
+    if (reservedCostUsd !== null && reportedCostUsd !== null) settleHarnessProviderCostUsd(reservedCostUsd, reportedCostUsd)
     const latencyMs = Date.now() - startedAt
     const inferenceLatencyMs = inferenceStartedAt === null ? 0 : Math.max(0, Date.now() - inferenceStartedAt)
     const success = errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300

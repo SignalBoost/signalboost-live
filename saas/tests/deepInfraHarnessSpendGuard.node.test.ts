@@ -65,7 +65,7 @@ test('DeepInfra inside a cost-bounded host HarnessRun requires a pre-call reserv
   )
 })
 
-function paidResponder(estimatedCost:number|undefined){
+function paidResponder(estimatedCost:number|null|undefined){
   let calls=0
   const fetch=async()=>{
     calls+=1
@@ -91,17 +91,20 @@ function boundedRun(runId:string,operation:()=>Promise<void>){
 }
 
 test('without a reported cost the full reservation stays and the next paid call fails closed before fetch',async()=>{
-  const priorFetch=globalThis.fetch
-  const provider=paidResponder(undefined)
-  globalThis.fetch=provider.fetch as typeof fetch
-  try{
-    await boundedRun('deepinfra-cost-unreported',async()=>{
-      assert.equal(await paidCall(),'ok')
-      await assert.rejects(paidCall(),/harness_provider_cost_budget_exceeded/)
-    })
-    assert.equal(provider.calls(),1,'the denied retry must not reach DeepInfra')
-  }finally{
-    globalThis.fetch=priorFetch
+  // Missing, null (Number(null) is 0; Codex on #4863) and non-numeric costs are unknown, never a release.
+  for(const [name,cost] of [['missing',undefined],['null',null],['text','0.01']] as const){
+    const priorFetch=globalThis.fetch
+    const provider=paidResponder(cost as number|null|undefined)
+    globalThis.fetch=provider.fetch as typeof fetch
+    try{
+      await boundedRun(`deepinfra-cost-unreported-${name}`,async()=>{
+        assert.equal(await paidCall(),'ok')
+        await assert.rejects(paidCall(),/harness_provider_cost_budget_exceeded/,name)
+      })
+      assert.equal(provider.calls(),1,`${name}: the denied retry must not reach DeepInfra`)
+    }finally{
+      globalThis.fetch=priorFetch
+    }
   }
 })
 

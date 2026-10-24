@@ -1,2 +1,2 @@
-base_sha=4558abb14b092bd055874e67bb1d57d207a95e68
-branch=fix/builder-v2-complete-failure-feedback-20261024
+base_sha=bdd8452767efc3a45987ec2b8b7e0305862abf87
+branch=fix/builder-job-call-cap-matches-slices-20261024

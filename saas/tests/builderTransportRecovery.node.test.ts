@@ -122,3 +122,8 @@ test('COS Builder results remain visible without navigating to History', () => {
   assert.match(transport, /window\.localStorage\.setItem\(LIVE_BUILDER_KEY/)
   assert.match(transport, /window\.localStorage\.getItem\(LIVE_BUILDER_KEY/)
 })
+
+test('the floating live Builder status panel uses an RTL-safe logical inset', () => {
+  assert.match(transport, /position: 'fixed', insetInlineEnd: 20, bottom: 20/)
+  assert.doesNotMatch(transport, /position: 'fixed', right: 20/)
+})

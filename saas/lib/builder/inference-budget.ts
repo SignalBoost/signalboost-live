@@ -14,6 +14,16 @@ export interface BuilderInferenceBudgetStore {
 export class BuilderBudgetError extends Error {
   constructor(code: string) { super(code); this.name = 'BuilderBudgetError' }
 }
+const jobScope = new AsyncLocalStorage<string>()
+export function withBuilderInferenceJob<T>(jobId: string, operation: () => T): T {
+  if (!jobId || jobId.length > 120) throw new BuilderBudgetError('builder_job_correlation_invalid')
+  return jobScope.run(jobId, operation)
+}
+export function builderInferenceCorrelation(): Readonly<{ correlationId?: string }> {
+  const correlationId = jobScope.getStore()
+  return correlationId ? { correlationId } : {}
+}
+
 const scope = new AsyncLocalStorage<{ store: BuilderInferenceBudgetStore; deadlineAt: number }>()
 export const currentBuilderInferenceBudget = () => scope.getStore() ?? null
 export function withBuilderInferenceBudget<T>(store: BuilderInferenceBudgetStore, deadlineAt: number, operation: () => T): T {

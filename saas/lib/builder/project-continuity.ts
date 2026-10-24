@@ -25,7 +25,11 @@ const CREATES_WHOLE_PROJECT = /\b(?:build|create|write|implement|generate|scaffo
  * particular package manifest (a static website has none).
  */
 export function isNewBuilderProjectObjective(objective: string): boolean {
-  const unwrapped = String(objective || '').replace(/^\s*(?:\*\*)?Objective(?:\*\*)?\s*:?\s*(?:\r?\n)+/i, '')
+  // Product titles such as `COS Builder Stress Test — LibraryFlow` can precede the actual Objective label.
+  // Only skip a short title and an explicit Objective heading, never an arbitrary prior instruction.
+  const unwrapped = String(objective || '')
+    .replace(/^\s*[^\r\n]{1,120}(?:\r?\n)+\s*(?:\*\*)?Objective(?:\*\*)?\s*:?\s*(?:\r?\n)+/i, '')
+    .replace(/^\s*(?:\*\*)?Objective(?:\*\*)?\s*:?\s*(?:\r?\n)+/i, '')
   const opening = openingDirective(unwrapped).replace(/[*_`,]/g, ' ').replace(/\s+/g, ' ')
   return isExplicitIsolatedProjectBuild(objective) || NEW_PROJECT.test(objective)
     || (CREATES_WHOLE_PROJECT.test(opening) && (isNewApplicationSpecification(unwrapped)

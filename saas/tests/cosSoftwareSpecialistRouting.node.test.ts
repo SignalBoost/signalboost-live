@@ -456,3 +456,8 @@ test('COS Software Specialist rejects copied past-turn transcripts before direct
   assert.match(source, /if \(copiedTranscript\) return NextResponse\.json\(/)
   assert.match(source, /execution_allowed: false/)
 })
+
+test('standalone app requests cannot enter owner repository repair', () => {
+  const specialist = read('../lib/ai/cos/softwareSpecialist.ts')
+  assert.match(specialist, /if \(!isNewBuilderProjectObjective\(objective\) && input\.allowRepositoryRepair/)
+})

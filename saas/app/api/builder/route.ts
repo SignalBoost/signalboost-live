@@ -316,7 +316,7 @@ export async function POST(request: Request) {
     // The repair job reproduces the failure before it edits anything, so a log that does not
     // reproduce on the deployed revision yields an honest "could not reproduce" result rather than
     // a wrong-revision repair — the safety the old clone-line requirement was reaching for.
-    const platformRepairTarget = files.length === 0
+    const platformRepairTarget = files.length === 0 && !newProjectRequested
       ? exactFailedLogTarget ?? signalBoostDeployedRepairTarget(objective, {
           commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
           branch: process.env.VERCEL_GIT_COMMIT_REF,
@@ -395,7 +395,7 @@ export async function POST(request: Request) {
 
     // An owner repair with no source anywhere goes to the platform repository at the deployed
     // revision instead of an empty workspace that can only answer "attach your source".
-    if (access.isOwner && files.length === 0 && !repositoryTarget && !project.context && !(project.workspaceId || selectedWorkspaceId)) {
+    if (access.isOwner && !newProjectRequested && files.length === 0 && !repositoryTarget && !project.context && !(project.workspaceId || selectedWorkspaceId)) {
       const sourceWorkspaceId = project.workspaceId || selectedWorkspaceId
       const sourceWorkspace = sourceWorkspaceId ? createSupabaseBuilderWorkspace(access.userId) : null
       // A storage failure counts as "has files": never reroute a workspace whose contents are unknown.

@@ -102,9 +102,12 @@ export function withHarnessExecutionContext<T>(
     && configuredMaxCostUsd >= 0
     ? { maxCostUsd: configuredMaxCostUsd, reservedCostUsd: 0 }
     : undefined
+  // Nested runs must inherit cancellation from their parent, including when the
+  // child provides a distinct AbortSignal. A parent cancellation is never optional.
+  const effectiveSignal = existing ? AbortSignal.any([existing.signal, signal]) : signal
   return harnessExecutionScope.run(Object.freeze({
     manifest,
-    signal,
+    signal: effectiveSignal,
     ...(providerCostLedger ? { providerCostLedger } : {}),
   }), operation)
 }

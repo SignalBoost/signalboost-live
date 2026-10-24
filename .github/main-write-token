@@ -1,2 +1,2 @@
-base_sha=850d421e957a63465e30129fad49d9290236bf8c
-branch=fix/builder-v2-progressive-unverified-resume-20261024
+base_sha=de83b0b11bd23a86a22efbe89d614cd3fc507119
+branch=fix/builder-labeled-new-project-isolation-20261023

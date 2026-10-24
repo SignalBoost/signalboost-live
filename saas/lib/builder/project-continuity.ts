@@ -25,8 +25,11 @@ const CREATES_WHOLE_PROJECT = /\b(?:build|create|write|implement|generate|scaffo
  * particular package manifest (a static website has none).
  */
 export function isNewBuilderProjectObjective(objective: string): boolean {
-  return isExplicitIsolatedProjectBuild(objective) || NEW_PROJECT.test(objective) || (isNewApplicationSpecification(objective)
-    && CREATES_WHOLE_PROJECT.test(openingDirective(objective).replace(/[*_`,]/g, ' ').replace(/\s+/g, ' ')))
+  const unwrapped = String(objective || '').replace(/^\s*(?:\*\*)?Objective(?:\*\*)?\s*:?\s*(?:\r?\n)+/i, '')
+  const opening = openingDirective(unwrapped).replace(/[*_`,]/g, ' ').replace(/\s+/g, ' ')
+  return isExplicitIsolatedProjectBuild(objective) || NEW_PROJECT.test(objective)
+    || (CREATES_WHOLE_PROJECT.test(opening) && (isNewApplicationSpecification(unwrapped)
+      || /\b(?:complete|full|entire)\s+(?:[\w.+#-]+\s+){0,4}(?:app|application|project|system|website|api)\b/i.test(opening)))
 }
 
 export type BuilderProjectContext = {

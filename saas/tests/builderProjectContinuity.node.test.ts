@@ -224,3 +224,26 @@ test('source admission refuses missing workspace without listing or writing file
   assert.deepEqual(empty, { status: 'source_missing', paths: [] })
   assert.equal(reads, 3)
 })
+
+test('Objective-labelled LibraryFlow is isolated rather than inheriting Calculator API files', async () => {
+  const library = [
+    'Objective',
+    'Build a complete Node.js application called LibraryFlow, a digital library management system with catalog, borrowing, returns, fines, and reporting.',
+    'Requirements',
+    'Project structure',
+    'libraryflow/',
+    '├── package.json',
+    '├── index.js',
+    '├── src/catalog.js',
+    '├── src/borrow.js',
+    '├── test/catalog.test.js',
+    'Verification commands',
+    'npm test',
+    'node --test test/*.test.js',
+    'node index.js',
+  ].join('\n')
+  const selected = await selectBuilderProject({ ...input, objective: library, requestedWorkspaceId: workspaceId },
+    async () => { assert.fail('LibraryFlow must not look up or borrow Calculator API'); return job })
+  assert.deepEqual(selected, {})
+  assert.equal((await selectBuilderProject({ ...input, objective: 'Objective\nUpdate the existing catalog screen' }, async () => job)).workspaceId, workspaceId)
+})

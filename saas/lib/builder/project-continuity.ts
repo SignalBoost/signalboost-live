@@ -24,8 +24,11 @@ const CREATES_WHOLE_PROJECT = /\b(?:build|create|write|implement|generate|scaffo
  * particular package manifest (a static website has none).
  */
 export function isNewBuilderProjectObjective(objective: string): boolean {
-  return isExplicitIsolatedProjectBuild(objective) || NEW_PROJECT.test(objective) || (isNewApplicationSpecification(objective)
-    && CREATES_WHOLE_PROJECT.test(openingDirective(objective).replace(/[*_`,]/g, ' ').replace(/\s+/g, ' ')))
+  // COS users often paste a task with an introductory Objective heading. Treat the ensuing
+  // whole-application directive as a fresh project, not a continuation of the previous workspace.
+  const normalized = objective.replace(/^\s*(?:#{1,6}\s*)?(?:objective|task|request)\s*:?\s*(?:\r?\n\s*)?/i, '').trimStart()
+  return isExplicitIsolatedProjectBuild(normalized) || NEW_PROJECT.test(normalized) || (isNewApplicationSpecification(normalized)
+    && CREATES_WHOLE_PROJECT.test(openingDirective(normalized).replace(/[*_`,]/g, ' ').replace(/\s+/g, ' ')))
 }
 
 export type BuilderProjectContext = {

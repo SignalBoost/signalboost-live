@@ -25,6 +25,15 @@ export type BuilderV2JobCycle = Readonly<{
   reason: string
 }>
 
+/** Preserve productive partial builds after a premature model stop; never forgive idle loops. */
+export function builderV2RecoverableEarlyStop(reason: string, madeProgress: boolean, checkpointPresent: boolean): boolean {
+  return madeProgress && checkpointPresent && (
+    reason === 'builder_v2_unverified_completion' ||
+    reason === 'builder_v2_checklist_incomplete' ||
+    reason === 'builder_v2_invalid_model_action'
+  )
+}
+
 /** Commands whose latest run after the last file change passed. */
 export function passedOnCurrentRevision(steps: readonly BuilderV2Receipt[]): Set<string> {
   const passed = new Set<string>()
@@ -121,7 +130,8 @@ export async function runBuilderV2JobCycle(input: {
   }
   // Slice budget, cancellation (slice deadline) and a model timeout/outage after progress all pause with the
   // checkpoint; the job's slice cap still bounds how often it resumes.
-  if (result.reason === 'builder_v2_step_budget' || result.reason === 'builder_v2_cancelled' || result.reason === 'builder_v2_model_unavailable') {
+  const recoverableEarlyStop = builderV2RecoverableEarlyStop(result.reason, madeProgress, Boolean(result.checkpoint))
+  if (result.reason === 'builder_v2_step_budget' || result.reason === 'builder_v2_cancelled' || result.reason === 'builder_v2_model_unavailable' || recoverableEarlyStop) {
     if (result.reason === 'builder_v2_cancelled' && input.signal?.aborted &&
         (input.signal.reason instanceof Error && input.signal.reason.message === 'builder_v2_total_deadline_exceeded')) {
       return { status: 'failed', result, reason: 'builder_v2_total_deadline_exceeded' }

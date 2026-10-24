@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { stripTypeScriptTypes } from 'node:module'
 import { PGlite } from '@electric-sql/pglite'
-import { BuilderBudgetError, builderBudgetedModelFetch, quoteDeepInfraRequest, readBuilderRunLimits, withBuilderInferenceBudget } from '../lib/builder/inference-budget.ts'
+import { BuilderBudgetError, builderBudgetedModelFetch, quoteDeepInfraRequest, readBuilderRunLimits, withBuilderInferenceBudget, withBuilderInferenceJob, builderInferenceCorrelation } from '../lib/builder/inference-budget.ts'
 import { createBuilderInferenceBudgetStore } from '../lib/builder/inference-budget-store.ts'
 import { currentTraceId, currentTraceparent, markActiveSpanFailed } from '../lib/observability/tracing.ts'
 
@@ -279,4 +279,28 @@ test('database enforces original deadline and refuses cap reset, duplicate call,
     } }, job)
     await assert.rejects(denied.reserve(randomUUID(), quote))
   } finally { await db.close() }
+})
+
+test('inference correlation follows the durable Builder job through async calls without leaking to another job', async () => {
+  const first = randomUUID()
+  const second = randomUUID()
+  assert.deepEqual(builderInferenceCorrelation(), {})
+  await Promise.all([
+    withBuilderInferenceJob(first, async () => {
+      await Promise.resolve()
+      assert.deepEqual(builderInferenceCorrelation(), { correlationId: first })
+    }),
+    withBuilderInferenceJob(second, async () => {
+      await Promise.resolve()
+      assert.deepEqual(builderInferenceCorrelation(), { correlationId: second })
+    }),
+  ])
+  assert.deepEqual(builderInferenceCorrelation(), {})
+})
+
+test('Builder V2 execution and every inference fallback carry the job correlation id', () => {
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  const port = readFileSync(new URL('../lib/cos/aiPort.ts', import.meta.url), 'utf8')
+  assert.match(runner, /withBuilderInferenceJob\(job\.id, \(\) => withBuilderSliceDeadline/)
+  assert.equal((port.match(/usageContext: \{ \.\.\.builderInferenceCorrelation\(\),/g) || []).length, 7)
 })

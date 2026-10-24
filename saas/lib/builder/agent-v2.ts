@@ -14,6 +14,12 @@ import { objectivePlantsDefect, plantedDefectCandidate, plantedDefectNotes, type
  * its saved receipts. Production 2026-10-16: maxSteps 24 was compared against the saved receipt count, so once a
  * job had 24 receipts every later slice resumed with zero steps and paused again without progress.
  */
+/** Recover distinct runtime API mismatches from the full Node test report, not only its first stack trace. */
+export function builderV2RuntimeMethodFailures(diagnostic: string): string[] {
+  const matches = [...String(diagnostic || '').matchAll(/\b(?:TypeError(?: \[Error\])?:\s*)?([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*){1,3}) is not a function\b/g)]
+  return [...new Set(matches.map(match => match[1]))].slice(0, 24)
+}
+
 export const BUILDER_V2_MAX_RECEIPTS = 400
 /** Consecutive receipts that neither changed a file nor passed a command. Debugging (failed run, several reads,
  * a missed edit) is normal work; only a long run with no change and no passing run is a stall, which pauses. */
@@ -638,12 +644,17 @@ export class BuilderV2Agent {
       const error = /(?:TypeError|ReferenceError|SyntaxError):[^\n]*/.exec(diagnostic)?.[0] ?? diagnostic.slice(0, 280)
       const failedRuns = steps.filter(step => step.tool === 'run_tests' && !step.ok).length
       const decimalAssertion = builderV2DecimalAssertionMismatch(diagnostic)
-      return { error, targets, runtimeTargets, failedRuns,
+      // Preserve every concrete runtime method failure, not just the first exception in a long Node test log.
+      // These are evidence for the model, never an instruction to rewrite tests or infer success.
+      const missingMethods = builderV2RuntimeMethodFailures(diagnostic)
+      return { error, targets, runtimeTargets, missingMethods, failedRuns,
         instruction: failedRuns >= 3
           ? 'Repeated host test failures have already consumed multiple repair rounds. Do not repeat the prior change strategy. Compare the exact assertion actual and expected with source behavior, including JavaScript floating-point semantics. Correct the root mismatch rather than oscillating code changes; change tests only if their assertion is demonstrably incorrect, never to suppress a legitimate failure. Host verification must pass after the final edit.'
           : decimalAssertion
             ? 'The failure may involve JavaScript floating-point representation. Check whether the test expectation matches the task contract and correct runtime arithmetic; avoid changing working math merely to satisfy a mistaken exact decimal expectation.'
-            : 'Use the actual failing command, caller imports and source API to diagnose the failure. Prefer a targeted edit_file operation; avoid repeating read_file calls. Do not change tests merely to silence failures. Host verification runs after edits.' }
+            : missingMethods.length
+              ? `The host reports missing runtime APIs: ${missingMethods.join(', ')}. Find the producer of these objects in the imported source files already provided, implement the missing methods with the semantics asserted by the tests, and use edit_file NOW. Do not spend this continuation on more read_file or list_files calls. Never weaken tests. Host verification runs after edits.`
+              : 'Use the actual failing command, caller imports and source API to diagnose the failure. Prefer a targeted edit_file operation; avoid repeating read_file calls. Do not change tests merely to silence failures. Host verification runs after edits.' }
     }
     for (let calls = 0; calls < maxSteps && steps.length < BUILDER_V2_MAX_RECEIPTS; calls++) {
       checkBuilderInferenceDeadline()

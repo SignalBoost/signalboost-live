@@ -114,3 +114,11 @@ test('accepted Builder and operational repair responses return 202 without waiti
   assert.doesNotMatch(direct, /builder-job-terminal/)
   assert.doesNotMatch(repair, /operational-repair-terminal/)
 })
+
+test('COS Builder results remain visible without navigating to History', () => {
+  assert.match(transport, /announceLiveBuilder\(\{ jobId, conversationId, status: 'running'/)
+  assert.match(transport, /setInterval\(\(\) => \{ void check\(\) \}, 3000\)/)
+  assert.match(transport, /role="status" aria-live="polite"/)
+  assert.match(transport, /window\.localStorage\.setItem\(LIVE_BUILDER_KEY/)
+  assert.match(transport, /window\.localStorage\.getItem\(LIVE_BUILDER_KEY/)
+})

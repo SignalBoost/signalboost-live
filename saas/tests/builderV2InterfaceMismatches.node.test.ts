@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { builderInterfaceMismatches, builderInterfaceRepairs, builderModuleInterface } from '../lib/builder/interface-mismatches.ts'
-import { BuilderV2Agent } from '../lib/builder/agent-v2.ts'
+import { BuilderV2Agent, builderV2RuntimeMethodFailures } from '../lib/builder/agent-v2.ts'
 import { BuilderV2Dispatcher } from '../lib/builder/agent-v2-dispatcher.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import type { BuilderRunnerPort } from '../lib/builder/contracts.ts'
@@ -327,4 +327,19 @@ test('factory literals: commas inside comments do not split members, and concise
     'missing_method:createTill.prototype.clear@3',
     'missing_method:createLedger.prototype.close@5',
   ])
+})
+
+test('LibraryFlow long Node test failures preserve every concrete missing method for targeted repair', () => {
+  const output = [
+    '✖ borrow creates a transaction',
+    'TypeError [Error]: tx.list is not a function',
+    'at TestContext.<anonymous> (/tmp/cos-builder/test/transactions.test.js:63:25)',
+    'TypeError [Error]: tx.list is not a function',
+    'TypeError [Error]: reports.totalBorrowed is not a function',
+    'TypeError [Error]: borrowed.returnBook is not a function',
+  ].join(String.fromCharCode(10))
+  assert.deepEqual(builderV2RuntimeMethodFailures(output), [
+    'tx.list', 'reports.totalBorrowed', 'borrowed.returnBook',
+  ])
+  assert.deepEqual(builderV2RuntimeMethodFailures('✔ all tests passed'), [])
 })

@@ -10,9 +10,10 @@ const NEW_PROJECT = /\b(?:new|another|separate|different|fresh|clean)\s+(?:(?:is
  * The opening instruction creates a whole thing ("Build a complete, working OrderFlow application", "Create a responsive
  * portfolio website"), not a part of the current one ("Implement order cancellation", "Create a settings page for our
  * app"): an indefinite article, then up to five describing words that are not a preposition or possessive, then a
- * whole-project noun.
+ * whole-project noun. A describing word may carry a dot or symbol ("Node.js", "C++"): Production 2026-10-23, "Build a complete
+ * Node.js application called LibraryFlow" reused the previous calculator workspace.
  */
-const CREATES_WHOLE_PROJECT = /\b(?:build|create|write|implement|generate|scaffold|produce|make|design|develop)\s+(?:a|an)\s+(?:(?!(?:for|to|in|into|of|on|inside|within|our|my|your|the|this|that|existing|current)\b)[\w-]+\s+){0,5}(?:app|application|website|web\s+app|site|project|service|game|tool|cli|api|system|program|platform|dashboard)\b/i
+const CREATES_WHOLE_PROJECT = /\b(?:build|create|write|implement|generate|scaffold|produce|make|design|develop)\s+(?:a|an)\s+(?:(?!(?:for|to|in|into|of|on|inside|within|our|my|your|the|this|that|existing|current)\b)[\w.+#-]+\s+){0,5}(?:app|application|website|web\s+app|site|project|service|game|tool|cli|api|system|program|platform|dashboard)\b/i
 
 /**
  * A request for a new project: an explicit "new/fresh project" phrase, or a complete new-application specification

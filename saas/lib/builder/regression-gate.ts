@@ -27,7 +27,10 @@ const SUPPLIED_FAILURE_EVIDENCE = /(?:^|\n)\s*(?:[A-Z][A-Za-z]*Error\b|Traceback
 // A title or divider is not the instruction. Production 2026-10-13: "# COS Builder Advanced Stress Test — OrderFlow"
 // above "Build a complete … application … from scratch" hid the build directive, so acceptance criteria that mention
 // errors and failing tests turned a new build into a repair with no source.
-const TITLE_OR_DIVIDER = /^\s*(?:#{1,6}(?:\s|$)|(?:[-*_=]\s*){3,}$)/
+// A Markdown heading, a divider, or a bare section label ("Objective", "Requirements:") left by a request copied
+// without its Markdown. Production 2026-10-23: the LibraryFlow request opened with the plain label "Objective", so
+// "Build a complete Node.js application called LibraryFlow" was not read as the instruction.
+const TITLE_OR_DIVIDER = /^\s*(?:#{1,6}(?:\s|$)|(?:[-*_=]\s*){3,}$|(?:objective|goal|overview|summary|task|description|context|background|scope|brief|requirements?)\s*:?\s*$)/i
 
 export function openingDirective(objective: string): string {
   const line = String(objective || '').split(/\r?\n/).find(item => item.trim().length > 0 && !TITLE_OR_DIVIDER.test(item))

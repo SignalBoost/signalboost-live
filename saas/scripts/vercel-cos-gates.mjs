@@ -35,6 +35,7 @@ const tests = [
   'tests/ownedSiteOptimizationMonitoring.node.test.ts',
   'tests/websiteOptimizerOwnerWorkflow.node.test.ts',
   'tests/builderV2ResumeReadWrite.node.test.ts',
+  'tests/builderPlainSpecLayout.node.test.ts',
   'tests/auditOwnedRepositoryRecovery.node.test.ts',
   'tests/cosAssistanceModeHarness.node.test.ts',
   'tests/builderHistoricalAcceptanceReport.node.test.ts',

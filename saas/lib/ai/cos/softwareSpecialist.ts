@@ -33,6 +33,7 @@ import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-
 import { readBuilderObjective } from '@/lib/builder/request-contract'
 import { runCosSoftwareSpecialistProductionHarness } from '@/lib/ai/cos/softwareSpecialistHarness'
 import { builderExecutionAdmissionBlocker } from '@/lib/builder/execution-admission'
+import { builderCopiedTranscriptBlocker } from '@/lib/builder/copied-transcript-guard'
 import {
   COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY,
   createCosProductionIngressManifest,
@@ -476,6 +477,9 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   if (input.body?.assistanceMode !== assistanceMode) {
     return tryCosSoftwareSpecialist({ ...input, body: { ...(input.body ?? {}), assistanceMode } })
   }
+
+  const copiedTranscript = builderCopiedTranscriptBlocker(objective)
+  if (copiedTranscript) return NextResponse.json({ ...copiedTranscript, source: 'cos-builder-admission-blocked', execution_allowed: false, external_action_taken: false, ...softwareSpecialistFields('software.delegate') }, { status: 422 })
 
   const admissionBlocker = builderExecutionAdmissionBlocker(objective)
   if (admissionBlocker) return NextResponse.json({

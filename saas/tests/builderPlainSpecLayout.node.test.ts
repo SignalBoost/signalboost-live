@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { builderTaskContract } from '../lib/builder/task-contract.ts'
 import { isNewBuilderProjectObjective } from '../lib/builder/project-continuity.ts'
-import { openingDirective } from '../lib/builder/regression-gate.ts'
+import { isRepairObjective, openingDirective } from '../lib/builder/regression-gate.ts'
 
 const libraryflow = readFileSync(new URL('./fixtures/builder-libraryflow-plain.txt', import.meta.url), 'utf8')
 
@@ -28,4 +28,16 @@ test('a bare section label is not the instruction, and a Node.js application is 
   assert.equal(isNewBuilderProjectObjective(libraryflow), true)
   // A feature for the current project stays in it.
   assert.equal(isNewBuilderProjectObjective('Objective\nImplement order cancellation in our existing app.\nRun:\nnpm test'), false)
+})
+
+test('a bare document title above the sections is not the instruction (LibraryFlow with its title)', () => {
+  // Production 2026-10-23: "COS Builder Stress Test — LibraryFlow" above "Objective" turned the build into a repair.
+  const titled = readFileSync(new URL('./fixtures/builder-libraryflow-titled-plain.txt', import.meta.url), 'utf8')
+  assert.match(openingDirective(titled), /^Build a complete Node\.js application called LibraryFlow/)
+  assert.equal(isNewBuilderProjectObjective(titled), true)
+  assert.equal(isRepairObjective(titled), false)
+  assert.equal(builderTaskContract(titled).files.length, 14)
+  // A short instruction followed by a section label is still the instruction.
+  assert.equal(openingDirective('Fix the login bug\nRequirements\nThe form must submit.'), 'Fix the login bug')
+  assert.equal(isRepairObjective('Fix the login bug\nRequirements\nThe form must submit without an error.'), true)
 })

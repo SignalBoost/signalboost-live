@@ -32,9 +32,18 @@ const SUPPLIED_FAILURE_EVIDENCE = /(?:^|\n)\s*(?:[A-Z][A-Za-z]*Error\b|Traceback
 // "Build a complete Node.js application called LibraryFlow" was not read as the instruction.
 const TITLE_OR_DIVIDER = /^\s*(?:#{1,6}(?:\s|$)|(?:[-*_=]\s*){3,}$|(?:objective|goal|overview|summary|task|description|context|background|scope|brief|requirements?)\s*:?\s*$)/i
 
+// A document title copied without its "#": one short line without sentence punctuation, directly followed by a section
+// label or heading. Production 2026-10-23: "COS Builder Stress Test — LibraryFlow" above "Objective" hid "Build a complete
+// Node.js application…", so the request read as a repair of an existing project (the same failure as the OrderFlow
+// title on 2026-10-13, which carried its "#").
+const BARE_TITLE = /^[^.!?:;]{1,100}$/
+// An instruction is never a title, even when it is short and a section label follows ("Fix the login bug" / "Requirements").
+const INSTRUCTION_START = /^(?:please\s+)?(?:fix|repair|debug|resolve|troubleshoot|build|create|make|write|implement|add|update|refactor|generate|develop|design|scaffold|deploy|test|run)\b/i
 export function openingDirective(objective: string): string {
-  const line = String(objective || '').split(/\r?\n/).find(item => item.trim().length > 0 && !TITLE_OR_DIVIDER.test(item))
-  return line ? line.trim() : ''
+  const lines = String(objective || '').split(/\r?\n/).map(item => item.trim()).filter(Boolean)
+  const line = lines.find((item, index) => !TITLE_OR_DIVIDER.test(item)
+    && !(BARE_TITLE.test(item) && !INSTRUCTION_START.test(item) && item.split(/\s+/).length <= 12 && TITLE_OR_DIVIDER.test(lines[index + 1] ?? '')))
+  return line ?? ''
 }
 
 // A hypothetical clause describes procedure, not a defect that exists now. Production 2026-10-13: the OrderFlow build

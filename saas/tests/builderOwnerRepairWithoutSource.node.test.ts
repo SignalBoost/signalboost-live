@@ -8,6 +8,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { hasWorkspaceSource, isOwnerRepairWithoutSource, signalBoostDeployedRepairTarget } from '../lib/builder/repository-repair-target.ts'
+import { isNewBuilderProjectObjective } from '../lib/builder/project-continuity.ts'
 
 const DEPLOYED = { commitSha: 'a'.repeat(40), branch: 'main' }
 const OWNER_REPAIRS = [
@@ -86,3 +87,27 @@ test('an isolated new application is never converted to a SignalBoost platform r
 })
 
 // end of saas/tests/builderOwnerRepairWithoutSource.node.test.ts (if this line is missing, the paste was cut short)
+
+test('titled LibraryFlow stress test is a fresh user project, never a platform repair', () => {
+  const objective = [
+    'COS Builder Stress Test — LibraryFlow',
+    'Objective',
+    'Build a complete Node.js application called LibraryFlow, a digital library management system with catalog, borrowing, returns, fines, and reporting.',
+    'Requirements',
+    'Project structure',
+    'libraryflow/',
+    '├── package.json',
+    '├── README.md',
+    '├── index.js',
+    '├── src/catalog.js',
+    '├── test/catalog.test.js',
+    'Verification commands',
+    'npm test',
+    'node --test test/*.test.js',
+    'node index.js',
+  ].join('\\n')
+  assert.equal(isNewBuilderProjectObjective(objective), true)
+  const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /const platformRepairTarget = files\\.length === 0 && !newProjectRequested/)
+  assert.match(route, /if \\(access\\.isOwner && !newProjectRequested && files\\.length === 0/)
+})

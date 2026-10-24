@@ -265,7 +265,7 @@ export const BUILDER_RESULT_CONTINUING: Copy = {
 // While a Builder job runs. Production 2026-10-23: "COS Builder is running job … Progress and the final result are
 // durable in History; the action will not be replayed." The job id stays in the response data, not the sentence.
 export const BUILDER_RUNNING: Copy = {
-  en: 'I’m on it. You can leave this page; the result will appear in History.',
+  en: 'I’m working on your project. Progress and the finished result will appear in this conversation automatically.',
   es: 'Estoy en ello. Puedes salir de esta página; el resultado aparecerá en el Historial.',
   pt: 'Estou cuidando disso. Você pode sair desta página; o resultado aparecerá no Histórico.',
   pl: 'Zajmuję się tym. Możesz opuścić tę stronę; wynik pojawi się w Historii.',

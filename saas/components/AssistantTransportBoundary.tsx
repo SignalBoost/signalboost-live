@@ -1,7 +1,7 @@
 // saas/components/AssistantTransportBoundary.tsx
 'use client'
 
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
   recoverAssistantReplyFromHistory,
   sendAssistantTurnAndRecover,
@@ -19,6 +19,15 @@ type AssistantRequestBody = {
 }
 
 const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
+
+const LIVE_BUILDER_KEY = 'cos-builder-live-conversation-job-v1'
+const LIVE_BUILDER_EVENT = 'cos-builder-live-job'
+type LiveBuilder = { jobId: string; conversationId: string; status: string; reply: string }
+function announceLiveBuilder(job: LiveBuilder): void {
+  try { window.localStorage.setItem(LIVE_BUILDER_KEY, JSON.stringify(job)) } catch { /* storage optional */ }
+  window.dispatchEvent(new CustomEvent<LiveBuilder>(LIVE_BUILDER_EVENT, { detail: job }))
+}
+
 const BUILDER_JOB_POLL_ATTEMPTS = 240
 const BUILDER_JOB_POLL_DELAY_MS = 2_000
 const BUILDER_HISTORY_POLL_ATTEMPTS = 11
@@ -305,6 +314,8 @@ async function executeBuilderFromConcierge(
     }, 503, 'builder-job-id-missing')
   }
 
+  announceLiveBuilder({ jobId, conversationId, status: 'running', reply: 'Building your application. Progress and the final result will appear here automatically.' })
+
   // POST already created a durable job and History row. Return the receipt immediately;
   // holding Concierge open until the worker finishes causes a false client timeout.
   return responseFromPayload({
@@ -351,6 +362,8 @@ async function executeOperationalRepairFromConcierge(
     return responseFromPayload(payload, response.status, 'operational-repair-backend')
   }
 
+  announceLiveBuilder({ jobId, conversationId, status: 'running', reply: 'Repair in progress. Results will appear here automatically.' })
+
   // Durable repair accepted: return its receipt now; History owns the final outcome.
   return responseFromPayload({
     ...payload,
@@ -388,6 +401,41 @@ async function executeArtifactFromConcierge(
 
 /** Transport and internal-tool boundary for the authorized owner Assistant. */
 export default function AssistantTransportBoundary({ children }: { children: ReactNode }) {
+  const [liveJob, setLiveJob] = useState<LiveBuilder | null>(null)
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(LIVE_BUILDER_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved) as LiveBuilder
+        if (typeof parsed.jobId === 'string' && /^[0-9a-f-]{36}$/i.test(parsed.jobId)) setLiveJob(parsed)
+      }
+    } catch { /* storage optional */ }
+    const listener = (event: Event) => setLiveJob((event as CustomEvent<LiveBuilder>).detail)
+    window.addEventListener(LIVE_BUILDER_EVENT, listener)
+    return () => window.removeEventListener(LIVE_BUILDER_EVENT, listener)
+  }, [])
+  useEffect(() => {
+    if (!liveJob?.jobId || !['running', 'paused', 'queued'].includes(liveJob.status)) return
+    let disposed = false
+    const check = async () => {
+      try {
+        const response = await window.fetch('/api/builder?jobId=' + encodeURIComponent(liveJob.jobId), { cache: 'no-store' })
+        if (!response.ok && response.status !== 202) return
+        const result = await response.json() as Record<string, unknown>
+        if (disposed) return
+        const nextStatus = String(result.status || 'running')
+        const nextReply = typeof result.reply === 'string' ? result.reply
+          : typeof (result.result as Record<string, unknown> | undefined)?.reply === 'string'
+            ? String((result.result as Record<string, unknown>).reply)
+            : liveJob.reply
+        const updated = { ...liveJob, status: nextStatus, reply: nextReply }
+        if (updated.status !== liveJob.status || updated.reply !== liveJob.reply) announceLiveBuilder(updated)
+      } catch { /* polling is read-only; retry without resubmission */ }
+    }
+    void check()
+    const timer = window.setInterval(() => { void check() }, 3000)
+    return () => { disposed = true; window.clearInterval(timer) }
+  }, [liveJob?.jobId, liveJob?.status, liveJob?.reply])
   useEffect(() => {
     const originalFetch = window.fetch.bind(window)
 
@@ -484,5 +532,16 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
     }
   }, [])
 
-  return children
+  return <>
+    {children}
+    {liveJob && <aside role="status" aria-live="polite" style={{ position: 'fixed', right: 20, bottom: 20, zIndex: 10000, width: 'min(410px, calc(100vw - 40px))', maxHeight: '55vh', overflowY: 'auto', padding: 14, border: '1px solid #334155', borderRadius: 12, background: '#0f172a', color: '#f8fafc', boxShadow: '0 8px 28px #0006', fontSize: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <strong>COS Builder · {liveJob.status === 'succeeded' ? 'Completed' : liveJob.status === 'failed' ? 'Needs attention' : liveJob.status === 'paused' ? 'Continuing' : 'Working'}</strong>
+        <button type="button" aria-label="Dismiss Builder status" onClick={() => { setLiveJob(null); try { window.localStorage.removeItem(LIVE_BUILDER_KEY) } catch {} }} style={{ background: 'transparent', border: 0, color: 'inherit', cursor: 'pointer' }}>×</button>
+      </div>
+      <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginBottom: 4 }}>{liveJob.reply}</p>
+      <small style={{ opacity: .7 }}>Job {liveJob.jobId}</small>
+    </aside>}
+  </>
+}
 }

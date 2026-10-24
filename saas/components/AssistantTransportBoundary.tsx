@@ -529,11 +529,28 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
     }
   }, [])
 
+  const stopLiveBuilder = async () => {
+    if (!liveJob?.jobId || !['queued', 'running', 'paused'].includes(liveJob.status)) return
+    try {
+      const response = await window.fetch('/api/builder?jobId=' + encodeURIComponent(liveJob.jobId), { method: 'DELETE', cache: 'no-store' })
+      if (!response.ok) throw new Error('builder_stop_failed')
+      const result = await response.json() as { stopped?: boolean; status?: string }
+      if (result.stopped || result.status === 'already_finished') {
+        announceLiveBuilder({ ...liveJob, status: 'failed', reply: result.stopped
+          ? 'Builder stopped by owner. Workspace and checkpoint remain available.'
+          : 'Builder already finished. Check History for its result.' })
+      }
+    } catch {
+      announceLiveBuilder({ ...liveJob, reply: 'Stop request could not be confirmed. Check the durable job status before retrying.' })
+    }
+  }
+
   return <>
     {children}
     {liveJob && <aside role="status" aria-live="polite" style={{ position: 'fixed', insetInlineEnd: 20, bottom: 20, zIndex: 10000, width: 'min(410px, calc(100vw - 40px))', maxHeight: '55vh', overflowY: 'auto', padding: 14, border: '1px solid #334155', borderRadius: 12, background: '#0f172a', color: '#f8fafc', boxShadow: '0 8px 28px #0006', fontSize: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <strong>COS Builder · {liveJob.status === 'succeeded' ? 'Completed' : liveJob.status === 'failed' ? 'Needs attention' : liveJob.status === 'paused' ? 'Continuing' : 'Working'}</strong>
+        {['queued', 'running', 'paused'].includes(liveJob.status) && <button type="button" aria-label="Stop Builder job" onClick={() => { void stopLiveBuilder() }} style={{ background: '#7f1d1d', border: '1px solid #fca5a5', borderRadius: 6, color: '#fff', padding: '4px 10px', cursor: 'pointer' }}>Stop job</button>}
         <button type="button" aria-label="Dismiss Builder status" onClick={() => { setLiveJob(null); try { window.localStorage.removeItem(LIVE_BUILDER_KEY) } catch {} }} style={{ background: 'transparent', border: 0, color: 'inherit', cursor: 'pointer' }}>×</button>
       </div>
       <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginBottom: 4 }}>{liveJob.reply}</p>

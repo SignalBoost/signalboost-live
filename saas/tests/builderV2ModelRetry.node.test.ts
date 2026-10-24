@@ -81,6 +81,8 @@ test('never retried: the slice budget running out, a cut-off reply, a cancellati
   for (const [name, error, abort] of [
     ['slice budget', new Error('builder_turn_timeout'), false],
     ['cut-off reply', new Error('local_model_output_truncated'), false],
+    // Production 2026-10-24: the slice's paid-fallback ceiling was spent; each retry was refused again before a model call.
+    ['slice spend ceiling', new Error('harness_provider_cost_budget_exceeded'), false],
     ['cancellation', noText(), true],
   ] as const) {
     const workspace = await setup('n')
@@ -88,7 +90,9 @@ test('never retried: the slice budget running out, a cut-off reply, a cancellati
     let calls = 0
     const agent = new BuilderV2Agent({ async generate() { calls++; if (abort) controller.abort(); throw error } },
       new BuilderV2Dispatcher(workspace, localRunner), workspace)
-    await agent.run({ workspaceId: 'n', objective, maxSteps: 1, signal: controller.signal, retryDelay: async () => { assert.fail(`${name} was retried`) } })
+    let retries = 0
+    await agent.run({ workspaceId: 'n', objective, maxSteps: 1, signal: controller.signal, retryDelay: async () => { retries++ } })
+    assert.equal(retries, 0, `${name} was retried`)
     assert.equal(calls, 1, name)
   }
 })

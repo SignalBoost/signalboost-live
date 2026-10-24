@@ -44,3 +44,33 @@ test('non-transient failure keeps saved receipts but remains terminal', async ()
   assert.equal(result.reason, 'builder_security_denied')
   assert.equal(result.result?.steps.length, 1)
 })
+
+// Production 2026-10-24 (LibraryFlow, workspace 557041fe): the owned GPU timed out, the slice spent its paid-fallback
+// ceiling on a failing run and three reads, and the job ended at slice 9 of 24 after 13 of 60 minutes. Each slice has
+// its own spend ceiling, so running out of it ends the slice, not the job; the idle-slice stop still bounds repeats.
+test('the slice spend ceiling running out without progress pauses the job instead of ending it', async () => {
+  const store = {
+    async load() { return { workspaceId: 'workspace', objective: 'Fix the application', claimGeneration: 9, checkpoint } },
+    async save() { return true },
+  }
+  const reads: BuilderV2Checkpoint = { ...checkpoint,
+    steps: [...checkpoint.steps, { tool: 'run_tests', ok: false, changed: false }, { tool: 'read_file', ok: true, changed: false }] }
+  const agent = { async run() {
+    return { ok: false, reason: 'builder_v2_model_unavailable', summary: 'harness_provider_cost_budget_exceeded', steps: reads.steps, checkpoint: reads }
+  } } as unknown as BuilderV2Agent
+  const result = await runBuilderV2JobCycle({ jobId: 'job', claimGeneration: 9, store, agent })
+  assert.equal(result.status, 'paused')
+  assert.equal(result.result?.steps.length, 3)
+})
+
+test('a model outage without progress still ends the job', async () => {
+  const store = {
+    async load() { return { workspaceId: 'workspace', objective: 'Fix the application', claimGeneration: 2, checkpoint } },
+    async save() { return true },
+  }
+  const agent = { async run() {
+    return { ok: false, reason: 'builder_v2_model_unavailable', summary: 'builder coding AI provider returned no text', steps: checkpoint.steps, checkpoint }
+  } } as unknown as BuilderV2Agent
+  const result = await runBuilderV2JobCycle({ jobId: 'job', claimGeneration: 2, store, agent })
+  assert.equal(result.status, 'failed')
+})

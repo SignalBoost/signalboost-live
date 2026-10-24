@@ -124,7 +124,12 @@ export async function runBuilderV2JobCycle(input: {
   // The slice's own time budget running out (builder_turn_timeout) is the normal end of a slice, like the step
   // budget, not a model outage: production 2026-10-16, OrderFlow wrote all 15 files, then a slice that spent its
   // time on a failing run and reads ended the job instead of pausing. The slice cap still bounds resumption.
-  const sliceDeadline = result.reason === 'builder_v2_model_unavailable' && result.summary === BUILDER_TURN_TIMEOUT_ERROR
+  // The same holds for the slice's paid-fallback spend ceiling: each slice runs in its own Harness run with its own
+  // provider budget. Production 2026-10-24 (LibraryFlow, workspace 557041fe): the owned GPU timed out, the slice spent
+  // its fallback budget on a failing run and reads, and the job ended at slice 9 of 24 after 13 of 60 minutes with every
+  // file written and 11 tests passing. The idle-slice stop, the slice cap and the total deadline still bound the job.
+  const sliceDeadline = result.reason === 'builder_v2_model_unavailable'
+    && (result.summary === BUILDER_TURN_TIMEOUT_ERROR || result.summary === 'harness_provider_cost_budget_exceeded')
   if (builderV2TimeoutDisposition({ unavailable: result.reason === 'builder_v2_model_unavailable', madeProgress, deadline: sliceDeadline, checkpointPresent: Boolean(result.checkpoint) }) === 'fail') {
     return { status: 'failed', result, reason: `builder_v2_model_unavailable: ${result.summary || 'builder_v2_model_error'}` }
   }

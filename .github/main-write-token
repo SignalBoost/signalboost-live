@@ -1,2 +1,2 @@
-base_sha=9ea9000487487cddb7d9edbe83ea3076af572a9a
-branch=fix/builder-inference-job-correlation-20261024
+base_sha=554a17920b2a000667571d7c4744688ce77896cb
+branch=fix/builder-slice-spend-ceiling-pauses-20261024

@@ -1,2 +1,2 @@
-base_sha=b11c9e6d9a5153bf7b0955c8a40b8d3fb5be327c
-branch=fix/builder-float-failure-loop-guidance-20261023
+base_sha=8619d952fe6cd67f2e243606e284fd6677ff2267
+branch=fix/builder-transcript-guard-import-20261023

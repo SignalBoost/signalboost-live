@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { builderCopiedTranscriptBlocker } from '../lib/builder/copied-transcript-guard.ts'
@@ -14,4 +15,12 @@ test('accepts quoted diagnostic logs without conversation markers', () => {
 })
 test('accepts a normal current request mentioning history in prose', () => {
   assert.equal(builderCopiedTranscriptBlocker('Create a new repo. Previous COS response 1 was invalid.'), null)
+})
+
+test('Builder POST wires the copied transcript guard before enqueue', () => {
+  const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /import\s*\{\s*builderCopiedTranscriptBlocker\s*\}\s*from\s*['"]@\/lib\/builder\/copied-transcript-guard['"]/)
+  const call = route.indexOf('builderCopiedTranscriptBlocker(objective)')
+  const enqueue = route.indexOf('enqueueBuilderJob(', call)
+  assert.ok(call > 0 && enqueue > call, 'guard must execute before durable enqueue')
 })

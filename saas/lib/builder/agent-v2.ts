@@ -761,6 +761,11 @@ export class BuilderV2Agent {
               : 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
             lastReceipt: compactAgainstWorkingSet(lastReceipt, working),
             latestFailedTest: currentFailure(),
+            // Complete failure names survive head/tail truncation; focus edits on these contracts.
+            failingTestNames: (() => {
+              const failed = failedOnRevision()?.output as { stdout?: unknown; stderr?: unknown } | undefined
+              return builderV2FailingTestSummary(String(failed?.stdout ?? '') + '\n' + String(failed?.stderr ?? ''))
+            })(),
             ...(currentFailure() ? { activeRepair: await activeRepair() } : {}),
             ...(interfaceRepairs.length ? { interfaceMismatches: interfaceRepairs } : {}),
             // While files are still being written, the real interface of the sources written so far, so later
@@ -947,6 +952,25 @@ function compactAgainstWorkingSet(lastReceipt: string, working: WorkingSet): str
   const failureCopy = working.failure && lastReceipt === JSON.stringify(working.failure).slice(0, 20_000)
   const compact = withoutWorkingSetCopies(failureCopy ? working.failure! : receipt, working)
   return compact === receipt || compact === working.failure ? lastReceipt : JSON.stringify(compact)
+}
+
+/** Extract every failed assertion name before long Node TAP output is compacted.
+ * A head/tail excerpt alone omits failures in the middle of a large suite.
+ * This diagnostic is advice only and never counts as passing test evidence.
+ */
+export function builderV2FailingTestSummary(output: string, limit = 40): string[] {
+  const failed: string[] = []
+  const seen = new Set<string>()
+  for (const line of output.split(/\r?\n/)) {
+    const match = line.match(/^\s*(?:✖\s+|not ok\s+\d+\s+-\s+)(.+)$/)
+    if (!match) continue
+    const title = match[1].trim().slice(0, 180)
+    if (!title || seen.has(title)) continue
+    seen.add(title)
+    failed.push(title)
+    if (failed.length >= limit) break
+  }
+  return failed
 }
 
 /** Keep the start and the end of long output, as Codex and Cline do (utils/string/src/truncate.rs; output-limits.ts). */

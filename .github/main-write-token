@@ -1,2 +1,2 @@
-base_sha=c146e369f77b66ddcd4541162767f77a130a437e
-branch=fix/builder-read-plain-spec-layout-20261023
+base_sha=850d421e957a63465e30129fad49d9290236bf8c
+branch=fix/builder-v2-progressive-unverified-resume-20261024

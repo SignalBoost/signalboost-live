@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { postWithAgentProgress } from '../lib/ai/cos/agentProgressClient.ts'
-import { BUILDER_JOB_FOLLOW_WINDOW_MS, BUILDER_JOB_POLL_DELAY_MS } from '../lib/builder/job-poll.ts'
+import { BUILDER_JOB_FOLLOW_WINDOW_MS, BUILDER_JOB_POLL_DELAY_MS, BUILDER_JOB_SLOW_POLL_DELAY_MS } from '../lib/builder/job-poll.ts'
 
 // Simulated clock: every wait advances time by its delay and resolves at once.
 function simulatedBrowser(jobRunsForMs: number) {
@@ -56,12 +56,18 @@ test('a job that runs for 8 minutes ends with its own final result, not the runn
   } finally { browser.restore() }
 })
 
-test('following stops at the job lifetime window and points to History', async () => {
-  const browser = simulatedBrowser(BUILDER_JOB_FOLLOW_WINDOW_MS + 60_000)
+test('a job that outlasts the window still ends with its own result in the chat, checked more slowly', async () => {
+  // Owner 2026-10-23: results must come back to the chat; Codex on #4847: never stop following while promising that.
+  const browser = simulatedBrowser(BUILDER_JOB_FOLLOW_WINDOW_MS + 10 * 60_000)
   try {
-    const result = await postWithAgentProgress({ target: 'cos', body, signal: new AbortController().signal, onProgress: () => undefined })
-    assert.equal(result.status, 202)
-    assert.ok(browser.checks() <= BUILDER_JOB_FOLLOW_WINDOW_MS / BUILDER_JOB_POLL_DELAY_MS + 1)
+    const progress: string[] = []
+    const result = await postWithAgentProgress({ target: 'cos', body, signal: new AbortController().signal, onProgress: event => progress.push(event.message) })
+    assert.equal(result.ok, true)
+    assert.equal(result.data.reply, 'Builder V2 verified the workspace.')
+    // Fast checks inside the window, then one every 30 s: about 20 more for the extra 10 minutes, not 300.
+    const fast = BUILDER_JOB_FOLLOW_WINDOW_MS / BUILDER_JOB_POLL_DELAY_MS
+    assert.ok(browser.checks() <= fast + 10 * 60_000 / BUILDER_JOB_SLOW_POLL_DELAY_MS + 2, `${browser.checks()} checks`)
+    assert.ok(progress.length > 0)
   } finally { browser.restore() }
 })
 

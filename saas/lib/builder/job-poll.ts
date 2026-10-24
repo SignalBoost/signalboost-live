@@ -20,6 +20,9 @@ export type BuilderJobFollowOutcome<T> =
 // job may run 60, so a long job's result never came back to the chat and the person was sent to History.
 export const BUILDER_JOB_FOLLOW_WINDOW_MS = BUILDER_JOB_TOTAL_DEADLINE_MS + 2 * 60_000
 export const BUILDER_JOB_POLL_DELAY_MS = 2_000
+// After the window a job that is still running is checked every 30 seconds until it ends, so the chat still shows its
+// result (Codex on #4847: never stop following while telling the person the result will appear).
+export const BUILDER_JOB_SLOW_POLL_DELAY_MS = 30_000
 // Consecutive checks that got no answer before the page says the connection is lost (about one minute).
 export const BUILDER_JOB_MAX_UNANSWERED_CHECKS = 30
 

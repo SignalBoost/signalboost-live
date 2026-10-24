@@ -1,9 +1,9 @@
 import { isConciergeBuilderObjective, structuredApplicationBuild } from './cosReasoningRolePolicy.ts'
-import { assistanceCopy, PROGRESS_DONE, PROGRESS_READY, PROGRESS_RECEIVED, PROGRESS_RECONNECTING, PROGRESS_STILL_RUNNING, PROGRESS_UNCONFIRMED, PROGRESS_WORKING, readPendingApproval } from './assistanceMode.ts'
+import { assistanceCopy, PROGRESS_DONE, PROGRESS_READY, PROGRESS_RECEIVED, PROGRESS_RECONNECTING, PROGRESS_SLOW, PROGRESS_STILL_RUNNING, PROGRESS_UNCONFIRMED, PROGRESS_WORKING, readPendingApproval } from './assistanceMode.ts'
 import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMessage } from './operator-progress.ts'
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findDurableCosTurnReply, findRecoveredAssistantTurn, type RecoveredAssistantTurn } from './assistantTransportRecovery.ts'
 import { planResearchTask } from './researchBudget.ts'
-import { BUILDER_JOB_FOLLOW_WINDOW_MS, BUILDER_JOB_POLL_DELAY_MS } from '../../builder/job-poll.ts'
+import { BUILDER_JOB_FOLLOW_WINDOW_MS, BUILDER_JOB_POLL_DELAY_MS, BUILDER_JOB_SLOW_POLL_DELAY_MS } from '../../builder/job-poll.ts'
 
 export type AgentProgressEvent = {
   phase: 'accepted' | 'running' | 'complete'
@@ -534,7 +534,7 @@ export async function postWithAgentProgress(args: {
 
     // The durable worker may still finish later, but a running transport receipt must never become
     // the visible assistant answer. Return an explicit timeout envelope instead of the original 202.
-    report('complete', say(PROGRESS_STILL_RUNNING))
+    report('complete', say(PROGRESS_SLOW))
     return {
       ok: false,
       status: 504,
@@ -565,14 +565,16 @@ export async function postWithAgentProgress(args: {
   // that kept running for several more minutes.
   args.onJobAccepted?.()
   const followUntil = Date.now() + BUILDER_JOB_FOLLOW_WINDOW_MS
-  while (Date.now() < followUntil) {
+  // Past the window the job is still checked, more slowly, until it ends or the person presses Stop.
+  for (;;) {
+    const slow = Date.now() >= followUntil
     report('running', repairRequest
-      ? operatorProgressMessage({ stage: 'fixing', target: progressTarget, builder: true })
-      : say(PROGRESS_WORKING))
+      ? operatorProgressMessage({ stage: slow ? 'durable' : 'fixing', target: progressTarget, builder: true })
+      : say(slow ? PROGRESS_STILL_RUNNING : PROGRESS_WORKING))
 
     let poll: Response
     try {
-      await wait(BUILDER_JOB_POLL_DELAY_MS, args.signal)
+      await wait(slow ? BUILDER_JOB_SLOW_POLL_DELAY_MS : BUILDER_JOB_POLL_DELAY_MS, args.signal)
       poll = await fetch(`/api/builder?jobId=${encodeURIComponent(jobId)}`, {
         method: 'GET', credentials: 'include', cache: 'no-store', signal: args.signal,
         headers: { accept: 'application/json' },
@@ -594,7 +596,7 @@ export async function postWithAgentProgress(args: {
       continue
     }
     // A job paused for the user's approval is waiting on them, not on Builder: show it now (approval card).
-    if (readPendingApproval(data)) break
+    if (readPendingApproval(data)) return { ok: true, status: 202, data }
     if (poll.status === 202 || ['queued', 'running', 'paused'].includes(String(data?.status || ''))) continue
     const terminalSucceeded = isVerifiedBuilderTerminal(data, poll.ok)
     report('complete', repairRequest
@@ -602,9 +604,4 @@ export async function postWithAgentProgress(args: {
       : say(terminalSucceeded ? PROGRESS_DONE : PROGRESS_UNCONFIRMED))
     return { ok: terminalSucceeded, status: poll.status, data }
   }
-
-  report('running', repairRequest
-    ? operatorProgressMessage({ stage: 'durable', target: progressTarget, builder: true })
-    : say(PROGRESS_STILL_RUNNING))
-  return { ok: false, status: 202, data: { ...data, reply: say(PROGRESS_STILL_RUNNING), incomplete: true } }
 }

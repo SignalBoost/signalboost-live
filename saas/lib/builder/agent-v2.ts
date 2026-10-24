@@ -926,6 +926,8 @@ export class BuilderV2Agent {
         this.modelCalls++ // Count attempted requests, including failed requests and retries.
         return await this.ai.generate(request)
       } catch (error) {
+        // The slice's spend ceiling refused the call before any model produced a reply: it used no model turn.
+        if (error instanceof Error && error.message === 'harness_provider_cost_budget_exceeded') this.modelCalls--
         if (error instanceof BuilderBudgetError || request.signal?.aborted || (error instanceof Error && error.message === 'builder_v2_model_call_budget_exhausted') || attempt >= BUILDER_V2_MODEL_RETRIES
           || (error instanceof Error && (error.message === 'local_model_output_truncated' || error.message === BUILDER_TURN_TIMEOUT_ERROR
             // The slice's provider spend ceiling is spent: a retry in this slice is refused again before reaching a model.

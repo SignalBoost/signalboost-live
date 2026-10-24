@@ -2,8 +2,9 @@
 //
 // Host-owned spend ceilings for paid DeepInfra fallback/training/assessment calls.
 // These are conservative reservation ceilings, not provider price estimates. The Harness reserves
-// the declared upper bound before a paid call begins; unused reservation is intentionally not
-// released within the run, so retries cannot silently exceed the run budget.
+// the declared upper bound before a paid call begins; once the provider reports the call's cost the
+// reservation is replaced by that cost, so retries count real spend and cannot exceed the run budget.
+// Without a reported cost the full reservation stays.
 
 export type DeepInfraSpendClass = 'builder' | 'university_practice' | 'university_assessment' | 'mass_evaluation_judge'
 

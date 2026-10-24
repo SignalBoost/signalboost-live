@@ -1,5 +1,5 @@
 import { currentHarnessExecutionContext } from '../../platform-harness/runtime/execution-context.ts'
-import { checkBuilderInferenceDeadline, currentBuilderInferenceBudget } from '../builder/inference-budget.ts'
+import { checkBuilderInferenceDeadline, currentBuilderInferenceBudget, builderInferenceCorrelation } from '../builder/inference-budget.ts'
 import { throwIfInferenceAborted } from '../ai/inferenceCancellation.ts'
 // Injected model-access seam for COS generators. Text requests enter the shared COS gateway so
 // existing Portables gain durable reuse and single-flight protection without owning provider logic.
@@ -57,7 +57,7 @@ async function tryActiveGraduate(
       // A coder graduate's cut-off reply is kept like the RunPod and fallback replies (Codex on #4632).
       allowTruncatedText: input.allowTruncatedText === true,
       ...(options.coding ? { frequencyPenalty: 0, presencePenalty: 0, jsonObject: true } : {}),
-      usageContext: {
+      usageContext: { ...builderInferenceCorrelation(),
         feature: options.coding ? 'builder_graduate' : 'platform_graduate',
         purpose: `${runtime.subjectId}:${role}`,
       },
@@ -120,7 +120,7 @@ export function createPlatformAiPort(): CosAiPort {
             signal: input.signal,
             systemPrompt: input.systemPrompt,
             maxTokens: input.maxTokens,
-            usageContext: { feature: 'platform_runpod_primary', purpose: 'portable_text' },
+            usageContext: { ...builderInferenceCorrelation(), feature: 'platform_runpod_primary', purpose: 'portable_text' },
           }, 'reasoner')
       throwIfInferenceAborted(input.signal)
       if (runpod.text) return runpod.text
@@ -139,13 +139,13 @@ async function generateBudgetedBuilder(input: Parameters<CosAiPort['generate']>[
   // paths are unavailable for a hard-dollar job; never assume their inference costs zero.
   const assigned = await tryAssignedPlatformModelTurn({ ...input,
     frequencyPenalty: 0, presencePenalty: 0, jsonObject: true,
-    usageContext: { feature: 'builder', purpose: 'coding_harness_budgeted' },
+    usageContext: { ...builderInferenceCorrelation(), feature: 'builder', purpose: 'coding_harness_budgeted' },
     maxEstimatedCostUsd: deepInfraMaxCallUsd('builder'),
   }, 'builder')
   if (assigned.result?.content?.trim()) return assigned.result.content
   return requireText(await callLocalModel({ ...input,
     frequencyPenalty: 0, presencePenalty: 0, jsonObject: true,
-    usageContext: { feature: 'builder', purpose: 'coding_harness_budgeted' },
+    usageContext: { ...builderInferenceCorrelation(), feature: 'builder', purpose: 'coding_harness_budgeted' },
     maxEstimatedCostUsd: deepInfraMaxCallUsd('builder'),
   }, { ...localInferenceConfigFromEnv(), model: builderCodingModelFromEnv(), fallbackFromOwned: true }), 'builder coding')
 }
@@ -209,7 +209,7 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
             // Production 2026-10-16: a Builder V2 batch reply hit maxTokens and the whole reply was discarded
             // (local_model_output_truncated); the caller keeps the complete actions of a cut-off reply.
             allowTruncatedText: input.allowTruncatedText === true,
-            usageContext: { feature: 'builder_runpod_primary', purpose: 'coding_harness' },
+            usageContext: { ...builderInferenceCorrelation(), feature: 'builder_runpod_primary', purpose: 'coding_harness' },
           }, 'builder').catch(error => {
             // Never swallow deliberate user/worker cancellation; only the shorter
             // owned-provider deadline may fall through to the configured fallback.
@@ -234,7 +234,7 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
         frequencyPenalty: 0,
         presencePenalty: 0,
         jsonObject: true,
-        usageContext: {
+        usageContext: { ...builderInferenceCorrelation(),
           feature: 'builder',
           purpose: ownedAttempted ? 'coding_harness_assigned_after_owned' : 'coding_harness_assigned',
         },
@@ -259,7 +259,7 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
         presencePenalty: 0,
         jsonObject: true,
         allowTruncatedText: input.allowTruncatedText === true,
-        usageContext: {
+        usageContext: { ...builderInferenceCorrelation(),
           feature: 'builder',
           purpose: ownedAttempted ? 'coding_harness_fallback_from_owned' : 'coding_harness',
         },

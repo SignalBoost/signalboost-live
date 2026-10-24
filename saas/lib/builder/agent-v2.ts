@@ -779,6 +779,14 @@ export class BuilderV2Agent {
         }, options.retryDelay ?? abortableDelay)
       } catch (error) {
         if (error instanceof BuilderBudgetError) return { ok: false, reason: error.message, steps, checkpoint: await snapshot() }
+        // Harness preflight is a hard governance rejection, not a transient model outage.
+        // Returning its own reason prevents the dispatcher from retrying the same unaffordable
+        // inference under a generic provider-unavailable classification.
+        if (error instanceof Error && error.message === 'harness_provider_cost_budget_exceeded') {
+          return { ok: false, reason: 'harness_provider_cost_budget_exceeded',
+            summary: 'Provider cost preflight rejected this model call; no inference was dispatched.',
+            steps, checkpoint: await snapshot() }
+        }
         if (options.signal?.aborted) return { ok: false, reason: 'builder_v2_cancelled', steps, checkpoint: await snapshot() }
         if (error instanceof Error && error.message === 'builder_v2_model_call_budget_exhausted') {
           return { ok: false, reason: 'builder_v2_model_call_budget_exhausted', summary: 'Whole-job model-call budget reached.', steps, checkpoint: await snapshot() }

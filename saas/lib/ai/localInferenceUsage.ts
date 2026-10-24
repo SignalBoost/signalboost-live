@@ -125,6 +125,24 @@ export async function recordLocalInferenceUsage(record: LocalInferenceUsageRecor
  */
 export const BUILDER_RUNPOD_HEALTH_WINDOW_MS = 120_000
 
+/**
+ * Protect long coding rounds from a healthy-but-too-slow owned endpoint.
+ * Require two measured successful completions with >=32 tokens each;
+ * a short response or missing usage is not enough evidence to reroute.
+ */
+export function builderRunpodRowsTooSlow(rows: ReadonlyArray<{
+  success?: unknown; completion_tokens?: unknown; latency_ms?: unknown
+}>): boolean {
+  if (rows.length < 2) return false
+  return rows.slice(0, 2).every(row => {
+    const tokens = nonNegativeInt(row.completion_tokens)
+    const elapsed = nonNegativeNumber(row.latency_ms)
+    return row.success === true && tokens !== null && tokens >= 32
+      && elapsed !== null && elapsed >= 1_000
+      && tokens * 1_000 / elapsed < 10
+  })
+}
+
 export function builderRunpodRowsTimedOut(rows: ReadonlyArray<{ success?: unknown; finish_reason?: unknown }>): boolean {
   return rows.length >= 2 && rows.slice(0, 2).every(row => row.success === false && String(row.finish_reason || '').startsWith('timeout:'))
 }
@@ -132,11 +150,11 @@ export function builderRunpodRowsTimedOut(rows: ReadonlyArray<{ success?: unknow
 export async function builderRunpodRecentlyTimingOut(nowMs = Date.now()): Promise<boolean> {
   const db = serviceDb()
   if (!db) return false
-  const { data, error } = await db.from('provider_inference_usage').select('success,finish_reason')
+  const { data, error } = await db.from('provider_inference_usage').select('success,finish_reason,completion_tokens,latency_ms')
     .eq('feature', 'builder_runpod_primary')
     .gte('created_at', new Date(nowMs - BUILDER_RUNPOD_HEALTH_WINDOW_MS).toISOString())
     .order('created_at', { ascending: false }).limit(2)
   // An unreadable health record never blocks the owned model: probe it as before.
   if (error || !data) return false
-  return builderRunpodRowsTimedOut(data)
+  return builderRunpodRowsTimedOut(data) || builderRunpodRowsTooSlow(data)
 }

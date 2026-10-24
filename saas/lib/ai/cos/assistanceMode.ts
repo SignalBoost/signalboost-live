@@ -266,17 +266,17 @@ export const BUILDER_RESULT_CONTINUING: Copy = {
 // durable in History; the action will not be replayed." The chat follows the job and replaces this message with the
 // result, so nobody is sent to History (owner: "User should not have to look up in the history for results").
 export const BUILDER_RUNNING: Copy = {
-  en: 'I’m on it. The result will appear here when it’s ready.',
-  es: 'Estoy en ello. El resultado aparecerá aquí cuando esté listo.',
-  pt: 'Estou cuidando disso. O resultado aparecerá aqui quando estiver pronto.',
-  pl: 'Zajmuję się tym. Wynik pojawi się tutaj, gdy będzie gotowy.',
-  ru: 'Уже работаю. Результат появится здесь, когда будет готов.',
-  de: 'Ich kümmere mich darum. Das Ergebnis erscheint hier, sobald es fertig ist.',
-  fr: 'Je m’en occupe. Le résultat apparaîtra ici dès qu’il sera prêt.',
-  it: 'Ci sto lavorando. Il risultato apparirà qui appena pronto.',
-  ja: '対応中です。準備ができ次第、結果をここに表示します。',
-  ko: '작업 중입니다. 준비되면 결과가 여기에 표시됩니다.',
-  ar: 'أعمل على ذلك. ستظهر النتيجة هنا عندما تكون جاهزة.',
+  en: 'I’m working on your project. Progress and the finished result will appear in this conversation automatically.',
+  es: 'Estoy trabajando en tu proyecto. El progreso y el resultado final aparecerán aquí, en esta conversación.',
+  pt: 'Estou trabalhando no seu projeto. O progresso e o resultado final aparecerão aqui, nesta conversa.',
+  pl: 'Pracuję nad Twoim projektem. Postęp i wynik końcowy pojawią się tutaj, w tej rozmowie.',
+  ru: 'Работаю над вашим проектом. Ход выполнения и итог появятся здесь, в этом чате.',
+  de: 'Ich arbeite an Ihrem Projekt. Fortschritt und Ergebnis werden hier in dieser Unterhaltung angezeigt.',
+  fr: 'Je travaille sur votre projet. La progression et le résultat final s’afficheront ici, dans cette conversation.',
+  it: 'Sto lavorando al tuo progetto. I progressi e il risultato finale appariranno qui, in questa conversazione.',
+  ja: 'プロジェクトを進めています。進捗と最終結果はこの会話に表示されます。',
+  ko: '프로젝트를 진행 중입니다. 진행 상황과 최종 결과는 이 대화에 표시됩니다.',
+  ar: 'أعمل على مشروعك. سيظهر التقدم والنتيجة النهائية هنا في هذه المحادثة.',
 }
 
 // A chat answer still being prepared after the browser request ended.

@@ -606,5 +606,5 @@ export async function postWithAgentProgress(args: {
   report('running', repairRequest
     ? operatorProgressMessage({ stage: 'durable', target: progressTarget, builder: true })
     : say(PROGRESS_STILL_RUNNING))
-  return { ok: true, status: 202, data }
+  return { ok: false, status: 202, data: { ...data, reply: say(PROGRESS_STILL_RUNNING), incomplete: true } }
 }

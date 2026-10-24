@@ -11,6 +11,8 @@ function treeDepth(raw: string | undefined): number {
   const branch = TREE_BRANCH.exec(raw ?? '')
   return branch ? Math.round(branch[1].replace(/│|\|/g, ' ').length / 4) + 1 : 0
 }
+const PLAIN_SECTION = /^(?:required files|project structure|file structure|folder structure|deliverables|verification commands|required execution|mandatory verification)\s*:?\s*$/i
+const CODE_LABEL = /^(?:text|plaintext|txt|bash|sh|shell|zsh|console|terminal)$/i
 const clean = (value: string) => value.trim().replace(/^[-*]\s+/, '').replace(/^`|`[.,;]?$|[.,;]$/g, '')
 
 /** Inline Run: clauses end at an unquoted sentence boundary, never inside a filename. */
@@ -64,8 +66,12 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
     }
     // Only a fenced block under an explicit deliverable/verification heading is a checklist.
     if (fence && !fileList && !runList) continue
-    if (!fence && /^#{1,6}\s/.test(line)) {
-      fileList = /(?:required files|project structure|file structure|deliverables)/i.test(line)
+    // The language label a copied code block leaves behind ("text", "bash") is not a file or a command.
+    if (!fence && (fileList || runList) && CODE_LABEL.test(line)) continue
+    // The same section titles as a bare line: a request copied from a rendered page loses its "#" (Production
+    // 2026-10-23, LibraryFlow: "Project structure" and "Verification commands" were plain lines).
+    if (!fence && (/^#{1,6}\s/.test(line) || PLAIN_SECTION.test(line))) {
+      fileList = /(?:required files|project structure|file structure|folder structure|deliverables)/i.test(line)
       runList = /(?:required execution|verification commands|mandatory verification)/i.test(line)
       tree.length = 0
       continue
@@ -86,7 +92,7 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
       // A drawn tree names entries without their parent directory. Rebuild each path from its depth;
       // the glyph-less top-level "project/" line is the workspace root itself, not a subdirectory.
       const branch = TREE_BRANCH.exec(raw)
-      if (branch || (fence && tree.length === 0 && /^[\w.-]+\/?$/.test(line) && treeDepth(lines[index + 1]) > 0)) {
+      if (branch || ((fence || line.endsWith('/')) && tree.length === 0 && /^[\w.-]+\/?$/.test(line) && treeDepth(lines[index + 1]) > 0)) {
         const depth = branch ? treeDepth(raw) : 0
         const name = branch ? branch[2] : ''
         tree.length = Math.min(tree.length, depth)

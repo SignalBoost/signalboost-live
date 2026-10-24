@@ -78,3 +78,9 @@ test('V2 route accepts an owned prior workspace and retains strict source checks
   assert.match(route, /await workspace\.listFiles\(workspaceId\)/)
   assert.match(route, /requiresExistingSource: true/)
 })
+
+test('LibraryFlow heading with CRLF remains a fresh new application', () => {
+  const objective = 'COS Builder Stress Test — LibraryFlow\r\nObjective  \r\nBuild a complete Node.js application called LibraryFlow.\r\nProject structure\r\n├── package.json\r\n├── src/catalog.js\r\n└── test/catalog.test.js'
+  assert.equal(isNewBuilderProjectObjective(objective), true)
+  assert.equal(isNewBuilderProjectObjective('Objective\r\nImplement order cancellation in our existing app.'), false)
+})

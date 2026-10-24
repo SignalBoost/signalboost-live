@@ -760,6 +760,10 @@ export class BuilderV2Agent {
               ? 'The host has already run the command on this unchanged revision and recorded the failure in latestFailedTest. The failing caller and its imported modules are in openFiles when available. Reconcile the actual caller with the implementation; do not rewrite unrelated manifests or weaken tests. Do not run the same command again until an edit changes the revision.'
               : 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
             lastReceipt: compactAgainstWorkingSet(lastReceipt, working),
+            failingTestNames: (() => {
+              const failed = failedOnRevision()?.output as { stdout?: unknown; stderr?: unknown } | undefined
+              return builderV2FailingTestSummary(String(failed?.stdout ?? '') + '\n' + String(failed?.stderr ?? ''))
+            })(),
             latestFailedTest: currentFailure(),
             ...(currentFailure() ? { activeRepair: await activeRepair() } : {}),
             ...(interfaceRepairs.length ? { interfaceMismatches: interfaceRepairs } : {}),
@@ -949,6 +953,24 @@ function compactAgainstWorkingSet(lastReceipt: string, working: WorkingSet): str
   const failureCopy = working.failure && lastReceipt === JSON.stringify(working.failure).slice(0, 20_000)
   const compact = withoutWorkingSetCopies(failureCopy ? working.failure! : receipt, working)
   return compact === receipt || compact === working.failure ? lastReceipt : JSON.stringify(compact)
+}
+
+/** Preserve distinct failed test names from full Node TAP evidence, including failures
+ * lost from the compact head/tail excerpt. This does not confer a passing state.
+ */
+export function builderV2FailingTestSummary(output: string, limit = 40): string[] {
+  const failed: string[] = []
+  const seen = new Set<string>()
+  for (const line of output.split(/\r?\n/)) {
+    const match = line.match(/^\s*(?:✖\s+|not ok\s+\d+\s+-\s+)(.+)$/)
+    if (!match) continue
+    const title = match[1].trim().slice(0, 180)
+    if (!title || seen.has(title)) continue
+    seen.add(title)
+    failed.push(title)
+    if (failed.length >= limit) break
+  }
+  return failed
 }
 
 /** Keep the start and the end of long output, as Codex and Cline do (utils/string/src/truncate.rs; output-limits.ts). */

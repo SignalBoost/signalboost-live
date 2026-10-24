@@ -1,2 +1,2 @@
-base_sha=e550df04a8b34e74f955f5e0ed096727db9afedc
-branch=fix/builder-cost-settle-reported-only-20261024
+base_sha=ec08017093a48db7e9485a0cb19c9329f4d2943d
+branch=test/builder-harness-checkpoint-cycle-20261024

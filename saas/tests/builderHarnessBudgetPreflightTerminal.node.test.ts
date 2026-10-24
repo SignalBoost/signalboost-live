@@ -6,16 +6,18 @@ import test from 'node:test'
 const source = fs.readFileSync(path.join(process.cwd(), 'lib/builder/agent-v2.ts'), 'utf8')
 const cycle = fs.readFileSync(path.join(process.cwd(), 'lib/builder/agent-v2-job-cycle.ts'), 'utf8')
 
-test('Harness provider budget preflight is terminal and never converted to a retryable provider outage', () => {
-  const guard = source.indexOf("error.message === 'harness_provider_cost_budget_exceeded'")
-  const unavailable = source.indexOf("reason: 'builder_v2_model_unavailable'", guard)
-  assert.ok(guard > 0, 'explicit budget guard must exist')
-  assert.ok(unavailable > guard, 'budget guard must precede generic retryable outage')
-  assert.match(source.slice(guard, unavailable), /reason: 'harness_provider_cost_budget_exceeded'/)
-  assert.match(source.slice(guard, unavailable), /checkpoint: await snapshot\(\)/)
-  assert.match(cycle, /reason === 'builder_v2_model_unavailable' \|\| recoverableEarlyStop/)
+test('per-slice Harness budget rejection checkpoints for governed continuation, rather than terminating the whole job', () => {
+  const guard = source.indexOf("if (error instanceof Error && error.message === 'harness_provider_cost_budget_exceeded')")
+  const outage = source.indexOf("return { ok: false, reason: 'builder_v2_model_unavailable'", guard)
+  assert.ok(guard > 0)
+  assert.ok(outage > guard)
+  const guarded = source.slice(guard, outage + 250)
+  assert.match(guarded, /reason: 'builder_v2_model_unavailable'/)
+  assert.match(guarded, /summary: 'harness_provider_cost_budget_exceeded'/)
+  assert.match(guarded, /checkpoint: await snapshot\(\)/)
+  assert.match(cycle, /result\.summary === 'harness_provider_cost_budget_exceeded'/)
 })
 
-test('in-slice model retries also stop immediately on provider preflight rejection', () => {
+test('budget exhaustion never causes an in-slice inference retry', () => {
   assert.match(source, /error\.message === 'harness_provider_cost_budget_exceeded'\)\)\) throw error/)
 })

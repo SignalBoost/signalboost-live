@@ -105,9 +105,9 @@ test('titled LibraryFlow stress test is a fresh user project, never a platform r
     'npm test',
     'node --test test/*.test.js',
     'node index.js',
-  ].join('\\n')
+  ].join(String.fromCharCode(10))
   assert.equal(isNewBuilderProjectObjective(objective), true)
   const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /const platformRepairTarget = files\\.length === 0 && !newProjectRequested/)
-  assert.match(route, /if \\(access\\.isOwner && !newProjectRequested && files\\.length === 0/)
+  assert.ok(route.includes('const platformRepairTarget = files.length === 0 && !newProjectRequested'))
+  assert.ok(route.includes('if (access.isOwner && !newProjectRequested && files.length === 0'))
 })

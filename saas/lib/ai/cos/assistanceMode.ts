@@ -265,17 +265,17 @@ export const BUILDER_RESULT_CONTINUING: Copy = {
 // While a Builder job runs. Production 2026-10-23: "COS Builder is running job … Progress and the final result are
 // durable in History; the action will not be replayed." The job id stays in the response data, not the sentence.
 export const BUILDER_RUNNING: Copy = {
-  en: 'I’m on it. You can leave this page; the result will appear in History.',
-  es: 'Estoy en ello. Puedes salir de esta página; el resultado aparecerá en el Historial.',
-  pt: 'Estou cuidando disso. Você pode sair desta página; o resultado aparecerá no Histórico.',
-  pl: 'Zajmuję się tym. Możesz opuścić tę stronę; wynik pojawi się w Historii.',
-  ru: 'Уже работаю. Можно уйти с этой страницы — результат появится в Истории.',
-  de: 'Ich kümmere mich darum. Sie können diese Seite verlassen; das Ergebnis erscheint im Verlauf.',
-  fr: 'Je m’en occupe. Vous pouvez quitter cette page ; le résultat apparaîtra dans l’Historique.',
-  it: 'Ci sto lavorando. Puoi lasciare questa pagina; il risultato apparirà nella Cronologia.',
-  ja: '対応中です。このページを離れても大丈夫です。結果は履歴に表示されます。',
-  ko: '작업 중입니다. 이 페이지를 떠나셔도 됩니다. 결과는 기록에 표시됩니다.',
-  ar: 'أعمل على ذلك. يمكنك مغادرة هذه الصفحة؛ ستظهر النتيجة في السجل.',
+  en: 'I’m working on your project. Progress and the finished result will appear in this conversation automatically.',
+  es: 'Estoy trabajando en tu proyecto. El progreso y el resultado final aparecerán aquí, en esta conversación.',
+  pt: 'Estou trabalhando no seu projeto. O progresso e o resultado final aparecerão aqui, nesta conversa.',
+  pl: 'Pracuję nad Twoim projektem. Postęp i wynik końcowy pojawią się tutaj, w tej rozmowie.',
+  ru: 'Работаю над вашим проектом. Ход выполнения и итог появятся здесь, в этом чате.',
+  de: 'Ich arbeite an Ihrem Projekt. Fortschritt und Ergebnis werden hier in dieser Unterhaltung angezeigt.',
+  fr: 'Je travaille sur votre projet. La progression et le résultat final s’afficheront ici, dans cette conversation.',
+  it: 'Sto lavorando al tuo progetto. I progressi e il risultato finale appariranno qui, in questa conversazione.',
+  ja: 'プロジェクトを進めています。進捗と最終結果はこの会話に表示されます。',
+  ko: '프로젝트를 진행 중입니다. 진행 상황과 최종 결과는 이 대화에 표시됩니다.',
+  ar: 'أعمل على مشروعك. سيظهر التقدم والنتيجة النهائية هنا في هذه المحادثة.',
 }
 
 // A chat answer still being prepared after the browser request ended.

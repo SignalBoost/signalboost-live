@@ -1,2 +1,2 @@
-base_sha=de83b0b11bd23a86a22efbe89d614cd3fc507119
-branch=fix/builder-labeled-new-project-isolation-20261023
+base_sha=07fc3dfac317afd8727ac7b48c59de21247a0bd0
+branch=fix/builder-result-in-chat-no-history-redirect-20261024

@@ -61,3 +61,12 @@ test('decimal assertion detector matches actual host error output, not literal b
  assert.equal(builderV2DecimalAssertionMismatch('AssertionError: + 4\\n- 5'), false)
  assert.equal(builderV2DecimalAssertionMismatch('0.3 0.30000000000000004'), false)
 })
+
+test('Builder chat keeps pending results in the conversation and never reports polling timeout as success', () => {
+  const copy = readFileSync(new URL('../lib/ai/cos/assistanceMode.ts', import.meta.url), 'utf8')
+  const progress = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
+  const running = copy.slice(copy.indexOf('export const BUILDER_RUNNING: Copy = {'), copy.indexOf('export const COS_TURN_ACCEPTED: Copy = {'))
+  assert.doesNotMatch(running, /result will appear in History|resultado aparecerá en el Historial|resultado aparecerá no Histórico/)
+  assert.match(running, /finished result will appear in this conversation/)
+  assert.match(progress, /return \{ ok: false, status: 202, data: \{ \.\.\.data, reply: 'The project is still running/)
+})

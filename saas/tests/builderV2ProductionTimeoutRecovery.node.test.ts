@@ -74,3 +74,18 @@ test('a model outage without progress still ends the job', async () => {
   const result = await runBuilderV2JobCycle({ jobId: 'job', claimGeneration: 2, store, agent })
   assert.equal(result.status, 'failed')
 })
+
+for (const summary of ['inference_transport_deadline', 'timeout:inference_transport_deadline']) {
+  test(`RunPod transport deadline ${summary} pauses an unchanged checkpoint instead of failing`, async () => {
+    const store = {
+      async load() { return { workspaceId: 'workspace', objective: 'Fix the application', claimGeneration: 3, checkpoint } },
+      async save() { return true },
+    }
+    const agent = { async run() {
+      return { ok: false, reason: 'builder_v2_model_unavailable', summary, steps: checkpoint.steps, checkpoint }
+    } } as unknown as BuilderV2Agent
+    const result = await runBuilderV2JobCycle({ jobId: 'job', claimGeneration: 3, store, agent })
+    assert.equal(result.status, 'paused')
+    assert.equal(result.result?.checkpoint?.revision, 1)
+  })
+}

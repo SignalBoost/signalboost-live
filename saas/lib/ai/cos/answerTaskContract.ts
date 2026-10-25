@@ -52,8 +52,16 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
       const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
       // Only omit a first line that actually repeats the requested task heading.
       // Inline numbered answers must retain their substantive opening analysis.
-      const answerBody = section.includes('\n') && normalize(firstLine) === normalize(directive)
-        ? section.slice(section.indexOf('\n') + 1).trim() : section
+      const plainFirstLine = firstLine.replace(/^[#*_`\s]+|[#*_`\s]+$/g, '').trim()
+      // Standalone short titles may paraphrase the task (e.g. "**Root causes**").
+      // Do not strip an opening analytical sentence just because it spans lines.
+      const standaloneHeading = section.includes('\n')
+        && (normalize(firstLine) === normalize(directive)
+          || (plainFirstLine.split(/\s+/).length <= 8
+            && plainFirstLine.length <= 72
+            && !/[.!?;:]$/.test(plainFirstLine)
+            && !/[,;]/.test(plainFirstLine)))
+      const answerBody = standaloneHeading ? section.slice(section.indexOf('\n') + 1).trim() : section
       const normalized = answerBody.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
       const repeatsPriorSection = seenSectionBodies.has(normalized)
       seenSectionBodies.add(normalized)

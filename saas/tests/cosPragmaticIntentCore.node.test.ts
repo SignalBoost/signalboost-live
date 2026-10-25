@@ -80,7 +80,7 @@ test('ordinary COS questions return before non-critical provenance persistence',
   assert.match(ownerBlock, /persistCosPrimaryProvenanceAfterResponse/)
   assert.doesNotMatch(ownerBlock, /await writeCosPrimaryProvenance/)
 
-  const ordinaryHandled = route.indexOf('if(cos?.handled&&missingAnalyticalTasks(input,cos.reply).length===0)')
+  const ordinaryHandled = route.indexOf('if(cos?.handled&&releasableAnalyticalAnswer(input,cos.reply))')
   assert.ok(ordinaryHandled >= 0, 'ordinary handled replies must preserve the analytical acceptance guard')
   const bestEffort = route.indexOf("source:'cos-local-best-effort'", ordinaryHandled)
   const ordinaryBlock = route.slice(ordinaryHandled, bestEffort)

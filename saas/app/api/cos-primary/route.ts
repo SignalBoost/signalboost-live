@@ -701,8 +701,13 @@ function freshEvidenceUnavailableReply(language:string,input=''):string{const co
 function freshSynthesisRejectedReply(language:string,input=''):string{const continuity=securityReleaseContinuityReply(input);if(continuity)return continuity;return buildFreshVerificationUnavailableReply({prompt:input,language})}
 function securityScenarioEvidenceIsSpecific(input:string,sources:FreshEvidenceSource[]):boolean{if(!/\b(?:zero[- ]day|vulnerabilit|infosec|tenant\s+metadata)\b/i.test(input))return true;const locator=input.match(/\bCVE-\d{4}-\d{4,}\b|\b(?:npm|pypi|maven|cargo|gem|composer)\s*[:/]\s*[@\w./-]+/i)?.[0];if(!locator)return false;return sources.some(source=>new RegExp(locator.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i').test(`${source.title}\n${source.snippet}\n${source.url}`))}
 
-function lowConfidenceDraftReply(cos: Awaited<ReturnType<typeof tryCOSFirstAnswer>>, reason: { detail: string }): string | null {
+function lowConfidenceDraftReply(cos: Awaited<ReturnType<typeof tryCOSFirstAnswer>>, reason: { detail: string }, userRequest: string): string | null {
   if (!cos || cos.handled || !('bestEffortReply' in cos) || !cos.bestEffortReply) return null
+  const gaps = missingAnalyticalTasks(userRequest, cos.bestEffortReply)
+  if (gaps.length) {
+    console.warn('[cos-task-contract-fallback-blocked]', JSON.stringify({ missingCount: gaps.length }))
+    return null
+  }
   return [`⚠️ Low-confidence draft (COS confidence ${cos.confidence.toFixed(2)}, below the ${confidenceThreshold().toFixed(2)} threshold; no external model was available to do better). ${reason.detail}`,'',cos.bestEffortReply].join('\n')
 }
 function localDraft(cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null):string|null{if(!cos)return null;if(cos.handled)return cos.reply;return 'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'?cos.bestEffortReply:null}
@@ -1143,7 +1148,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     const sourceDigestFallback=freshHardFail&&!normativeEvidenceFallback&&freshSources.length
       ? buildSourceSummaryFallback(lookupInput,freshSources,language) : null
     const partialCompletion=Boolean(requiresFreshEvidence&&(partialFreshOfficeHolderReply||normativeEvidenceFallback||sourceDigestFallback))
-    const baseFailureReply=partialFreshOfficeHolderReply??normativeEvidenceFallback??sourceDigestFallback??(freshHardFail?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(lowConfidenceDraftReply(cos,reason)??buildHonestRefusalReply({prompt:input,language})))
+    const baseFailureReply=partialFreshOfficeHolderReply??normativeEvidenceFallback??sourceDigestFallback??(freshHardFail?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(lowConfidenceDraftReply(cos,reason,input)??buildHonestRefusalReply({prompt:input,language})))
     const ownerDiagnostics=isPrivileged&&requiresFreshEvidence?{
       build:String(process.env.VERCEL_GIT_COMMIT_SHA||'unknown').slice(0,7),
       search:{status:freshSources.length?'ok':'fail',sourceCount:freshSources.length,sources:freshSources.slice(0,10).map(source=>({id:source.id,title:source.title,url:source.url}))},
@@ -1195,7 +1200,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       : embeddedMatchesGenerator
         ? embedded!
         : authoritativeProvenance(cos,{invoked:externalInvoked,provider:external.provider,model:external.model})
-    const reply=continuityFailed?(lowConfidenceDraftReply(cos,reason)??`COS independent reasoning could not complete this request: ${reason.detail} External fallback was also unavailable. No action was executed.`):rawReply
+    const reply=continuityFailed?(lowConfidenceDraftReply(cos,reason,input)??`COS independent reasoning could not complete this request: ${reason.detail} External fallback was also unavailable. No action was executed.`):rawReply
     const innerSource=String(payload?.source||'').trim()
     const responseSource=continuityFailed?'cos-independent-reasoner-unavailable':externalInvoked?'external_fallback':innerSource&&innerSource!=='external_fallback'?innerSource:'cos-local-retry'
     const finalConfidence=finiteNumber(payload?.confidence_score)??finiteNumber((executionProvenance as any)?.local_reasoning?.confidence)??(continuityFailed?cos?.confidence??0:null)

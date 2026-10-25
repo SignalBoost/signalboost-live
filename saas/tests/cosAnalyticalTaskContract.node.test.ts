@@ -12,11 +12,29 @@ test('exact payment incident derives eight deliverables without hardcoded paymen
   assert.match(analyticalTaskRepairDirective(incident, incomplete), /full ORIGINAL request/)
 })
 
-test('a structurally complete eight-part report meets the enumerated contract', () => {
+test('eight substantively distinct incident sections pass the contract', () => {
+  const details = [
+    'Likely causes include consumer replay during partition reassignments and accounting double counting even when primary keys remain unique. Compare business payment identifiers.',
+    'Rank redelivery plus insufficient payment idempotency first, reporting aggregation defects next, and a pure settlement cutoff mismatch third; this ranking is provisional.',
+    'Kafka lag and pod restarts correlate in time but do not prove replay caused an inflated ledger. Confirm event identifiers and commit order before assigning causation.',
+    'Missing evidence includes settlement identifiers, bank cutoff dates, raw Kafka offsets, restart reasons, source ledger writes, and complete unsampled transaction traces.',
+    'Preserve immutable payment records, align timestamps and consumer rebalances, reconstruct one affected transaction from producer to bank settlement, and audit aggregations.',
+    'Simulate a consumer interruption after ledger commit but before offset acknowledgement; verify that duplicate deliveries cannot create another accounting effect in staging.',
+    'A restart can trigger replay while a stale Redis key bypasses deduplication; a reporting projection may then count two events though the processor settled one payment.',
+    'The leading unverified mechanism is Kafka event redelivery interacting with inadequate business-level accounting idempotency. Verify with immutable settlement identifiers.',
+  ]
   const answer = requestedAnalyticalTasks(incident).map((task, index) =>
-    (index + 1) + '. ' + task + '\n' + 'Each working hypothesis is linked to relevant observations, an alternative explanation, a discriminating check, and what cannot be concluded without incident records.'
+    (index + 1) + '. ' + task + '\n' + details[index]
   ).join('\n')
   assert.deepEqual(missingAnalyticalTasks(incident, answer), [])
+})
+
+test('eight copied generic paragraphs are not eight completed investigations', () => {
+  const generic = 'Each working hypothesis is linked to observations, alternative explanations, a discriminating check, and what cannot be concluded without operational records and end-to-end event traces.'
+  const answer = requestedAnalyticalTasks(incident).map((task, index) =>
+    (index + 1) + '. ' + task + '\n' + generic
+  ).join('\n')
+  assert.ok(missingAnalyticalTasks(incident, answer).length >= 7)
 })
 
 test('headings without content do not satisfy the task contract', () => {

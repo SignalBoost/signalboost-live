@@ -8,8 +8,7 @@ const incident = readFileSync(new URL('./fixtures/cos-incident-analysis-brief.tx
 
 test('COS final low-confidence fallback applies the same analytical task gate', () => {
   assert.match(route, /function lowConfidenceDraftReply\([^\n]+userRequest: string\)/)
-  assert.match(route, /const gaps = missingAnalyticalTasks\(userRequest, cos\.bestEffortReply\)/)
-  assert.match(route, /if \(gaps\.length\) \{[\s\S]*?return null/)
+  assert.match(route, /if \(!releasableAnalyticalAnswer\(userRequest, cos\.bestEffortReply\)\) \{[\s\S]*?return null/)
   assert.match(route, /lowConfidenceDraftReply\(cos,reason,input\)/)
   assert.doesNotMatch(route, /lowConfidenceDraftReply\(cos,reason\)/)
 })

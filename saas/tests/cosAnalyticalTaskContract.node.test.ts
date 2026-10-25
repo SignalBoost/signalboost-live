@@ -96,7 +96,7 @@ test('reasoner recovery uses analytical-specific reasoning instead of the generi
   assert.match(source, /ANALYTICAL RECOVERY/)
   assert.match(source, /A lack of telemetry prevents confirmation, NOT generation of provisional, ranked hypotheses/)
   assert.match(source, /firstTaskGaps\.length && firstParsedForPolicy/)
-  assert.match(source, /: buildDiagnosticRepairPrompt\(effectiveArgs\.prompt, first\)/)
+  assert.match(source, /: buildDiagnosticRepairPrompt\(effectiveArgs\.prompt, initialDraft\)/)
 })
 
 test('analytical no-draft recovery is bounded and uses original request', () => {

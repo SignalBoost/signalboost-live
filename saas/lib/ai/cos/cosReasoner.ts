@@ -12,7 +12,7 @@
 // same exact-host allow-list + API-key controls as any other remote LOCAL_AI_* endpoint.
 
 import { randomUUID } from 'node:crypto'
-import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective } from './answerTaskContract.ts'
+import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective, releasableAnalyticalAnswer } from './answerTaskContract.ts'
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { callLocalModel, captureServedInference, localInferenceConfigFromEnv, type LocalModelCallArgs, type ServedInference } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
@@ -383,12 +383,15 @@ export async function callRawCosReasoner(
           advisoryDiagnosisDefectsAfter: repairedAdvisoryDefects,
         }))
         void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:false, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,initialDraft), repairedDraft:repaired?assessReasonerDraft(effectiveArgs.prompt,repaired):null, advisoryDiagnosisDefectsBefore:firstAdvisoryDefects, advisoryDiagnosisDefectsAfter:repairedAdvisoryDefects } })
+        // A repair that closed some task gaps is the better analysis even when it did not close all of them.
+        if (repaired && firstTaskGaps.length > 0 && repairedTaskGaps.length < firstTaskGaps.length && repairedAdvisoryDefects.length <= firstAdvisoryDefects.length) text = repaired
       }
     }
 
     const finalParsedForPolicy = parseLocalResult(text)
     const remainingTaskGaps = finalParsedForPolicy ? missingAnalyticalTasks(effectiveArgs.prompt, finalParsedForPolicy.answer) : []
-    if (remainingTaskGaps.length) {
+    // Only a non-answer is withheld; a substantive analysis with gaps is the model's real work and is released.
+    if (remainingTaskGaps.length && !(finalParsedForPolicy && releasableAnalyticalAnswer(effectiveArgs.prompt, finalParsedForPolicy.answer))) {
       console.warn('[cos-task-contract-release-blocked]', JSON.stringify({ missingCount: remainingTaskGaps.length, requestedCount: firstTaskGaps.length }))
       recorder.skip('skill_citation_repair', 'task_contract_unmet')
       return null

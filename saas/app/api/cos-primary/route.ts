@@ -11,7 +11,7 @@ import { WEB_KNOWLEDGE_RESEARCH_CAPABILITY } from '@/platform-harness/capabiliti
 import { POST as legacyConciergePost } from '@/app/api/concierge/route'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
 import { buildHonestRefusalReply } from '@/lib/ai/cos/honestRefusalReply'
-import { missingAnalyticalTasks } from '@/lib/ai/cos/answerTaskContract'
+import { releasableAnalyticalAnswer } from '@/lib/ai/cos/answerTaskContract'
 import { buildFreshVerificationUnavailableReply } from '@/lib/ai/cos/freshVerificationUnavailableReply'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { tryDomainAvailabilityLookup } from '@/lib/ai/cos/domainAvailability'
@@ -703,9 +703,8 @@ function securityScenarioEvidenceIsSpecific(input:string,sources:FreshEvidenceSo
 
 function lowConfidenceDraftReply(cos: Awaited<ReturnType<typeof tryCOSFirstAnswer>>, reason: { detail: string }, userRequest: string): string | null {
   if (!cos || cos.handled || !('bestEffortReply' in cos) || !cos.bestEffortReply) return null
-  const gaps = missingAnalyticalTasks(userRequest, cos.bestEffortReply)
-  if (gaps.length) {
-    console.warn('[cos-task-contract-fallback-blocked]', JSON.stringify({ missingCount: gaps.length }))
+  if (!releasableAnalyticalAnswer(userRequest, cos.bestEffortReply)) {
+    console.warn('[cos-task-contract-fallback-blocked]', JSON.stringify({ blocked: true }))
     return null
   }
   return [`⚠️ Low-confidence draft (COS confidence ${cos.confidence.toFixed(2)}, below the ${confidenceThreshold().toFixed(2)} threshold; no external model was available to do better). ${reason.detail}`,'',cos.bestEffortReply].join('\n')
@@ -1076,12 +1075,12 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)){
     try{recordCosLatencyStage('primary:before_cos_first',Date.now()-startedAt);cos=await timeCosStage('primary:cos_first_answer',()=>tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest||modelPlannedSemanticMemory||modelPlannedCreativeMemory}))}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
   }
-  if(cos?.handled&&missingAnalyticalTasks(input,cos.reply).length===0){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';persistCosPrimaryProvenanceAfterResponse(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
+  if(cos?.handled&&releasableAnalyticalAnswer(input,cos.reply)){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';persistCosPrimaryProvenanceAfterResponse(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
   // A low confidence score is learning/calibration telemetry, not permission to throw away a
   // useful guarded answer. For ordinary non-live, non-action tasks, release the best-effort answer
   // that already survived the normal COS pipeline instead of replacing it with a generic refusal.
-  if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&cos&&!cos.handled&&'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'&&cos.bestEffortReply.trim()&&missingAnalyticalTasks(input,cos.bestEffortReply).length===0){
+  if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&cos&&!cos.handled&&'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'&&cos.bestEffortReply.trim()&&releasableAnalyticalAnswer(input,cos.bestEffortReply)){
     const reply=cos.bestEffortReply.trim()
     const executionProvenance=authoritativeProvenance(cos,{invoked:false})
     ;(executionProvenance as any).completion_first={released_best_effort:true,confidence:cos.confidence,threshold:confidenceThreshold()}

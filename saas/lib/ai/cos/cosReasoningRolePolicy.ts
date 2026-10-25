@@ -208,7 +208,7 @@ export function classifyCosSoftwareDelivery(prompt: string): CosSoftwareDelivery
   const building = /(?:^|[.!?\n]\s*)(?:please\s+)?(?:build|create|scaffold|implement|develop)\s+(?:a\s+|an\s+|the\s+)?(?:[\w -]+\s+)?(?:app|application|project|system|service|api|worker)\b/i.test(prose)
     || structuredApplicationBuild(objective)
   const analytical = /\b(?:analy[sz]e|analysis|investigate|identify|explain|diagnos[ei]|trace|audit|review|recommend|report|root causes?|failure modes?|debugging tasks?)\b/i.test(prose)
-  if (directedMutation) return analytical && /\\b(?:investigate|analy[sz]e|report|root cause|explain)\\b/i.test(prose) ? 'hybrid' : 'repair'
+  if (directedMutation) return analytical && /\b(?:investigate|analy[sz]e|report|root cause|explain)\b/i.test(prose) ? 'hybrid' : 'repair'
   if (building) return analytical ? 'hybrid' : 'build'
   return 'analysis'
 }

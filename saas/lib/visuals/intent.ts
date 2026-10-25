@@ -238,8 +238,17 @@ function canonicalVisualToken(token: string): string {
   return match || token
 }
 
+// A misspelled picture word is corrected only next to a drawing verb ("create an imaage"). Elsewhere a word one
+// letter away from a picture word is usually just a word: "Logs are sampled at 10%" is not "logo" (production
+// 2026-10-25), nor "here" a "herb".
+const VISUAL_TYPO_WINDOW = 3
+
 function normalizedVisualTokens(prompt: string): string[] {
-  return normalizedTokens(prompt).map(canonicalVisualToken)
+  const raw = normalizedTokens(prompt)
+  const corrected = raw.map(canonicalVisualToken)
+  const actions = corrected.flatMap((token, index) => VISUAL_ACTION_TOKENS.has(token) ? [index] : [])
+  return corrected.map((token, index) => token === raw[index] || VISUAL_ACTION_TOKENS.has(token)
+    || actions.some((action) => Math.abs(action - index) <= VISUAL_TYPO_WINDOW) ? token : raw[index])
 }
 
 function isOriginalMarkRequest(tokens: string[]): boolean {
@@ -399,15 +408,25 @@ export function isExecutableSoftwareBrief(prompt: string): boolean {
   return deliverable.test(prompt) && action.test(prompt)
 }
 
+// A generic verb (create, make, design, generate) asks for a picture only when the picture word is its object,
+// within a few words of it. Production 2026-10-25: an incident-analysis brief ("Do NOT create files … Logs are
+// sampled at 10% … Design experiments …") was answered with "I could not verify an authoritative image of that
+// mark": "Logs" was typo-corrected to "logo" dozens of words away from any verb, and anywhere-in-the-text matching
+// treated the two as one request.
+const VISUAL_OBJECT_WINDOW = 6
+
 export function isConciergeVisualObjective(prompt: string): boolean {
   if (isExecutableSoftwareBrief(prompt)) return false
-  const tokens = normalizedVisualTokens(prompt)
+  const tokens = normalizedVisualTokens(prompt).map((token) => token.replace(/[.,;:!?)"'\]]+$/, ''))
   if (!tokens.length || !tokens.some((token) => VISUAL_ACTION_TOKENS.has(token))) return false
   if (tokens.some((token) => SELF_SUFFICIENT_VISUAL_ACTION_TOKENS.has(token))) return true
-  if (tokens.some((token) => VISUAL_SUBJECT_TOKENS.has(token))) return true
-
-  const normalized = ` ${tokens.join(' ')} `
-  return VISUAL_SUBJECT_PHRASES.some((phrase) => normalized.includes(` ${phrase} `))
+  const actions = tokens.flatMap((token, index) => VISUAL_ACTION_TOKENS.has(token) ? [index] : [])
+  const near = (index: number) => actions.some((action) => Math.abs(action - index) <= VISUAL_OBJECT_WINDOW)
+  if (tokens.some((token, index) => VISUAL_SUBJECT_TOKENS.has(token) && near(index))) return true
+  return VISUAL_SUBJECT_PHRASES.some((phrase) => {
+    const words = phrase.split(' ')
+    return tokens.some((_, index) => words.every((word, offset) => tokens[index + offset] === word) && near(index))
+  })
 }
 
 /**

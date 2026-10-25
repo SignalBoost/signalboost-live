@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { BUILDER_RUNPOD_HEALTH_WINDOW_MS, builderRunpodRowsTimedOut } from '../lib/ai/localInferenceUsage.ts'
+import { BUILDER_RUNPOD_HEALTH_WINDOW_MS, builderRunpodRowsTimedOut, builderRunpodRowsTooSlow } from '../lib/ai/localInferenceUsage.ts'
 
 const timeout = (reason = 'timeout:inference_transport_deadline') => ({ success: false, finish_reason: reason })
 
@@ -43,3 +43,14 @@ test('an open breaker skips RunPod and goes straight to the fallback a timeout w
   assert.doesNotMatch(builder, /let builderRunpod|builderRunpodBlockedUntil/, 'no per-instance breaker state remains')
 })
 // end of saas/tests/builderRunpodSharedHealth.node.test.ts (if this line is missing, the paste was cut short)
+
+test('two measured slow successful replies trigger temporary owned-provider cooldown', () => {
+  const slow = { success: true, completion_tokens: 48, latency_ms: 8300 }
+  const fast = { success: true, completion_tokens: 48, latency_ms: 1000 }
+  assert.equal(builderRunpodRowsTooSlow([slow, slow]), true)
+  assert.equal(builderRunpodRowsTooSlow([slow, fast]), false)
+  assert.equal(builderRunpodRowsTooSlow([slow]), false)
+  assert.equal(builderRunpodRowsTooSlow([{ success: true, completion_tokens: 5, latency_ms: 10000 }, slow]), false)
+  assert.equal(builderRunpodRowsTooSlow([{ success: true, completion_tokens: null, latency_ms: 10000 }, slow]), false)
+  assert.equal(builderRunpodRowsTooSlow([{ success: false, completion_tokens: 48, latency_ms: 8300 }, slow]), false)
+})

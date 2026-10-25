@@ -56,6 +56,18 @@ test('inline numbered analysis retains distinct first lines before shared caveat
   assert.deepEqual(missingAnalyticalTasks(prompt, answer), [])
 })
 
+test('paraphrased standalone section headings cannot disguise copied generic analysis', () => {
+  const prompt = [
+    'Investigate database errors and latency.',
+    '1. List plausible root causes.',
+    '2. Rank competing explanations.',
+    '3. Describe missing evidence.',
+  ].join('\n')
+  const copied = 'Each working hypothesis is linked to observations, alternative explanations, a discriminating check, and what cannot be concluded without operational records and end-to-end event traces.'
+  const answer = ['1. **Root causes**', copied, '2. **Ranking**', copied, '3. **Missing evidence**', copied].join('\n')
+  assert.ok(missingAnalyticalTasks(prompt, answer).length >= 2)
+})
+
 test('headings without content do not satisfy the task contract', () => {
   const headings = requestedAnalyticalTasks(incident).map((task, i) => (i + 1) + '. ' + task).join('\n')
   assert.equal(missingAnalyticalTasks(incident, headings).length, 8)

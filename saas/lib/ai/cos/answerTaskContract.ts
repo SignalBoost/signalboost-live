@@ -48,7 +48,8 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
       // Require a meaningful amount of explanation and novel analytical content.
       const requestedWords = new Set(topicWords(directive))
       const novel = new Set(topicWords(section).filter(word => !requestedWords.has(word)))
-      const normalized = section.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+      const answerBody = section.includes('\n') ? section.slice(section.indexOf('\n') + 1).trim() : section
+      const normalized = answerBody.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
       const repeatsPriorSection = seenSectionBodies.has(normalized)
       seenSectionBodies.add(normalized)
       return section.length < 100 || novel.size < 7 || repeatsPriorSection

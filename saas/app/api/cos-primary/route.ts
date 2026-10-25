@@ -53,8 +53,8 @@ import { buildNormativeFreshEvidenceFallback } from '@/lib/ai/cos/normativeFresh
 import { buildSourceSummaryFallback } from '@/lib/ai/cos/sourceDigestFallback'
 import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExternalSynthesis'
 import { callCosReasoner, callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
-import { companyKnowledgeBlock, cosAudience, cosIdentityPreamble, type CosAudience } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
-import { LONG_FORM_ANSWER_MAX_TOKENS, callLocalModel, callLocalModelTurn, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { companyKnowledgeBlock, cosAudience, cosIdentityPreamble, longFormReasonerMaxTokens, type CosAudience } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
+import { callLocalModel, callLocalModelTurn, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { readPublicPages } from '@/lib/ai/tools/publicWebAgent'
@@ -440,7 +440,7 @@ async function runCompletionFirstRescue(input:string,language:string,audience:Co
   const longForm=isLongFormAnalysisRequest(input)
   const result=await callCosReasoner({
     temperature:0,
-    ...(longForm?{longForm:true,maxTokens:LONG_FORM_ANSWER_MAX_TOKENS}:{maxTokens:1400,timeoutMs:9_000}),
+    ...(longForm?{longForm:true,maxTokens:longFormReasonerMaxTokens()}:{maxTokens:1400,timeoutMs:9_000}),
     disableThinking:true,
     usageContext:{feature:'cos_interactive_answer',purpose:'completion_rescue'},
     systemPrompt:[

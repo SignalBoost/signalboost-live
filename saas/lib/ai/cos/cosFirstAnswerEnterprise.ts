@@ -198,12 +198,20 @@ function knowledgeFactRetrievalBudgetMs():number {
   return Number.isFinite(value) ? Math.max(250, Math.min(15000, value)) : 900
 }
 
+function reasonerGlobalTokenCeiling():number {
+  const globalCeiling = Number(process.env.COS_REASONER_MAX_TOKENS || '6000')
+  return Number.isFinite(globalCeiling) ? Math.max(768, globalCeiling) : 6000
+}
+
 function interactiveReasonerMaxTokens():number {
   const configured = Number(process.env.COS_INTERACTIVE_REASONER_MAX_TOKENS || '2000')
-  const globalCeiling = Number(process.env.COS_REASONER_MAX_TOKENS || '6000')
   const bounded = Number.isFinite(configured) ? Math.max(768, Math.min(3000, configured)) : 2000
-  const ceiling = Number.isFinite(globalCeiling) ? Math.max(768, globalCeiling) : 6000
-  return Math.min(bounded, ceiling)
+  return Math.min(bounded, reasonerGlobalTokenCeiling())
+}
+
+/** A multi-part analysis gets more room, never above the configured global ceiling (Codex on #4879). */
+export function longFormReasonerMaxTokens():number {
+  return Math.min(Math.max(interactiveReasonerMaxTokens(), LONG_FORM_ANSWER_MAX_TOKENS), reasonerGlobalTokenCeiling())
 }
 
 function interactiveReasonerFeature(prompt:string):'cos_interactive_answer'|'cos_interactive_authoring' {
@@ -1095,7 +1103,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     temperature:Number(process.env.COS_REASONER_TEMPERATURE ?? '0'),
     // A multi-part analysis gets the time and room to finish (local-inference LONG_FORM_ANSWER_*).
     ...(isLongFormAnalysisRequest(input.prompt)
-      ? { longForm:true, maxTokens:Math.max(interactiveReasonerMaxTokens(), LONG_FORM_ANSWER_MAX_TOKENS) }
+      ? { longForm:true, maxTokens:longFormReasonerMaxTokens() }
       : { maxTokens:interactiveReasonerMaxTokens() }),
     systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English', { privileged: audience === 'owner', audience, question: input.prompt }),
     // COMPANY KNOWLEDGE BLOCK (2026-09-26). Every audience gets the owner-approved company identity and

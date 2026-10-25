@@ -49,6 +49,15 @@ test('a non-answer is never released', () => {
   ]) assert.equal(releasableAnalyticalAnswer(incident, reply), false, reply)
 })
 
+// Codex on #4900: the checklist headings plus one refusal paragraph repeated under each must stay a non-answer.
+test('repeated task headings with a repeated refusal under each are not substantive', async () => {
+  const { requestedAnalyticalTasks } = await import('../lib/ai/cos/answerTaskContract.ts')
+  const refusal = 'Without the consumer offsets, pod restart logs, cache metrics and reconciliation exports for the incident window I cannot responsibly say anything about this item; please provide that telemetry first, together with the baseline values for a normal day so the comparison is meaningful.'
+  const padded = requestedAnalyticalTasks(incident).map((task, index) => `${index + 1}. ${task}\n${refusal}`).join('\n\n')
+  assert.ok(padded.length > 2400, `${padded.length}`)
+  assert.equal(releasableAnalyticalAnswer(incident, padded), false)
+})
+
 test('requests without enumerated deliverables are unaffected', () => {
   assert.equal(releasableAnalyticalAnswer('What is a message queue?', 'A message queue is asynchronous transport.'), true)
 })

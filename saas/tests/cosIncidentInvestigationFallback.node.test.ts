@@ -1,25 +1,26 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { buildHonestRefusalReply, incidentInvestigationFallback } from '../lib/ai/cos/honestRefusalReply.ts'
+import { buildHonestRefusalReply } from '../lib/ai/cos/honestRefusalReply.ts'
+import { requestedAnalyticalTasks } from '../lib/ai/cos/answerTaskContract.ts'
 
 const incident = readFileSync(new URL('./fixtures/cos-incident-analysis-brief.txt', import.meta.url), 'utf8')
 
-test('exact production payment incident receives all eight investigation tasks even on fallback', () => {
+test('the eight-task incident request is recognized, but model failure cannot become a canned answer', () => {
+  assert.equal(requestedAnalyticalTasks(incident).length, 8)
   const answer = buildHonestRefusalReply({ prompt: incident, language: 'en' })
-  for (const section of [
-    '1. Plausible causes:', '2. Ranked working hypotheses',
-    '3. Correlation versus causation:', '4. Missing evidence:',
-    '5. Forensic plan:', '6. Controlled experiments',
-    '7. Combined-fault pathway:', '8. Single most likely working explanation:',
-  ]) assert.ok(answer.includes(section), section)
-  assert.match(answer, /Kafka at-least-once replay/)
-  assert.match(answer, /Revenue reports are 2% higher than bank deposits/)
-  assert.match(answer, /No production records were inspected/)
-  assert.doesNotMatch(answer, /To answer it properly I need|authoritative image/)
+  assert.match(answer, /could not complete the requested analytical deliverables/i)
+  assert.match(answer, /root cause is unconfirmed/i)
+  assert.doesNotMatch(answer, /Kafka at-least-once replay|Ranked working hypotheses|To answer it properly I need/)
 })
 
-test('ordinary diagnosis and unrelated incident remain on general fallback', () => {
-  assert.equal(incidentInvestigationFallback('Why did GEN-2 fail during the test?'), null)
-  assert.equal(incidentInvestigationFallback('Investigate a Kubernetes outage and propose experiments.'), null)
+test('unseen analytical assignments also fail honestly rather than claiming a completed analysis', () => {
+  const prompt = 'Investigate unexpected database growth.\n1. List plausible reasons.\n2. Rank alternatives.\n3. Describe evidence needed.'
+  assert.equal(requestedAnalyticalTasks(prompt).length, 3)
+  assert.match(buildHonestRefusalReply({ prompt, language: 'en' }), /could not complete the requested analytical deliverables/)
+})
+
+test('ordinary narrow diagnosis retains its normal no-proof fallback', () => {
+  const reply = buildHonestRefusalReply({ prompt: 'Why did GEN-2 fail during the test? Give leading hypotheses.', language: 'en' })
+  assert.match(reply, /readings that separate the candidate causes/)
 })

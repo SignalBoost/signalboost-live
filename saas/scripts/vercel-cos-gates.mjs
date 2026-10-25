@@ -15,6 +15,7 @@ if (bypassAudit.status !== 0) process.exit(bypassAudit.status ?? 1)
 
 
 const tests = [
+  'tests/cosPrimaryTaskReleaseContract.node.test.ts',
   'tests/cosAnalyticalTaskContract.node.test.ts',
   'tests/builderInferenceBudget.node.test.ts',
   'tests/builderIsolatedAcceptanceRouting.node.test.ts',

@@ -8,6 +8,7 @@ import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
 import { BUILDER_JOB_MODEL_CALL_BUDGET } from './work-budget.ts'
 import { builderFailurePaths, builderFailureImports } from './failure-context.ts'
 import { objectivePlantsDefect, plantedDefectCandidate, plantedDefectNotes, type PlantedDefectNote } from './planted-defect-notes.ts'
+import { BUILDER_STUCK_RUNS, builderAssertionSnippet, builderFailingTests, builderTestProgress, builderTestRegression, builderTestRunScore } from './test-progress.ts'
 
 /**
  * Whole-job receipt bound. `maxSteps` is the per-slice budget; a resumed job gets a fresh slice budget on top of
@@ -44,6 +45,8 @@ const WORKING_SET_CHARS = 12_000
 // Preserve more of failing assertions and stack traces without expanding the 12K source working set.
 const FAILURE_OUTPUT_CHARS = 12_000
 const MODEL_RETRY_BASE_MS = 1_000
+/** Largest project source kept in the checkpoint for the automatic undo to the best-scoring version. */
+const BEST_VERSION_CHARS = 300_000
 const MODEL_RETRY_MAX_MS = 15_000
 
 const SYSTEM_PROMPT = [
@@ -83,8 +86,10 @@ const hasSyntaxError = (receipt: BuilderV2Receipt) =>
 /** Older receipts keep only what checkpoint validation and acceptance need, so long builds stay small. */
 function compactReceipt(receipt: BuilderV2Receipt): BuilderV2Receipt {
   const output = receipt.output as Record<string, unknown> | undefined
+  // A run keeps its own pass/fail score, so the trend of every run stays visible after compaction.
+  const score = builderTestRunScore(receipt)
   const kept = receipt.tool === 'run_tests'
-    ? output && { exitCode: output.exitCode, timedOut: output.timedOut, requestedCommand: output.requestedCommand, executedCommand: output.executedCommand }
+    ? output && { exitCode: output.exitCode, timedOut: output.timedOut, requestedCommand: output.requestedCommand, executedCommand: output.executedCommand, ...(score ? { score } : {}) }
     : receipt.tool === 'browser_cli'
     ? output && { url: output.url, action: output.action, exitCode: output.exitCode, timedOut: output.timedOut }
     : output && typeof output === 'object' && !Array.isArray(output) && typeof output.path === 'string' ? { path: output.path } : undefined
@@ -104,6 +109,9 @@ export type BuilderV2Checkpoint = Readonly<{
   /** Consecutive resumed work slices without a new host receipt or source revision. */
   idleSlices?: number
   modelCalls?: number
+  /** Source of the version with the best test score so far, and the step that scored it (automatic undo). */
+  bestFiles?: Readonly<Record<string, string>>
+  bestStep?: number
 }>
 
 /** Limit repeated resumptions that execute no tools and make no source changes. */
@@ -422,6 +430,12 @@ export class BuilderV2Agent {
     let lastReceipt = saved?.lastReceipt ?? ''
     this.modelCalls = Number.isSafeInteger(saved?.modelCalls) && (saved?.modelCalls ?? 0) >= 0 ? saved!.modelCalls! : 0
     this.modelCallBudget = options.modelCallBudget ?? BUILDER_JOB_MODEL_CALL_BUDGET
+    // The best-scoring version's source, valid only while it still belongs to the best run in the receipts.
+    let bestStep = saved?.bestStep ?? -1
+    let bestFiles: Readonly<Record<string, string>> | undefined =
+      saved?.bestFiles && bestStep === builderTestProgress(steps).bestAt ? saved.bestFiles : undefined
+    // Told to the model once, on the turn after the host undid a change that made tests worse.
+    let regressionUndone: Record<string, unknown> | null = null
     const snapshot = async (): Promise<BuilderV2Checkpoint | undefined> => {
       if (!this.workspace) return undefined
       const lastChange = steps.findLastIndex(receipt => receipt.changed)
@@ -433,6 +447,7 @@ export class BuilderV2Agent {
         revision, verifiedRevision, unproductive, lastReceipt,
         idleSlices: saved?.idleSlices ?? 0,
         modelCalls: this.modelCalls,
+        ...(bestFiles ? { bestFiles, bestStep } : {}),
       }
     }
     const checklist = builderTaskContract(options.objective)
@@ -499,6 +514,49 @@ export class BuilderV2Agent {
       const checkpoint = await snapshot()
       if (checkpoint) await options.onCheckpoint(checkpoint)
     }
+    // Never go backwards: a run that reaches a new best score saves that version's source; a run that passes fewer
+    // tests than the best restores it, so the next repair starts from the best version, not from a regression.
+    const afterTestRun = async () => {
+      const run = steps[steps.length - 1]
+      const score = run ? builderTestRunScore(run) : null
+      if (!score || !this.workspace) return
+      const progress = builderTestProgress(steps)
+      if (progress.bestAt === steps.length - 1) {
+        const files: Record<string, string> = {}
+        let size = 0
+        for (const path of knownFiles) {
+          const file = await this.workspace.readFile(options.workspaceId, path)
+          if (!file) continue
+          size += file.content.length
+          // A project too large to keep in the checkpoint keeps its score but gets no automatic undo.
+          if (size > BEST_VERSION_CHARS) { bestFiles = undefined; bestStep = -1; return }
+          files[path] = file.content
+        }
+        bestFiles = files
+        bestStep = steps.length - 1
+        return
+      }
+      if (!builderTestRegression(progress.best, score) || !bestFiles || bestStep !== progress.bestAt) return
+      const restored: string[] = []
+      for (const [path, content] of Object.entries(bestFiles)) {
+        const current = await this.workspace.readFile(options.workspaceId, path)
+        if (!current || current.content === content) continue
+        const action: BuilderV2Action = { tool: 'write_file', path, content }
+        const receipt = await this.dispatcher.dispatch(options.workspaceId, action, { seenContent: current.content })
+        if (!receipt.changed) continue
+        record(action, { ...receipt, output: { ...(receipt.output as object), restoredBest: true } })
+        restored.push(path)
+        // Each restored file is checkpointed at once, so an interrupted rollback stays resumable (Codex on #4868).
+        await persist()
+      }
+      if (!restored.length) return
+      regressionUndone = {
+        message: `Your last change made the tests worse (${score.passed} passing, the best version had ${progress.best!.passed}). `
+          + 'The host restored the best version of these files. Do not repeat that change; fix the remaining failures a different way.',
+        restoredFiles: restored, bestPassing: progress.best!.passed, bestFailing: progress.best!.failed,
+      }
+      await persist()
+    }
     // The revision the host last ran the required commands on; each revision is host-verified at most once.
     // Do not rerun a failed command just because another execution slice claimed this job.
     // Every host receipt is revision-bound by the latest changed file.
@@ -560,6 +618,7 @@ export class BuilderV2Agent {
         const receipt = await this.dispatcher.dispatch(options.workspaceId, action)
         record(action, receipt)
         await persist()
+        await afterTestRun()
         if (!receipt.ok) return null
       }
       return verifiedNow()
@@ -655,6 +714,31 @@ export class BuilderV2Agent {
             : missingMethods.length
               ? `The host reports missing runtime APIs: ${missingMethods.join(', ')}. Find the producer of these objects in the imported source files already provided, implement the missing methods with the semantics asserted by the tests, and use edit_file NOW. Do not spend this continuation on more read_file or list_files calls. Never weaken tests. Host verification runs after edits.`
               : 'Use the actual failing command, caller imports and source API to diagnose the failure. Prefer a targeted edit_file operation; avoid repeating read_file calls. Do not change tests merely to silence failures. Host verification runs after edits.' }
+    }
+    // Each failing test of the latest run with what it expected and what it got, next to the assertion's lines, and
+    // the score trend. After BUILDER_STUCK_RUNS runs that did not beat the best score, the model is told to stop
+    // patching and re-diagnose (LangChain's harness: the doom-loop nudge; reflect before the next edit).
+    const failingTestsPrompt = async () => {
+      const progress = builderTestProgress(steps)
+      const failingTests = []
+      for (const failing of builderFailingTests(failedOnRevision(), knownFiles)) {
+        const [path, line] = (failing.location ?? '').split(':')
+        const file = path && this.workspace ? await this.workspace.readFile(options.workspaceId, path) : null
+        failingTests.push(file && Number(line) > 0 ? { ...failing, snippet: builderAssertionSnippet(file.content, Number(line)) } : failing)
+      }
+      const latest = progress.latest
+      const best = progress.best
+      return {
+        ...(failingTests.length ? { failingTests } : {}),
+        ...(latest && best ? { testScore: { passing: latest.passed, failing: latest.failed, bestPassing: best.passed, bestFailing: best.failed,
+          runsWithoutImprovement: progress.runsWithoutImprovement } } : {}),
+        ...(best && progress.runsWithoutImprovement >= BUILDER_STUCK_RUNS ? { stuck: {
+          instruction: `Your last ${progress.runsWithoutImprovement} test runs did not beat the best result (${best.passed} passing, ${best.failed} failing). `
+            + 'Stop repeating the same kind of change. For each entry in failingTests, compare expected with actual and read the assertion snippet, '
+            + 'decide whether the source or the test contradicts the objective, '
+            + 'then make the single edit that fixes that mismatch. Never weaken a correct test.',
+        } } : {}),
+      }
     }
     for (let calls = 0; calls < maxSteps && steps.length < BUILDER_V2_MAX_RECEIPTS; calls++) {
       checkBuilderInferenceDeadline()
@@ -767,6 +851,8 @@ export class BuilderV2Agent {
             recurringFailures: builderV2RecurringFailures(steps),
             latestFailedTest: currentFailure(),
             ...(currentFailure() ? { activeRepair: await activeRepair() } : {}),
+            ...(currentFailure() ? await failingTestsPrompt() : {}),
+            ...(regressionUndone ? { regressionUndone } : {}),
             ...(interfaceRepairs.length ? { interfaceMismatches: interfaceRepairs } : {}),
             // While files are still being written, the real interface of the sources written so far, so later
             // files (usually the tests) import names that exist instead of inventing them.
@@ -804,6 +890,7 @@ export class BuilderV2Agent {
         }
         return { ok: false, reason: 'builder_v2_model_unavailable', summary: error instanceof Error ? error.message : 'builder_v2_model_error', steps, checkpoint: await snapshot() }
       }
+      regressionUndone = null
       const decision = parseDecision(raw)
       if (!decision) {
         if (++invalidReplies >= REJECTION_LIMIT) return { ok: false, reason: 'builder_v2_invalid_model_action', steps, checkpoint: await snapshot() }
@@ -898,6 +985,12 @@ export class BuilderV2Agent {
           action.tool === 'write_file' ? { seenContent: seen.get(action.path) } : {})
         record(action, receipt)
         await persist()
+        if (action.tool === 'run_tests') {
+          const before = revision
+          await afterTestRun()
+          // The host restored the best version: the rest of this batch was planned against the reverted source.
+          if (revision !== before) break
+        }
         // A stall pauses with its checkpoint for the bounded continuation controller (#4590): the next slice
         // resumes with fresh repeat tracking, and the job's slice cap bounds how often that happens.
         if (unproductive >= BUILDER_V2_STALL_LIMIT) return { ok: false, reason: 'builder_v2_step_budget', steps, checkpoint: await snapshot() }

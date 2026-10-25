@@ -88,8 +88,21 @@ export function releasableAnalyticalAnswer(prompt: string, answer: string): bool
   if (!tasks.length) return true
   const missing = missingAnalyticalTasks(prompt, answer)
   if (!missing.length) return true
-  const body = String(answer || '')
-  if (body.trim().length < tasks.length * 250) return false
+  // Judge only the answer's own analysis: lines that repeat a requested task heading and paragraphs repeated
+  // under several headings do not count (Codex on #4900: the checklist plus one refusal paragraph repeated
+  // eight times must stay a non-answer).
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  const headings = new Set(tasks.map(normalize))
+  const seen = new Set<string>()
+  const body = String(answer || '').split(/\n\s*\n|\n(?=\s*(?:#{1,6}\s*)?\d{1,2}[.)]\s)/)
+    .map(block => block.split('\n').filter(line => !headings.has(normalize(line.replace(/^\s*(?:#{1,6}\s*)?(?:\d{1,2}[.)]\s*)?/, '')))).join('\n').trim())
+    .filter(block => {
+      const key = normalize(block)
+      if (!key || seen.has(key)) return false
+      seen.add(key)
+      return true
+    }).join('\n\n')
+  if (body.length < tasks.length * 250) return false
   const vocabulary = new Set(topicWords(body))
   const covered = tasks.filter(directive => {
     const topics = [...new Set(topicWords(directive))]

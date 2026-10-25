@@ -26,7 +26,8 @@ import { semanticCacheAllowedForPrompt } from './cacheSafetyPolicy.ts'
 import { normativeAnswerContractViolations } from './normativeAnswerPolicy.ts'
 import { INSTRUCTION_NARRATION_SIGNAL, instructionNarrationSignals, stripInstructionNarration } from './cosInstructionNarration.ts'
 import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
-import { localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { LONG_FORM_ANSWER_MAX_TOKENS, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { isLongFormAnalysisRequest } from './cosReasoningRolePolicy.ts'
 import { learnedEvidenceUseRequired } from './learnedEvidencePolicy.ts'
 import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { classifyRunpodFailure, runpodCapacityUnavailableReason } from '@/lib/ai/cos/runpodCapacityError'
@@ -1092,7 +1093,10 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     // reason in the visible answer instead of hidden scratch work.
     disableThinking:true,
     temperature:Number(process.env.COS_REASONER_TEMPERATURE ?? '0'),
-    maxTokens:interactiveReasonerMaxTokens(),
+    // A multi-part analysis gets the time and room to finish (local-inference LONG_FORM_ANSWER_*).
+    ...(isLongFormAnalysisRequest(input.prompt)
+      ? { longForm:true, maxTokens:Math.max(interactiveReasonerMaxTokens(), LONG_FORM_ANSWER_MAX_TOKENS) }
+      : { maxTokens:interactiveReasonerMaxTokens() }),
     systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English', { privileged: audience === 'owner', audience, question: input.prompt }),
     // COMPANY KNOWLEDGE BLOCK (2026-09-26). Every audience gets the owner-approved company identity and
     // public catalog directly in the prompt for questions about iTMounts. When the identity was only one

@@ -31,6 +31,9 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
   if (!tasks.length) return []
   const body = String(answer || '')
   const vocabulary = new Set(topicWords(body))
+  // A repeated generic paragraph under different numbered headings is not eight
+  // independent analytical deliverables. Check section bodies, not their headings.
+  const seenSectionBodies = new Set<string>()
   // Parse all numbered sections once. Searching independently for each heading and
   // slicing from that match can accidentally include the NEXT heading as content.
   const sections = [...body.matchAll(/(?:^|\n)[ \t]*(?:#{1,6}[ \t]*)?(\d{1,2})[.)][ \t]+/g)]
@@ -45,7 +48,10 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
       // Require a meaningful amount of explanation and novel analytical content.
       const requestedWords = new Set(topicWords(directive))
       const novel = new Set(topicWords(section).filter(word => !requestedWords.has(word)))
-      return section.length < 100 || novel.size < 7
+      const normalized = section.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+      const repeatsPriorSection = seenSectionBodies.has(normalized)
+      seenSectionBodies.add(normalized)
+      return section.length < 100 || novel.size < 7 || repeatsPriorSection
     }
     // Some legitimate answers use prose headings instead of numbers. Permit those
     // only when the answer meaningfully mentions the task's subject matter.

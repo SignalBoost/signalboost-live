@@ -54,3 +54,25 @@ test('typo tolerance does not turn ordinary political or writing prompts into im
     assert.equal(detectConciergeVisualIntent(prompt), null, prompt)
   }
 })
+
+// Production 2026-10-25: an incident-analysis brief got "I could not verify an authoritative image of that mark".
+// "Logs are sampled at 10%" was typo-corrected to "logo", dozens of words away from "create" and "design".
+test('a picture word far from any drawing verb does not make a text request visual', async () => {
+  const { readFileSync } = await import('node:fs')
+  const brief = readFileSync(new URL('./fixtures/cos-incident-analysis-brief.txt', import.meta.url), 'utf8')
+  assert.equal(isConciergeVisualObjective(brief), false)
+  assert.equal(detectConciergeVisualIntent(brief), null)
+  for (const prompt of [
+    'Do not create files. Check whether the logs are sampled at 10 percent and design an experiment for each hypothesis about the duplicate charges.',
+    'Generate a summary of the outage. Our monitoring dashboard shows the icon turning red during the deploy window every night.',
+  ]) assert.equal(isConciergeVisualObjective(prompt), false, prompt)
+  for (const prompt of [
+    'create a modern minimalist logo for my bakery',
+    'generate a high quality photo realistic image of a lighthouse at dusk',
+    'design a coat of arms for the Silva family',
+  ]) assert.equal(isConciergeVisualObjective(prompt), true, prompt)
+  // Codex on #4875: a far misspelled mark under a drawing verb keeps verified-reference lookup, and a text
+  // deliverable about an image stays text.
+  assert.equal(detectConciergeVisualIntent('draw the official manchester united logoo')?.mode, 'reference-mark')
+  assert.equal(isConciergeVisualObjective('make a summary of this image.'), false)
+})

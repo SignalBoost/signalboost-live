@@ -1,2 +1,2 @@
-base_sha=0000ce856d894619e1cfb5d64a0b59ab314628db
-branch=fix/builder-runpod-throughput-current-main-20261025
+base_sha=390e2fa89712cbaed1e314e68e5a4b81fb472960
+branch=test/builder-harness-complete-loop-20261024

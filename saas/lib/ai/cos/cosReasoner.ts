@@ -12,6 +12,7 @@
 // same exact-host allow-list + API-key controls as any other remote LOCAL_AI_* endpoint.
 
 import { randomUUID } from 'node:crypto'
+import { missingAnalyticalTasks, analyticalTaskRepairDirective } from './answerTaskContract.ts'
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { callLocalModel, captureServedInference, localInferenceConfigFromEnv, type LocalModelCallArgs, type ServedInference } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
@@ -289,7 +290,8 @@ export async function callRawCosReasoner(
     const firstAdvisoryDefects = advisoryDiagnosis && firstParsedForPolicy
       ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, firstParsedForPolicy.answer)
       : []
-    const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, first) || firstAdvisoryDefects.length > 0
+    const firstTaskGaps = firstParsedForPolicy ? missingAnalyticalTasks(effectiveArgs.prompt, firstParsedForPolicy.answer) : []
+    const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, first) || firstAdvisoryDefects.length > 0 || firstTaskGaps.length > 0
     const qualityRepairAffordable = hasBudgetFor(budget, localCallEstimateMs())
     if (!qualityRepairNeeded) recorder.skip('quality_repair', 'not_needed')
     else if (!qualityRepairAffordable) recorder.skip('quality_repair', 'no_budget')
@@ -301,6 +303,7 @@ export async function callRawCosReasoner(
           temperature: 0,
           prompt: [
             buildDiagnosticRepairPrompt(effectiveArgs.prompt, first),
+            ...(firstTaskGaps.length && firstParsedForPolicy ? ['', analyticalTaskRepairDirective(effectiveArgs.prompt, firstParsedForPolicy.answer)] : []),
             ...(firstAdvisoryDefects.length ? ['', ADVISORY_DIAGNOSIS_OWNER_POLICY, '', `The rejected draft violated: ${firstAdvisoryDefects.join(', ')}.`] : []),
           ].join('\n'),
         },
@@ -320,10 +323,12 @@ export async function callRawCosReasoner(
       const repairedAdvisoryDefects = advisoryDiagnosis && repairedParsedForPolicy
         ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, repairedParsedForPolicy.answer)
         : []
+      const repairedTaskGaps = repairedParsedForPolicy ? missingAnalyticalTasks(effectiveArgs.prompt, repairedParsedForPolicy.answer) : firstTaskGaps
+      const taskContractRepairAccepted = firstTaskGaps.length > 0 && repairedTaskGaps.length === 0
       const advisoryPolicyRepairAccepted = firstAdvisoryDefects.length > 0 && repairedAdvisoryDefects.length === 0
       const generalRepairAccepted = Boolean(repaired && preferRepairedDraft(effectiveArgs.prompt, first, repaired))
 
-      if (repaired && (advisoryPolicyRepairAccepted || (firstAdvisoryDefects.length === 0 && generalRepairAccepted))) {
+      if (repaired && repairedTaskGaps.length === 0 && (taskContractRepairAccepted || advisoryPolicyRepairAccepted || (firstAdvisoryDefects.length === 0 && generalRepairAccepted))) {
         console.info('[cos-local-quality-repair]', JSON.stringify({
           at: new Date().toISOString(),
           reasoner: config.label,
@@ -346,6 +351,12 @@ export async function callRawCosReasoner(
     }
 
     const finalParsedForPolicy = parseLocalResult(text)
+    const remainingTaskGaps = finalParsedForPolicy ? missingAnalyticalTasks(effectiveArgs.prompt, finalParsedForPolicy.answer) : []
+    if (remainingTaskGaps.length) {
+      console.warn('[cos-task-contract-release-blocked]', JSON.stringify({ missingCount: remainingTaskGaps.length, requestedCount: firstTaskGaps.length }))
+      recorder.skip('skill_citation_repair', 'task_contract_unmet')
+      return null
+    }
     const remainingAdvisoryDefects = advisoryDiagnosis && finalParsedForPolicy
       ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, finalParsedForPolicy.answer)
       : []

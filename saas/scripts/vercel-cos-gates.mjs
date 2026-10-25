@@ -470,6 +470,7 @@ const tests = [
   'tests/conciergeSemanticVisualIntent.node.test.ts',
 
   'tests/conciergeVisualTypoRouting.node.test.ts',
+  'tests/cosLongFormAnalysisWindow.node.test.ts',
 
   'tests/visualObjectiveContract.node.test.ts',
 

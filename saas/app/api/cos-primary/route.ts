@@ -54,7 +54,7 @@ import { buildNormativeFreshEvidenceFallback } from '@/lib/ai/cos/normativeFresh
 import { buildSourceSummaryFallback } from '@/lib/ai/cos/sourceDigestFallback'
 import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExternalSynthesis'
 import { callCosReasoner, callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
-import { companyKnowledgeBlock, cosAudience, cosIdentityPreamble, type CosAudience } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
+import { companyKnowledgeBlock, cosAudience, cosIdentityPreamble, longFormReasonerMaxTokens, type CosAudience } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { callLocalModel, callLocalModelTurn, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
@@ -72,7 +72,7 @@ import { isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/f
 import { FAST_EDIT_AUTHOR_INSTRUCTIONS, FAST_EDIT_REVIEW_INSTRUCTIONS, formatIndependentEditReviewPrompt, runSelfReviewedEdit } from '@/lib/ai/cos/selfReviewTextEdit'
 import { EDIT_DETAIL_REPAIR_INSTRUCTIONS, formatEditDetailRepairPrompt, stripUnrequestedSubjectLine, unsupportedEditDetails, userAuthoredText } from '@/lib/ai/cos/editFactGuard'
 import { looksLikeArtifactContinuation } from '@/lib/ai/cos/artifactContinuationIntent'
-import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective, isLongFormAnalysisRequest } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { newAgentLoopTrace, redactUrlQueries, runCosAgentLoop } from '@/lib/ai/cos/agentLoop/cosAgentLoop'
@@ -436,11 +436,13 @@ function fastAuthoringResponse(startedAt:number,input:string,fast:{reply:string;
 
 async function runCompletionFirstRescue(input:string,language:string,audience:CosAudience):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
   // ONE BRAIN: the rescue lane carries the same COS identity and company knowledge as the main pipeline.
+  // A multi-part analysis is the last chance before failing closed: it gets the long-form answer window
+  // (still clamped to the turn deadline) instead of 9 s / 1,400 tokens, which cannot hold such an answer.
+  const longForm=isLongFormAnalysisRequest(input)
   const result=await callCosReasoner({
     temperature:0,
-    maxTokens:1400,
+    ...(longForm?{longForm:true,maxTokens:longFormReasonerMaxTokens()}:{maxTokens:1400,timeoutMs:9_000}),
     disableThinking:true,
-    timeoutMs:9_000,
     usageContext:{feature:'cos_interactive_answer',purpose:'completion_rescue'},
     systemPrompt:[
       cosIdentityPreamble(audience),

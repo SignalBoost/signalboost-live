@@ -70,6 +70,8 @@ export interface LocalModelCallArgs {
   disableThinking?: boolean
   /** Caller-specific hard transport deadline. The lower of this value and config.timeoutMs wins. */
   timeoutMs?: number
+  /** A multi-part analysis answer: gets LONG_FORM_ANSWER_TIMEOUT_MS instead of the one-pass chat answer limit. */
+  longForm?: boolean
   /** Disable configured-model fallback after an owned-primary failure for latency-critical calls. */
   allowConfiguredFallback?: boolean
   /** Return non-empty text on finish_reason=length so a caller with a dedicated salvage parser can recover it. */
@@ -236,11 +238,18 @@ function agentToolLoopRound(args: LocalModelCallArgs): boolean {
   return String(args.usageContext?.purpose || '').trim().toLowerCase() === 'agent_tool_loop'
 }
 
+/** One long-form analysis answer, inside the 150 s browser-turn model deadline (app/api/cos-browser). */
+export const LONG_FORM_ANSWER_TIMEOUT_MS = 120_000
+/** Output room for a multi-part analysis; the reasoning role's own token cap still applies. */
+export const LONG_FORM_ANSWER_MAX_TOKENS = 4_000
+
 function interactiveModelTimeoutMs(args: LocalModelCallArgs, configTimeoutMs: number): number {
   // An agent-loop round may write a whole analysis program; the loop owns its per-round bound
   // (cosAgentLoop ROUND_TIMEOUT_MS) inside the turn deadline. Production 2026-10-16: the 20 s
   // one-pass answer clamp cut the code-writing round ("Inference transport deadline exceeded").
   if (agentToolLoopRound(args)) return Math.min(configTimeoutMs, 60_000)
+  // A multi-part analysis cannot be written in the one-pass limit; it is still clamped to the turn deadline.
+  if (args.longForm === true) return Math.min(configTimeoutMs, LONG_FORM_ANSWER_TIMEOUT_MS)
   const directEdit = directTextTransformation(args)
   const authoring = interactiveAuthoring(args)
   const simpleKnowledge = simpleKnowledgeResponse(args)

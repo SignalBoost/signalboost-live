@@ -106,7 +106,8 @@ function roleSystemPrompt(request: CosReasoningRequest, role: CosSpecialistRole)
   return [request.systemPrompt, COS_GENERAL_REASONING_DISCIPLINE, roleGuidance].filter(Boolean).join('\n\n')
 }
 
-function toLocalModelCallArgs(request: CosReasoningRequest, role: CosSpecialistRole): LocalModelCallArgs {
+/** The model call a worker makes for a request: every control the caller set survives worker selection. */
+export function toLocalModelCallArgs(request: CosReasoningRequest, role: CosSpecialistRole): LocalModelCallArgs {
   const systemPrompt = roleSystemPrompt(request, role)
   const deterministicControl = request.disableThinking === true && request.jsonObject === true
   const requestedTokens = Number(request.maxTokens)
@@ -124,6 +125,8 @@ function toLocalModelCallArgs(request: CosReasoningRequest, role: CosSpecialistR
     ...(request.presencePenalty === undefined ? {} : { presencePenalty: request.presencePenalty }),
     ...(request.disableThinking === undefined ? {} : { disableThinking: request.disableThinking }),
     ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+    // Codex on #4879: without this the long-form window never reached inference.
+    ...(request.longForm === undefined ? {} : { longForm: request.longForm }),
     ...(request.allowConfiguredFallback === undefined ? {} : { allowConfiguredFallback: request.allowConfiguredFallback }),
     ...(request.allowTruncatedText === undefined ? {} : { allowTruncatedText: request.allowTruncatedText }),
     ...(request.persistUsage === undefined ? {} : { persistUsage: request.persistUsage }),

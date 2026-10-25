@@ -214,7 +214,7 @@ export function classifyCosSoftwareDelivery(prompt: string): CosSoftwareDelivery
 }
 
 export function isConciergeBuilderObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
-  if (classifyCosSoftwareDelivery(prompt) === 'analysis') return false
+  if (classifyCosSoftwareDelivery(prompt) === 'analysis' && /\b(?:analy[sz]e|analysis|investigate|identify|explain|diagnos[ei]|trace|audit|review|recommend|report|root causes?|failure modes?|debugging tasks?)\b/i.test(prompt)) return false
   if (excludedFromBuilder(prompt, context)) return false
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true

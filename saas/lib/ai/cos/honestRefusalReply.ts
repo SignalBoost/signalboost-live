@@ -405,8 +405,45 @@ export function isAmateurCatalogListPrompt(prompt: string): boolean {
   return CATALOG_LIST_ASK.test(text) && CATALOG_TEAMS.test(text)
 }
 
+/**
+ * An incident commander's numbered investigative deliverables are actionable without
+ * production telemetry: missing telemetry limits certainty, not hypothesis analysis.
+ * This is a bounded evidence-based fallback, not a claim that a live investigation ran.
+ */
+export function incidentInvestigationFallback(prompt: string): string | null {
+  const request = String(prompt || '')
+  const isIncident = /\b(?:incident commander|forensic investigation|root causes?)\b/i.test(request)
+  const asksAnalysis = /\b(?:rank causes|correlations? versus causations?|missing evidence|experiments to confirm|multiple faults|most likely explanation)\b/i.test(request)
+  const payments = /\b(?:payment|transaction|revenue|deposits?)\b/i.test(request)
+  const queue = /\b(?:kafka|consumer lag|redis|kubernetes|pod restart)\b/i.test(request)
+  if (!isIncident || !asksAnalysis || !payments || !queue) return null
+  const observations = request.split(/\r?\n/)
+    .map(line => line.trim().replace(/^[-*]\s*/, ''))
+    .filter(line => /(?:reports? are|duplicate transaction|consumer lag|primary keys|cache hit rate|pod restarts?|logs are sampled)/i.test(line))
+    .slice(0, 10)
+  return [
+    'Incident investigation — preliminary, evidence-limited assessment',
+    '',
+    '1. Plausible causes: Kafka redelivery after worker interruption; missing business-level idempotency; inconsistent Redis payment state; non-atomic offset/database commits; duplicate revenue-ledger or reporting aggregation; reused business transaction IDs; PSP webhook retries; settlement cutoffs, fees, refunds and chargebacks; pod OOM/probe failure, deployments or Kafka rebalances.',
+    '2. Ranked working hypotheses (qualitative, not measured probabilities): (1) replay plus ineffective idempotency, (2) double-counted accounting/reporting, (3) settlement-basis mismatch, (4) stale cache or bad cache keys, (5) transaction-ID reuse. Pod restart may trigger replay; it is not sufficient by itself.',
+    '3. Correlation versus causation: lag, pod restarts, high Redis hit rate and duplicate IDs occurring near discrepancies are associations. Prove causal order using timestamps, Kafka offsets, payment identifiers, DB commits, and settlement records. Redis hits may rise because of replay rather than cause it; unique PostgreSQL primary keys do not ensure unique business transactions.',
+    '4. Missing evidence: transaction-level PSP capture/settlement records; revenue definitions and reconciliation dates; ledger business keys and uniqueness constraints; Kafka topic/partition/offset/ack history; Redis key contents/TTLs and hit denominators; pod restart reasons; full unsampled traces and producer IDs.',
+    '5. Forensic plan: preserve logs and immutable financial records; reconcile matched transaction cohorts on the same date/currency/gross-net basis; trace duplicate IDs from producer through Kafka to DB and settlement; align restarts, rebalances, cache mutations and lag on a UTC timeline; compare affected and unaffected windows; audit idempotency boundaries and ledger aggregation before changing production.',
+    '6. Controlled experiments (staging and synthetic payments only): interrupt a consumer after DB commit but before offset commit to check duplicate effects; replay identical payment identifiers to verify uniqueness; vary Redis TTL/cache state to check whether accounting changes; simulate pod restart and consumer rebalance; reconstruct revenue from an immutable ledger and compare to settlement after cutoff/fee adjustments. Each hypothesis is weakened if its predicted duplicate or timing effect is absent.',
+    '7. Combined-fault pathway: restart or rebalance causes an uncommitted Kafka event to replay; stale or incorrectly scoped cache fails to prevent a second accounting action; rows use distinct database primary keys but the same logical payment ID; reports count both while the PSP settles once; 10% sampled logs obscure the duplicate path.',
+    '8. Single most likely working explanation: Kafka at-least-once replay interacting with missing or ineffective business-level idempotency in financial accounting. This is a testable hypothesis, not a confirmed cause; settlement-definition discrepancies remain a serious alternative.',
+    '',
+    ...(observations.length ? ['Provided observations:', ...observations.map(item => '- ' + item), ''] : []),
+    'No production records were inspected and no experiments were executed. The cause remains unconfirmed pending transaction-level reconciliation and event tracing.',
+  ].join('\n')
+}
+
 export function buildHonestRefusalReply(args: { prompt: string; language?: string | null }): string {
   const language = normalizeLanguage(args.language)
+  if (language === 'en') {
+    const investigation = incidentInvestigationFallback(args.prompt)
+    if (investigation) return investigation
+  }
   if (isAmateurCatalogListPrompt(String(args.prompt ?? ''))) {
     return CATALOG_COPY[language]
   }

@@ -246,6 +246,9 @@ const VISUAL_TYPO_WINDOW = 3
 function normalizedVisualTokens(prompt: string): string[] {
   const raw = normalizedTokens(prompt)
   const corrected = raw.map(canonicalVisualToken)
+  // A drawing verb that asks for a picture by itself admits the whole request, so its mark words stay recognized
+  // however far away ("draw the official manchester united logoo"; Codex on #4875).
+  if (corrected.some((token) => SELF_SUFFICIENT_VISUAL_ACTION_TOKENS.has(token))) return corrected
   const actions = corrected.flatMap((token, index) => VISUAL_ACTION_TOKENS.has(token) ? [index] : [])
   return corrected.map((token, index) => token === raw[index] || VISUAL_ACTION_TOKENS.has(token)
     || actions.some((action) => Math.abs(action - index) <= VISUAL_TYPO_WINDOW) ? token : raw[index])
@@ -417,7 +420,7 @@ const VISUAL_OBJECT_WINDOW = 6
 
 export function isConciergeVisualObjective(prompt: string): boolean {
   if (isExecutableSoftwareBrief(prompt)) return false
-  const tokens = normalizedVisualTokens(prompt).map((token) => token.replace(/[.,;:!?)"'\]]+$/, ''))
+  const tokens = normalizedVisualTokens(prompt)
   if (!tokens.length || !tokens.some((token) => VISUAL_ACTION_TOKENS.has(token))) return false
   if (tokens.some((token) => SELF_SUFFICIENT_VISUAL_ACTION_TOKENS.has(token))) return true
   const actions = tokens.flatMap((token, index) => VISUAL_ACTION_TOKENS.has(token) ? [index] : [])

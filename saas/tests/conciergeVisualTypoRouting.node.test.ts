@@ -70,6 +70,9 @@ test('a picture word far from any drawing verb does not make a text request visu
     'create a modern minimalist logo for my bakery',
     'generate a high quality photo realistic image of a lighthouse at dusk',
     'design a coat of arms for the Silva family',
-    'make me a poster.',
   ]) assert.equal(isConciergeVisualObjective(prompt), true, prompt)
+  // Codex on #4875: a far misspelled mark under a drawing verb keeps verified-reference lookup, and a text
+  // deliverable about an image stays text.
+  assert.equal(detectConciergeVisualIntent('draw the official manchester united logoo')?.mode, 'reference-mark')
+  assert.equal(isConciergeVisualObjective('make a summary of this image.'), false)
 })

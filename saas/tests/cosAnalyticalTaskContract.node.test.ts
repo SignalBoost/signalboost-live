@@ -37,6 +37,25 @@ test('eight copied generic paragraphs are not eight completed investigations', (
   assert.ok(missingAnalyticalTasks(incident, answer).length >= 7)
 })
 
+test('inline numbered analysis retains distinct first lines before shared caveats', () => {
+  const prompt = [
+    'Investigate the database service degradation.',
+    '1. List plausible root causes.',
+    '2. Rank competing explanations.',
+    '3. Describe missing evidence.',
+  ].join('\n')
+  const caveat = 'This remains provisional until operational telemetry confirms it. Additional system evidence is needed before a final determination.'
+  const answer = [
+    '1. Replication slot retention can grow WAL files and exhaust disk during an outage, particularly when a downstream consumer stops acknowledging new positions.',
+    caveat,
+    '2. Rank runaway WAL retention first because replication lag rose alongside storage; rank a batch ingestion surge second, and table bloat third pending query history.',
+    caveat,
+    '3. Obtain replication slot restart LSN values, WAL generation rates, ingestion records, and database storage breakdowns to distinguish sustained retention from transient load.',
+    caveat,
+  ].join('\n')
+  assert.deepEqual(missingAnalyticalTasks(prompt, answer), [])
+})
+
 test('headings without content do not satisfy the task contract', () => {
   const headings = requestedAnalyticalTasks(incident).map((task, i) => (i + 1) + '. ' + task).join('\n')
   assert.equal(missingAnalyticalTasks(incident, headings).length, 8)

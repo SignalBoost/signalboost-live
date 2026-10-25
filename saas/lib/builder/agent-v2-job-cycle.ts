@@ -129,7 +129,8 @@ export async function runBuilderV2JobCycle(input: {
   // its fallback budget on a failing run and reads, and the job ended at slice 9 of 24 after 13 of 60 minutes with every
   // file written and 11 tests passing. The idle-slice stop, the slice cap and the total deadline still bound the job.
   const sliceDeadline = result.reason === 'builder_v2_model_unavailable'
-    && (result.summary === BUILDER_TURN_TIMEOUT_ERROR || result.summary === 'harness_provider_cost_budget_exceeded')
+    && (result.summary === BUILDER_TURN_TIMEOUT_ERROR || result.summary === 'harness_provider_cost_budget_exceeded'
+      || result.summary === 'inference_transport_deadline' || result.summary === 'timeout:inference_transport_deadline')
   if (builderV2TimeoutDisposition({ unavailable: result.reason === 'builder_v2_model_unavailable', madeProgress, deadline: sliceDeadline, checkpointPresent: Boolean(result.checkpoint) }) === 'fail') {
     return { status: 'failed', result, reason: `builder_v2_model_unavailable: ${result.summary || 'builder_v2_model_error'}` }
   }

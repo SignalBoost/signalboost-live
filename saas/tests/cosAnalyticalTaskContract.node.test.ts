@@ -20,7 +20,7 @@ test('a structurally complete eight-part report meets the enumerated contract', 
 })
 
 test('headings without content do not satisfy the task contract', () => {
-  const headings = requestedAnalyticalTasks(incident).map((task, i) => (i + 1) + '. ' + task).join('\\n')
+  const headings = requestedAnalyticalTasks(incident).map((task, i) => (i + 1) + '. ' + task).join('\n')
   assert.equal(missingAnalyticalTasks(incident, headings).length, 8)
 })
 

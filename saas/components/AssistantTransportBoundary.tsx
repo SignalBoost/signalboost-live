@@ -399,6 +399,7 @@ async function executeArtifactFromConcierge(
 /** Transport and internal-tool boundary for the authorized owner Assistant. */
 export default function AssistantTransportBoundary({ children }: { children: ReactNode }) {
   const [liveJob, setLiveJob] = useState<LiveBuilder | null>(null)
+  const [liveProgress, setLiveProgress] = useState<Record<string, unknown> | null>(null)
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(LIVE_BUILDER_KEY)
@@ -420,6 +421,7 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
         if (!response.ok && response.status !== 202) return
         const result = await response.json() as Record<string, unknown>
         if (disposed) return
+        setLiveProgress(result.progress && typeof result.progress === 'object' ? result.progress as Record<string, unknown> : null)
         const nextStatus = String(result.status || 'running')
         const nextReply = typeof result.reply === 'string' ? result.reply
           : typeof (result.result as Record<string, unknown> | undefined)?.reply === 'string'
@@ -554,6 +556,12 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
         <button type="button" aria-label="Dismiss Builder status" onClick={() => { setLiveJob(null); try { window.localStorage.removeItem(LIVE_BUILDER_KEY) } catch {} }} style={{ background: 'transparent', border: 0, color: 'inherit', cursor: 'pointer' }}>×</button>
       </div>
       <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginBottom: 4 }}>{liveJob.reply}</p>
+      {liveProgress && <div aria-label="Builder live progress" style={{ fontSize: 12, opacity: .85, lineHeight: 1.6 }}>
+        <div>Phase: {String(liveProgress.phase ?? liveJob.status)} · Work rounds: {String(liveProgress.workRounds ?? '—')} · Files written: {String(liveProgress.filesWritten ?? '—')}</div>
+        <div>Model calls: {String(liveProgress.modelCalls ?? '—')} · Last activity: {liveProgress.activityAgeSeconds == null ? '—' : String(liveProgress.activityAgeSeconds) + 's ago'}</div>
+        {liveProgress.lastTest && typeof liveProgress.lastTest === 'object' && <div>Last test: {String((liveProgress.lastTest as Record<string, unknown>).command ?? 'command')} · {((liveProgress.lastTest as Record<string, unknown>).passed === true) ? 'PASS' : 'FAIL'} · exit {String((liveProgress.lastTest as Record<string, unknown>).exitCode ?? '—')}</div>}
+        {liveProgress.needsAttention === true && <div role="alert">No recent recorded Builder activity. Check History or stop this job if necessary.</div>}
+      </div>}
       <small style={{ opacity: .7 }}>Job {liveJob.jobId}</small>
     </aside>}
   </>

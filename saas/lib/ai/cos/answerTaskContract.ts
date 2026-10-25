@@ -31,20 +31,24 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
   if (!tasks.length) return []
   const body = String(answer || '')
   const vocabulary = new Set(topicWords(body))
+  // Parse all numbered sections once. Searching independently for each heading and
+  // slicing from that match can accidentally include the NEXT heading as content.
+  const sections = [...body.matchAll(/(?:^|\n)[ \t]*(?:#{1,6}[ \t]*)?(\d{1,2})[.)][ \t]+/g)]
   return tasks.filter((directive, index) => {
-    const numbered = new RegExp('(?:^|\\n)\\s*(?:#{1,5}\\s*)?' + (index + 1) + '[.)][ \\t]+').test(body)
-    if (numbered) {
-      // A heading alone is not completion. Judge the content of this section,
-      // ending at the next numbered section or the document boundary.
-      const sectionStart = body.search(new RegExp('(?:^|\\n)\\s*(?:#{1,5}\\s*)?' + (index + 1) + '[.)][ \\t]+'))
-      // Regex literals take single backslashes: the doubled ones matched a literal '\\' and never a heading.
-      const tail = body.slice(sectionStart).replace(/^\s*(?:#{1,5}\s*)?\d+[.)][ \t]+[^\n]*\n?/, '')
-      // The next section may begin the tail itself when this one is a bare heading.
-      const next = tail.search(/(?:^|\n)\s*(?:#{1,5}\s*)?\d+[.)][ \t]+/)
-      const section = next >= 0 ? tail.slice(0, next) : tail
-      if (section.trim().length < 70) return true
-      return false
+    const position = sections.findIndex(item => Number(item[1]) === index + 1)
+    if (position >= 0) {
+      const match = sections[position]
+      const end = position + 1 < sections.length
+        ? sections[position + 1].index! : body.length
+      const section = body.slice(match.index! + match[0].length, end).trim()
+      // A heading or a copy of the user's checklist is not a completed task.
+      // Require a meaningful amount of explanation and novel analytical content.
+      const requestedWords = new Set(topicWords(directive))
+      const novel = new Set(topicWords(section).filter(word => !requestedWords.has(word)))
+      return section.length < 100 || novel.size < 7
     }
+    // Some legitimate answers use prose headings instead of numbers. Permit those
+    // only when the answer meaningfully mentions the task's subject matter.
     const topics = [...new Set(topicWords(directive))]
     if (!topics.length) return body.length < tasks.length * 90
     return topics.filter(word => vocabulary.has(word)).length < Math.min(2, topics.length)

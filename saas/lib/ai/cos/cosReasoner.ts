@@ -12,7 +12,7 @@
 // same exact-host allow-list + API-key controls as any other remote LOCAL_AI_* endpoint.
 
 import { randomUUID } from 'node:crypto'
-import { missingAnalyticalTasks, analyticalTaskRepairDirective } from './answerTaskContract.ts'
+import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective } from './answerTaskContract.ts'
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { callLocalModel, captureServedInference, localInferenceConfigFromEnv, type LocalModelCallArgs, type ServedInference } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
@@ -269,7 +269,9 @@ export async function callRawCosReasoner(
     }
 
     if (remainingMs(budget) < 1_000) return null
-    const first = await recorder.time('draft', () => callLocalModel(effectiveArgs, boundedInference()), 'model').catch(error => {
+    const first = await recorder.time('draft', () => callLocalModel(effectiveArgs, requestedAnalyticalTasks(effectiveArgs.prompt).length > 0
+      ? { ...boundedInference(), timeoutMs: Math.min(25_000, boundedInference().timeoutMs) }
+      : boundedInference()), 'model').catch(error => {
       console.error('[cos-reasoner-local-call-failed]', JSON.stringify({
         at: new Date().toISOString(),
         phase: 'draft',
@@ -293,6 +295,7 @@ export async function callRawCosReasoner(
     const firstTaskGaps = firstParsedForPolicy ? missingAnalyticalTasks(effectiveArgs.prompt, firstParsedForPolicy.answer) : []
     const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, first) || firstAdvisoryDefects.length > 0 || firstTaskGaps.length > 0
     const qualityRepairAffordable = hasBudgetFor(budget, localCallEstimateMs())
+      || (firstTaskGaps.length > 0 && remainingMs(budget) >= 8_000)
     if (!qualityRepairNeeded) recorder.skip('quality_repair', 'not_needed')
     else if (!qualityRepairAffordable) recorder.skip('quality_repair', 'no_budget')
 

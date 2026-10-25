@@ -37,8 +37,10 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
       // A heading alone is not completion. Judge the content of this section,
       // ending at the next numbered section or the document boundary.
       const sectionStart = body.search(new RegExp('(?:^|\\n)\\s*(?:#{1,5}\\s*)?' + (index + 1) + '[.)][ \\t]+'))
-      const tail = body.slice(sectionStart).replace(/^\\s*(?:#{1,5}\\s*)?\\d+[.)][ \\t]+[^\\n]*\\n?/, '')
-      const next = tail.search(/\\n\\s*(?:#{1,5}\\s*)?\\d+[.)][ \\t]+/)
+      // Regex literals take single backslashes: the doubled ones matched a literal '\\' and never a heading.
+      const tail = body.slice(sectionStart).replace(/^\s*(?:#{1,5}\s*)?\d+[.)][ \t]+[^\n]*\n?/, '')
+      // The next section may begin the tail itself when this one is a bare heading.
+      const next = tail.search(/(?:^|\n)\s*(?:#{1,5}\s*)?\d+[.)][ \t]+/)
       const section = next >= 0 ? tail.slice(0, next) : tail
       if (section.trim().length < 70) return true
       return false

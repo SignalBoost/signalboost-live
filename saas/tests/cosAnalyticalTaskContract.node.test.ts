@@ -84,6 +84,21 @@ test('unseen database incident follows the same contract', () => {
   assert.equal(missingAnalyticalTasks(prompt, 'Please send me more readings first.').length, 5)
 })
 
+test('analytical recovery directive requires provisional investigation despite missing telemetry', () => {
+  const repair = analyticalTaskRepairDirective(incident, incomplete)
+  assert.match(repair, /Missing production telemetry limits certainty, not preliminary analytical work/)
+  assert.match(repair, /Answer the full ORIGINAL request/)
+  assert.ok(missingAnalyticalTasks(incident, incomplete).length > 0)
+})
+
+test('reasoner recovery uses analytical-specific reasoning instead of the generic diagnostic rewrite', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
+  assert.match(source, /ANALYTICAL RECOVERY/)
+  assert.match(source, /A lack of telemetry prevents confirmation, NOT generation of provisional, ranked hypotheses/)
+  assert.match(source, /firstTaskGaps\.length && firstParsedForPolicy/)
+  assert.match(source, /: buildDiagnosticRepairPrompt\(effectiveArgs\.prompt, first\)/)
+})
+
 test('ordinary coding and prose requests do not create an analytical acceptance checklist', () => {
   assert.deepEqual(requestedAnalyticalTasks('Fix src/login.ts and run npm test.'), [])
   assert.deepEqual(requestedAnalyticalTasks('Write a Node.js calculator with two files.'), [])

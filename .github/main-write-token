@@ -1,2 +1,2 @@
-base_sha=390e2fa89712cbaed1e314e68e5a4b81fb472960
-branch=test/builder-harness-complete-loop-20261024
+base_sha=5307bbebd1b5a8fe6a10fcd96fb12f37fab0b386
+branch=fix/builder-inference-transport-deadline-20261024

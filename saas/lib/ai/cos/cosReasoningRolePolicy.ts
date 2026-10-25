@@ -194,7 +194,27 @@ export function structuredApplicationBuild(prompt: string): boolean {
     && /\b(?:npm test|node --test|run these commands|automated tests|test runner)\b/i.test(body)
 }
 
+/**
+ * Classify the requested software deliverable, not technical vocabulary inside an
+ * example. A diagnostic report with embedded code is not authorization to mutate
+ * files or launch a paid Builder job.
+ */
+export type CosSoftwareDelivery = 'analysis' | 'repair' | 'build' | 'hybrid'
+export function classifyCosSoftwareDelivery(prompt: string): CosSoftwareDelivery {
+  const objective = String(prompt || '').slice(0, 16_000)
+  // Inspect directive portions, not example source or the words in a code fence.
+  const prose = objective.replace(/```[\s\S]*?```/g, ' [supplied code] ')
+  const directedMutation = /\b(?:debug|fix|repair|patch|modify|edit|refactor|update|change|implement|deploy|commit|merge|correct)\s+(?:(?:my|this|the|our|attached|following|existing)\s+)?(?:code|script|worker|app|application|repository|repo|project|source|bug|defect|issue|logic|function|files?|system|login|component)\b|\b(?:fix|repair|patch|modify|edit|refactor|update|change|implement|deploy|commit|merge)\s+it\b|\b(?:can|could|would)\s+you\s+(?:please\s+)?(?:fix|repair|patch|modify|edit|implement|deploy|commit|merge)\b|\b(?:make|apply)\s+(?:the|these|a)\s+(?:code\s+)?(?:changes?|fixes?|patch)\b/i.test(prose)
+  const building = /(?:^|[.!?\n]\s*)(?:please\s+)?(?:build|create|scaffold|implement|develop)\s+(?:a\s+|an\s+|the\s+)?(?:[\w -]+\s+)?(?:app|application|project|system|service|api|worker)\b/i.test(prose)
+    || structuredApplicationBuild(objective)
+  const analytical = /\b(?:analy[sz]e|analysis|investigate|identify|explain|diagnos[ei]|trace|audit|review|recommend|report|root causes?|failure modes?|debugging tasks?)\b/i.test(prose)
+  if (directedMutation) return analytical && /\b(?:investigate|analy[sz]e|report|root cause|explain)\b/i.test(prose) ? 'hybrid' : 'repair'
+  if (building) return analytical ? 'hybrid' : 'build'
+  return 'analysis'
+}
+
 export function isConciergeBuilderObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
+  if (classifyCosSoftwareDelivery(prompt) === 'analysis' && /\b(?:analy[sz]e|analysis|investigate|identify|explain|diagnos[ei]|trace|audit|review|recommend|report|root causes?|failure modes?|debugging tasks?)\b/i.test(prompt)) return false
   if (excludedFromBuilder(prompt, context)) return false
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true

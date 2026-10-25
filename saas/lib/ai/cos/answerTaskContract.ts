@@ -33,7 +33,16 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
   const vocabulary = new Set(topicWords(body))
   return tasks.filter((directive, index) => {
     const numbered = new RegExp('(?:^|\\n)\\s*(?:#{1,5}\\s*)?' + (index + 1) + '[.)][ \\t]+').test(body)
-    if (numbered) return false
+    if (numbered) {
+      // A heading alone is not completion. Judge the content of this section,
+      // ending at the next numbered section or the document boundary.
+      const sectionStart = body.search(new RegExp('(?:^|\\\\n)\\\\s*(?:#{1,5}\\\\s*)?' + (index + 1) + '[.)][ \\\\t]+'))
+      const tail = body.slice(sectionStart).replace(/^\\s*(?:#{1,5}\\s*)?\\d+[.)][ \\t]+[^\\n]*\\n?/, '')
+      const next = tail.search(/\\n\\s*(?:#{1,5}\\s*)?\\d+[.)][ \\t]+/)
+      const section = next >= 0 ? tail.slice(0, next) : tail
+      if (section.trim().length < 70) return true
+      return false
+    }
     const topics = [...new Set(topicWords(directive))]
     if (!topics.length) return body.length < tasks.length * 90
     return topics.filter(word => vocabulary.has(word)).length < Math.min(2, topics.length)

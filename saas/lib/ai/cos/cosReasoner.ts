@@ -12,7 +12,7 @@
 // same exact-host allow-list + API-key controls as any other remote LOCAL_AI_* endpoint.
 
 import { randomUUID } from 'node:crypto'
-import { missingAnalyticalTasks, analyticalTaskRepairDirective } from './answerTaskContract.ts'
+import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective } from './answerTaskContract.ts'
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { callLocalModel, captureServedInference, localInferenceConfigFromEnv, type LocalModelCallArgs, type ServedInference } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'

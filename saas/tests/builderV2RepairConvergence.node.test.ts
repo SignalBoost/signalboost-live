@@ -4,11 +4,12 @@
 // change that made things worse, and gave the model raw output instead of each failing assertion.
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { BuilderV2Agent } from '../lib/builder/agent-v2.ts'
+import { BuilderV2Agent, type BuilderV2Checkpoint } from '../lib/builder/agent-v2.ts'
+import { workspaceDigest } from '../lib/builder/checkpoint.ts'
 import { BuilderV2Dispatcher, type BuilderV2Receipt } from '../lib/builder/agent-v2-dispatcher.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import type { BuilderRunnerPort } from '../lib/builder/contracts.ts'
@@ -151,4 +152,36 @@ test('scores are compared only for the same command: one test file is not a regr
   assert.deepEqual(builderTestProgress(steps).best, { passed: 2, failed: 0 })
   assert.deepEqual(builderTestProgress(steps, 'npm test').best, { passed: 25, failed: 3 })
   assert.equal(builderTestProgress(steps, 'npm test').runsWithoutImprovement, 0)
+})
+
+// A real Node run of a describe/it suite: the failing assertion is indented and the suite only says a subtest failed.
+test('failures inside describe/it suites are named with their own expected and actual (Codex on #4868)', () => {
+  const tap = readFileSync(new URL('./fixtures/builder-tap-nested-failure.txt', import.meta.url), 'utf8')
+  assert.deepEqual(builderFailingTests(run(tap), ['test/calc.test.js']),
+    [{ name: 'adds', location: 'test/calc.test.js:5', message: '2 == 3', expected: '3', actual: '2' }])
+})
+
+test('an interrupted rollback is checkpointed file by file, so the job stays resumable (Codex on #4868)', async () => {
+  const workspace = await project('r')
+  await workspace.writeFile('r', 'src/extra.js', 'module.exports = 1\n')
+  // One reply breaks days() and changes a second file: 1 of 3 passing, so the host restores both files.
+  const regress = JSON.stringify({ type: 'tools', actions: [
+    { tool: 'edit_file', path: 'src/fine.js', search: 'Math.floor(hours / 24)', replace: 'hours' },
+    { tool: 'edit_file', path: 'src/extra.js', search: '1', replace: '2' },
+  ] })
+  // The model only edits; every write_file here is the host restoring a file. The second one is cut off the way a
+  // slice deadline cuts off a dispatch (checkBuilderInferenceDeadline throws before the tool runs).
+  const dispatcher = new BuilderV2Dispatcher(workspace, localRunner)
+  const dispatch = dispatcher.dispatch.bind(dispatcher)
+  let restores = 0
+  dispatcher.dispatch = async (id, action, options) => {
+    if (action.tool === 'write_file' && ++restores === 2) throw new Error('builder_turn_timeout')
+    return dispatch(id, action, options)
+  }
+  let last: BuilderV2Checkpoint | undefined
+  const agent = new BuilderV2Agent({ async generate() { return regress } }, dispatcher, workspace)
+  await assert.rejects(agent.run({ workspaceId: 'r', objective, maxSteps: 3, retryDelay: async () => {},
+    onCheckpoint: async checkpoint => { last = checkpoint } }), /builder_turn_timeout/)
+  assert.ok(last?.steps.some(step => (step.output as { restoredBest?: unknown } | undefined)?.restoredBest === true))
+  assert.equal(last?.workspaceDigest, await workspaceDigest(workspace, 'r'), 'the saved checkpoint matches the partly restored workspace')
 })

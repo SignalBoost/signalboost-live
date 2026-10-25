@@ -546,6 +546,8 @@ export class BuilderV2Agent {
         if (!receipt.changed) continue
         record(action, { ...receipt, output: { ...(receipt.output as object), restoredBest: true } })
         restored.push(path)
+        // Each restored file is checkpointed at once, so an interrupted rollback stays resumable (Codex on #4868).
+        await persist()
       }
       if (!restored.length) return
       regressionUndone = {

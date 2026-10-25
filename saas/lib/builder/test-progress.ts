@@ -125,9 +125,13 @@ export function builderFailingTests(receipt: BuilderV2Receipt | undefined, known
       if (name && !found.has(name)) found.set(name, { name, ...detailFields(block, knownFiles) })
     }
   }
-  for (const match of text.matchAll(/^not ok \d+ - (.+)\n((?:[ \t]+.*\n?)*)/gm)) {
-    const name = match[1].trim()
-    if (!found.has(name)) found.set(name, { name, ...detailFields(match[2], knownFiles) })
+  // Failures inside describe/it suites are indented; the suite's own entry only says its subtests failed
+  // (Codex on #4868), so it is skipped in favour of the failing assertion itself.
+  for (const match of text.matchAll(/^([ \t]*)not ok \d+ - (.+)\n((?:\1[ \t]+.*\n?)*)/gm)) {
+    const name = match[2].trim()
+    const block = match[3].split(/\n[ \t]*\.\.\.\s*(?:\n|$)/)[0]
+    if (/failureType:\s*'subtestsFailed'/.test(block) || found.has(name)) continue
+    found.set(name, { name, ...detailFields(block, knownFiles) })
   }
   if (!found.size) {
     // A spec run without the summary section: the inline ✖ lines still name the tests.

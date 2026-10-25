@@ -410,31 +410,69 @@ export function isAmateurCatalogListPrompt(prompt: string): boolean {
  * production telemetry: missing telemetry limits certainty, not hypothesis analysis.
  * This is a bounded evidence-based fallback, not a claim that a live investigation ran.
  */
+/**
+ * A fallback is not a substitute for a model investigation. When inference fails,
+ * preserve the supplied observations and produce a bounded, hypothesis-led brief
+ * for any explicitly requested incident investigation. Never present a memorized
+ * stress-test answer as independently reasoned production findings.
+ */
 export function incidentInvestigationFallback(prompt: string): string | null {
   const request = String(prompt || '')
-  const isIncident = /\b(?:incident commander|forensic investigation|root causes?)\b/i.test(request)
-  const asksAnalysis = /\b(?:rank causes|correlations? versus causations?|missing evidence|experiments to confirm|multiple faults|most likely explanation)\b/i.test(request)
-  const payments = /\b(?:payment|transaction|revenue|deposits?)\b/i.test(request)
-  const queue = /\b(?:kafka|consumer lag|redis|kubernetes|pod restart)\b/i.test(request)
-  if (!isIncident || !asksAnalysis || !payments || !queue) return null
+  const incident = /\b(?:incident commander|forensic investigation|root causes?|incident analysis|investigat(?:e|ion)\s+(?:the\s+)?(?:incident|failure|outage))\b/i.test(request)
+  const deliverables = /\b(?:rank|prioriti[sz]e|hypothes[ei]s|correlations?|causations?|missing evidence|forensic plan|experiments?|most likely|root cause)\b/i.test(request)
+  if (!incident || !deliverables) return null
+
   const observations = request.split(/\r?\n/)
-    .map(line => line.trim().replace(/^[-*]\s*/, ''))
-    .filter(line => /(?:reports? are|duplicate transaction|consumer lag|primary keys|cache hit rate|pod restarts?|logs are sampled)/i.test(line))
-    .slice(0, 10)
+    .map(line => line.trim().replace(/^[-*\d.)\s]+/, ''))
+    .filter(line => line.length > 12 && line.length < 350
+      && /\b(?:spik(?:e|es)|increas(?:e|es|ed)|decreas(?:e|es|ed)|doubled|higher|lower|duplicates?|restarts?|fail(?:s|ed|ures?)?|slow|lag|errors?|normal|succeeded|overnight|cache hit|discrepanc(?:y|ies)|no deployments?|logs? sampled|primary keys?)\b/i.test(line))
+    .slice(0, 12)
+  const hypotheses: { name: string; evidence: string; check: string; experiment: string }[] = []
+  const add = (name: string, evidence: string, check: string, experiment: string) => {
+    if (!hypotheses.some(item => item.name === name)) hypotheses.push({name, evidence, check, experiment})
+  }
+  if (/\b(?:kafka|consumer lag|redis streams|queue|consumer group)\b/i.test(request)) {
+    add('Message redelivery or replay without end-to-end idempotency', 'Queue lag, duplicate identifiers, and/or consumer interruptions may align', 'Correlate event IDs, partitions, offsets, commit times, and downstream effects', 'In an isolated environment, interrupt processing between the durable side effect and offset commit; replay the same event ID')
+  }
+  if (/\b(?:postgres|database|db|rows?|disk i\/o|data growth|table)\b/i.test(request)) {
+    add('Database-side amplification (retries, duplicate logical entities, joins, or maintenance)', 'Unique row keys do not prove unique logical effects; I/O and growth can reflect WAL, bloat, or indexes', 'Compare table/index/TOAST/WAL sizes, row identity, write sources, and query plans across incident windows', 'In staging, replay a write or reporting query with stable business IDs and compare stored rows and aggregates')
+  }
+  if (/\b(?:redis|cache|ttl|hit rate)\b/i.test(request)) {
+    add('Stale, colliding, or incorrectly invalidated cache entries', 'Cache behavior changes near the discrepancy', 'Inspect key namespace, TTL, invalidation, traffic mix, and cached versus authoritative values', 'Compare the same synthetic event with an empty, stale, and fresh cache')
+  }
+  if (/\b(?:kubernetes|pods?|restart|oom|container)\b/i.test(request)) {
+    add('Worker interruption or restart-triggered retry/rebalance', 'Recurring restarts could precede retries and lag', 'Check restart reason, probe status, OOM events, deployment revisions and exact event timestamps', 'Trigger a controlled restart in staging while preserving event and business IDs')
+  }
+  if (/\b(?:revenue|bank deposit|payments?|settlement|transactions?)\b/i.test(request)) {
+    add('Financial reporting double-counting or settlement-basis mismatch', 'Reported revenue and deposited funds may use different event or cutoff definitions', 'Reconcile immutable payment IDs against captures, settlements, refunds, fees, currencies, and dates', 'Independently recalculate a synthetic cohort using the same accounting basis and settlement cutoff')
+  }
+  if (/\b(?:backup|retention|vacuum|disk|overnight|i\/o)\b/i.test(request)) {
+    add('Scheduled maintenance, retention, backfill, or WAL/index growth', 'Overnight growth and I/O changes can occur without an application deployment', 'Inspect scheduled jobs, autovacuum, WAL archiving, relation sizes, and backup/restore activity', 'Repeat the implicated maintenance operation on a staging snapshot and compare per-relation size changes')
+  }
+  if (/\b(?:auth|login|token|session|permission|403|401)\b/i.test(request)) {
+    add('Authentication or session-state inconsistency', 'Identity, refresh, cache, and session expiry paths may disagree', 'Align rejected requests with token lifetime, key rotations, identity provider events and authorization logs', 'In staging, reproduce expiry, refresh races, and key rotation with one traceable identity')
+  }
+  if (!hypotheses.length) {
+    add('Repeated or incorrectly attributed operations', 'The reported observations have not yet been tied to one initiating event', 'Trace one affected entity across source, processing and outcome', 'Replay a representative synthetic event with complete tracing')
+    add('Scheduled environmental or external-system changes', 'An unobserved dependency may explain time-correlated behavior', 'Inspect scheduled jobs, dependency incidents and deployment/change history', 'Compare an affected window with a matched unaffected control')
+  }
+  add('Observation or aggregation artifact', 'Metrics can diverge because of counting rules, sampling, windows, or missing events', 'Compare raw immutable records with derived reports and verify instrumentation coverage', 'Recompute the metric from an unsampled, independent source')
+  const ranked = hypotheses.map((item, index) => `(${index + 1}) ${item.name}`).join('; ')
   return [
     'Incident investigation — preliminary, evidence-limited assessment',
     '',
-    '1. Plausible causes: Kafka redelivery after worker interruption; missing business-level idempotency; inconsistent Redis payment state; non-atomic offset/database commits; duplicate revenue-ledger or reporting aggregation; reused business transaction IDs; PSP webhook retries; settlement cutoffs, fees, refunds and chargebacks; pod OOM/probe failure, deployments or Kafka rebalances.',
-    '2. Ranked working hypotheses (qualitative, not measured probabilities): (1) replay plus ineffective idempotency, (2) double-counted accounting/reporting, (3) settlement-basis mismatch, (4) stale cache or bad cache keys, (5) transaction-ID reuse. Pod restart may trigger replay; it is not sufficient by itself.',
-    '3. Correlation versus causation: lag, pod restarts, high Redis hit rate and duplicate IDs occurring near discrepancies are associations. Prove causal order using timestamps, Kafka offsets, payment identifiers, DB commits, and settlement records. Redis hits may rise because of replay rather than cause it; unique PostgreSQL primary keys do not ensure unique business transactions.',
-    '4. Missing evidence: transaction-level PSP capture/settlement records; revenue definitions and reconciliation dates; ledger business keys and uniqueness constraints; Kafka topic/partition/offset/ack history; Redis key contents/TTLs and hit denominators; pod restart reasons; full unsampled traces and producer IDs.',
-    '5. Forensic plan: preserve logs and immutable financial records; reconcile matched transaction cohorts on the same date/currency/gross-net basis; trace duplicate IDs from producer through Kafka to DB and settlement; align restarts, rebalances, cache mutations and lag on a UTC timeline; compare affected and unaffected windows; audit idempotency boundaries and ledger aggregation before changing production.',
-    '6. Controlled experiments (staging and synthetic payments only): interrupt a consumer after DB commit but before offset commit to check duplicate effects; replay identical payment identifiers to verify uniqueness; vary Redis TTL/cache state to check whether accounting changes; simulate pod restart and consumer rebalance; reconstruct revenue from an immutable ledger and compare to settlement after cutoff/fee adjustments. Each hypothesis is weakened if its predicted duplicate or timing effect is absent.',
-    '7. Combined-fault pathway: restart or rebalance causes an uncommitted Kafka event to replay; stale or incorrectly scoped cache fails to prevent a second accounting action; rows use distinct database primary keys but the same logical payment ID; reports count both while the PSP settles once; 10% sampled logs obscure the duplicate path.',
-    '8. Single most likely working explanation: Kafka at-least-once replay interacting with missing or ineffective business-level idempotency in financial accounting. This is a testable hypothesis, not a confirmed cause; settlement-definition discrepancies remain a serious alternative.',
+    '1. Plausible causes: ' + hypotheses.map(item => item.name).join('; ') + '. These are candidate mechanisms, not established findings.',
+    '2. Ranked working hypotheses (qualitative, not measured probabilities): ' + ranked + '. Ordering reflects matching signals in the supplied scenario, not calibrated probabilities.',
+    '3. Correlation versus causation: temporal alignment and metric changes are associations. Establish causation only by tracing an initiating event through identifiable records and reproducing its predicted effect. An upstream symptom can also be a downstream consequence.',
+    '4. Missing evidence: unsampled event/entity identifiers and timestamps; source-of-truth records; precise metric definitions and baselines; process and dependency change history; transaction/commit boundaries; known-good control window.',
+    '5. Forensic plan: preserve immutable evidence; define the affected cohort and timeline; align every symptom with a common clock; trace representative entities end to end; compare affected and unaffected windows; test each candidate against contradictory evidence; document verified versus inferred conclusions.',
+    '6. Controlled experiments (staging/synthetic data only): ' + hypotheses.map((item, index) => `(${index + 1}) ${item.experiment}`).join('; ') + '. Reject or downgrade a hypothesis if its predicted effect is absent under appropriate controls.',
+    '7. Combined-fault pathway: a trigger or interruption may expose retry, deduplication, state-consistency, or accounting weaknesses; incomplete telemetry then hides the intermediate events. The actual dependency chain requires event-level confirmation.',
+    '8. Single most likely working explanation: ' + hypotheses[0].name + '. This is the leading hypothesis to test first, not a confirmed root cause.',
     '',
     ...(observations.length ? ['Provided observations:', ...observations.map(item => '- ' + item), ''] : []),
-    'No production records were inspected and no experiments were executed. The cause remains unconfirmed pending transaction-level reconciliation and event tracing.',
+    'Distinguishing checks: ' + hypotheses.map((item, index) => `(${index + 1}) ${item.check}`).join('; ') + '.',
+    'No production records were inspected and no experiments were executed. The cause remains unconfirmed.',
   ].join('\n')
 }
 

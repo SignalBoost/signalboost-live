@@ -839,13 +839,14 @@ export class BuilderV2Agent {
             instruction: interfaceRepairs.length
               ? 'interfaceMismatches lists every place a test disagrees with its source module, found by reading the files: a name the module does not export, a method its class does not define, a constructor or factory called with the wrong number of arguments, a chained method that does not return this, or a module mutating a field on the copy returned by a getter in another module (so the change is lost). Fix all of them in this reply, one edit_file per module: add the missing export (keep the existing ones) or method, give the parameter a default or accept the arguments the tests pass, return this from the chained method, and for a mutated copy either return the stored object from the getter or make the caller use the update method of the owning module; change a test only if the objective names the API the source already has. Each exportStatement is the exact current text, usable as the edit_file search. Host verification runs after your edits.'
               : currentFailure()
-              ? 'The host has already run the command on this unchanged revision and recorded the failure in latestFailedTest. The failing caller and its imported modules are in openFiles when available. Reconcile the actual caller with the implementation; do not rewrite unrelated manifests or weaken tests. Do not run the same command again until an edit changes the revision.'
+              ? 'Check recurringFailures first: a failing test repeated across edited revisions indicates the previous repair did not address its cause. Trace the owning state mutation or API contract and repair that implementation, rather than making another superficial edit. The host has already run the command on this unchanged revision and recorded the failure in latestFailedTest. The failing caller and its imported modules are in openFiles when available. Reconcile the actual caller with the implementation; do not rewrite unrelated manifests or weaken tests. Do not run the same command again until an edit changes the revision.'
               : 'Do not list_files again when workspaceFiles is supplied. Write several missingRequiredFiles per "tools" reply; once all exist the host runs the required commands and returns their output.',
             lastReceipt: compactAgainstWorkingSet(lastReceipt, working),
             failingTestNames: (() => {
               const failed = failedOnRevision()?.output as { stdout?: unknown; stderr?: unknown } | undefined
               return builderV2FailingTestSummary(String(failed?.stdout ?? '') + '\n' + String(failed?.stderr ?? ''))
             })(),
+            recurringFailures: builderV2RecurringFailures(steps),
             latestFailedTest: currentFailure(),
             ...(currentFailure() ? { activeRepair: await activeRepair() } : {}),
             ...(currentFailure() ? await failingTestsPrompt() : {}),
@@ -1064,6 +1065,28 @@ export function builderV2FailingTestSummary(output: string, limit = 40): string[
     if (failed.length >= limit) break
   }
   return failed
+}
+
+/**
+ * Durable failing-test recurrence across source revisions. Unlike a same-revision
+ * retry guard, this spots repeated unresolved defects despite successful edits.
+ */
+export function builderV2RecurringFailures(
+  receipts: readonly Pick<BuilderV2Receipt, 'tool' | 'ok' | 'output'>[],
+  minOccurrences = 3,
+): Array<{ name: string; occurrences: number }> {
+  const counts = new Map<string, number>()
+  for (const receipt of receipts) {
+    if (receipt.tool !== 'run_tests' || receipt.ok) continue
+    const output = receipt.output as { stdout?: unknown; stderr?: unknown } | undefined
+    for (const name of builderV2FailingTestSummary(String(output?.stdout ?? '') + '\n' + String(output?.stderr ?? ''))) {
+      counts.set(name, (counts.get(name) ?? 0) + 1)
+    }
+  }
+  return [...counts].filter(([, count]) => count >= minOccurrences)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+    .map(([name, occurrences]) => ({ name, occurrences }))
 }
 
 /** Keep the start and the end of long output, as Codex and Cline do (utils/string/src/truncate.rs; output-limits.ts). */

@@ -49,3 +49,23 @@ test('genuine application build keeps Builder', () => {
   assert.equal(classifyCosSoftwareDelivery(prompt), 'build')
   assert.equal(isConciergeBuilderObjective(prompt), true)
 })
+
+
+test('explicit run-and-repair certification preserves Builder routing', () => {
+  const prompt = 'Run: node report.js — it fails. Observe the actual failure, diagnose it from the recorded output rather than guessing, correct the cause, and prove recovery by running the same command again until it succeeds and prints the report line.'
+  assert.equal(isConciergeBuilderObjective(prompt), true)
+})
+
+test('isolated repository acceptance stays executable despite report vocabulary', () => {
+  const prompt = `Run a real, isolated end-to-end Builder acceptance test.
+Use Builder V2 and the configured approved models.
+Create an isolated Node.js repository with:
+- sum.js exporting sum(a,b) but deliberately implemented as a - b.
+- sum.test.js using node:test.
+Acceptance sequence:
+1. Run node --test sum.test.js and record the actual failure.
+2. Inspect and repair only sum.js.
+3. Commit the repair and open a PR against the isolated test branch.
+4. Report PASS only after every step is verified.`
+  assert.equal(isConciergeBuilderObjective(prompt), true)
+})

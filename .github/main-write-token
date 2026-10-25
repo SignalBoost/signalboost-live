@@ -1,2 +1,2 @@
-base_sha=62767361fd4b173827cd74d6d5ae693d2160c339
-branch=fix/cos-analysis-versus-builder-intent-20261025
+base_sha=e85346fc82c14f48c3da3240759976edcc1bfcbf
+branch=fix/cos-routing-admission-regressions-20261025

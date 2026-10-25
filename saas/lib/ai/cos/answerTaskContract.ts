@@ -48,7 +48,12 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
       // Require a meaningful amount of explanation and novel analytical content.
       const requestedWords = new Set(topicWords(directive))
       const novel = new Set(topicWords(section).filter(word => !requestedWords.has(word)))
-      const answerBody = section.includes('\n') ? section.slice(section.indexOf('\n') + 1).trim() : section
+      const firstLine = section.split('\n', 1)[0].trim()
+      const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+      // Only omit a first line that actually repeats the requested task heading.
+      // Inline numbered answers must retain their substantive opening analysis.
+      const answerBody = section.includes('\n') && normalize(firstLine) === normalize(directive)
+        ? section.slice(section.indexOf('\n') + 1).trim() : section
       const normalized = answerBody.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
       const repeatsPriorSection = seenSectionBodies.has(normalized)
       seenSectionBodies.add(normalized)

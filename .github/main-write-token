@@ -1,2 +1,2 @@
-base_sha=4ad97f3c1fa6fbcb3e6097c56c3bb9b94d6048ac
-branch=fix/builder-live-stop-control-20261024
+base_sha=fcec7790da2e5eed43d7e981d829aaee681a1b3d
+branch=fix/builder-v2-persistent-failure-memory-20261024

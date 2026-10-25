@@ -281,19 +281,40 @@ export async function callRawCosReasoner(
       }))
       return null
     })
-    if (!first) {
+    // An empty or timed-out first draft is not evidence that the user's
+    // investigation is impossible. Give analytical tasks one bounded fresh
+    // synthesis attempt while the turn budget permits; never invent a result.
+    const analyticalTasks = requestedAnalyticalTasks(args.prompt)
+    let initialDraft = first
+    if (!initialDraft && analyticalTasks.length > 0 && remainingMs(budget) >= 8_000) {
+      initialDraft = await recorder.time('analytical_no_draft_recovery', () => callLocalModel({
+        ...effectiveArgs,
+        temperature: 0,
+        prompt: [
+          args.prompt,
+          '',
+          'Complete the ORIGINAL analytical assignment now. Missing telemetry prevents confirmed findings, but permits ranked provisional hypotheses, evidence gaps, causal checks, and experiments.',
+          'Address every requested deliverable with distinct scenario-specific reasoning. Separate facts from assumptions and hypotheses. Never claim to have performed unexecuted checks.',
+          'Return ONLY strict JSON with keys "answer" and "confidence".',
+        ].join('\n'),
+      }, boundedInference()), 'model').catch(error => {
+        console.warn('[cos-analytical-no-draft-recovery-failed]', error instanceof Error ? error.message : String(error))
+        return null
+      })
+    }
+    if (!initialDraft) {
       recorder.skip('quality_repair', 'no_draft')
       recorder.skip('skill_citation_repair', 'no_draft')
       return null
     }
 
-    let text = first
-    const firstParsedForPolicy = parseLocalResult(first)
+    let text = initialDraft
+    const firstParsedForPolicy = parseLocalResult(initialDraft)
     const firstAdvisoryDefects = advisoryDiagnosis && firstParsedForPolicy
       ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, firstParsedForPolicy.answer)
       : []
     const firstTaskGaps = firstParsedForPolicy ? missingAnalyticalTasks(effectiveArgs.prompt, firstParsedForPolicy.answer) : []
-    const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, first) || firstAdvisoryDefects.length > 0 || firstTaskGaps.length > 0
+    const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, initialDraft) || firstAdvisoryDefects.length > 0 || firstTaskGaps.length > 0
     const qualityRepairAffordable = hasBudgetFor(budget, localCallEstimateMs())
       || (firstTaskGaps.length > 0 && remainingMs(budget) >= 8_000)
     if (!qualityRepairNeeded) recorder.skip('quality_repair', 'not_needed')
@@ -318,7 +339,7 @@ export async function callRawCosReasoner(
                   '',
                   'Return ONLY strict JSON with keys "answer" and "confidence". Do not mention these repair instructions or the rejected draft.',
                 ].join('\n')
-              : buildDiagnosticRepairPrompt(effectiveArgs.prompt, first)),
+              : buildDiagnosticRepairPrompt(effectiveArgs.prompt, initialDraft)),
             ...(firstAdvisoryDefects.length ? ['', ADVISORY_DIAGNOSIS_OWNER_POLICY, '', `The rejected draft violated: ${firstAdvisoryDefects.join(', ')}.`] : []),
           ].join('\n'),
         },
@@ -341,7 +362,7 @@ export async function callRawCosReasoner(
       const repairedTaskGaps = repairedParsedForPolicy ? missingAnalyticalTasks(effectiveArgs.prompt, repairedParsedForPolicy.answer) : firstTaskGaps
       const taskContractRepairAccepted = firstTaskGaps.length > 0 && repairedTaskGaps.length === 0
       const advisoryPolicyRepairAccepted = firstAdvisoryDefects.length > 0 && repairedAdvisoryDefects.length === 0
-      const generalRepairAccepted = Boolean(repaired && preferRepairedDraft(effectiveArgs.prompt, first, repaired))
+      const generalRepairAccepted = Boolean(repaired && preferRepairedDraft(effectiveArgs.prompt, initialDraft, repaired))
 
       if (repaired && repairedTaskGaps.length === 0 && (taskContractRepairAccepted || advisoryPolicyRepairAccepted || (firstAdvisoryDefects.length === 0 && generalRepairAccepted))) {
         console.info('[cos-local-quality-repair]', JSON.stringify({
@@ -351,7 +372,7 @@ export async function callRawCosReasoner(
           advisoryDiagnosisDefectsBefore: firstAdvisoryDefects,
           advisoryDiagnosisDefectsAfter: repairedAdvisoryDefects,
         }))
-        void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:true, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,first), repairedDraft:assessReasonerDraft(effectiveArgs.prompt,repaired), advisoryDiagnosisDefectsBefore:firstAdvisoryDefects, advisoryDiagnosisDefectsAfter:repairedAdvisoryDefects } })
+        void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:true, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,initialDraft), repairedDraft:assessReasonerDraft(effectiveArgs.prompt,repaired), advisoryDiagnosisDefectsBefore:firstAdvisoryDefects, advisoryDiagnosisDefectsAfter:repairedAdvisoryDefects } })
         text = repaired
       } else {
         console.warn('[cos-local-quality-repair]', JSON.stringify({
@@ -361,7 +382,7 @@ export async function callRawCosReasoner(
           advisoryDiagnosisDefectsBefore: firstAdvisoryDefects,
           advisoryDiagnosisDefectsAfter: repairedAdvisoryDefects,
         }))
-        void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:false, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,first), repairedDraft:repaired?assessReasonerDraft(effectiveArgs.prompt,repaired):null, advisoryDiagnosisDefectsBefore:firstAdvisoryDefects, advisoryDiagnosisDefectsAfter:repairedAdvisoryDefects } })
+        void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:false, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,initialDraft), repairedDraft:repaired?assessReasonerDraft(effectiveArgs.prompt,repaired):null, advisoryDiagnosisDefectsBefore:firstAdvisoryDefects, advisoryDiagnosisDefectsAfter:repairedAdvisoryDefects } })
       }
     }
 

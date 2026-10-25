@@ -99,6 +99,14 @@ test('reasoner recovery uses analytical-specific reasoning instead of the generi
   assert.match(source, /: buildDiagnosticRepairPrompt\(effectiveArgs\.prompt, first\)/)
 })
 
+test('analytical no-draft recovery is bounded and uses original request', () => {
+  const reasoner = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
+  assert.match(reasoner, /!initialDraft && analyticalTasks\.length > 0 && remainingMs\(budget\) >= 8_000/)
+  assert.match(reasoner, /analytical_no_draft_recovery/)
+  assert.match(reasoner, /args\.prompt,[\s\S]*?Complete the ORIGINAL analytical assignment now/)
+  assert.match(reasoner, /if \(!initialDraft\) \{[\s\S]*?return null/)
+})
+
 test('ordinary coding and prose requests do not create an analytical acceptance checklist', () => {
   assert.deepEqual(requestedAnalyticalTasks('Fix src/login.ts and run npm test.'), [])
   assert.deepEqual(requestedAnalyticalTasks('Write a Node.js calculator with two files.'), [])

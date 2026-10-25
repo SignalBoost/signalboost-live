@@ -14,9 +14,14 @@ test('exact payment incident derives eight deliverables without hardcoded paymen
 
 test('a structurally complete eight-part report meets the enumerated contract', () => {
   const answer = requestedAnalyticalTasks(incident).map((task, index) =>
-    (index + 1) + '. ' + task + ': substantive findings, relevant comparison, and limitations.'
+    (index + 1) + '. ' + task + '\n' + 'The available observations support competing explanations; this section compares concrete mechanisms, discriminating evidence, and uncertainty without claiming an experiment was run.'
   ).join('\n')
   assert.deepEqual(missingAnalyticalTasks(incident, answer), [])
+})
+
+test('numbered headings without substantive sections do not satisfy completion', () => {
+  const headings = requestedAnalyticalTasks(incident).map((task, index) => (index + 1) + '. ' + task).join('\\n')
+  assert.equal(missingAnalyticalTasks(incident, headings).length, 8)
 })
 
 test('unseen database incident follows the same contract', () => {

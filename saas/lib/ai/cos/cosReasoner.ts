@@ -269,9 +269,9 @@ export async function callRawCosReasoner(
     }
 
     if (remainingMs(budget) < 1_000) return null
-    const first = await recorder.time('draft', () => callLocalModel(effectiveArgs, requestedAnalyticalTasks(effectiveArgs.prompt).length > 0
-      ? { ...boundedInference(), timeoutMs: Math.min(25_000, boundedInference().timeoutMs) }
-      : boundedInference()), 'model').catch(error => {
+    // Keep long-form analytical synthesis inside the shared turn deadline rather
+    // than imposing an extra 25-second truncation that forces rescue calls.
+    const first = await recorder.time('draft', () => callLocalModel(effectiveArgs, boundedInference()), 'model').catch(error => {
       console.error('[cos-reasoner-local-call-failed]', JSON.stringify({
         at: new Date().toISOString(),
         phase: 'draft',

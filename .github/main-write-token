@@ -1,2 +1,2 @@
-base_sha=c7e2f679854d625abde0a613685602af3582ea38
-branch=fix/cos-longform-cap-release-gate-20261026
+base_sha=bc036a9c3fd2ca95ca5d97673e7619968bc64dc5
+branch=fix/cos-live-acceptance-unmocked-20261026

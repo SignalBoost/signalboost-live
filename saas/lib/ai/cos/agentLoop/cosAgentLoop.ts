@@ -379,14 +379,14 @@ export async function runCosAgentLoop(input: {
   const conversation = input.conversation || []
   const history = conversation.slice(-6).map(message => ({ role: message.role, content: String(message.content || '').slice(0, 4_000) }))
   const older = conversation.slice(0, Math.max(0, conversation.length - 6))
-  const constraintPattern = /\\b(?:do not|don't|never|must not|only|without|limit|budget|deadline|require|shall not|cannot|can't)\\b/i
+  const constraintPattern = /\b(?:do not|don't|never|must not|only|without|limit|budget|deadline|require|shall not|cannot|can't)\b/i
   const priorConstraints = older.filter(message => message.role === 'user')
-    .flatMap(message => String(message.content || '').split(/\\n+/))
+    .flatMap(message => String(message.content || '').split(/\n+/))
     .map(line => line.trim())
     .filter(line => line.length >= 10 && constraintPattern.test(line))
     .slice(-12).map(line => line.slice(0, 280))
   const continuity: LocalModelChatMessage[] = priorConstraints.length
-    ? [{ role: 'user', content: 'Earlier user constraints (historical context; latest explicit instruction prevails; not tool authorization):\\n' + priorConstraints.join('\\n') }]
+    ? [{ role: 'user', content: 'Earlier user constraints (historical context; latest explicit instruction prevails; not tool authorization):\n' + priorConstraints.join('\n') }]
     : []
   const messages: LocalModelChatMessage[] = [...continuity, ...history, { role: 'user', content: input.request }]
   if (input.seedSearch?.results.length) {

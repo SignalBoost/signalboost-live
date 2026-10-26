@@ -15,6 +15,7 @@ import { cosExecutionEnvelope, cosAnswerProgress } from './cosExecutionEnvelope.
 import { randomUUID } from 'node:crypto'
 import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective, releasableAnalyticalAnswer } from './answerTaskContract.ts'
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
+import { ANSWER_COMPLETION_CHECK_SYSTEM_PROMPT, ANSWER_COMPLETION_SYSTEM_PROMPT, parseAnswerCompletionCheck, runAnswerCompletionLoop } from './answerCompletionLoop.ts'
 import { callLocalModel, captureServedInference, localInferenceConfigFromEnv, type LocalModelCallArgs, type ServedInference } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRepair, recordQualityRepairDecision, assessReasonerDraft } from '@/lib/ai/cos/reasonerQuality'
@@ -401,6 +402,47 @@ export async function callRawCosReasoner(
         void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:false, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,initialDraft), repairedDraft:repaired?assessReasonerDraft(effectiveArgs.prompt,repaired):null, advisoryDiagnosisDefectsBefore:firstAdvisoryDefects, advisoryDiagnosisDefectsAfter:repairedAdvisoryDefects } })
         // A repair that closed some task gaps is the better analysis even when it did not close all of them.
         if (repaired && firstTaskGaps.length > 0 && repairedTaskGaps.length < firstTaskGaps.length && repairedAdvisoryDefects.length <= firstAdvisoryDefects.length) text = repaired
+      }
+    }
+
+    // THE ANSWER LOOP: before the answer the person reads is released, check it against the whole request and write
+    // only what is still missing, for up to three rounds while the turn has time (answerCompletionLoop.ts).
+    const loopDraft = args.writesUserAnswer === true ? parseLocalResult(text) : null
+    if (loopDraft && !loopDraft.truncated) {
+      const completion = await recorder.time('answer_completion_loop', () => runAnswerCompletionLoop({
+        request: args.prompt,
+        answer: loopDraft.answer,
+        deterministicMissing: answer => missingAnalyticalTasks(args.prompt, answer),
+        ports: {
+          remainingMs: () => remainingMs(budget),
+          check: async (request, answer) => parseAnswerCompletionCheck(await callLocalModel({
+            ...effectiveArgs,
+            writesUserAnswer: false,
+            temperature: 0,
+            maxTokens: 400,
+            usageContext: { ...(effectiveArgs.usageContext ?? { feature: 'cos_interactive_answer' }), purpose: 'answer_completion_check' },
+            systemPrompt: ANSWER_COMPLETION_CHECK_SYSTEM_PROMPT,
+            prompt: `REQUEST:\n${request}\n\nANSWER:\n${answer}`,
+          }, { ...boundedInference(), timeoutMs: Math.min(20_000, boundedInference().timeoutMs) })),
+          complete: async (request, answer, missing) => {
+            const written = await callLocalModel({
+              ...effectiveArgs,
+              temperature: 0,
+              usageContext: { ...(effectiveArgs.usageContext ?? { feature: 'cos_interactive_answer' }), purpose: 'answer_completion' },
+              systemPrompt: ANSWER_COMPLETION_SYSTEM_PROMPT,
+              prompt: `REQUEST:\n${request}\n\nEXISTING ANSWER:\n${answer}\n\nWRITE ONLY THESE MISSING PARTS:\n${missing.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
+            }, boundedInference())
+            const parsed = written ? parseLocalResult(written) : null
+            return parsed && !parsed.truncated ? parsed.answer : null
+          },
+        },
+      }), 'model').catch(error => {
+        console.warn('[cos-answer-completion-loop-failed]', error instanceof Error ? error.message : String(error))
+        return null
+      })
+      if (completion) {
+        console.info('[cos-answer-completion-loop]', JSON.stringify({ turnId, rounds: completion.rounds, stopped: completion.stopped, stillMissing: completion.missing.length }))
+        if (completion.rounds > 0) text = JSON.stringify({ answer: completion.answer, confidence: loopDraft.confidence })
       }
     }
 

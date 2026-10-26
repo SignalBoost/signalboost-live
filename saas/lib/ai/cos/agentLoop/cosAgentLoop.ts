@@ -419,14 +419,26 @@ export async function runCosAgentLoop(input: {
       rounds += 1
       // The last round always happens with tools off while the answer reserve remains, so a turn
       // whose tools ran long still answers from what it gathered instead of ending with nothing.
-      const finalRound = forceAnswer || rounds === MAX_ROUNDS || remainingMs() < answerReserveMs(input.policy) + 5_000
+      const finalRound = forceAnswer || rounds === MAX_ROUNDS || remainingMs() < answerReserveMs(policy) + 5_000
+      // Tool-capable rounds must leave an independent answer budget. Previously a
+      // slow tool-selection model could consume the last usable inference window
+      // and leave the user with only a failed-closed response.
+      const roundTimeoutMs = Math.min(
+        ROUND_TIMEOUT_MS,
+        remainingMs() - (finalRound ? 2_000 : answerReserveMs(policy) + 2_000),
+      )
+      if (roundTimeoutMs < 1_000) {
+        forceAnswer = true
+        rounds -= 1
+        continue
+      }
       const roundStartedAt = now()
       const turn = await input.model({
         systemPrompt,
         messages,
         tools,
         toolChoice: finalRound ? 'none' : 'auto',
-        timeoutMs: Math.min(ROUND_TIMEOUT_MS, remainingMs() - 2_000),
+        timeoutMs: roundTimeoutMs,
       }).catch((error: unknown) => {
         trace.modelError = redactUrlQueries(error instanceof Error ? error.message : String(error)).slice(0, 600)
         return null

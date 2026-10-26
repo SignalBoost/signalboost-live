@@ -1,6 +1,6 @@
 # Dependencies
-node_modules/
-saas/node_modules/
+node_modules
+saas/node_modules
 
 # Next.js build output
 .next/

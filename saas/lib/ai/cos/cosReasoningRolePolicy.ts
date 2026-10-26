@@ -225,7 +225,14 @@ export function isConciergeBuilderObjective(prompt: string, context?: CosCodingR
   // to launch a paid Builder job. Require an affirmative software-delivery objective
   // before applying Builder-specific evidence rules; embedded runbooks and campaign
   // fixtures are not executable authorization.
-  if (classifyCosSoftwareDelivery(prompt) === 'analysis') return false
+  // Do not discard an affirmative coding instruction just because a separate
+  // software-delivery classifier returned 'analysis'. Execution prohibitions
+  // were already enforced above, and explicit source/build requests are
+  // evaluated by the remaining Builder admission checks.
+  if (classifyCosSoftwareDelivery(prompt) === 'analysis'
+    && !explicitBuilderExecutionRequest(prompt)
+    && !attachedSourceIsTheJob(prompt, context)
+    && !isCosCodingObjective(prompt, context)) return false
   if (excludedFromBuilder(prompt, context)) return false
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true

@@ -64,7 +64,9 @@ export async function runAnswerCompletionLoop(input: Readonly<{
   let previousMissing: number | null = null
   let missing: string[] = []
   for (let round = 0; ; round++) {
-    if (input.ports.remainingMs() < reserve) return { answer, rounds: round, missing, stopped: 'budget' }
+    // Reserve time for optional repair, not the initial answer check. Otherwise a
+    // completed draft is rejected before either checker or trusted verifier runs.
+    if (input.ports.remainingMs() <= 0) return { answer, rounds: round, missing, stopped: 'budget' }
     const checked = await input.ports.check(input.request, answer).catch(() => null)
     const floor = input.deterministicMissing ? [...input.deterministicMissing(answer)] : []
     if (checked === null && !floor.length) return { answer, rounds: round, missing: floor, stopped: 'checker_unavailable' }

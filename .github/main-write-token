@@ -1,2 +1,2 @@
-base_sha=de6604b49be1ec75bec718ff5c98e61e3d326cce
-branch=fix/harness-cost-settlement-keeps-paid-answer-20261026
+base_sha=a97614a5bb1cf1027071736a1cce0f781e0e802e
+branch=fix/cos-inference-precancelled-signal-20261026

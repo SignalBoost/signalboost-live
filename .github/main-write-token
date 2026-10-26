@@ -1,2 +1,2 @@
-base_sha=644d6919c85cbe407c929ec22b3f181cb6a1497e
-branch=fix/cos-timeout-await-history-recovery-20261026
+base_sha=067b5a695a64b26eb539831f98cf3767b02c8220
+branch=fix/cos-campaign-builder-misroute-20261026

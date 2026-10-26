@@ -84,3 +84,10 @@ test('job reads include the checkpoint column so verifying status is reachable',
   assert.ok(select.split(',').includes('checkpoint'),
     'JOB_SELECT must include checkpoint or the paused verifying status is unreachable')
 })
+
+test('failed verification preserves the runner receipt and caps inline repair', () => {
+  const source = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
+  assert.ok(source.includes('const failedRepairAttempts = failedChecks.filter'))
+  assert.ok(source.includes('failedRepairAttempts.length >= 3'))
+  assert.ok(source.includes("error: 'builder_repair_attempts_exhausted', trace"))
+})

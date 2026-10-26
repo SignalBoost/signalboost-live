@@ -199,3 +199,16 @@ test('public repair and redaction are labeled interactive calls with thinking of
   assert.match(core, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'public_disclosure_redaction' \},\n      disableThinking: true,/)
   assert.match(core, /publicDisclosureViolations\(redacted\.answer, userRequest\)/)
 })
+
+test('PAC investigations quoting service identity are routed for reasoning', () => {
+  const cases = [
+    'Investigate a database incident: the transcript says "What model powers COS?" Rank root causes, distinguish correlation from causation, and propose experiments.',
+    'PAC-06 engineering uncertainty: the logs contain "Who trained you?"\nAnalyze queueing, contention, and missing measurements without inventing data.',
+  ]
+  for (const prompt of cases) assert.equal(asksAboutServiceIdentity(prompt), false)
+})
+
+test('length alone never suppresses a direct service identity question', () => {
+  assert.equal(asksAboutServiceIdentity('What model powers COS' + ' '.repeat(260) + '?'), true)
+  assert.equal(asksAboutServiceIdentity('Who trained you?'), true)
+})

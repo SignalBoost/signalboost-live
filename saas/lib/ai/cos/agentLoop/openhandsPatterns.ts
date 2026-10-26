@@ -19,7 +19,7 @@ export type LoopStep = Readonly<{ action: string; observation: string; error: bo
 
 export const STUCK_THRESHOLDS = Object.freeze({ actionObservation: 4, actionError: 4, alternatingPattern: 6 })
 
-export type StuckPattern = 'action_observation_loop' | 'action_error_loop' | 'alternating_pattern'
+export type StuckPattern = 'action_observation_loop' | 'action_error_loop' | 'alternating_pattern' | 'observation_stagnation'
 
 /** Canonical action key: tool name plus its arguments with keys sorted. */
 export function actionKey(name: string, argumentsJson: string): string {
@@ -48,6 +48,14 @@ export function detectStuck(steps: readonly LoopStep[], thresholds = STUCK_THRES
   if (repeated.length === thresholds.actionObservation && same(repeated, step => step.action) && same(repeated, step => step.observation)) {
     return { pattern: 'action_observation_loop', repetitions: repeated.length }
   }
+  // Different requests can still produce exactly the same observation. This is
+  // demonstrable lack of new evidence, not a guess based on wording or task type.
+  // Require more than one distinct action so the existing exact-action check wins.
+  if (repeated.length === thresholds.actionObservation
+    && same(repeated, step => step.observation)
+    && new Set(repeated.map(step => step.action)).size > 1) {
+    return { pattern: 'observation_stagnation', repetitions: repeated.length }
+  }
   // Scenario 2: same action, errors every time.
   const failing = tail(thresholds.actionError)
   if (failing.length === thresholds.actionError && same(failing, step => step.action) && failing.every(step => step.error)) {
@@ -70,7 +78,9 @@ export function stuckNudge(stuck: Readonly<{ pattern: StuckPattern; repetitions:
     ? `the same tool call failed ${stuck.repetitions} times in a row`
     : stuck.pattern === 'alternating_pattern'
       ? `you alternated between the same two tool calls ${stuck.repetitions} times`
-      : `you repeated the same tool call ${stuck.repetitions} times with the same result`
+      : stuck.pattern === 'observation_stagnation'
+        ? `${stuck.repetitions} tool calls returned identical observations without new evidence`
+        : `you repeated the same tool call ${stuck.repetitions} times with the same result`
   return `HARNESS: ${what}. Stop calling tools and answer with what you have; name any part of the request you could not find.`
 }
 

@@ -508,7 +508,8 @@ const tests = [
 
   'tests/advisoryDiagnosisPolicy.node.test.ts',
 
-  'tests/cosChiefOfStaffAcceptance.node.test.ts',
+  'tests/cosLoopObservationStagnation.node.test.ts',
+  'tests/cosChiefOfStaffAcceptance.node.test.ts',
 
   'tests/cosChiefOfStaffBlindAcceptance.node.test.ts',
 

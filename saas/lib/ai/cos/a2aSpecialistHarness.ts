@@ -186,10 +186,16 @@ export async function runCosA2ASpecialistProductionHarness<T>(input: {
     return Object.freeze({ ok: false, runId, code: 'harness_evidence_sink_unavailable' })
   }
 
+  // Child delegation may never increase the parent's tool, concurrency, time or cost authority.
+  // Keep cost limits in the governed request so a new child cannot reset the parent's ceiling.
+  if (parentManifest.identity.tenantId !== scope.tenantId) {
+    return Object.freeze({ ok: false, runId, code: 'harness_a2a_specialist_parent_tenant_mismatch' })
+  }
   const limits = Object.freeze({
-    maxToolCalls: 1,
-    maxConcurrency: 1,
-    deadlineMs: A2A_SPECIALIST_DEADLINE_MS,
+    maxToolCalls: Math.min(1, parentManifest.limits.maxToolCalls),
+    maxConcurrency: Math.min(1, parentManifest.limits.maxConcurrency),
+    deadlineMs: Math.min(A2A_SPECIALIST_DEADLINE_MS, parentManifest.limits.deadlineMs),
+    ...(parentManifest.limits.maxCostUsd !== undefined ? { maxCostUsd: parentManifest.limits.maxCostUsd } : {}),
   })
 
   const request = createProductionHarnessRequest({

@@ -15,6 +15,7 @@ if (bypassAudit.status !== 0) process.exit(bypassAudit.status ?? 1)
 
 
 const tests = [
+  'tests/cosBrowserTimeoutHistoryRecovery.node.test.ts',
   'tests/cosStaleBuilderStatus.node.test.ts',
   'tests/cosInvestigationBuilderRouting.node.test.ts',
   'tests/cosLiveAcceptanceHarness.node.test.ts',

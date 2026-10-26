@@ -76,14 +76,15 @@ test('empty and junk input is safe', () => {
 test('the gate runs on every public answer and fails closed with no draft', () => {
   // One COS pipeline (2026-09-26): every public answer passes through releaseToPublic.
   const source = readFileSync(PUBLIC_PIPELINE, 'utf8')
-  assert.match(source, /return learnFromTurn\(input, await releaseToPublic\(input, brain\)\)/)
+  assert.match(source, /return learnFromTurn\(input, await releasePublic\(brain\)\)/)
+  assert.match(source, /publicScope \? releaseToPublic\(input, result, selfDisclosure === 'part'\) : result/)
   const releaseAt = source.indexOf('async function releaseToPublic(')
   const release = source.slice(releaseAt, source.indexOf('function harvestCatalogNames('))
-  assert.match(release, /const disclosures = publicDisclosureViolations\(answer, userRequest\)/)
+  assert.match(release, /const disclosures = publicDisclosureViolations\(answer, userRequest, gate\)/)
   assert.ok(!/isSignalBoostSpecificPublicRequest/.test(release), 'gate must apply to every public answer')
   const failClosed = release.slice(release.indexOf('const redacted ='), release.indexOf('answer = redacted.answer.trim()'))
   assert.ok(!/bestEffortReply\s*:/.test(failClosed), 'a redaction failure must not surface a draft')
-  assert.match(release, /publicDisclosureViolations\(draft, userRequest\)\.length/, 'low-confidence drafts are gated too')
+  assert.match(release, /publicDisclosureViolations\(draft, userRequest, gate\)\.length/, 'low-confidence drafts are gated too')
 })
 
 test('detects a question about what runs the service', () => {
@@ -121,14 +122,14 @@ test('unknown language falls back to English', () => {
   assert.equal(publicImplementationDisclosureReply(null), publicImplementationDisclosureReply('en'))
 })
 
-test('the public self-referential branch runs before the redaction attempt', () => {
+test('the release step judges every check with the request\'s self-disclosure context', () => {
   const source = readFileSync(PUBLIC_PIPELINE, 'utf8')
   const releaseAt = source.indexOf('async function releaseToPublic(')
-  const branchAt = source.indexOf('if (disclosures.length && asksAboutServiceIdentity(userRequest))', releaseAt)
-  const redactAt = source.indexOf('You are COS repairing a public answer that disclosed', releaseAt)
-  assert.ok(releaseAt > 0 && branchAt > releaseAt && redactAt > branchAt, 'boundary reply must pre-empt the redaction pass')
-  const branch = source.slice(branchAt, branchAt + 400)
-  assert.match(branch, /reply: publicImplementationDisclosureReply\(/)
+  const end = source.indexOf('function harvestCatalogNames(', releaseAt)
+  const body = source.slice(releaseAt, end)
+  assert.match(body, /selfDisclosureRequest = false/)
+  assert.equal(body.match(/publicDisclosureViolations\([^)]*, gate\)/g)?.length, 3)
+  assert.doesNotMatch(body, /publicDisclosureViolations\([^)]*userRequest\)/)
 })
 
 test('the false-attribution answer that shipped to production is now caught', () => {
@@ -157,14 +158,14 @@ test('questions about other people building other things are not identity questi
   ]) assert.equal(asksAboutServiceIdentity(prompt), false, prompt)
 })
 
-test('PUBLIC identity is answered before the public reasoner is called', () => {
+test('PUBLIC identity is decided before every public answer path, including live facts and the reasoner', () => {
   const source = readFileSync(PUBLIC_PIPELINE, 'utf8')
-  const branchAt = source.indexOf('if (isPublicDeliveryScope()) {\n    // ONE COS PIPELINE')
-  const interceptAt = source.indexOf('if (asksAboutServiceIdentity(userRequest)) {', branchAt)
-  const reasonerAt = source.indexOf('const brain = await tryEnterpriseCOSFirstAnswer(input)', branchAt)
-  assert.ok(branchAt > 0, 'public branch must exist')
-  assert.ok(interceptAt > branchAt, 'public intercept must exist')
-  assert.ok(reasonerAt > interceptAt, 'public intercept must precede the COS reasoner call')
+  const decidedAt = source.indexOf('const selfDisclosure = publicScope')
+  const boundaryAt = source.indexOf("if (selfDisclosure === 'only') {", decidedAt)
+  const freshAt = source.indexOf('await tryFreshCurrentFact(input)', decidedAt)
+  const reasonerAt = source.indexOf('const brain = await tryEnterpriseCOSFirstAnswer(input)', decidedAt)
+  assert.ok(decidedAt > 0 && boundaryAt > decidedAt && freshAt > boundaryAt && reasonerAt > freshAt)
+  assert.match(source.slice(boundaryAt, boundaryAt + 300), /reply: publicImplementationDisclosureReply\(input\.language\)/)
 })
 
 test('a vendor the visitor named is part of the answer, not a stack disclosure (2026-09-27)', () => {
@@ -197,7 +198,7 @@ test('public repair and redaction are labeled interactive calls with thinking of
   const core = readFileSync(PUBLIC_PIPELINE, 'utf8')
   assert.match(core, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'public_scope_repair' \},\n      disableThinking: true,/)
   assert.match(core, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'public_disclosure_redaction' \},\n      disableThinking: true,/)
-  assert.match(core, /publicDisclosureViolations\(redacted\.answer, userRequest\)/)
+  assert.match(core, /publicDisclosureViolations\(redacted\.answer, userRequest, gate\)/)
 })
 
 test('PAC investigations quoting service identity are routed for reasoning', () => {

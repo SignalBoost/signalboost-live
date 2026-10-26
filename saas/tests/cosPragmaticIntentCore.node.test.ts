@@ -29,7 +29,7 @@ test('shared COS core cannot re-impose freshness after neural contextual interpr
   assert.match(core, /const heuristicRequiresFreshEvidence = requiresFreshExternalEvidence\(input\.prompt\)/)
   assert.match(core, /const baselineRequiresFreshEvidence = heuristicRequiresFreshEvidence \|\| semanticIntentRequiresFreshness\(semanticTaskIntent\)/)
   assert.match(core, /const suppressFreshnessForInterpretation = semanticIntentSuppressesFreshness\(semanticTaskIntent\)/)
-  assert.match(core, /if \(baselineRequiresFreshEvidence && !suppressFreshnessForInterpretation\) \{\s*return learnFromTurn\(input, await tryFreshCurrentFact\(input\)\)/s)
+  assert.match(core, /if \(baselineRequiresFreshEvidence && !suppressFreshnessForInterpretation\) \{\s*return learnFromTurn\(input, await releasePublic\(await tryFreshCurrentFact\(input\)\)\)/s)
   assert.match(core, /if \(!suppressFreshnessForInterpretation && classifyKnowledgeAccess\(input\.prompt\)\.mode === 'search_if_thin'\)/)
   assert.match(core, /\[cos-core-contextual-freshness-suppressed\]/)
 })
@@ -48,7 +48,7 @@ test('the Production failure phrase can only come from a freshness path that con
   const guardedFreshCall = core.indexOf('if (baselineRequiresFreshEvidence && !suppressFreshnessForInterpretation)')
   assert.ok(failure >= 0)
   assert.ok(guardedFreshCall >= 0)
-  assert.match(core, /return learnFromTurn\(input, await tryFreshCurrentFact\(input\)\)/)
+  assert.match(core, /return learnFromTurn\(input, await releasePublic\(await tryFreshCurrentFact\(input\)\)\)/)
 })
 
 test('ordinary answerable turns do not pay a semantic-classifier round trip', () => {

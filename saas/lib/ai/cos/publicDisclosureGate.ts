@@ -133,20 +133,32 @@ function selfAttributedWindows(answer: string): string[] {
 /**
  * Internal disclosures present in a public-scope answer. Empty array means the answer is safe to
  * render publicly. Applies to every public answer, on every subject.
+ *
+ * selfDisclosureRequest: the request asks about this service's own model, provider or creator (decided by meaning,
+ * see publicSelfDisclosureIntent.ts). The question then supplies the self-reference, so ANY model family, AI vendor
+ * or infrastructure name in the answer is a disclosure, in any language: "Qwen." answering "What model powers COS?",
+ * or "Soy un modelo de lenguaje creado por OpenAI." answering "¿Quién te creó?" (Codex on #4955).
  */
-export function publicDisclosureViolations(answer: string, userRequest = ''): PublicDisclosureViolation[] {
+export function publicDisclosureViolations(
+  answer: string,
+  userRequest = '',
+  options: Readonly<{ selfDisclosureRequest?: boolean }> = {},
+): PublicDisclosureViolation[] {
   const value = String(answer ?? '')
   if (!value.trim()) return []
   const violations: PublicDisclosureViolation[] = []
 
-  if (infrastructureDisclosed(value, String(userRequest ?? ''))) violations.push('infrastructure_identifier')
+  if (options.selfDisclosureRequest === true) {
+    if (INFRASTRUCTURE_IDENTIFIER.test(value)) violations.push('infrastructure_identifier')
+    if (MODEL_TERM.test(value)) violations.push('model_self_attribution')
+  } else if (infrastructureDisclosed(value, String(userRequest ?? ''))) violations.push('infrastructure_identifier')
   if (INTERNAL_IDENTIFIER.test(value)) violations.push('internal_identifier')
   if (EVIDENCE_LABEL.test(value)) violations.push('evidence_label')
   if (PROVENANCE_FUNNEL.test(value)) violations.push('provenance_funnel')
 
   const windows = selfAttributedWindows(value)
   if (windows.length) {
-    if (windows.some(window => MODEL_TERM.test(window))) {
+    if (!violations.includes('model_self_attribution') && windows.some(window => MODEL_TERM.test(window))) {
       violations.push('model_self_attribution')
     }
     if (windows.some(window => INTERNAL_COMPONENT.test(window))) {
@@ -225,8 +237,9 @@ export function publicImplementationDisclosureReply(language?: string | null): s
 //
 // The real fix is that this question must not reach the model at all. It has exactly ONE correct
 // answer, known at build time, so the public path answers it deterministically before inference.
-// That also covers the whole family — who made you, who trained you, are you ChatGPT — which the
-// base model would otherwise answer from whatever it remembers about itself.
+// Since 2026-10-26 the public path decides "is this that question?" by meaning, in any language
+// (publicSelfDisclosureIntent.ts); the word rules below are the owner channel's detector and the
+// public path's fallback when that judge gives no verdict.
 
 /** Asks who or what built, trained, owns, or runs this service. */
 const ASKS_SERVICE_IDENTITY =
@@ -234,8 +247,8 @@ const ASKS_SERVICE_IDENTITY =
 
 /**
  * True for any question about what this service is, who built it, or what runs it.
- * The public path must answer these from publicImplementationDisclosureReply() BEFORE calling
- * the reasoner — never by inspecting what the reasoner produced.
+ * The owner channel answers these from the verified runtime topology before calling the reasoner; the public
+ * path uses this only when the meaning-based judge gives no verdict (publicSelfDisclosureIntent.ts).
  */
 export function asksAboutServiceIdentity(prompt: string): boolean {
   const value = String(prompt ?? '').trim()

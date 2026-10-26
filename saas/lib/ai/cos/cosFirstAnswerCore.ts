@@ -62,6 +62,7 @@ function withComputedArithmetic<T extends { answer: string } | null>(parsed: T):
 }
 
 import { publicDisclosureViolations, asksAboutServiceIdentity, publicImplementationDisclosureReply } from './publicDisclosureGate.ts'
+import { classifyPublicSelfDisclosure, PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS } from './publicSelfDisclosureIntent.ts'
 import { publicScenarioScopeViolations, publicUserRequestText } from './publicScenarioScope.ts'
 import {
   tryCOSFirstAnswer as tryEnterpriseCOSFirstAnswer,
@@ -76,6 +77,14 @@ const PLATFORM_STACK_ASK = /(?:model|modelo|llm|reasoner|engine|provedor|provide
 function isPlatformStackQuestion(prompt: unknown): boolean {
   const text = String(prompt ?? '')
   return isPlatformSelfKnowledgePrompt(text) || PLATFORM_STACK_ASK.test(text)
+}
+
+async function decidePublicSelfDisclosure(request: string): Promise<'only' | 'part' | 'none'> {
+  const judged = await classifyPublicSelfDisclosure(request)
+  const wordRule = asksAboutServiceIdentity(request) || isPlatformStackQuestion(request)
+  if (judged === null) return wordRule ? 'only' : 'none'
+  if (judged === 'none' && wordRule && request.length > PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS) return 'part'
+  return judged
 }
 
 function ownerPlatformStackReply(language?: string | null): string {
@@ -200,13 +209,15 @@ function freshProvenance(args: {
 async function releaseToPublic(
   input: { prompt: string; language?: string },
   result: COSFirstAnswerResult,
+  selfDisclosureRequest = false,
 ): Promise<COSFirstAnswerResult> {
+  const gate = { selfDisclosureRequest }
   const userRequest = publicUserRequestText(input.prompt)
   const languageRule = input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.'
   if (!result.handled) {
     // A low-confidence draft is only ever shown if it would itself pass the disclosure gate.
     const draft = 'bestEffortReply' in result ? String(result.bestEffortReply || '') : ''
-    if (draft && publicDisclosureViolations(draft, userRequest).length) {
+    if (draft && publicDisclosureViolations(draft, userRequest, gate).length) {
       return { handled: false, confidence: result.confidence, reason: 'reason' in result ? result.reason : 'Public draft withheld.', provenance: { ...(result.provenance as Record<string, unknown>), publicDraftWithheld: true } as any }
     }
     return result
@@ -244,10 +255,7 @@ async function releaseToPublic(
     answer = repaired.answer.trim()
   }
 
-  const disclosures = publicDisclosureViolations(answer, userRequest)
-  if (disclosures.length && asksAboutServiceIdentity(userRequest)) {
-    return { ...result, reply: publicImplementationDisclosureReply(input.language), confidence: 1 }
-  }
+  const disclosures = publicDisclosureViolations(answer, userRequest, gate)
   if (disclosures.length) {
     // Labeled interactive call with thinking off (2026-09-27): production 19:56 ET this redaction ran unlabeled on
     // the background RunPod reasoner with hidden thinking — 36.1s and 1,311 tokens for one public answer.
@@ -266,7 +274,7 @@ async function releaseToPublic(
       prompt: [`USER REQUEST:\n${userRequest}`, `REJECTED DRAFT:\n${answer}`, `DISCLOSURES:\n${disclosures.join(', ')}`, 'Return the corrected answer now.'].join('\n\n'),
     }).catch(() => null)
     const redacted = withComputedArithmetic(redact?.text ? parseLocalResult(redact.text) : null)
-    if (!redacted || redacted.truncated || !redacted.answer.trim() || publicDisclosureViolations(redacted.answer, userRequest).length) {
+    if (!redacted || redacted.truncated || !redacted.answer.trim() || publicDisclosureViolations(redacted.answer, userRequest, gate).length) {
       // Fails closed with no draft: an answer containing internals must never reach the reader.
       return {
         handled: false,
@@ -844,21 +852,38 @@ export async function tryCOSFirstAnswer(input: {
     return learnFromTurn(input, await tryLiveNamedCatalog(input))
   }
 
-  // Any identity/model/provider question is answered deterministically and scope-aware, BEFORE the
-  // enterprise reasoner runs — otherwise the owner's phrasing can slip past the narrow platform-stack
-  // detector, reach the model, and get the public non-disclosure deflection on the owner's own
-  // channel. Public scope still gets the non-disclosure boundary; the owner gets the real stack.
-  if (isPlatformStackQuestion(input.prompt) || asksAboutServiceIdentity(input.prompt)) {
-    const reply = isPublicDeliveryScope()
-      ? publicImplementationDisclosureReply(input.language)
-      : ownerPlatformStackReply(input.language)
+  // The owner's identity/model/provider question is answered from the verified runtime topology BEFORE the
+  // enterprise reasoner runs, so the owner gets the real stack rather than the model's memory of itself.
+  // Public scope is not intercepted here: see the public branch below.
+  if (!isPublicDeliveryScope() && (isPlatformStackQuestion(input.prompt) || asksAboutServiceIdentity(input.prompt))) {
     return learnFromTurn(input, {
       handled: true,
-      reply,
+      reply: ownerPlatformStackReply(input.language),
       confidence: 1,
       provenance: { responseSource: 'cos_local_primary', selfKnowledgeDeterministic: true } as any,
     })
   }
+
+  // PUBLIC SELF-DISCLOSURE (owner decision 2026-10-26): whether a public request asks about this service's own model,
+  // provider or creator is decided by meaning, in any language (publicSelfDisclosureIntent.ts), before any answer path,
+  // so an identity question can never reach a path that releases its answer unchecked. Only a request that asks
+  // nothing else gets the fixed boundary reply; every other request is answered whole and released through
+  // releaseToPublic(). The word rules (both detectors the old public intercept used) are the safety net only: with no
+  // verdict they decide as the old intercept did, and for a request longer than the judge saw, a "none" verdict is not
+  // trusted on its own — the request is answered whole but released under the strict self-disclosure gate.
+  const publicScope = isPublicDeliveryScope()
+  const publicRequest = publicScope ? publicUserRequestText(input.prompt) : ''
+  const selfDisclosure = publicScope ? await decidePublicSelfDisclosure(publicRequest) : 'none'
+  if (selfDisclosure === 'only') {
+    return learnFromTurn(input, {
+      handled: true,
+      reply: publicImplementationDisclosureReply(input.language),
+      confidence: 1,
+      provenance: { responseSource: 'cos_local_primary', selfKnowledgeDeterministic: true } as any,
+    })
+  }
+  const releasePublic = async (result: COSFirstAnswerResult): Promise<COSFirstAnswerResult> =>
+    publicScope ? releaseToPublic(input, result, selfDisclosure === 'part') : result
 
   const directTextTransformation = await tryDirectTextTransformation(input)
   if (directTextTransformation) {
@@ -894,11 +919,11 @@ export async function tryCOSFirstAnswer(input: {
   }
 
   if (baselineRequiresFreshEvidence && !suppressFreshnessForInterpretation) {
-    return learnFromTurn(input, await tryFreshCurrentFact(input))
+    return learnFromTurn(input, await releasePublic(await tryFreshCurrentFact(input)))
   }
 
   if (!suppressFreshnessForInterpretation && classifyKnowledgeAccess(input.prompt).mode === 'search_if_thin') {
-    const looked = await tryFreshCurrentFact(input)
+    const looked = await releasePublic(await tryFreshCurrentFact(input))
     const reply = 'reply' in looked ? String(looked.reply || '') : ''
     const refused = /could not stand behind|did not release an answer|verification unavailable|live verification/i.test(reply)
     if (looked.handled && reply && !refused) {
@@ -912,19 +937,11 @@ export async function tryCOSFirstAnswer(input: {
     // in the public audience: public-safe retrieval, the public boundary, and this release gate. The
     // separate public-only pipeline that used to answer company questions has been removed.
     //
-    // SELF-IDENTITY IS A RELEASE RULE, ANSWERED BEFORE INFERENCE (2026-08-26): "what model powers
-    // this?" has exactly one correct public answer, so the model is never asked.
-    const userRequest = publicUserRequestText(input.prompt)
-    if (asksAboutServiceIdentity(userRequest)) {
-      return learnFromTurn(input, {
-        handled: true,
-        reply: publicImplementationDisclosureReply(input.language),
-        confidence: 1,
-        provenance: { responseSource: 'cos_local_primary', selfKnowledgeDeterministic: true } as any,
-      })
-    }
+    // EVERY PUBLIC REQUEST IS REASONED WHOLE (owner decision 2026-10-26): the self-disclosure verdict above already
+    // answered requests that ask only about this service's implementation. The public audience instructs COS never to
+    // name its model or provider, and releaseToPublic() redacts any internal it still finds or releases nothing.
     const brain = await tryEnterpriseCOSFirstAnswer(input)
-    return learnFromTurn(input, await releaseToPublic(input, brain))
+    return learnFromTurn(input, await releasePublic(brain))
   }
 
   if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {    try {

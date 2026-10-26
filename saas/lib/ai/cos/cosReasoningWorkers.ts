@@ -130,6 +130,7 @@ export function toLocalModelCallArgs(request: CosReasoningRequest, role: CosSpec
     ...(request.allowConfiguredFallback === undefined ? {} : { allowConfiguredFallback: request.allowConfiguredFallback }),
     ...(request.allowTruncatedText === undefined ? {} : { allowTruncatedText: request.allowTruncatedText }),
     ...(request.persistUsage === undefined ? {} : { persistUsage: request.persistUsage }),
+    ...(request.signal === undefined ? {} : { signal: request.signal }),
   }
 }
 

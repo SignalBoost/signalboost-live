@@ -558,15 +558,15 @@ export class BuilderToolLoop {
     }
     // Model capacity (a busy slot or a timed-out round) is not work: hand this slice's progress to the job runner's
     // capacity re-queue so the resumed job continues from here. The round produced nothing and is not counted.
-    const capacityStop = async (reason: 'builder_runpod_primary_busy' | 'builder_model_round_timeout'): Promise<BuilderLoopResult> => {
+    const capacityStop = async (reason: 'builder_runpod_primary_busy' | 'builder_model_round_timeout' | 'harness_provider_cost_budget_exceeded'): Promise<BuilderLoopResult> => {
       attempt = Math.max(0, attempt - 1)
       // #4323: after completed writes a timed-out round resumes by verifying the saved files first.
       if (reason === 'builder_model_round_timeout' && writeCount > 0) verificationPending = true
       const paused = await pause()
       return paused.ok === false && paused.checkpoint ? { ...paused, error: reason } : paused
     }
-    const capacityReason = (error: unknown): 'builder_runpod_primary_busy' | 'builder_model_round_timeout' | null =>
-      error instanceof Error && (error.message === 'builder_runpod_primary_busy' || error.message === 'builder_model_round_timeout') ? error.message : null
+    const capacityReason = (error: unknown): 'builder_runpod_primary_busy' | 'builder_model_round_timeout' | 'harness_provider_cost_budget_exceeded' | null =>
+      error instanceof Error && (error.message === 'builder_runpod_primary_busy' || error.message === 'builder_model_round_timeout' || error.message === 'harness_provider_cost_budget_exceeded') ? error.message : null
     const deadlineAtMs = Number(input.deadlineAtMs)
     const outOfTime = (): boolean => Number.isFinite(deadlineAtMs)
       && deadlineAtMs - Date.now() <= ROUND_RESERVE_MS

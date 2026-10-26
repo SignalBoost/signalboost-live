@@ -166,8 +166,15 @@ export function isPublicReleasable(answer: string): boolean {
 }
 
 // ---------------------------------------------------------------------------------------------
-// "What powers you?" detection
+// The reply for "what powers you?"
 // ---------------------------------------------------------------------------------------------
+//
+// When a visitor asks what model, provider or stack runs this service, the honest public answer
+// is a short statement that implementation details are not published — NOT an outage message.
+// Before this existed, the redaction pass could not clear such a draft, the turn failed closed
+// with no reply, and the route surfaced its generic "COS is temporarily unavailable" string
+// (verified in production 2026-08-26). A visitor read "broken" when the truth was "not public",
+// which is both misleading and a worse impression than the honest boundary.
 
 /** Asks what model, provider, or technology runs this service. */
 const ASKS_WHAT_POWERS_IT =
@@ -178,8 +185,32 @@ export function asksWhatPowersTheService(prompt: string): boolean {
   return ASKS_WHAT_POWERS_IT.test(String(prompt ?? ''))
 }
 
+const IMPLEMENTATION_REPLY: Record<string, string> = {
+  en: 'COS is SignalBoost\'s own reasoning layer, and it is what answers you here. I do not publish the underlying model, provider, or infrastructure details on this channel. Ask me anything else and I will answer it directly.',
+  es: 'COS es la capa de razonamiento propia de SignalBoost, y es la que te responde aquí. No publico detalles del modelo, del proveedor ni de la infraestructura en este canal. Pregúntame cualquier otra cosa y te respondo directamente.',
+  pt: 'O COS é a camada de raciocínio própria da SignalBoost e é ela que responde aqui. Não divulgo detalhes do modelo, do fornecedor ou da infraestrutura neste canal. Pergunte-me qualquer outra coisa e respondo diretamente.',
+  pl: 'COS to własna warstwa rozumowania SignalBoost i to ona tutaj odpowiada. Nie ujawniam na tym kanale szczegółów modelu, dostawcy ani infrastruktury. Zapytaj o cokolwiek innego, a odpowiem wprost.',
+  ru: 'COS — собственный слой рассуждений SignalBoost, и именно он отвечает вам здесь. Я не раскрываю на этом канале сведения о модели, поставщике или инфраструктуре. Спросите о чём угодно другом, и я отвечу прямо.',
+  de: 'COS ist die eigene Reasoning-Schicht von SignalBoost, und sie beantwortet hier Ihre Fragen. Details zum zugrunde liegenden Modell, Anbieter oder zur Infrastruktur veröffentliche ich in diesem Kanal nicht. Fragen Sie mich gern etwas anderes, und ich antworte direkt.',
+  fr: 'COS est la couche de raisonnement propre à SignalBoost, et c’est elle qui vous répond ici. Je ne publie pas de détails sur le modèle, le fournisseur ou l’infrastructure sous-jacents sur ce canal. Posez-moi toute autre question et j’y répondrai directement.',
+  it: 'COS è il livello di ragionamento proprietario di SignalBoost ed è ciò che ti risponde qui. Non pubblico dettagli sul modello, sul fornitore o sull’infrastruttura sottostanti in questo canale. Chiedimi qualsiasi altra cosa e ti risponderò direttamente.',
+  ja: 'COSはSignalBoost独自の推論レイヤーであり、ここでお答えしているのはCOSです。このチャネルでは、基盤となるモデル、プロバイダー、インフラの詳細は公開していません。その他のご質問には直接お答えします。',
+  ko: 'COS는 SignalBoost 자체의 추론 계층이며, 여기에서 답변하는 것도 COS입니다. 이 채널에서는 기반 모델, 제공업체, 인프라에 관한 세부 정보를 공개하지 않습니다. 다른 질문은 무엇이든 하시면 바로 답변해 드리겠습니다.',
+  ar: 'COS هي طبقة الاستدلال الخاصة بـ SignalBoost، وهي التي تجيبك هنا. لا أنشر تفاصيل النموذج أو المزوّد أو البنية التحتية الأساسية على هذه القناة. اسألني أي شيء آخر وسأجيبك مباشرة.',
+}
+
+/**
+ * The public answer to "what powers you?". Names nothing, states the boundary plainly, and
+ * invites the reader onward. Passes publicDisclosureViolations() by construction — a test pins
+ * that, because a reply that itself tripped the gate would loop.
+ */
+export function publicImplementationDisclosureReply(language?: string | null): string {
+  const code = String(language ?? 'en').trim().slice(0, 2).toLowerCase()
+  return IMPLEMENTATION_REPLY[code] ?? IMPLEMENTATION_REPLY.en
+}
+
 // ---------------------------------------------------------------------------------------------
-// Self-identity question detection (owner channel)
+// Self-identity questions are answered deterministically, never by the model
 // ---------------------------------------------------------------------------------------------
 //
 // Production failure, 2026-08-26: asked "What model powers COS?" the public channel replied
@@ -192,11 +223,10 @@ export function asksWhatPowersTheService(prompt: string): boolean {
 // being complete, and a list of every AI vendor a base model might name itself after never is.
 // The term list is widened below anyway, as a backstop.
 //
-// That false self-description is now caught on the answer: MODEL_TERM covers "trained by" and the vendor family, and
-// the public audience tells COS that COS powers the Concierge and implementation details are not public. The public
-// channel no longer answers identity questions from a fixed reply before inference (owner decision 2026-10-26): a
-// word rule on the request replaced whole answers to requests that merely mentioned models or providers. The owner
-// channel still answers its own identity questions from the verified runtime topology.
+// The real fix is that this question must not reach the model at all. It has exactly ONE correct
+// answer, known at build time, so the public path answers it deterministically before inference.
+// That also covers the whole family — who made you, who trained you, are you ChatGPT — which the
+// base model would otherwise answer from whatever it remembers about itself.
 
 /** Asks who or what built, trained, owns, or runs this service. */
 const ASKS_SERVICE_IDENTITY =
@@ -204,7 +234,7 @@ const ASKS_SERVICE_IDENTITY =
 
 /**
  * True for any question about what this service is, who built it, or what runs it.
- * Used to answer the OWNER's identity questions from the verified runtime topology before calling
+ * The public path must answer these from publicImplementationDisclosureReply() BEFORE calling
  * the reasoner — never by inspecting what the reasoner produced.
  */
 export function asksAboutServiceIdentity(prompt: string): boolean {

@@ -219,7 +219,11 @@ export function isConciergeBuilderObjective(prompt: string, context?: CosCodingR
   const analysisOnly = /\b(?:investigat(?:e|ion)|analy[sz](?:e|is)|forensic|incident commander|root causes?|hypotheses)\b/i.test(prompt)
     && /\b(?:do\s+not|don't|never|no)\s+(?:(?:write|generate|create|build|modify|execute|run)\s+(?:any\s+)?(?:code|files?|projects?|tests?)|(?:generate|create|build)\s+(?:a\s+)?project)\b/i.test(prompt)
   if (analysisOnly && classifyCosSoftwareDelivery(prompt) === 'analysis') return false
-  // A concrete runnable proof or isolated repository directive is executable work even\n  // if its instructions also ask the worker to diagnose/report test outcomes.\n  const executableProof = /\brun\s*:\s*(?:node|npm|pnpm|yarn|bun|python3?)\s+\S|\bcreate\s+an?\s+isolated\s+(?:[\w.-]+\s+){0,5}repository\b/i.test(prompt)\n  if (!executableProof && classifyCosSoftwareDelivery(prompt) === 'analysis' && /\b(?:analy[sz]e|analysis|investigate|identify|explain|diagnos[ei]|trace|audit|review|recommend|report|root causes?|failure modes?|debugging tasks?)\b/i.test(prompt)) return false
+  // A quoted test command is evidence in an analytical specification, not permission
+  // to launch a paid Builder job. Require an affirmative software-delivery objective
+  // before applying Builder-specific evidence rules; embedded runbooks and campaign
+  // fixtures are not executable authorization.
+  if (classifyCosSoftwareDelivery(prompt) === 'analysis') return false
   if (excludedFromBuilder(prompt, context)) return false
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true

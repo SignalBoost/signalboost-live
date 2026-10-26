@@ -251,6 +251,10 @@ const ASKS_SERVICE_IDENTITY =
  * path uses this only when the meaning-based judge gives no verdict (publicSelfDisclosureIntent.ts).
  */
 export function asksAboutServiceIdentity(prompt: string): boolean {
-  const value = String(prompt ?? '')
+  const value = String(prompt ?? '').trim()
+  // An incident analysis may quote a self-identity question as evidence. Route the
+  // substantive investigation to reasoning; keep direct self-identity questions
+  // deterministic even when their wording is long.
+  if (/[\r\n]/.test(value) || /\b(?:investigat(?:e|ion)|diagnos(?:e|is)|root.cause|hypothes(?:is|es)|forensic|rank(?:ed)? causes|propose experiments|uncertainty analysis)\b/i.test(value)) return false
   return asksWhatPowersTheService(value) || ASKS_SERVICE_IDENTITY.test(value)
 }

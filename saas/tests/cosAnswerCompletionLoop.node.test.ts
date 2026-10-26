@@ -64,13 +64,13 @@ test('the loop never runs more than three completion rounds', async () => {
   assert.equal(result.stopped, 'max_rounds')
 })
 
-test('without time for a check and a completion the answer is released as it is', async () => {
+test('without enough repair time the checker still runs but completion is withheld', async () => {
   let calls = 0
   const result = await runAnswerCompletionLoop({
     request: 'r', answer: 'a',
     ports: { remainingMs: () => ANSWER_COMPLETION_ROUND_RESERVE_MS - 1, check: async () => { calls++; return ['x'] }, complete: async () => { calls++; return 'y' } },
   })
-  assert.deepEqual({ stopped: result.stopped, calls, answer: result.answer }, { stopped: 'budget', calls: 0, answer: 'a' })
+  assert.deepEqual({ stopped: result.stopped, calls, answer: result.answer }, { stopped: 'budget', calls: 1, answer: 'a' })
 })
 
 test('a checker that cannot answer is never read as "complete"; numbered deliverables are still checked', async () => {

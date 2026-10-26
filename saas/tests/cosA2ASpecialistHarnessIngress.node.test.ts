@@ -174,3 +174,11 @@ test('live /api/cos-specialist route cannot orchestrate outside the Harness', ()
   assert.ok(guard >= 0)
   assert.ok(source.indexOf('requireCosA2ASpecialistHarnessIngress()', guard) > guard)
 })
+
+test('A2A specialist child inherits the parent spend and deadline ceiling', () => {
+  const source = readFileSync(join(process.cwd(), 'lib/ai/cos/a2aSpecialistHarness.ts'), 'utf8')
+  assert.match(source, /deadlineMs: Math\\.min\\(A2A_SPECIALIST_DEADLINE_MS, parentManifest\\.limits\\.deadlineMs\\)/)
+  assert.match(source, /maxCostUsd: parentManifest\\.limits\\.maxCostUsd/)
+  assert.match(source, /maxToolCalls: Math\\.min\\(1, parentManifest\\.limits\\.maxToolCalls\\)/)
+  assert.match(source, /maxConcurrency: Math\\.min\\(1, parentManifest\\.limits\\.maxConcurrency\\)/)
+})

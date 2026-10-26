@@ -1,2 +1,2 @@
-base_sha=3f42d2f278a0455e29c51047ee476153025f1f87
-branch=fix/cos-agent-loop-context-continuity-20261026
+base_sha=d1efeb718405be289571e4b6cbe1e2d95703bd33
+branch=fix/cos-a2a-parent-budget-current-main-20261026

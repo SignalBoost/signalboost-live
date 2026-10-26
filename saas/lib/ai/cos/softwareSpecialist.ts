@@ -9,7 +9,8 @@ import { builderRepositoryImportIntent, builderRepositoryTarget, importBuilderRe
 import { after, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { publicAuditUserId } from '@/lib/auth/publicAuditIdentity'
-import { pastedSourceCode, type CosCodingRoutingContext } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { isConciergeBuilderObjective, pastedSourceCode, type CosCodingRoutingContext } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { compileCosInstructionContract } from '@/lib/ai/cos/instructionContract'
 import { repairAwaitingSource } from '@/lib/ai/cos/softwareRepairIntent'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import type { SupportedLanguage } from '@/lib/i18n/supportedLanguages'
@@ -55,6 +56,8 @@ export type CosSoftwareSpecialistRequest = Readonly<{
    * this is what admits software work; the request's wording alone never does.
    */
   plannerRequested?: boolean
+  /** The person confirmed our own offer to repair (pendingOwnerSoftwareRepair); the objective is the recovered request. */
+  confirmedRepairContinuation?: boolean
   deployment?: Readonly<{
     commitSha?: string | null
     branch?: string | null
@@ -175,6 +178,7 @@ async function enqueueRepositoryRepair(input: {
  */
 export function specialistAdmitted(input: CosSoftwareSpecialistRequest, objective: string, sourceAttached: boolean, mediaAttached: boolean): boolean {
   return input.plannerRequested === true
+    || input.confirmedRepairContinuation === true
     || sourceAttached
     || mediaAttached
     || pastedSourceCode(objective)
@@ -334,8 +338,13 @@ async function tryCosSoftwareSpecialistLegacy(
     })
   }
 
-  // A Builder job starts only on COS's own request or on source that is actually here, never on the wording.
-  const executionRequested = input.plannerRequested === true || sourceAttached || pastedSourceCode(objective)
+  // A Builder job starts only on COS's own request, on a confirmed repair offer, or on source that is actually here
+  // and handed over to be worked on (code supplied to be explained stays with COS; Codex on #4916). An explicit
+  // instruction not to execute always wins.
+  const executionRequested = !compileCosInstructionContract(objective).prohibitsExecution && (
+    input.plannerRequested === true
+    || input.confirmedRepairContinuation === true
+    || ((sourceAttached || pastedSourceCode(objective)) && isConciergeBuilderObjective(objective, context)))
   if (mediaAttached || !(executionRequested || repositoryTarget || project.context)) return null
   // PR #4719: Builder V2 continues and repairs an existing project; only an explicitly selected
   // workspace with no recorded job in this conversation is refused.

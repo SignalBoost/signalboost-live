@@ -35,6 +35,8 @@ test('the words of a request never admit software work; facts or the planner do'
     assert.equal(specialistAdmitted(request({ plannerRequested: true }), words, false, false), true, words.slice(0, 40))
   }
   assert.equal(specialistAdmitted(request(), 'this is broken', true, false), true, 'an attached source file')
+  // Codex on #4916: the owner's "go" after our own offer to repair carries the recovered request into admission.
+  assert.equal(specialistAdmitted(request({ confirmedRepairContinuation: true }), 'Fix the Failed to fetch error on the Builder page', false, false), true)
   assert.equal(specialistAdmitted(request(), 'Why does this crash?\n```js\nconst items = []\nitems[3].name\n```', false, false), true, 'pasted source')
 })
 
@@ -45,6 +47,7 @@ test('chat consults the Software Specialist before the planner only on facts', (
   assert.doesNotMatch(gate, /softwareRepairRequest|isConciergeBuilderObjective|isSoftwareRepairRequest/)
   // The planner's handoff is what admits a request described only in words.
   assert.equal(browser.match(/plannerRequested: true,/g)?.length, 3)
+  assert.match(browser, /confirmedRepairContinuation: Boolean\(ownerRepairFollowup\) && specialistObjective === ownerRepairFollowup,/)
 })
 
 test('every surface can ask for the Software Specialist; repository authority stays with the signed-in owner', () => {

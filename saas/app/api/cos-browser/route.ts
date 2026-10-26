@@ -342,6 +342,8 @@ async function executeBrowserTurn(req: NextRequest) {
       ? await tryCosSoftwareSpecialist({
           body,
           objective: specialistObjective,
+          // The owner confirmed our own repair offer; the objective is the recovered request (Codex on #4916).
+          confirmedRepairContinuation: Boolean(ownerRepairFollowup) && specialistObjective === ownerRepairFollowup,
           surface: browserSurface,
           allowRepositoryRepair: ownerSoftwareAuthority.allowRepositoryRepair && (!operationalEvidence || explicitOperationalRepair),
           signalBoostDeploymentContext: isSignalBoostDeploymentContext(req),

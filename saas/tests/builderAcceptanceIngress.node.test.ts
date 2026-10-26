@@ -182,3 +182,14 @@ test('Developer admits explicit isolated PR and preview jobs when generic classi
   assert.equal(calls.jobs[0].metadata.builderEngine, 'v2')
   assert.equal(calls.repairs, 0)
 })
+
+// Codex on #4916: code supplied to be explained is not permission to run a paid Builder job, while code handed over
+// to be repaired still is.
+test('pasted source is worked on only when it is handed over as the job', async () => {
+  const explain = 'Explain this function. Do not run or change any code.\n```js\nfunction total(items) {\n  return items.reduce((sum, item) => sum + item.price, 0)\n}\n```'
+  const { specialist, calls } = setup(true)
+  const response = await specialist({ body: { messages: [{ role: 'user', content: explain }] }, objective: explain, surface: 'assistant' })
+  assert.equal(response, null)
+  assert.equal(calls.jobs.length, 0)
+  assert.equal(calls.workspace, 0)
+})

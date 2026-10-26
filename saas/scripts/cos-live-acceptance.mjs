@@ -20,7 +20,7 @@ if (!process.env.COS_LIVE_EXPECTED_COMMIT) {
   console.error('COS live acceptance NOT RUN: set COS_LIVE_EXPECTED_COMMIT for deployment correlation.')
   process.exit(2)
 }
-const result = spawnSync('npx', ['playwright','test','--config=playwright.live.config.ts'], {
+const result = spawnSync('npx', ['--no-install','playwright','test','--config=playwright.live.config.ts'], {
   cwd: process.cwd(),
   env: process.env,
   stdio: 'inherit',

@@ -1,2 +1,2 @@
-base_sha=b817c3020b43136640ee55f9d7a5abd85fc988a4
-branch=fix/cos-release-gate-two-regressions-20261026
+base_sha=e5a9116d2e8d613de5f719fd8b6806dd43246984
+branch=fix/cos-a2a-test-reconcile-latest-main-20261026

@@ -23,11 +23,14 @@ export const SELF_DISCLOSURE_JUDGE_MS = 2_500
 /** The judge sees at most this much of the request; the caller re-checks anything longer (Codex on #4955). */
 export const PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS = 4_000
 
+// Labeled as an interactive call (like the public scope repair and redaction calls) so it takes the bounded
+// interactive transport, never the background primary-GPU readiness wait that can hold a call for up to 120s before
+// its transport timeout starts (Codex on #4955).
 async function defaultReasoner(args: Record<string, unknown>) {
   const { callCosReasoner } = await import('./cosReasoner.ts')
   return callCosReasoner({
     ...args,
-    usageContext: { feature: 'cos_routing_classifier', purpose: 'public_self_disclosure' },
+    usageContext: { feature: 'cos_interactive_answer', purpose: 'public_self_disclosure' },
     disableThinking: true,
     timeoutMs: SELF_DISCLOSURE_JUDGE_MS,
     allowConfiguredFallback: false,
@@ -35,14 +38,23 @@ async function defaultReasoner(args: Record<string, unknown>) {
 }
 
 /**
- * The transport timeout does not bound everything before it: a not-yet-ready primary GPU can hold a call in its
- * readiness wait for up to 120s before the transport starts (Codex on #4955). The whole judge is therefore raced
- * against its own deadline; a late judge yields no verdict and the caller's conservative fallback decides.
+ * The whole judge is bounded by its own deadline, and at the deadline its model call is aborted rather than left
+ * running: a late judge yields no verdict, consumes no further compute, and the caller's conservative fallback decides.
  */
-function withinDeadline<T>(work: Promise<T>, deadlineMs: number): Promise<T | null> {
+async function withinDeadline<T>(work: (signal: AbortSignal) => Promise<T>, deadlineMs: number): Promise<T | null> {
+  const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), deadlineMs) })
-  return Promise.race([work.catch(() => null), deadline]).finally(() => clearTimeout(timer))
+  const deadline = new Promise<null>(resolve => {
+    timer = setTimeout(() => {
+      controller.abort(new Error('public_self_disclosure_judge_deadline'))
+      resolve(null)
+    }, deadlineMs)
+  })
+  try {
+    return await Promise.race([work(controller.signal).catch(() => null), deadline])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 const SYSTEM_PROMPT = [
@@ -62,7 +74,7 @@ export async function classifyPublicSelfDisclosure(
 ): Promise<PublicSelfDisclosureIntent | null> {
   const value = String(request || '').trim()
   if (!value) return 'none'
-  const result = await withinDeadline(callImpl({
+  const result = await withinDeadline(signal => callImpl({
     temperature: 0,
     maxTokens: 24,
     jsonObject: true,
@@ -70,6 +82,7 @@ export async function classifyPublicSelfDisclosure(
     presencePenalty: 0,
     systemPrompt: SYSTEM_PROMPT,
     prompt: value.slice(0, PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS),
+    signal,
   }), deadlineMs)
   if (!result?.text) return null
   try {

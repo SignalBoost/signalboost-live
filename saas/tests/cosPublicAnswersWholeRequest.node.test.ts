@@ -58,11 +58,23 @@ test('every public answer path runs after the verdict and is released through th
   assert.equal(core.match(/await tryFreshCurrentFact\(input\)/g)?.length, core.match(/releasePublic\(await tryFreshCurrentFact\(input\)\)/g)?.length)
 })
 
-test('a judge that hangs (e.g. a GPU readiness wait) yields no verdict within its own deadline', async () => {
+test('a judge that hangs yields no verdict within its own deadline, and its model call is aborted', async () => {
   const startedAt = Date.now()
-  const verdict = await classifyPublicSelfDisclosure('What model powers you?', () => new Promise(() => {}), 50)
+  let signal: AbortSignal | undefined
+  const verdict = await classifyPublicSelfDisclosure('What model powers you?', args => {
+    signal = args.signal as AbortSignal
+    return new Promise(() => {})
+  }, 50)
   assert.equal(verdict, null)
   assert.ok(Date.now() - startedAt < 1_000)
+  assert.equal(signal?.aborted, true)
+})
+
+test('the judge takes the bounded interactive transport and its cancel signal reaches the model call', () => {
+  const judge = readFileSync(new URL('../lib/ai/cos/publicSelfDisclosureIntent.ts', import.meta.url), 'utf8')
+  assert.match(judge, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'public_self_disclosure' \}/)
+  const workers = readFileSync(new URL('../lib/ai/cos/cosReasoningWorkers.ts', import.meta.url), 'utf8')
+  assert.match(workers, /\.\.\.\(request\.signal === undefined \? \{\} : \{ signal: request\.signal \}\)/)
 })
 
 test('without a verdict, both detectors the old public intercept used still decide', () => {

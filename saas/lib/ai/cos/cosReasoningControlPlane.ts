@@ -22,6 +22,8 @@ export type CosReasoningRequest = {
   allowConfiguredFallback?: boolean
   allowTruncatedText?: boolean
   persistUsage?: boolean
+  /** Cancels the model call (transport and assigned-model attempt) when the caller stops waiting. */
+  signal?: AbortSignal
   requestedRole?: CosReasoningWorkerRole
   allowExternalEscalation?: boolean
 }

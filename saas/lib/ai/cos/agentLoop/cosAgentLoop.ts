@@ -369,9 +369,9 @@ export async function runCosAgentLoop(input: {
     ? 'The user requested analysis only. Do not execute code, generate project files, or use run_python. Research and explain without performing prohibited execution.'
     : 'Respect the original user instructions. Do not infer permission for code or project mutation merely from quoted examples.'
   const deliverableInstructions = contract.deliverables.length
-    ? '\\nRequired deliverables in the user instruction (cover each explicitly):\\n' + contract.deliverables.map((item, index) => `${index + 1}. ${item}`).join('\\n')
+    ? '\nRequired deliverables in the user instruction (cover each explicitly):\n' + contract.deliverables.map((item, index) => `${index + 1}. ${item}`).join('\n')
     : ''
-  const systemPrompt = cosAgentSystemPrompt(input.language, new Date(now())) + '\\n' + contractInstructions + deliverableInstructions
+  const systemPrompt = cosAgentSystemPrompt(input.language, new Date(now())) + '\n' + contractInstructions + deliverableInstructions
   const evidence: AgentEvidence = emptyEvidence(input.request)
   const history = (input.conversation || []).slice(-6).map(message => ({ role: message.role, content: String(message.content || '').slice(0, 4_000) }))
   const messages: LocalModelChatMessage[] = [...history, { role: 'user', content: input.request }]

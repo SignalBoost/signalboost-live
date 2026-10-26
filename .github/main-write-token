@@ -1,2 +1,2 @@
-base_sha=f2a4e96418205f33d592ec6456757f743359c358
-branch=fix/cos-stale-builder-status-current-main-20261026
+base_sha=644d6919c85cbe407c929ec22b3f181cb6a1497e
+branch=fix/cos-timeout-await-history-recovery-20261026

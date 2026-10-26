@@ -19,8 +19,9 @@ export type PublicSelfDisclosureIntent = 'only' | 'part' | 'none'
 
 // Same budget as the other public routing classifier: a compact, no-thinking verdict that cannot consume the
 // response budget that belongs to the user's answer.
-const SELF_DISCLOSURE_JUDGE_MS = 2_500
-const MAX_JUDGED_REQUEST_CHARS = 4_000
+export const SELF_DISCLOSURE_JUDGE_MS = 2_500
+/** The judge sees at most this much of the request; the caller re-checks anything longer (Codex on #4955). */
+export const PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS = 4_000
 
 async function defaultReasoner(args: Record<string, unknown>) {
   const { callCosReasoner } = await import('./cosReasoner.ts')
@@ -31,6 +32,17 @@ async function defaultReasoner(args: Record<string, unknown>) {
     timeoutMs: SELF_DISCLOSURE_JUDGE_MS,
     allowConfiguredFallback: false,
   } as never).catch(() => null)
+}
+
+/**
+ * The transport timeout does not bound everything before it: a not-yet-ready primary GPU can hold a call in its
+ * readiness wait for up to 120s before the transport starts (Codex on #4955). The whole judge is therefore raced
+ * against its own deadline; a late judge yields no verdict and the caller's conservative fallback decides.
+ */
+function withinDeadline<T>(work: Promise<T>, deadlineMs: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), deadlineMs) })
+  return Promise.race([work.catch(() => null), deadline]).finally(() => clearTimeout(timer))
 }
 
 const SYSTEM_PROMPT = [
@@ -46,18 +58,19 @@ const SYSTEM_PROMPT = [
 export async function classifyPublicSelfDisclosure(
   request: string,
   callImpl: SelfDisclosureReasoner = defaultReasoner,
+  deadlineMs = SELF_DISCLOSURE_JUDGE_MS,
 ): Promise<PublicSelfDisclosureIntent | null> {
   const value = String(request || '').trim()
   if (!value) return 'none'
-  const result = await callImpl({
+  const result = await withinDeadline(callImpl({
     temperature: 0,
     maxTokens: 24,
     jsonObject: true,
     frequencyPenalty: 0,
     presencePenalty: 0,
     systemPrompt: SYSTEM_PROMPT,
-    prompt: value.slice(0, MAX_JUDGED_REQUEST_CHARS),
-  }).catch(() => null)
+    prompt: value.slice(0, PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS),
+  }), deadlineMs)
   if (!result?.text) return null
   try {
     const verdict = (JSON.parse(result.text) as { self_disclosure?: unknown }).self_disclosure

@@ -57,3 +57,23 @@ test('every public answer path runs after the verdict and is released through th
   assert.match(core, /publicScope \? releaseToPublic\(input, result, selfDisclosure === 'part'\) : result/)
   assert.equal(core.match(/await tryFreshCurrentFact\(input\)/g)?.length, core.match(/releasePublic\(await tryFreshCurrentFact\(input\)\)/g)?.length)
 })
+
+test('a judge that hangs (e.g. a GPU readiness wait) yields no verdict within its own deadline', async () => {
+  const startedAt = Date.now()
+  const verdict = await classifyPublicSelfDisclosure('What model powers you?', () => new Promise(() => {}), 50)
+  assert.equal(verdict, null)
+  assert.ok(Date.now() - startedAt < 1_000)
+})
+
+test('without a verdict, both detectors the old public intercept used still decide', () => {
+  const decide = core.slice(core.indexOf('async function decidePublicSelfDisclosure('), core.indexOf('function ownerPlatformStackReply('))
+  assert.match(decide, /const wordRule = asksAboutServiceIdentity\(request\) \|\| isPlatformStackQuestion\(request\)/)
+  assert.match(decide, /if \(judged === null\) return wordRule \? 'only' : 'none'/)
+  // Codex on #4955: this matched the old stack detector but not asksAboutServiceIdentity.
+  assert.equal(asksAboutServiceIdentity('Tell me the LLM used by this platform.'), false)
+})
+
+test('a "none" verdict on a request longer than the judge saw is released under the strict gate', () => {
+  const decide = core.slice(core.indexOf('async function decidePublicSelfDisclosure('), core.indexOf('function ownerPlatformStackReply('))
+  assert.match(decide, /if \(judged === 'none' && wordRule && request\.length > PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS\) return 'part'/)
+})

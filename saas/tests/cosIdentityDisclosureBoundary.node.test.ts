@@ -47,7 +47,7 @@ test('trusted runtime context reports RunPod primary separately from DeepInfra f
 
 test('public identity is decided by meaning; the owner channel keeps its runtime-topology answer', () => {
   assert.match(core, /if \(!isPublicDeliveryScope\(\) && \(isPlatformStackQuestion\(input\.prompt\) \|\| asksAboutServiceIdentity\(input\.prompt\)\)\)/)
-  assert.match(core, /\(await classifyPublicSelfDisclosure\(publicRequest\)\) \?\? \(asksAboutServiceIdentity\(publicRequest\) \? 'only' : 'none'\)/)
+  assert.match(core, /const selfDisclosure = publicScope \? await decidePublicSelfDisclosure\(publicRequest\) : 'none'/)
   assert.match(core, /publicImplementationDisclosureReply\(input\.language\)/)
   assert.doesNotMatch(enterprise, /publicImplementationDisclosureReply/)
 })

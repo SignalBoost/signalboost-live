@@ -62,7 +62,7 @@ function withComputedArithmetic<T extends { answer: string } | null>(parsed: T):
 }
 
 import { publicDisclosureViolations, asksAboutServiceIdentity, publicImplementationDisclosureReply } from './publicDisclosureGate.ts'
-import { classifyPublicSelfDisclosure } from './publicSelfDisclosureIntent.ts'
+import { classifyPublicSelfDisclosure, PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS } from './publicSelfDisclosureIntent.ts'
 import { publicScenarioScopeViolations, publicUserRequestText } from './publicScenarioScope.ts'
 import {
   tryCOSFirstAnswer as tryEnterpriseCOSFirstAnswer,
@@ -77,6 +77,14 @@ const PLATFORM_STACK_ASK = /(?:model|modelo|llm|reasoner|engine|provedor|provide
 function isPlatformStackQuestion(prompt: unknown): boolean {
   const text = String(prompt ?? '')
   return isPlatformSelfKnowledgePrompt(text) || PLATFORM_STACK_ASK.test(text)
+}
+
+async function decidePublicSelfDisclosure(request: string): Promise<'only' | 'part' | 'none'> {
+  const judged = await classifyPublicSelfDisclosure(request)
+  const wordRule = asksAboutServiceIdentity(request) || isPlatformStackQuestion(request)
+  if (judged === null) return wordRule ? 'only' : 'none'
+  if (judged === 'none' && wordRule && request.length > PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS) return 'part'
+  return judged
 }
 
 function ownerPlatformStackReply(language?: string | null): string {
@@ -860,13 +868,12 @@ export async function tryCOSFirstAnswer(input: {
   // provider or creator is decided by meaning, in any language (publicSelfDisclosureIntent.ts), before any answer path,
   // so an identity question can never reach a path that releases its answer unchecked. Only a request that asks
   // nothing else gets the fixed boundary reply; every other request is answered whole and released through
-  // releaseToPublic(). A judge outage falls back to the conservative word rule: a classifier failure never opens the
-  // boundary.
+  // releaseToPublic(). The word rules (both detectors the old public intercept used) are the safety net only: with no
+  // verdict they decide as the old intercept did, and for a request longer than the judge saw, a "none" verdict is not
+  // trusted on its own — the request is answered whole but released under the strict self-disclosure gate.
   const publicScope = isPublicDeliveryScope()
   const publicRequest = publicScope ? publicUserRequestText(input.prompt) : ''
-  const selfDisclosure = publicScope
-    ? (await classifyPublicSelfDisclosure(publicRequest)) ?? (asksAboutServiceIdentity(publicRequest) ? 'only' : 'none')
-    : 'none'
+  const selfDisclosure = publicScope ? await decidePublicSelfDisclosure(publicRequest) : 'none'
   if (selfDisclosure === 'only') {
     return learnFromTurn(input, {
       handled: true,

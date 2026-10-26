@@ -401,12 +401,10 @@ export async function postWithAgentProgress(args: {
       if (boundedPublicTransport && responseSignal.aborted) {
         // A dropped HTTP request is not proof of a failed model. The server
         // may already have persisted the response before the gateway timed out.
-        const saved = historyWatchEligible ? await recoverSavedTurnOnce({
-          conversationId: conversationIdForTurn,
-          userText: userTextForTurn,
-          sentAtMs: startedAt,
-          signal: args.signal,
-        }) : null
+        // The browser deadline is shorter than the durable History watch.
+        // A single immediate read can miss the answer that is still being saved.
+        // Continue the existing read-only watch; never replay this POST.
+        const saved = historyWatchEligible ? await watched : null
         if (saved) {
           report('complete', say(PROGRESS_READY))
           return { ok: true, status: 200, data: historyRecoveryData(saved) }
@@ -473,12 +471,15 @@ export async function postWithAgentProgress(args: {
     || receivedReply === transportFailureReply(requestBody)
     || ['concierge-browser-deadline', 'assistant-transport-unconfirmed', 'cos-browser-turn-deadline'].includes(String(data?.source || ''))
   if (historyWatchEligible && transportFailed && !args.signal.aborted) {
-    const saved = await recoverSavedTurnOnce({
+    // A server/gateway timeout envelope may arrive before History is committed.
+    // The already-started read-only watch was stopped when the HTTP race ended,
+    // so continue bounded recovery here without a duplicate POST.
+    const saved = await watchHistoryForCompletedTurn({
       conversationId: conversationIdForTurn,
       userText: userTextForTurn,
       sentAtMs: startedAt,
       signal: args.signal,
-    })
+    }).catch(() => null)
     if (saved) {
       report('complete', say(PROGRESS_READY))
       return { ok: true, status: 200, data: historyRecoveryData(saved) }

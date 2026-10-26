@@ -64,3 +64,38 @@ test('a model-issued forbidden call is blocked at execution, even if the model i
   assert.equal(result?.reply, 'Analysis completed without execution.')
   assert.ok(calls >= 2)
 })
+
+test('older user restrictions survive conversation truncation without granting tools', async () => {
+  let captured: readonly { role: string; content?: string | null }[] = []
+  const model: AgentModelTurn = async input => {
+    captured = input.messages
+    return { content: 'Completed with available evidence.', toolCalls: [], finishReason: 'stop', provider: 'test', model: 'test' }
+  }
+  await runCosAgentLoop({
+    request: 'Explain the findings.',
+    conversation: [
+      { role: 'user', content: 'Never publish private customer data. Limit spending to 50 cents.' },
+      ...Array.from({ length: 8 }, (_, i) => ({ role: i % 2 ? 'assistant' as const : 'user' as const, content: 'A routine context message number ' + i })),
+    ],
+    language: 'en', model, ports,
+    policy: { maxPythonRuns: 2, browserAllowed: false }, deadlineAt: Date.now() + 90_000,
+  })
+  assert.match(captured.map(message => message.content || '').join('\n'), /Never publish private customer data/)
+  assert.equal(captured.at(-1)?.content, 'Explain the findings.')
+})
+
+test('historical constraints are bounded and do not transform the latest request into execution authorization', async () => {
+  let content = ''
+  const model: AgentModelTurn = async input => {
+    content = input.messages.map(m => m.content || '').join(' ')
+    return { content: 'Analysis completed.', toolCalls: [], finishReason: 'stop', provider: 'test', model: 'test' }
+  }
+  await runCosAgentLoop({
+    request: 'Investigate the incident. Do not execute code.',
+    conversation: Array.from({ length: 40 }, (_, i) => ({ role: 'user' as const, content: 'Never expose API credentials in report section ' + i })),
+    language: 'en', model, ports, policy: { maxPythonRuns: 2, browserAllowed: false },
+    deadlineAt: Date.now() + 90_000,
+  })
+  assert.ok(content.length < 30_000)
+  assert.match(content, /Never expose API credentials/)
+})

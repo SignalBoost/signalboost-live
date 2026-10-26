@@ -1,2 +1,2 @@
-base_sha=3f42d2f278a0455e29c51047ee476153025f1f87
-branch=fix/cos-agent-loop-context-continuity-20261026
+base_sha=b817c3020b43136640ee55f9d7a5abd85fc988a4
+branch=fix/cos-release-gate-two-regressions-20261026

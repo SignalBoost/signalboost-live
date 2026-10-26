@@ -144,7 +144,8 @@ const internalRetrievalIndex = enterpriseFirstAnswer.indexOf('const context = aw
 const enterpriseReasonerIndex = enterpriseFirstAnswer.indexOf('const reasoned = await callCosReasoner')
 if (internalRetrievalIndex < 0 || enterpriseReasonerIndex < 0 || internalRetrievalIndex > enterpriseReasonerIndex) failures.push('advisory_diagnosis_internal_retrieval_must_precede_reasoner')
 const honestRefusal = await readFile(path.join(root, 'lib/ai/cos/honestRefusalReply.ts'), 'utf8')
-if (!honestRefusal.includes('I still cannot stand behind a single cause yet.')) failures.push('advisory_diagnosis_uncertainty_last_copy_missing')
+// The no-answer reply never depends on the request's wording (2026-10-26): no keyword-built input lists.
+if (/SHAPE_|PROBES|missingInputKeys/.test(honestRefusal)) failures.push('honest_refusal_must_not_guess_from_wording')
 
 const diagnosisResearchTrace = await readFile(path.join(root, 'lib/ai/cos/advisoryDiagnosisResearchTrace.ts'), 'utf8')
 for (const required of ['recordAdvisoryDiagnosisResearchForAnswer', 'consumeAdvisoryDiagnosisResearchForAnswer', 'TRACE_TTL_MS', 'MAX_TRACES = 128']) {

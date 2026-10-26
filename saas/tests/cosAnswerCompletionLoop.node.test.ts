@@ -64,13 +64,13 @@ test('the loop never runs more than three completion rounds', async () => {
   assert.equal(result.stopped, 'max_rounds')
 })
 
-test('without time for a check and a completion the answer is released as it is', async () => {
+test('without enough repair time the checker still runs but completion is withheld', async () => {
   let calls = 0
   const result = await runAnswerCompletionLoop({
     request: 'r', answer: 'a',
     ports: { remainingMs: () => ANSWER_COMPLETION_ROUND_RESERVE_MS - 1, check: async () => { calls++; return ['x'] }, complete: async () => { calls++; return 'y' } },
   })
-  assert.deepEqual({ stopped: result.stopped, calls, answer: result.answer }, { stopped: 'budget', calls: 0, answer: 'a' })
+  assert.deepEqual({ stopped: result.stopped, calls, answer: result.answer }, { stopped: 'budget', calls: 1, answer: 'a' })
 })
 
 test('a checker that cannot answer is never read as "complete"; numbered deliverables are still checked', async () => {
@@ -189,4 +189,22 @@ test('COS reasoner blocks release when completion verification is incomplete', (
   assert.match(source, /if \(!completion \|\| completion\.stopped !== 'complete'\)/)
   const guard = source.indexOf("if (!completion || completion.stopped !== 'complete')")
   assert.ok(guard > 0 && guard < source.indexOf('const finalParsedForPolicy = parseLocalResult(text)'))
+})
+
+
+test('verification can pass when time remains for a check but not a repair round', async () => {
+  const receipts: boolean[] = []
+  let repaired = false
+  const result = await runAnswerCompletionLoop({request:'Explain a verified fact',answer:'Grounded explanation',ports:{remainingMs:()=>10_000,check:async()=>[],verify:async()=>({passed:true,failures:[]}),persistVerification:async receipt=>{receipts.push(receipt.passed)},complete:async()=>{repaired=true;return null}}})
+  assert.equal(result.stopped,'complete')
+  assert.deepEqual(receipts,[true])
+  assert.equal(repaired,false)
+})
+
+test('insufficient repair time still reports missing work', async () => {
+  let checked=false
+  const result=await runAnswerCompletionLoop({request:'Supply three findings',answer:'One finding',ports:{remainingMs:()=>10_000,check:async()=>{checked=true;return ['two missing']},complete:async()=>{throw Error('repair must not run')}}})
+  assert.equal(checked,true)
+  assert.equal(result.stopped,'budget')
+  assert.deepEqual(result.missing,['two missing'])
 })

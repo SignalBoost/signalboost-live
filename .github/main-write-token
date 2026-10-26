@@ -1,2 +1,2 @@
-base_sha=967c3a015511d8596a476fbd9c1e839508afe462
-branch=fix/cos-answer-room-not-guessed-20261026
+base_sha=f2a4e96418205f33d592ec6456757f743359c358
+branch=fix/cos-stale-builder-status-current-main-20261026

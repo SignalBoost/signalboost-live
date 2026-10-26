@@ -415,6 +415,14 @@ export async function callRawCosReasoner(
         deterministicMissing: answer => missingAnalyticalTasks(args.prompt, answer),
         ports: {
           remainingMs: () => remainingMs(budget),
+          // Deterministic host-side quality gate. A model's self-verdict cannot override these defects.
+          verify: async (request, answer) => {
+            const failures = [
+              ...missingAnalyticalTasks(request, answer),
+              ...(advisoryDiagnosis ? advisoryDiagnosisBriefDefects(request, answer) : []),
+            ]
+            return { passed: failures.length === 0, failures }
+          },
           check: async (request, answer) => parseAnswerCompletionCheck(await callLocalModel({
             ...effectiveArgs,
             writesUserAnswer: false,

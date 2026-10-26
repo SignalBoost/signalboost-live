@@ -782,9 +782,12 @@ function ownedReasonerContextWindowTokens(config: LocalInferenceConfig): number 
 }
 
 /** Chat answers are short; this cap keeps a runaway owned answer from holding the chat for a minute. */
-function interactiveRunpodMaxTokens(requested: number | undefined): number {
+export function interactiveRunpodMaxTokens(requested: number | undefined, longForm = false): number {
   const configured = Number(process.env.COS_INTERACTIVE_RUNPOD_MAX_TOKENS || '1000')
-  const cap = Number.isFinite(configured) ? Math.max(512, Math.min(4000, Math.floor(configured))) : 1000
+  const chatCap = Number.isFinite(configured) ? Math.max(512, Math.min(4000, Math.floor(configured))) : 1000
+  // Long-form investigations must not inherit the short-chat ceiling. The
+  // request still has a hard bound, and its existing deadline is unchanged.
+  const cap = longForm ? 4000 : chatCap
   return Math.min(requested ?? cap, cap)
 }
 
@@ -869,7 +872,7 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
       const contextWindowTokens = ownedReasonerContextWindowTokens(runpodConfig)
       try {
         const turn = await callConfiguredModelTurn(
-          { ...args, maxTokens: interactiveRunpodMaxTokens(args.maxTokens) },
+          { ...args, maxTokens: interactiveRunpodMaxTokens(args.maxTokens, args.longForm === true) },
           {
             ...runpodConfig,
             ...(contextWindowTokens ? { contextWindowTokens } : {}),

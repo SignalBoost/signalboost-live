@@ -183,3 +183,10 @@ test('host validation cannot exceed the built-in three correction rounds', async
   assert.equal(result.stopped, 'no_progress')
   assert.ok(result.rounds <= ANSWER_COMPLETION_MAX_ROUNDS)
 })
+
+test('COS reasoner blocks release when completion verification is incomplete', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
+  assert.match(source, /if \(!completion \|\| completion\.stopped !== 'complete'\)/)
+  const guard = source.indexOf("if (!completion || completion.stopped !== 'complete')")
+  assert.ok(guard > 0 && guard < source.indexOf('const finalParsedForPolicy = parseLocalResult(text)'))
+})

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { runCosAgentLoop, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
 import type { AgentToolPorts } from '../lib/ai/cos/agentLoop/cosAgentTools.ts'
+import { SUPPORTED_LANGUAGES } from '../lib/i18n/supportedLanguages.ts'
 
 const ports: AgentToolPorts = {
   search: async () => [],
@@ -107,7 +108,15 @@ test('historical constraints in every required COS language reach the model', as
     'Não divulgue credenciais particulares.',
     'Nigdy nie ujawniaj poufnych danych.',
     'Никогда не раскрывайте секретные данные.',
+    'Niemals vertrauliche Kundendaten veröffentlichen.',
+    'Ne jamais partager les données confidentielles.',
+    'Non divulgare informazioni riservate.',
+    '顧客の秘密情報を公開しないでください。',
+    '고객의 비밀 정보를 공유하지 마세요.',
+    'لا تشارك معلومات العملاء السرية.',
   ]
+  assert.deepEqual([...SUPPORTED_LANGUAGES], ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'])
+  assert.equal(requirements.length, SUPPORTED_LANGUAGES.length)
   let captured = ''
   const model: AgentModelTurn = async input => {
     captured = input.messages.map(message => message.content || '').join(' ')

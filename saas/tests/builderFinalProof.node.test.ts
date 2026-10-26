@@ -22,7 +22,7 @@ const publication = {
   repository: 'SignalBoost/builder-123', repositoryCreated: true, repositoryPrivate: true,
   pullRequestUrl: 'https://github.com/SignalBoost/builder-123/pull/1',
   commitSha: 'a'.repeat(40), mergeCommitSha: 'b'.repeat(40),
-  previewUrl: 'https://test.vercel.app',
+  deploymentId: 'dpl_verified-receipt-123', previewUrl: 'https://test.vercel.app',
   endpointUrl: 'https://test.vercel.app/sum?a=2&b=3',
   status: 'verified', httpStatus: 200, responseBody: { total: 5 },
 }
@@ -75,4 +75,11 @@ test('missing budget or exceeded deadline cannot pass explicit 10-minute budget 
 
 test('test verification cannot be overridden by publication success', () => {
   assert.equal(proof({ acceptance: { ...acceptance, passed: false } }).criteria.hostTests, false)
+})
+
+
+test('a PR and commit without a verified Vercel deployment cannot claim publication success', () => {
+  assert.equal(proof({ publication: { ...publication, status: 'building' } }).criteria.publication, false)
+  assert.equal(proof({ publication: { ...publication, deploymentId: undefined } }).criteria.publication, false)
+  assert.equal(proof({ publication: { ...publication, previewUrl: 'https://untrusted.example.com' } }).criteria.publication, false)
 })

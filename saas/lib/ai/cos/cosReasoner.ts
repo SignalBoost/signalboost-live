@@ -470,6 +470,10 @@ export async function callRawCosReasoner(
         console.warn('[cos-answer-completion-loop-failed]', error instanceof Error ? error.message : String(error))
         return null
       })
+      if (!completion || completion.stopped !== 'complete') {
+        console.warn('[cos-answer-verification-blocked]', { turnId, status: completion?.stopped ?? 'unavailable' })
+        return null
+      }
       if (completion) {
         console.info('[cos-answer-completion-loop]', JSON.stringify({ turnId, rounds: completion.rounds, stopped: completion.stopped, stillMissing: completion.missing.length }))
         if (completion.rounds > 0) text = JSON.stringify({ answer: completion.answer, confidence: loopDraft.confidence })

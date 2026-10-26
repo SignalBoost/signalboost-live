@@ -37,7 +37,7 @@ import { resolveSemanticPublicIdentity, shouldResolveSemanticPublicIdentity } fr
 import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
-import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective, isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective, isConciergeBuilderObjective, pastedSourceCode } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { decideCosAgentTurn, stableKnowledgeQuestionNeedsNoPlanner, type CosAgentDecision } from '@/lib/ai/cos/cosAgentDecision'
 import { encodePlannerSearchQueriesHeader, PLANNER_SEARCH_QUERIES_HEADER } from '@/lib/ai/cos/plannerSearchQueries'
 import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
@@ -327,9 +327,13 @@ async function executeBrowserTurn(req: NextRequest) {
   // authenticated owner identity, never the mouth that carried the request.
   const specialistObjective = authenticatedOwner && isSignalBoostDeploymentContext(req) && ownerRepairFollowup
     ? ownerRepairFollowup : operationalPrompt || prompt
+  // Before COS's planner reads the request, only facts send it to the Software Specialist: attached or pasted
+  // source, a pasted log the person asked to repair, or a reply to our own offer to repair. Wording never does
+  // (Production 2026-10-26: "repair"/"fail" next to "test"/"server" sent an acceptance campaign to a paid Builder
+  // job); the planner below hands real software work over with plannerRequested.
   const shouldConsultSoftwareSpecialist = hasSourceAttachment || explicitOperationalRepair
-    || softwareRepairRequest
-    || isConciergeBuilderObjective(prompt, routingContext)
+    || Boolean(ownerRepairFollowup)
+    || pastedSourceCode(prompt)
   const ownerRepositoryRepairAllowed = authenticatedOwner
     && ownerSoftwareAuthority.allowRepositoryRepair
     && (!operationalEvidence || explicitOperationalRepair)
@@ -463,7 +467,7 @@ async function executeBrowserTurn(req: NextRequest) {
     || (browserSurface !== 'concierge' && authenticatedOwner && mentionsPlatformConcept(prompt))
   if (agentToolsRequired && !operationalEvidence) {
     agentDecision = { mode: 'orchestrate', answer: '', confidence: 1, capabilities: ['compute'], searchQueries: [], reason: 'host_compute_guard', reasonerLabel: 'host' }
-  } else if (!operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !isPlatformSelfKnowledgePrompt(prompt) && !asksAboutThisService && !stableKnowledgeQuestionNeedsNoPlanner(prompt, priorAnswer)) {
+  } else if (!operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !stableKnowledgeQuestionNeedsNoPlanner(prompt, priorAnswer)) {
     const plannerStartedAt = Date.now()
     agentDecision = await decideCosAgentTurn({
       prompt,
@@ -473,6 +477,13 @@ async function executeBrowserTurn(req: NextRequest) {
       language,
     })
     recordCosLatencyStage(`${browserSurface}:planner`, Date.now() - plannerStartedAt)
+    // A request about this service is still answered by COS from its owner-approved identity, never from a web
+    // lookup; the planner is consulted only so that real software work on it ("fix the Builder page") reaches the
+    // Software Specialist now that wording no longer does.
+    if ((isPlatformSelfKnowledgePrompt(prompt) || asksAboutThisService) && agentDecision?.mode === 'orchestrate'
+      && !agentDecision.capabilities.includes('software_specialist') && !agentDecision.capabilities.includes('repository_read')) {
+      agentDecision = null
+    }
   }
 
   // The model gets first semantic choice. Host policy may still require MORE evidence before release.
@@ -535,6 +546,7 @@ async function executeBrowserTurn(req: NextRequest) {
             body,
             objective: prompt,
             surface: browserSurface,
+            plannerRequested: true,
             allowRepositoryRepair: ownerSoftwareAuthority.allowRepositoryRepair,
             signalBoostDeploymentContext: isSignalBoostDeploymentContext(req),
             deployment,
@@ -544,6 +556,7 @@ async function executeBrowserTurn(req: NextRequest) {
               body,
               objective: prompt,
               surface: 'assistant',
+              plannerRequested: true,
               allowRepositoryRepair: false,
               signalBoostDeploymentContext: false,
               deployment,
@@ -552,6 +565,7 @@ async function executeBrowserTurn(req: NextRequest) {
               body,
               objective: prompt,
               surface: 'concierge',
+              plannerRequested: true,
               allowRepositoryRepair: false,
               signalBoostDeploymentContext: false,
               deployment,

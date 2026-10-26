@@ -655,3 +655,10 @@ test('a short live-fact loop with its own answer reserve still searches', async 
   const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
   assert.match(route, /turn\.liveFact\?\{\.\.\.basePolicy,answerReserveMs:LIVE_FACT_ANSWER_RESERVE_MS\}:basePolicy/)
 })
+
+test('tool-planning model rounds preserve a separate final answer deadline', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/agentLoop/cosAgentLoop.ts', import.meta.url), 'utf8')
+  assert.match(source, /remainingMs\(\) - \(finalRound \? 2_000 : answerReserveMs\(policy\) \+ 2_000\)/)
+  assert.match(source, /timeoutMs: roundTimeoutMs/)
+  assert.match(source, /if \(roundTimeoutMs < 1_000\)/)
+})

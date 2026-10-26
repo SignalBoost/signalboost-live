@@ -660,8 +660,20 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
     clearTimeout(timeout)
     harnessContext?.signal.removeEventListener('abort', abortFromHarness)
     args.signal?.removeEventListener('abort', abortFromCaller)
-    // The run ceiling counts what the provider reported this call cost, not its upper-bound reservation.
-    if (reservedCostUsd !== null && reportedCostUsd !== null) settleHarnessProviderCostUsd(reservedCostUsd, reportedCostUsd)
+    // The run ceiling counts what the provider reported this call cost, not its upper-bound reservation. Settlement
+    // never throws out of this block: the call already ran and was paid for, so its answer and its usage record are
+    // kept, and an overspend already sits in the ledger, so the NEXT reservation fails closed. Production 2026-10-26:
+    // a throwing settlement here discarded paid answers and skipped the usage row and telemetry for the call.
+    if (reservedCostUsd !== null && reportedCostUsd !== null) {
+      try {
+        settleHarnessProviderCostUsd(reservedCostUsd, reportedCostUsd)
+      } catch (settlementError) {
+        console.error('[harness-provider-cost-settlement]', JSON.stringify({
+          requestId, provider, model, reservedCostUsd, reportedCostUsd,
+          error: settlementError instanceof Error ? settlementError.message : String(settlementError),
+        }))
+      }
+    }
     const latencyMs = Date.now() - startedAt
     const inferenceLatencyMs = inferenceStartedAt === null ? 0 : Math.max(0, Date.now() - inferenceStartedAt)
     const success = errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300

@@ -301,8 +301,8 @@ export async function POST(request: Request) {
 
     let files = cleanFiles(body?.files)
     const repositoryTarget = builderRepositoryTarget(objective, body?.repositoryUrl)
+    // Single-file jobs run the shared verified task loop (lib/builder/verified-task-loop.ts).
     const debugPlan = planDebugFileJob(objective, files)
-    if (debugPlan) return noStore({ error: 'builder_v1_debug_mode_retired_use_v2', execution_allowed: false }, { status: 409 })
     const ownerDeveloperLogSubmission = access.isOwner
       && isOperationalLogEvidence(objective)
       && SIGNALBOOST_OPERATIONAL_TARGET.test(objective)

@@ -18,7 +18,8 @@ import { trimObjectiveForHarness, runSoftwareDelegationWithSafeRetry } from '@/l
 export { extractFailureEvidence } from '@/lib/ai/cos/softwareSpecialistRecovery'
 import { isOperationalLogEvidence } from '@/lib/ai/cos/pastedOperationalLog'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
-import { extractBuilderSourceFiles, planDebugFileJob } from '@/lib/builder/debug-file-job'
+import { extractBuilderSourceFiles, planDebugFileJob, type DebugFilePlan } from '@/lib/builder/debug-file-job'
+import { builderFilePath } from '@/lib/builder/file-chunks'
 import { enqueueBuilderJob } from '@/lib/builder/job-store'
 import { readBuilderEvidenceJob } from '@/lib/builder/job-store'
 import { assistanceCopy, BUILDER_RUNNING, DEFAULT_ASSISTANCE_MODE, normalizeAssistanceMode, type AssistanceMode } from '@/lib/ai/cos/assistanceMode'
@@ -56,6 +57,11 @@ export type CosSoftwareSpecialistRequest = Readonly<{
    * this is what admits software work; the request's wording alone never does.
    */
   plannerRequested?: boolean
+  /**
+   * COS's planner asked for one file to be written and proven by a command: the job runs the shared verified task
+   * loop (lib/builder/verified-task-loop.ts) instead of a full Builder project.
+   */
+  verifiedTask?: Readonly<{ targetPath: string; verifyCommand: string }> | null
   /** The person confirmed our own offer to repair (pendingOwnerSoftwareRepair); the objective is the recovered request. */
   confirmedRepairContinuation?: boolean
   deployment?: Readonly<{
@@ -176,6 +182,15 @@ async function enqueueRepositoryRepair(input: {
  * or "fail" anywhere next to "test", "server" or "app" admitted an analysis request (an acceptance campaign) as a
  * paid Builder job; the wording of a request alone never admits it.
  */
+/** A planner-requested single file to write and prove: a valid workspace path and one bounded command. */
+export function verifiedTaskPlan(task: CosSoftwareSpecialistRequest['verifiedTask']): DebugFilePlan | null {
+  const command = String(task?.verifyCommand || '').trim()
+  if (!task || !command || command.length > 2_000) return null
+  let path: string
+  try { path = builderFilePath(String(task.targetPath || '').trim()) } catch { return null }
+  return Object.freeze({ path, command, runtime: /\.py$/i.test(path) ? 'python3' : 'node', files: Object.freeze([path]) })
+}
+
 export function specialistAdmitted(input: CosSoftwareSpecialistRequest, objective: string, sourceAttached: boolean, mediaAttached: boolean): boolean {
   return input.plannerRequested === true
     || input.confirmedRepairContinuation === true
@@ -398,8 +413,9 @@ async function tryCosSoftwareSpecialistLegacy(
 
   const conversationId = conversationIdFrom(input.body) || crypto.randomUUID()
   const jobId = crypto.randomUUID()
-  const debugPlan = repositoryTarget ? null : planDebugFileJob(objective, stagedFiles)
-  if (debugPlan) return NextResponse.json({ reply: 'Legacy Builder debug mode is retired. Use a fresh Builder V2 request.', execution_allowed: false, source: 'builder-v2-only' }, { status: 409 })
+  // Single-file jobs (an attached file to fix, or one file COS asked to have written and proven) run the shared
+  // verified task loop; everything else is a Builder V2 project.
+  const debugPlan = repositoryTarget ? null : verifiedTaskPlan(input.verifiedTask) ?? planDebugFileJob(objective, stagedFiles)
   const reply = runningReply(resolveResponseLanguage(rawObjective, input.body?.context?.language))
   const specialistSkill = debugPlan ? 'software.repair' : 'software.build'
 

@@ -13,7 +13,8 @@ import { readBuilderRunLimits, withBuilderInferenceBudget, withBuilderInferenceJ
 import { builderInferenceBudgetSummary, createBuilderInferenceBudgetStore, readBuilderInferenceBudgetReceipt } from './inference-budget-store.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import type { BuilderToolTrace } from './contracts.ts'
-import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
+import type { DebugFilePlan } from './debug-file-job.ts'
+import { runVerifiedTaskLoop, verifiedTaskFailureReport } from './verified-task-loop.ts'
 import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, requeueBuilderContinuationCycle, readBuilderWorkspaceFingerprint, getBuilderJobForUser, peekBuilderJob, type BuilderJobRecord } from './job-store.ts'
 import { MAX_WORK_SLICES, builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport, builderJobOverTotalDeadline, BUILDER_JOB_TOTAL_DEADLINE_MS, BUILDER_SLICE_MAX_STEPS } from './work-budget.ts'
 import { builderContractObjective, builderTaskContract, builderTaskProgress } from './task-contract.ts'
@@ -164,6 +165,43 @@ function debugPlan(job: BuilderJobRecord): DebugFilePlan | null {
   const files = rawPaths.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
   if (!path || !command) return null
   return Object.freeze({ path, command, runtime, files: files.length ? files : [path] })
+}
+
+/** One single-file job through the shared verified task loop, finished with its real evidence. */
+async function runSingleFileVerifiedJob(job: BuilderJobRecord, plan: DebugFilePlan): Promise<void> {
+  const workspace = createSupabaseBuilderWorkspace(job.userId)
+  if (!workspace) { await terminalFailure(job, 'builder_job_storage_unavailable'); return }
+  const deadlineAtMs = Date.now() + BUILDER_JOB_BUDGET_MS - BUILDER_JOB_RESULT_RESERVE_MS
+  const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort({ yieldToChat: selfHealingCapacityJob(job) }), { deadlineAtMs })
+  const workingKnowledge = await workingAgentKnowledgeBlock(job.objective, 'builder')
+  const loop = () => runVerifiedTaskLoop({
+    workingKnowledge,
+    task: job.objective,
+    workspaceId: job.workspaceId,
+    verifyCommand: plan.command,
+    editablePaths: plan.files.length ? plan.files : [plan.path],
+    ports: { ai, runner: new VercelSandboxBuilderRunner(), workspace },
+    deadlineAtMs,
+  })
+  // Owner-declared spend limits admit only Builder V2 jobs (enqueueBuilderJob), so this job runs under the Builder
+  // job budget and deadline above.
+  const result = await withBuilderInferenceJob(job.id, loop).catch(error => {
+    console.error('[builder_verified_task_failed]', { jobId: job.id, message: error instanceof Error ? error.message : 'unknown' })
+    return null
+  })
+  if (!result) { await terminalFailure(job, 'builder_verified_task_failed'); return }
+  console.info('[builder_verified_task]', JSON.stringify({ jobId: job.id, stopped: result.stopped, attempts: result.attempts.length }))
+  const files = (await workspace.listFiles(job.workspaceId).catch(() => [])).map(file => file.path)
+  const trace = publicTrace(result.trace)
+  const status = result.ok ? 'succeeded' : 'failed'
+  const reply = historyReply(result.ok ? result.answer : verifiedTaskFailureReport(result, plan.command), job.workspaceId, files)
+  const error = result.ok ? null : result.error
+  await finishBuilderJob({
+    jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration, status, reply, error,
+    result: { jobId: job.id, workspaceId: job.workspaceId, status, reply, files, trace, engine: 'verified_task_loop',
+      verifiedTask: { command: plan.command, attempts: result.attempts, stopped: result.stopped },
+      ...(error ? { error } : {}) },
+  })
 }
 
 function oneLine(value: unknown): string {
@@ -663,6 +701,16 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       return
     }
 
+    // SINGLE-FILE JOBS run the shared verified task loop (verified-task-loop.ts): write one file, run the check in the
+    // sandbox, feed the real failure back, at most three attempts. Builder single-file jobs (attached source to fix)
+    // and COS chat verified-file requests both arrive here as debug_file jobs. Production 2026-10-26: these jobs were
+    // refused below as "builder_v1_retired_use_v2", so no single-file job had run since the V1 loop was retired.
+    const singleFile = debugPlan(job)
+    if (singleFile) {
+      await runSingleFileVerifiedJob(job, singleFile)
+      return
+    }
+
     // Production acceptance is a host-owned, owner-only lane. It must complete in one claim:
     // browser state and browser_cli evidence are deliberately not persisted across Builder checkpoints.
     if (job.ownerAuthorized === true && job.metadata.builderPlaywrightCliCanary === true) {
@@ -817,25 +865,13 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     const browserCli = createBuilderPlaywrightCliPort({
       ownerAuthorized: job.ownerAuthorized === true,
     })
-    const plan = debugPlan(job)
-    const documentationPaths = !plan && isRepairObjective(job.objective)
+    const documentationPaths = isRepairObjective(job.objective)
       ? job.checkpoint ? job.checkpoint.documentationPaths ?? null : await classifyBuilderDocumentationIntent(ai, job.objective) : null
-    const priorLessons = plan ? [] : await workspace.fetchProjectRepairSignals(job.workspaceId).catch(() => {
+    const priorLessons = await workspace.fetchProjectRepairSignals(job.workspaceId).catch(() => {
       console.warn('[builder_project_lesson_read_failed]', { jobId })
       return []
     })
-    const result = await withBuilderSliceDeadline(() => plan
-      ? runDebugFileJob({
-          objective: job.objective,
-          workspaceId: job.workspaceId,
-          plan,
-          workspace,
-          runner,
-          ai,
-          cognitiveSkills: cognitive.items,
-          workingKnowledge: combinedWorkingKnowledge,
-        })
-      : new BuilderToolLoop(ai, workspace, runner, mcp, browserCli).run({
+    const result = await withBuilderSliceDeadline(() => new BuilderToolLoop(ai, workspace, runner, mcp, browserCli).run({
           objective: job.objective,
           workspaceId: job.workspaceId,
           priorLessons,
@@ -898,7 +934,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       if (await requeueBuilderContinuationCycle({ job, checkpoint: result.checkpoint, reply,
         result: { jobId: job.id, workspaceId: job.workspaceId, status: 'queued', reply, files, trace } })) return
     }
-    const shouldExplain = Boolean(plan) || isRepairObjective(job.objective) || typeof job.metadata.proposalSourceJobId === 'string'
+    const shouldExplain = isRepairObjective(job.objective) || typeof job.metadata.proposalSourceJobId === 'string'
       || trace.some(item => item.toolId === 'run' && !item.ok)
     const initialReply = async (fallback: string, status: string) => shouldExplain
       ? explainInitialBuilderRepair({
@@ -1002,7 +1038,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       evidence: { files, successfulRuns: result.trace.filter(item => item.toolId === 'run' && item.ok).length, verification: 'workspace_changed_and_host_command_exit_zero' },
     }).catch(() => console.warn('[builder_episode_write_failed]', { jobId }))
     // Only after the generation-fenced terminal write; learning failure cannot undo task success.
-    if (!plan) await workspace.recordJobRepairLesson(job.workspaceId, job.id, job.claimGeneration, result)
+    await workspace.recordJobRepairLesson(job.workspaceId, job.id, job.claimGeneration, result)
       .then(recorded => console.info('[builder_project_lesson_outcome]', { jobId, recorded, retrievedSignals: priorLessons.length }))
       .catch(() => console.warn('[builder_project_lesson_write_failed]', { jobId }))
   } catch (error) {

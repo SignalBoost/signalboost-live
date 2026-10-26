@@ -1,4 +1,5 @@
 // saas/lib/ai/cos/cosReasoningRolePolicy.ts
+import { compileCosInstructionContract } from './instructionContract.ts'
 import { MAX_BUILDER_OBJECTIVE_CHARS } from '../../builder/request-contract.ts'
 import { isOperationalLogEvidence } from './pastedOperationalLog.ts'
 import { isContentGenerationRequest } from './contentGenerationIntent.ts'
@@ -214,6 +215,7 @@ export function classifyCosSoftwareDelivery(prompt: string): CosSoftwareDelivery
 }
 
 export function isConciergeBuilderObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
+  if (compileCosInstructionContract(prompt).prohibitsExecution) return false
   // An explicit analysis-only instruction is not authorization for project execution.
   // Negated verbs such as "do not create files" must not count as Builder intent.
   const analysisOnly = /\b(?:investigat(?:e|ion)|analy[sz](?:e|is)|forensic|incident commander|root causes?|hypotheses)\b/i.test(prompt)

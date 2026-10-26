@@ -10,6 +10,7 @@ import * as requestContract from '../lib/builder/request-contract.ts'
 import * as isolatedIntent from '../lib/builder/isolated-project-intent.ts'
 import * as publication from '../lib/builder/isolated-publication.ts'
 import * as assistance from '../lib/ai/cos/assistanceMode.ts'
+import * as plannerQueries from '../lib/ai/cos/plannerSearchQueries.ts'
 const { BUILDER_RUNNING } = assistance
 
 const objective = readFileSync(new URL('./fixtures/builder-isolated-acceptance.txt', import.meta.url), 'utf8')
@@ -29,6 +30,11 @@ async function withoutPublicationConfig<T>(run: () => Promise<T>): Promise<T> {
       else process.env[key] = previous[index]
     })
   }
+}
+
+class NextRequest extends Request {
+  nextUrl: URL
+  constructor(url: string | URL, init?: RequestInit) { super(url, init); this.nextUrl = new URL(String(url)) }
 }
 
 class NextResponse extends Response {
@@ -55,7 +61,7 @@ function setup(owner: boolean, specialistResponse?: any, forceClassifierFalse = 
   const unexpected = (name: string) => () => { throw new Error(`unexpected port: ${name}`) }
   const fallback = new Proxy({}, { get: () => () => false })
   const modules: Record<string, any> = {
-    'next/server': { NextResponse, after: () => { calls.scheduled++ } },
+    'next/server': { NextResponse, NextRequest, after: () => { calls.scheduled++ } },
     '@/lib/auth/access': { getAccess: async () => ({ userId, isOwner: owner }) },
     // The person-facing progress sentence is real product copy, not an external port.
     '@/lib/ai/cos/assistanceMode': { assistanceCopy: assistance.assistanceCopy, BUILDER_RUNNING: assistance.BUILDER_RUNNING },
@@ -95,7 +101,13 @@ function setup(owner: boolean, specialistResponse?: any, forceClassifierFalse = 
     '@/lib/ai/cos/publicConciergeIdentityIntent': { shouldResolveSemanticPublicIdentity: () => true, resolveSemanticPublicIdentity: unexpected('identity model') },
     '@/lib/public-brand': { PUBLIC_BRAND: { name: 'iTMounts' } },
     '@/app/api/cos-primary/route': { POST: () => { calls.model++; return NextResponse.json({ reply: 'HTTP\nPASS\nINCOMPLETE' }) } },
-    '@/lib/ai/cos/cosAgentDecision': { decideCosAgentTurn: unexpected('general planner') },
+    // A build request in words reaches the Software Specialist through COS's planner, never through its wording
+    // (2026-10-26); the planner here asks for it as the real one does for software work.
+    '@/lib/ai/cos/plannerSearchQueries': plannerQueries,
+    '@/lib/ai/cos/cosAgentDecision': {
+      stableKnowledgeQuestionNeedsNoPlanner: () => false,
+      decideCosAgentTurn: async () => ({ mode: 'orchestrate', answer: '', confidence: 1, capabilities: ['software_specialist'], searchQueries: [], reason: 'software_work', reasonerLabel: 'test' }),
+    },
   }
   const specialist = handler('../lib/ai/cos/softwareSpecialist.ts', 'tryCosSoftwareSpecialist', modules, fallback)
   modules['@/lib/ai/cos/softwareSpecialist'] = { tryCosSoftwareSpecialist: specialistResponse || (async (input: any) => { const r = await specialist(input); assert.ok(r, 'eligible build must produce a specialist response'); return r }) }

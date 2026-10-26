@@ -173,7 +173,7 @@ async function enqueueRepositoryRepair(input: {
  * or "fail" anywhere next to "test", "server" or "app" admitted an analysis request (an acceptance campaign) as a
  * paid Builder job; the wording of a request alone never admits it.
  */
-function specialistAdmitted(input: CosSoftwareSpecialistRequest, objective: string, sourceAttached: boolean, mediaAttached: boolean): boolean {
+export function specialistAdmitted(input: CosSoftwareSpecialistRequest, objective: string, sourceAttached: boolean, mediaAttached: boolean): boolean {
   return input.plannerRequested === true
     || sourceAttached
     || mediaAttached

@@ -83,7 +83,8 @@ test('acceptance campaign instructions and embedded test commands are not Builde
     'A disposable repository is part of a test case, not the requested output.',
   ].join('\n')
   assert.equal(classifyCosSoftwareDelivery(prompt), 'analysis')
-  assert.equal(isConciergeBuilderObjective(prompt), false)
+  // Its wording no longer decides admission: the Software Specialist is entered only on facts or on COS's own
+  // planner request (tests/cosBuilderAdmissionFacts.node.test.ts).
 })
 
 test('an affirmative runnable software repair still routes to Builder', () => {

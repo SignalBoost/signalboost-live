@@ -77,7 +77,8 @@ test('live_web and conversation_history plans steer COS without a second semanti
 })
 
 test('current platform runtime facts stay host-verified rather than model-guessed', () => {
-  assert.match(browser, /!isPlatformSelfKnowledgePrompt\(prompt\)/)
+  // Runtime questions still never reach a web lookup: only a software handoff from the planner is kept for them.
+  assert.match(browser, /\(isPlatformSelfKnowledgePrompt\(prompt\) \|\| asksAboutThisService\) && agentDecision\?\.mode === 'orchestrate'/)
   assert.match(primary, /if\(access\?\.isOwner&&isPlatformSelfKnowledgePrompt\(input\)\)/)
 })
 
@@ -94,8 +95,9 @@ test('first semantic decision prefers native function tools and keeps JSON plann
   assert.ok(nativeAt > 0 && compatAt > nativeAt)
 })
 
-test('public Concierge receives only the public-safe live_web and compute native capabilities', () => {
-  // compute runs the governed agent tool loop (search, fetch, sandboxed Python); no private capability.
-  assert.match(decision, /input\.surface === 'concierge'\s*\? \['live_web', 'compute'\]/)
+test('public Concierge receives only the public-safe live_web, compute and Software Specialist capabilities', () => {
+  // compute runs the governed agent tool loop (search, fetch, sandboxed Python); the Software Specialist keeps public
+  // work in its isolated workspace. No private capability.
+  assert.match(decision, /input\.surface === 'concierge'\s*\? \['live_web', 'compute', 'software_specialist'\]/)
   assert.match(decision, /input\.ownerAuthenticated\s*\? COS_AGENT_CAPABILITIES/)
 })

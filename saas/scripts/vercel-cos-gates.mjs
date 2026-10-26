@@ -477,6 +477,7 @@ const tests = [
 
   'tests/conciergeVisualTypoRouting.node.test.ts',
   'tests/cosUserAnswerWindow.node.test.ts',
+  'tests/cosBuilderAdmissionFacts.node.test.ts',
   'tests/cosSubstantiveAnalysisRelease.node.test.ts',
 
   'tests/visualObjectiveContract.node.test.ts',

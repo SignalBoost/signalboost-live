@@ -46,18 +46,23 @@ test('a native capability plan suppresses redundant semantic classification down
 
 test('public Concierge cannot request owner-private capabilities', () => {
   const catalog = decision.slice(decision.indexOf('function toolCatalog'), decision.indexOf('function turnReasonerLabel'))
-  assert.match(catalog, /input\.surface === 'concierge'\s*\n\s*\? \['live_web', 'compute'\]/)
+  assert.match(catalog, /input\.surface === 'concierge'\s*\n\s*\? \['live_web', 'compute', 'software_specialist'\]/)
+  assert.doesNotMatch(catalog.slice(catalog.indexOf("input.surface === 'concierge'"), catalog.indexOf('input.ownerAuthenticated')), /repository_read|platform_runtime|internal_context|external_action/)
   assert.match(catalog, /input\.ownerAuthenticated\s*\n\s*\? COS_AGENT_CAPABILITIES/)
 })
 
-test('questions about this service skip the first-turn direct model answer', async () => {
+test('questions about this service are answered by COS, never by a planner lookup', async () => {
   // Production 2026-09-26: "What is iTMounts?" was answered directly by the first-turn model as
   // "a digital mount management system" because that model has no identity or glossary.
   const gate = browser.indexOf('const asksAboutThisService = isSignalBoostSpecificPublicRequest(prompt)')
   const ownerOnly = browser.indexOf("|| (browserSurface !== 'concierge' && authenticatedOwner && mentionsPlatformConcept(prompt))", gate)
-  const guarded = browser.indexOf('!isPlatformSelfKnowledgePrompt(prompt) && !asksAboutThisService', ownerOnly)
-  const decide = browser.indexOf('agentDecision = await decideCosAgentTurn({', guarded)
-  assert.ok(gate > 0 && ownerOnly > gate && guarded > ownerOnly && decide > guarded)
+  // The planner is consulted so real software work on this service reaches the Software Specialist (2026-10-26); any
+  // other capability it asks for is dropped and COS answers from its owner-approved identity.
+  const decide = browser.indexOf('agentDecision = await decideCosAgentTurn({', ownerOnly)
+  const guarded = browser.indexOf("(isPlatformSelfKnowledgePrompt(prompt) || asksAboutThisService) && agentDecision?.mode === 'orchestrate'", decide)
+  const dropped = browser.indexOf('agentDecision = null', guarded)
+  assert.ok(gate > 0 && ownerOnly > gate && decide > ownerOnly && guarded > decide && dropped > guarded)
+  assert.match(browser.slice(guarded, dropped), /!agentDecision\.capabilities\.includes\('software_specialist'\) && !agentDecision\.capabilities\.includes\('repository_read'\)/)
 
   const { isSignalBoostSpecificPublicRequest } = await import('../lib/ai/cos/publicScenarioScope.ts')
   assert.equal(isSignalBoostSpecificPublicRequest('What is iTMounts?'), true)

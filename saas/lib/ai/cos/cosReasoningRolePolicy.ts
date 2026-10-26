@@ -219,11 +219,6 @@ export function isConciergeBuilderObjective(prompt: string, context?: CosCodingR
   const analysisOnly = /\b(?:investigat(?:e|ion)|analy[sz](?:e|is)|forensic|incident commander|root causes?|hypotheses)\b/i.test(prompt)
     && /\b(?:do\s+not|don't|never|no)\s+(?:(?:write|generate|create|build|modify|execute|run)\s+(?:any\s+)?(?:code|files?|projects?|tests?)|(?:generate|create|build)\s+(?:a\s+)?project)\b/i.test(prompt)
   if (analysisOnly && classifyCosSoftwareDelivery(prompt) === 'analysis') return false
-  // A quoted test command is evidence in an analytical specification, not permission
-  // to launch a paid Builder job. Require an affirmative software-delivery objective
-  // before applying Builder-specific evidence rules; embedded runbooks and campaign
-  // fixtures are not executable authorization.
-  if (classifyCosSoftwareDelivery(prompt) === 'analysis') return false
   if (excludedFromBuilder(prompt, context)) return false
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true

@@ -50,13 +50,16 @@ test('"Fix the …" software requests are never taken by the fast text-edit lane
   assert.equal(isFastTextTransform('edit  - Hi Ryland,  how can I get SCRY added to my phone? Would you have some time we culd meet before my trip?  Thank you'), true)
 })
 
-test('chat ingress sends a repair request to the Software Specialist before any edit, authoring or identity lane', () => {
+// A repair request is kept out of the edit, authoring and identity lanes so COS's planner can hand it to the Software
+// Specialist; its wording alone no longer starts software work (2026-10-26).
+test('chat ingress keeps a repair request out of the edit, authoring and identity lanes and admits software work only on facts', () => {
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.match(route, /const ownerRepairFollowup = pendingOwnerSoftwareRepair\(messages, prompt\)/)
   assert.match(route, /const softwareRepairRequest = isSoftwareRepairRequest\(prompt\) \|\| Boolean\(ownerRepairFollowup\)\s*\n\s*const directTextTransformation = softwareRepairRequest \? null : detectDirectTextTransformation\(prompt\)/)
   assert.match(route, /isAuthoringObjectiveWithoutLiveLookup\(prompt\)\s*\n\s*&& !softwareRepairRequest/)
   assert.match(route, /browserSurface === 'concierge' && !softwareRepairRequest && !isConciergeBuilderObjective/)
-  assert.match(route, /shouldConsultSoftwareSpecialist = hasSourceAttachment \|\| explicitOperationalRepair\s*\n\s*\|\| softwareRepairRequest/)
+  assert.match(route, /shouldConsultSoftwareSpecialist = hasSourceAttachment \|\| explicitOperationalRepair\s*\n\s*\|\| Boolean\(ownerRepairFollowup\)\s*\n\s*\|\| pastedSourceCode\(prompt\)/)
+  assert.doesNotMatch(route, /shouldConsultSoftwareSpecialist = [^\n]*\n[^\n]*softwareRepairRequest/)
 })
 
 test('the specialist repairs the platform for the owner and asks everyone else for the code, never a dead end', () => {
@@ -72,7 +75,8 @@ test('the specialist repairs the platform for the owner and asks everyone else f
   assert.match(branch, /SOURCE_REQUEST_REPLY\[resolveResponseLanguage\(rawObjective, input\.body\?\.context\?\.language\)\]/)
   const table = specialist.slice(specialist.indexOf('const SOURCE_REQUEST_REPLY'), specialist.indexOf('function runningReply'))
   for (const language of SUPPORTED_LANGUAGES) assert.match(table, new RegExp(`\\n  ${language}: '[^']{40,}`), language)
-  assert.match(specialist, /const specialistRelevant = sourceAttached\s*\n\s*\|\| mediaAttached\s*\n\s*\|\| isSoftwareRepairRequest\(objective\)/)
+  assert.match(specialist, /const specialistRelevant = specialistAdmitted\(input, objective, sourceAttached, mediaAttached\)/)
+  assert.doesNotMatch(specialist, /isSoftwareRepairRequest\(objective\)/)
 })
 
 test('a conversation with a recorded project is continued by Builder V2 instead of refused (PR #4719 parity)', () => {

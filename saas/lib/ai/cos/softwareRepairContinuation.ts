@@ -1,3 +1,5 @@
+import { isSoftwareRepairRequest } from './softwareRepairIntent.ts'
+
 const FOLLOW_UP = /^(?:go|yes|yes,?\s*(?:do it|fix it|proceed)|fix it|repair it|do it|proceed|continue|try again|please fix it)[.!\s]*$/i
 const SOURCE_REQUEST = /(?:I can fix that\. Attach the file|send (?:the )?link to a public GitHub repository)/i
 
@@ -21,9 +23,9 @@ export function pendingOwnerSoftwareRepair(messages: readonly unknown[], latestP
   // do not revive an unrelated old task from the chat history.
   const earlier = history.slice(0, -2).filter(message => message.role === 'user').slice(-4)
   for (let index = earlier.length - 1; index >= 0; index--) {
-    // The request is the message our source request answered, not one whose wording looks like a repair.
     const request = earlier[index].content.trim()
-    if (!FOLLOW_UP.test(request)) return request ? request.slice(0, 4000) : null
+    if (isSoftwareRepairRequest(request)) return request.slice(0, 4000)
+    if (!FOLLOW_UP.test(request)) return null
   }
   return null
 }

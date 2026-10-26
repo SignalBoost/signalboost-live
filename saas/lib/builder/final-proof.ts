@@ -51,7 +51,10 @@ export function builderFinalProof(input: Readonly<{
       !input.publicationError && p && typeof p.repository === 'string' &&
       /^https:\/\/github\.com\//.test(String(p.pullRequestUrl || '')) &&
       typeof p.commitSha === 'string' && /^[a-f0-9]{40}$/i.test(p.commitSha) &&
-      typeof p.mergeCommitSha === 'string' && /^[a-f0-9]{40}$/i.test(p.mergeCommitSha),
+      typeof p.mergeCommitSha === 'string' && /^[a-f0-9]{40}$/i.test(p.mergeCommitSha) &&
+      p.status === 'verified' &&
+      typeof p.deploymentId === 'string' && p.deploymentId.length > 0 &&
+      typeof p.previewUrl === 'string' && /^https:\/\/[^/]+\.vercel\.app\/?$/.test(p.previewUrl),
     ),
     newPrivateRepository: !wantsNewRepository || Boolean(p?.repositoryCreated === true && p?.repositoryPrivate === true),
     endpoint: endpointVerified,

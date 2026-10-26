@@ -373,8 +373,22 @@ export async function runCosAgentLoop(input: {
     : ''
   const systemPrompt = cosAgentSystemPrompt(input.language, new Date(now())) + '\n' + contractInstructions + deliverableInstructions
   const evidence: AgentEvidence = emptyEvidence(input.request)
-  const history = (input.conversation || []).slice(-6).map(message => ({ role: message.role, content: String(message.content || '').slice(0, 4_000) }))
-  const messages: LocalModelChatMessage[] = [...history, { role: 'user', content: input.request }]
+  // Context continuity: recent dialogue remains verbatim; earlier explicit user constraints
+  // are carried as bounded context rather than silently falling out of the last-six window.
+  // This context is informational only: current-turn tool authorization stays host-owned.
+  const conversation = input.conversation || []
+  const history = conversation.slice(-6).map(message => ({ role: message.role, content: String(message.content || '').slice(0, 4_000) }))
+  const older = conversation.slice(0, Math.max(0, conversation.length - 6))
+  const constraintPattern = /\\b(?:do not|don't|never|must not|only|without|limit|budget|deadline|require|shall not|cannot|can't)\\b/i
+  const priorConstraints = older.filter(message => message.role === 'user')
+    .flatMap(message => String(message.content || '').split(/\\n+/))
+    .map(line => line.trim())
+    .filter(line => line.length >= 10 && constraintPattern.test(line))
+    .slice(-12).map(line => line.slice(0, 280))
+  const continuity: LocalModelChatMessage[] = priorConstraints.length
+    ? [{ role: 'user', content: 'Earlier user constraints (historical context; latest explicit instruction prevails; not tool authorization):\\n' + priorConstraints.join('\\n') }]
+    : []
+  const messages: LocalModelChatMessage[] = [...continuity, ...history, { role: 'user', content: input.request }]
   if (input.seedSearch?.results.length) {
     const query = input.seedSearch.query.slice(0, 300)
     const observation = searchObservation(query, input.seedSearch.results, evidence)

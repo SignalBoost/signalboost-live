@@ -1,2 +1,2 @@
-base_sha=bd2b447423af11cac6538d828476d906a9700ab9
-branch=fix/cos-preserve-answer-budget-20261026
+base_sha=1d7bfdf5805c41a6eb0b9fbb2b678c6aaf9aeb13
+branch=fix/cos-answers-action-requests-without-executor-20261026

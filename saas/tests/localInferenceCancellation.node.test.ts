@@ -41,6 +41,8 @@ test('local inference cancellation aborts fetch; expired work emits no phantom p
     assert.equal(state.rows.length,1);
     assert.equal(state.rows[0].finishReason,'aborted:inference_owner_cancelled');
     await assert.rejects(callLocalModel(input,config),/owner_cancelled/);
+    // Reusing an already-cancelled signal must never open a new provider fetch.
+    assert.equal(state.fetches,1);
     state.remaining=0;
     await assert.rejects(callLocalModel({prompt:'repair'},config),/inference_deadline_expired/);
     assert.equal(state.fetches,1);

@@ -1,2 +1,2 @@
-base_sha=87f00605e670eb7e6b4eb1d5bd6b19bad66b113b
-branch=fix/harness-builder-intent-overblocking-20261026
+base_sha=7653783eb505f01067d98471634d74c128ebbe38
+branch=fix/builder-starts-on-facts-not-words-20261026

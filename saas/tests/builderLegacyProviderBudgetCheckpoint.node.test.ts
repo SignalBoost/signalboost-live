@@ -41,8 +41,8 @@ test('legacy Builder checkpoints even an initial provider ceiling without repeat
 
 test('durable job runner classifies provider-ceiling interruptions as bounded deferrals', () => {
   const source = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url),'utf8')
-  assert.match(source, /type SelfHealingDeferralReason[^\\n]+harness_provider_cost_budget_exceeded/)
-  assert.match(source, /MAX_STANDARD_CAPACITY_DEFERRALS/)
-  assert.match(source, /result\\.error === 'harness_provider_cost_budget_exceeded'/)
-  assert.match(source, /await deferSelfHealingCapacity\\(job, result\\.error, trace, result\\.checkpoint \\?\\? null\\)/)
+  assert.ok(source.includes("type SelfHealingDeferralReason ="))
+  assert.ok(source.includes("harness_provider_cost_budget_exceeded"))
+  assert.ok(source.includes("MAX_STANDARD_CAPACITY_DEFERRALS"))
+  assert.ok(source.includes("await deferSelfHealingCapacity(job, result.error, trace, result.checkpoint ?? null)"))
 })

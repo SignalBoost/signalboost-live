@@ -1,2 +1,2 @@
-base_sha=6ea1efb3de7e6628ab36d6d78b67426ded6399e8
-branch=fix/cos-answer-loop-release-gate-20261026
+base_sha=f1c82695545525d3837bf4f199e2f3e2bed42750
+branch=fix/cos-diagnostic-retrieval-loop-20261026

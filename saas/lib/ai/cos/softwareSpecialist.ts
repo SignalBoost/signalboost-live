@@ -9,8 +9,9 @@ import { builderRepositoryImportIntent, builderRepositoryTarget, importBuilderRe
 import { after, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { publicAuditUserId } from '@/lib/auth/publicAuditIdentity'
-import { isConciergeBuilderObjective, type CosCodingRoutingContext } from '@/lib/ai/cos/cosReasoningRolePolicy'
-import { isSoftwareRepairRequest, repairAwaitingSource } from '@/lib/ai/cos/softwareRepairIntent'
+import { isConciergeBuilderObjective, pastedSourceCode, type CosCodingRoutingContext } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { compileCosInstructionContract } from '@/lib/ai/cos/instructionContract'
+import { repairAwaitingSource } from '@/lib/ai/cos/softwareRepairIntent'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import type { SupportedLanguage } from '@/lib/i18n/supportedLanguages'
 import { trimObjectiveForHarness, runSoftwareDelegationWithSafeRetry } from '@/lib/ai/cos/softwareSpecialistRecovery'
@@ -49,6 +50,14 @@ export type CosSoftwareSpecialistRequest = Readonly<{
   surface: CosSoftwareSpecialistSurface
   allowRepositoryRepair?: boolean
   signalBoostDeploymentContext?: boolean
+  /**
+   * COS's capability planner read the whole request and asked for the Software Specialist. Together with facts
+   * (attached or pasted source, an attached image or PDF, a pending proposal, a pasted log the owner may repair),
+   * this is what admits software work; the request's wording alone never does.
+   */
+  plannerRequested?: boolean
+  /** The person confirmed our own offer to repair (pendingOwnerSoftwareRepair); the objective is the recovered request. */
+  confirmedRepairContinuation?: boolean
   deployment?: Readonly<{
     commitSha?: string | null
     branch?: string | null
@@ -160,6 +169,25 @@ async function enqueueRepositoryRepair(input: {
  * a coding brain. This function owns the software-specialist admission/execution decision while
  * preserving the existing public-workspace and owner-only repository-repair authority boundaries.
  */
+/**
+ * What admits a request to the Software Specialist: COS's planner asked for it, or a fact proves software work is in
+ * hand (attached or pasted source, an attached image or PDF, a reply to a pending Builder proposal, a question about
+ * the conversation's Builder project, a pasted log the owner may repair). Production 2026-10-26: a "fix", "repair"
+ * or "fail" anywhere next to "test", "server" or "app" admitted an analysis request (an acceptance campaign) as a
+ * paid Builder job; the wording of a request alone never admits it.
+ */
+export function specialistAdmitted(input: CosSoftwareSpecialistRequest, objective: string, sourceAttached: boolean, mediaAttached: boolean): boolean {
+  return input.plannerRequested === true
+    || input.confirmedRepairContinuation === true
+    || sourceAttached
+    || mediaAttached
+    || pastedSourceCode(objective)
+    || isBuilderProposalApproval(objective)
+    || isBuilderEvidenceRequest(objective)
+    || isBuilderProjectQuestion(objective)
+    || (input.allowRepositoryRepair === true && isOperationalLogEvidence(objective))
+}
+
 async function tryCosSoftwareSpecialistLegacy(
   input: CosSoftwareSpecialistRequest,
   signal?: AbortSignal,
@@ -172,21 +200,9 @@ async function tryCosSoftwareSpecialistLegacy(
   const context = routingContext(input.body)
   const sourceAttached = hasSourceAttachment(context)
   const mediaAttached = hasImageOrPdfAttachment(input.body)
-  const roleMatched = isConciergeBuilderObjective(objective, context)
   const designMatched = DESIGN_ARTIFACT.test(objective) && DESIGN_REQUEST.test(objective)
   const importRequested = builderRepositoryImportIntent(objective)
-  const repairRequested = isSoftwareRepairRequest(objective)
-  const specialistRelevant = sourceAttached
-    || mediaAttached
-    || repairRequested
-    || roleMatched
-    || designMatched
-    || importRequested
-    || isBuilderProposalApproval(objective)
-    || wantsBuilderProposal(objective)
-    || isBuilderEvidenceRequest(objective)
-    || isBuilderProjectQuestion(objective)
-    || (input.allowRepositoryRepair === true && isOperationalLogEvidence(objective))
+  const specialistRelevant = specialistAdmitted(input, objective, sourceAttached, mediaAttached)
 
   // Ordinary Concierge conversation must never pay the Builder/project-state admission cost.
   // In Production this mattered during a local-inference outage: a simple educational question was
@@ -322,7 +338,14 @@ async function tryCosSoftwareSpecialistLegacy(
     })
   }
 
-  if (mediaAttached || !(roleMatched || designMatched || repairRequested || repositoryTarget || project.context)) return null
+  // A Builder job starts only on COS's own request, on a confirmed repair offer, or on source that is actually here
+  // and handed over to be worked on (code supplied to be explained stays with COS; Codex on #4916). An explicit
+  // instruction not to execute always wins.
+  const executionRequested = !compileCosInstructionContract(objective).prohibitsExecution && (
+    input.plannerRequested === true
+    || input.confirmedRepairContinuation === true
+    || ((sourceAttached || pastedSourceCode(objective)) && isConciergeBuilderObjective(objective, context)))
+  if (mediaAttached || !(executionRequested || repositoryTarget || project.context)) return null
   // PR #4719: Builder V2 continues and repairs an existing project; only an explicitly selected
   // workspace with no recorded job in this conversation is refused.
   if (!project.context && selectionBody?.workspaceId) return NextResponse.json({ reply: 'Builder V2 requires a fresh workspace; legacy workspace continuation is disabled.', execution_allowed: false, source: 'builder-v2-only' }, { status: 409 })
@@ -455,17 +478,7 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   const sourceAttached = hasSourceAttachment(context)
   const mediaAttached = hasImageOrPdfAttachment(input.body)
   const requestedMode = normalizeAssistanceMode(input.body?.assistanceMode ?? input.body?.context?.assistanceMode)
-  const specialistRelevant = sourceAttached
-    || mediaAttached
-    || isSoftwareRepairRequest(objective)
-    || isConciergeBuilderObjective(objective, context)
-    || (DESIGN_ARTIFACT.test(objective) && DESIGN_REQUEST.test(objective))
-    || builderRepositoryImportIntent(objective)
-    || isBuilderProposalApproval(objective)
-    || wantsBuilderProposal(objective)
-    || isBuilderEvidenceRequest(objective)
-    || isBuilderProjectQuestion(objective)
-    || (input.allowRepositoryRepair === true && isOperationalLogEvidence(objective))
+  const specialistRelevant = specialistAdmitted(input, objective, sourceAttached, mediaAttached)
 
   if (!specialistRelevant) return null
 
@@ -527,9 +540,7 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
       // A recognized executable software request must never silently fall through
       // to the generic conversational answer generator when delegation declines.
       // Guidance requests intentionally use the ordinary conversation path above.
-      if (delegated === null && (isConciergeBuilderObjective(objective, context)
-        || (DESIGN_ARTIFACT.test(objective) && DESIGN_REQUEST.test(objective))
-        || builderRepositoryImportIntent(objective))) {
+      if (delegated === null && input.plannerRequested === true) {
         return NextResponse.json({
           reply: 'COS recognized a software execution request but could not admit it to Builder. No execution has been confirmed. Check History for an existing job before retrying.',
           source: 'cos-builder-handoff-unavailable',

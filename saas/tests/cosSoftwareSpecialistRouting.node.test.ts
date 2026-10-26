@@ -102,7 +102,8 @@ test('COS Software Specialist owns Builder and owner Platform Engineer execution
   const repair = read('../lib/builder/repository-repair.ts')
 
   assert.match(specialist, /export async function tryCosSoftwareSpecialist/)
-  assert.match(specialist, /isConciergeBuilderObjective/)
+  assert.match(specialist, /function specialistAdmitted\(/)
+  assert.match(specialist, /input\.plannerRequested === true/)
   assert.match(specialist, /enqueueBuilderJob/)
   assert.match(specialist, /enqueueSignalBoostRepositoryRepairJob/)
   assert.match(specialist, /input\.allowRepositoryRepair && access\?\.isOwner && access\.userId && !sourceAttached/)
@@ -436,7 +437,7 @@ test('a build request that opens with a question word but is addressed to the ag
 test('recognized Builder work cannot disappear into unrelated COS conversation', () => {
   const source = read('../lib/ai/cos/softwareSpecialist.ts')
   assert.match(source, /const delegated = await tryCosSoftwareSpecialistLegacy\(input, signal\)/)
-  assert.match(source, /if \(delegated === null && \(isConciergeBuilderObjective\(objective, context\)/)
+  assert.match(source, /if \(delegated === null && input\.plannerRequested === true\)/)
   assert.match(source, /source: 'cos-builder-handoff-unavailable'/)
   assert.match(source, /execution_allowed: false/)
   assert.match(source, /status: 503/)

@@ -1,0 +1,257 @@
+# iTMounts / COS — Production Acceptance Campaign
+
+**Campaign ID:** COS-PAC-001  
+**Target:** https://itmounts.com  
+**Scope:** COS orchestration, reasoning harness, Builder V2, Playwright, inference routing, observability, resilience, and production release  
+**Status:** PENDING EXECUTION  
+**Goal:** Establish verifiable evidence that COS operates reliably end-to-end, beyond passing unit tests and deployment checks.
+
+---
+
+## 1. Mandatory Execution Rules
+
+1. Execute against the deployed production commit and record its SHA.
+2. Use genuine COS inference, routing, and harness behavior. Never substitute canned answers or fixture responses.
+3. Preserve the original test prompts without modifying them to make COS pass.
+4. Record actual model calls, latencies, output tokens, retries, decisions, and failures.
+5. Run real browser tests using Playwright.
+6. Do not count a skipped, timed-out, or partially completed test as PASS.
+7. Do not automatically merge a repair solely because CI passes.
+8. Re-run failed scenarios after repairs, followed by the full regression suite.
+9. Never expose credentials, private customer information, or raw sensitive telemetry.
+10. The final certification must cite evidence from the deployed production version.
+
+## 2. Production Acceptance Matrix
+
+| ID | Test | Required Result |
+|---|---|---|
+| PAC-01 | Eight-part forensic investigation | All eight deliverables answered |
+| PAC-02 | Unseen database incident | Ranked causal hypotheses and experiments |
+| PAC-03 | Unseen infrastructure incident | Evidence-driven root-cause analysis |
+| PAC-04 | Unseen cybersecurity investigation | Hypothesis-based defensive analysis |
+| PAC-05 | Business investigation | Competing explanations and decision criteria |
+| PAC-06 | Engineering uncertainty | Technical reasoning without invented measurements |
+| PAC-07 | RunPod busy | Governed recovery or bounded failure |
+| PAC-08 | Model timeout | No uncontrolled retry loop |
+| PAC-09 | Output-length truncation | Complete recovered answer or honest terminal failure |
+| PAC-10 | Malformed model output | Safe parsing and bounded recovery |
+| PAC-11 | Answer acceptance contract | Reject incomplete, duplicated, or generic responses |
+| PAC-12 | Correct routing | Investigation never enters Builder as coding work |
+| PAC-13 | Playwright browser workflow | Actual submitted request reaches final response |
+| PAC-14 | Conversation History | Completed results persist after refresh and return |
+| PAC-15 | Cancellation and recovery | No unintended duplicate execution |
+| PAC-16 | Observability | Complete correlated request trace |
+| PAC-17 | Budget and deadline enforcement | No configured limit bypass |
+| PAC-18 | Builder V2 integration | Verified fail/change/pass cycle in isolation |
+| PAC-19 | CI and deployment checks | All required checks green |
+| PAC-20 | Production reliability | 20 consecutive successful analytical requests |
+
+## 3. Primary Forensic Reasoning Test — PAC-01
+
+Use the original eight-part payment/Kafka incident prompt already employed during COS debugging. Do not replace it with a newly invented benchmark.
+
+The response must provide:
+
+1. Plausible root causes.
+2. Ranked hypotheses with explanations.
+3. Correlations distinguished from causation.
+4. Missing evidence and decisive measurements.
+5. A forensic investigation plan.
+6. Experiments that differentiate competing explanations.
+7. Interacting failure mechanisms.
+8. A most-likely provisional explanation, with uncertainty and verification criteria.
+
+**PASS:** All eight deliverables receive meaningful, scenario-specific treatment, with reasonable uncertainty labeling.
+
+**FAIL:** COS says it needs more readings, cannot establish the root cause, could not complete the investigation, or outputs headings without meaningful analysis.
+
+A confirmed root cause is not necessary. A substantive, evidence-aware investigation is necessary.
+
+## 4. Unseen Investigation Tests — PAC-02 Through PAC-06
+
+For each test, submit a genuinely unfamiliar scenario. Keep the scenarios distinct from existing regression fixtures and vary their format.
+
+Require COS to:
+
+- Identify and prioritize reasonable hypotheses.
+- Explain observations versus assumptions.
+- Identify discriminating evidence.
+- Design practical investigative experiments.
+- State the most likely working explanation.
+- Avoid fabricating executed checks or measured facts.
+
+Do not award a pass merely because the answer is long, has numbered sections, or resembles the requested format. Assess technical substance and internal consistency.
+
+## 5. Inference Resilience Tests — PAC-07 Through PAC-10
+
+Exercise the following conditions in a controlled, isolated environment using the same production release artifact or an equivalent staging deployment.
+
+**RunPod busy:** Simulate contention or use a controlled provider stub. COS must respect ownership priorities, use only authorized fallback routes, and avoid repeatedly launching expensive requests.
+
+**Timeout:** Delay the inference response beyond its configured deadline. Confirm cancellation, accurate failure telemetry, and bounded recovery.
+
+**Output truncation:** Return an incomplete generation with an output-length finish reason. COS must not present incomplete JSON or silently treat truncated text as complete.
+
+**Malformed output:** Return broken JSON, empty text, and missing required fields. Recovery must be bounded and safe.
+
+Production should not be deliberately destabilized to create these conditions. Fault injection must not impact ordinary users.
+
+## 6. Harness and Routing Tests — PAC-11 and PAC-12
+
+Verify the complete request lifecycle:
+
+User request → intent classification → context retrieval → model routing → inference → response parsing → answer validation → repair (if necessary) → release → History persistence.
+
+Acceptance requirements:
+
+- Analytical work cannot be misrouted to a software Builder job.
+- Genuine coding tasks must remain routable to Builder.
+- No canned incident response may impersonate model analysis.
+- Repeated generic paragraphs must not pass merely by having different headings.
+- Substantive analysis must not be discarded because it contains nested numbered lists.
+- One recovery path must not bypass another required policy or evidence boundary.
+- The terminal user-visible response must match the verified orchestration outcome.
+
+## 7. Playwright Acceptance — PAC-13 Through PAC-15
+
+Run authenticated browser tests against production using a designated test account.
+
+Test desktop and mobile layouts, with these required actions:
+
+1. Open the platform and start a new COS conversation.
+2. Submit the forensic prompt.
+3. Observe request progress and final result.
+4. Confirm the answer is complete and readable.
+5. Refresh the browser.
+6. Return to the conversation through History.
+7. Confirm the persisted response matches the original result.
+8. Test safe recovery from a simulated lost browser connection.
+9. Test cancellation without unauthorized duplicate execution.
+10. Confirm unrelated conversations and user data remain isolated.
+
+Capture timestamped screenshots, traces, and relevant request identifiers.
+
+## 8. Observability — PAC-16
+
+Every tested request must be traceable through its lifecycle.
+
+At minimum, capture:
+
+- Test ID and run ID.
+- Deployed commit SHA.
+- Conversation and correlation identifiers, where safely accessible.
+- Selected inference provider and model.
+- Routing decision.
+- Inference start and completion times.
+- Input and output token usage where reported.
+- Finish reason.
+- Retry and rescue attempts.
+- RunPod busy or timeout classification.
+- Answer-contract validation result.
+- User-visible final outcome.
+- Persistence confirmation.
+
+If a request fails, the evidence must identify the stage and reason rather than relying on generic application-error text.
+
+## 9. Resource Governance — PAC-17
+
+Verify hard limits on model deadlines, total turn duration, cost exposure, repeated attempts, and concurrent inference.
+
+Confirm that:
+
+- Retries cannot reset cumulative budgets.
+- A cancelled or expired request cannot continue issuing model calls.
+- Background jobs cannot repeatedly deprive interactive users of capacity contrary to configured priority rules.
+- Timeout handling retains accurate failure provenance.
+- Every attempted fallback is authorized and accounted for.
+
+## 10. Builder V2 — PAC-18
+
+Use an isolated, disposable repository fixture with one deliberately failing test.
+
+The acceptance workflow must:
+
+1. Identify the failure.
+2. Reproduce it with the actual test command.
+3. Inspect the relevant source.
+4. Apply a minimal repair.
+5. Re-run the same verification command.
+6. Complete any additional required checks.
+7. Preserve proof of what changed and which tests passed.
+8. Stop safely if the defect cannot be verified or the budget is exhausted.
+
+No changes to the main production codebase are required for this certification case.
+
+## 11. Release Gate — PAC-19
+
+Require complete success for all applicable release checks:
+
+- TypeScript compilation.
+- Unit tests.
+- COS harness regression suite.
+- Builder V2 verification suite.
+- Playwright tests.
+- Required GitHub Actions.
+- Vercel production build.
+- Production deployment readiness.
+- Review findings and branch protection.
+- Live application smoke tests.
+
+A deployment marked READY is necessary but not sufficient for completion.
+
+## 12. Reliability Qualification — PAC-20
+
+Run 20 consecutive production analytical requests covering different subjects and formats.
+
+Each must:
+
+- Reach a terminal outcome.
+- Produce a complete, meaningful analysis.
+- Respect resource constraints.
+- Preserve its answer in History.
+- Generate a usable observability record.
+
+**Acceptance target:** 20/20 successful analytical completions.
+
+An unresolved or incomplete answer resets the qualification run after the defect is repaired. Infrastructure fault-injection cases are evaluated separately because a safe bounded failure can be their expected result.
+
+## 13. Required Evidence Package
+
+For each test, record:
+
+| Field | Required |
+|---|---|
+| Test ID | Yes |
+| Production commit | Yes |
+| Execution timestamp | Yes |
+| Exact prompt or fault scenario | Yes |
+| Expected behavior | Yes |
+| Actual behavior | Yes |
+| PASS / FAIL / BLOCKED | Yes |
+| Correlation ID | Where available |
+| Model call receipt | For inference tests |
+| Playwright trace or screenshot | For browser tests |
+| Failure cause | If failed |
+| Repair PR | If applicable |
+| Post-repair retest result | If applicable |
+
+## 14. Completion Decision
+
+The campaign may be certified complete only when:
+
+- All 20 mandatory acceptance cases meet their criteria.
+- Every blocking defect has been repaired and retested.
+- Required CI and deployment checks are green.
+- Production behavior matches the tested release.
+- No unresolved high-severity orchestration or harness defect remains.
+- Evidence is retained for independent review.
+
+**Final certification outcome:** PASS / FAIL / BLOCKED.
+
+No simulated success, inferred success, or incomplete test may be reported as verified production success.
+
+---
+
+**Campaign authorization:** Acceptance testing only. This document does not authorize unreviewed production data mutation, credential exposure, destructive fault injection, or automatic merging.
+
+**Current campaign status:** NOT YET EXECUTED / NOT CERTIFIED.

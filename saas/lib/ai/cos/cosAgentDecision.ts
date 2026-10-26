@@ -61,7 +61,7 @@ const CAPABILITY_DESCRIPTIONS: Record<CosAgentCapability, string> = {
   creative_memory: 'Retrieve validated successful approaches, structures, styles, useful elements, and failure lessons that may improve how the task is solved or presented. Creative Memory is never factual evidence.',
   platform_runtime: 'Read current host-verified COS/iTMounts runtime and model configuration for the authenticated owner.',
   repository_read: 'Inspect the authorized repository or codebase before answering.',
-  software_specialist: 'Hand off real debugging, implementation, testing, or deployment work to the governed Software Specialist.',
+  software_specialist: 'Hand off work that must build, change, run, test, debug or deploy actual software, code, files or a website to the governed Software Specialist. Not for analysis, investigation, explanation, review or planning that is answered in writing, even when its subject is software.',
   external_action: 'Request an authorized action in an external system; host policy decides whether execution is allowed.',
 }
 
@@ -90,11 +90,13 @@ const LIVE_WEB_PLANNING_RULES = [
 ].join(' ')
 
 function toolCatalog(input: { surface: 'assistant' | 'concierge'; ownerAuthenticated: boolean }): readonly LocalModelToolDefinition[] {
+  // Every surface can hand software work to the Software Specialist: wording no longer does it (2026-10-26), and the
+  // Specialist itself keeps public work in its isolated workspace and repository authority with the signed-in owner.
   const allowed: readonly CosAgentCapability[] = input.surface === 'concierge'
-    ? ['live_web', 'compute']
+    ? ['live_web', 'compute', 'software_specialist']
     : input.ownerAuthenticated
       ? COS_AGENT_CAPABILITIES
-      : ['live_web', 'compute']
+      : ['live_web', 'compute', 'software_specialist']
   return Object.freeze(allowed.map(name => Object.freeze({
     type: 'function' as const,
     function: Object.freeze({
@@ -180,7 +182,7 @@ export function stableKnowledgeQuestionNeedsNoPlanner(prompt: string, previousAs
   if (/^(?:what(?: is|'s)|define|explain)\\s+[A-Z][A-Z0-9-]{1,9}(?:\\s*[?.!]|$)/.test(String(prompt || '').trim())) return false
   const questionShape = /^(?:what|why|how|explain|define|describe|compare|when|where)\b/.test(text)
   if (!questionShape) return false
-  if (/\b(?:today|current|currently|latest|live|now|this (?:week|month|year)|price|weather|schedule|availability|near me|my (?:account|email|calendar|files?|repo|repository|project)|deploy|commit|merge|pull request|pr\b|fix|change|create|send|book|buy|cancel|delete|update)\b/.test(text)) return false
+  if (/\b(?:today|current|currently|latest|live|now|this (?:week|month|year)|price|weather|schedule|availability|near me|my (?:account|email|calendar|files?|repo|repository|project)|deploy|commit|merge|pull request|pr\b|fix|change|create|send|book|buy|cancel|delete|update|build|implement|write|code|develop|run|debug|repair|test)\b/.test(text)) return false
   return true
 }
 
@@ -217,6 +219,7 @@ export async function decideCosAgentTurn(input: {
       'Your only job: if information or action outside the model is materially required, call only the minimum function tools needed.',
       'A function call is a capability request, NOT authorization. The host independently checks identity, scope, permissions, safety, and action policy.',
       'Do not call tools merely because a topic is sophisticated. A conceptual software question that stable knowledge can answer needs no tool.',
+      'Read the whole request before choosing: decide what the user asks to have DONE, not which words appear in it. Request software_specialist only when the user wants software actually built, changed, run or repaired; an investigation, analysis, test plan or specification to discuss is answered by COS.',
       'Request compute when the answer needs a chart, graph or plot, a calculation over real data, statistics, or anything that requires running code; COS then retrieves the data and runs the code itself.',
       'Current/future travel details such as transport, fares, opening hours, prices, availability, schedules, weather, or other mutable facts require live_web.',
       LIVE_WEB_PLANNING_RULES,

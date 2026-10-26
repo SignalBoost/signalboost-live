@@ -11,6 +11,7 @@
 //   - cited URLs must be URLs this turn actually searched or fetched.
 
 import { compileCosInstructionContract, decideCosLoopContinuation } from '../instructionContract.ts'
+import { isAdvisoryDiagnosisPrompt, advisoryDiagnosisBriefDefects } from '../advisoryDiagnosisPolicy.ts'
 import type { LocalModelChatMessage, LocalModelToolCall, LocalModelToolDefinition, LocalModelTurnResult } from '../../local-inference.ts'
 import { CRITIC_SYSTEM_PROMPT, actionKey, criticMessages, detectStuck, observationIsError, parseCriticVerdict, refinementPrompt, shouldRefine, stuckNudge, type LoopStep } from './openhandsPatterns.ts'
 import { agentToolDefinitions, answerReserveMs, emptyEvidence, executeAgentTool, searchObservation, type AgentEvidence, type AgentSearchResult, type AgentToolPolicy, type AgentToolPorts } from './cosAgentTools.ts'
@@ -408,6 +409,8 @@ export async function runCosAgentLoop(input: {
   let answer = ''
   let rounds = 0
   let forceAnswer = false
+  let diagnosisRecoveryIssued = false
+  const diagnosisRequest = isAdvisoryDiagnosisPrompt(input.request)
 
   const runRounds = async (): Promise<void> => {
     while (rounds < MAX_ROUNDS && remainingMs() > MIN_ROUND_MS) {
@@ -436,7 +439,22 @@ export async function runCosAgentLoop(input: {
       trace.model = model
       const calls: readonly LocalModelToolCall[] = finalRound ? [] : turn.toolCalls
       if (!calls.length) {
-        answer = String(turn.content || '').trim()
+        const draft = String(turn.content || '').trim()
+        // A missing-data dodge cannot terminate an investigation while authorized
+        // read-only evidence tools and a bounded reasoning round remain available.
+        // This recovery never widens tool permissions or fabricates telemetry.
+        if (diagnosisRequest && !diagnosisRecoveryIssued && !finalRound
+          && advisoryDiagnosisBriefDefects(input.request, draft).length > 0
+          && permittedToolNames.size > 0
+          && remainingMs() > answerReserveMs(policy) + MIN_ROUND_MS) {
+          diagnosisRecoveryIssued = true
+          messages.push(
+            { role: 'assistant', content: draft },
+            { role: 'user', content: 'HARNESS: This investigation is not complete. First inspect existing authorized evidence with a relevant read-only tool when available; never query unrelated tenant data. Then provide observed facts, ranked candidate hypotheses, discriminating read-only checks, missing evidence, and a provisional assessment. Do not request all measurements before analyzing.' },
+          )
+          continue
+        }
+        answer = draft
         return
       }
       messages.push(assistantMessage(turn))

@@ -70,8 +70,19 @@ export function settleHarnessProviderCostUsd(reservedUsd: number, actualUsd: num
   const ledger = harnessExecutionScope.getStore()?.providerCostLedger
   const reserved = Number(reservedUsd)
   const actual = Number(actualUsd)
-  if (!ledger || !Number.isFinite(reserved) || reserved <= 0 || !Number.isFinite(actual) || actual < 0) return
+  if (!ledger) return
+  if (!Number.isFinite(reserved) || reserved <= 0 || !Number.isFinite(actual) || actual < 0) {
+    throw new Error('harness_provider_cost_settlement_invalid')
+  }
+  if (reserved > ledger.reservedCostUsd + Number.EPSILON) {
+    throw new Error('harness_provider_cost_settlement_exceeds_reserved')
+  }
+  // Record the actual provider charge before failing closed: spent money must never disappear
+  // from the ledger, even when a provider reports a charge above its reservation.
   ledger.reservedCostUsd = Math.max(0, Number((ledger.reservedCostUsd - reserved + actual).toFixed(6)))
+  if (ledger.reservedCostUsd > ledger.maxCostUsd + Number.EPSILON) {
+    throw new Error('harness_provider_cost_budget_exceeded')
+  }
 }
 
 export function withHarnessProviderCostBudget<T>(

@@ -56,6 +56,9 @@ for (const scenario of cases) {
       case: scenario.name,
       timestamp: new Date().toISOString(),
       target: new URL(process.env.COS_LIVE_BASE_URL!).origin,
+      expectedCommit: process.env.COS_LIVE_EXPECTED_COMMIT,
+      // Expected revision must be verified independently against the Vercel deployment.
+      deploymentCommitVerified: false,
       status: response.status(),
       responseSource: typeof payload.source === 'string' ? payload.source : null,
       elapsedMs: Date.now() - started,

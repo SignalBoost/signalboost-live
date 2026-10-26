@@ -10,6 +10,7 @@
 //     (one repair round, then unsupported answers are withheld);
 //   - cited URLs must be URLs this turn actually searched or fetched.
 
+import { compileCosInstructionContract, decideCosLoopContinuation } from '../instructionContract.ts'
 import type { LocalModelChatMessage, LocalModelToolCall, LocalModelToolDefinition, LocalModelTurnResult } from '../../local-inference.ts'
 import { CRITIC_SYSTEM_PROMPT, actionKey, criticMessages, detectStuck, observationIsError, parseCriticVerdict, refinementPrompt, shouldRefine, stuckNudge, type LoopStep } from './openhandsPatterns.ts'
 import { agentToolDefinitions, answerReserveMs, emptyEvidence, executeAgentTool, searchObservation, type AgentEvidence, type AgentSearchResult, type AgentToolPolicy, type AgentToolPorts } from './cosAgentTools.ts'
@@ -356,8 +357,21 @@ export async function runCosAgentLoop(input: {
   const trace = input.trace ?? newAgentLoopTrace()
   const now = input.now ?? Date.now
   const remainingMs = () => input.deadlineAt - now()
-  const tools = agentToolDefinitions(input.policy)
-  const systemPrompt = cosAgentSystemPrompt(input.language, new Date(now()))
+  // Carry the shared admission contract into the actual execution loop, not merely
+  // the initial router. The original request remains intact in the user message.
+  const contract = compileCosInstructionContract(input.request)
+  const policy: AgentToolPolicy = contract.prohibitsExecution
+    ? { ...input.policy, maxPythonRuns: 0 }
+    : input.policy
+  const tools = agentToolDefinitions(policy).filter(tool =>
+    !contract.prohibitsExecution || tool.function.name !== 'run_python')
+  const contractInstructions = contract.prohibitsExecution
+    ? 'The user requested analysis only. Do not execute code, generate project files, or use run_python. Research and explain without performing prohibited execution.'
+    : 'Respect the original user instructions. Do not infer permission for code or project mutation merely from quoted examples.'
+  const deliverableInstructions = contract.deliverables.length
+    ? '\nRequired deliverables in the user instruction (cover each explicitly):\n' + contract.deliverables.map((item, index) => `${index + 1}. ${item}`).join('\n')
+    : ''
+  const systemPrompt = cosAgentSystemPrompt(input.language, new Date(now())) + '\n' + contractInstructions + deliverableInstructions
   const evidence: AgentEvidence = emptyEvidence(input.request)
   const history = (input.conversation || []).slice(-6).map(message => ({ role: message.role, content: String(message.content || '').slice(0, 4_000) }))
   const messages: LocalModelChatMessage[] = [...history, { role: 'user', content: input.request }]
@@ -373,6 +387,9 @@ export async function runCosAgentLoop(input: {
   }
   const toolCalls: string[] = []
   const loopSteps: LoopStep[] = []
+  const permittedToolNames = new Set(tools.map(tool => tool.function.name))
+  const seenObservations = new Set<string>()
+  let unproductiveSteps = 0
   let model = ''
   let answer = ''
   let rounds = 0
@@ -412,14 +429,32 @@ export async function runCosAgentLoop(input: {
       for (const [index, call] of calls.entries()) {
         // Every call the model issued gets a tool result (the protocol requires it); only calls
         // within the host budget and deadline execute.
-        const allowed = index < MAX_CALLS_PER_ROUND && toolCalls.length < MAX_TOOL_CALLS && remainingMs() > MIN_ROUND_MS
+        const permitted = permittedToolNames.has(call.function.name)
+        const allowed = permitted && !forceAnswer && index < MAX_CALLS_PER_ROUND && toolCalls.length < MAX_TOOL_CALLS && remainingMs() > MIN_ROUND_MS
         if (allowed) toolCalls.push(call.function.name)
-        const observation = allowed
-          ? await executeAgentTool({ name: call.function.name, argumentsJson: call.function.arguments, ports: input.ports, policy: input.policy, evidence, remainingMs })
-          : 'Error: tool budget for this turn is spent; this call was not executed. Answer with what you have.'
+        const observation = !permitted
+          ? 'Error: tool is not authorized for this request; this call was not executed.'
+          : allowed
+            ? await executeAgentTool({ name: call.function.name, argumentsJson: call.function.arguments, ports: input.ports, policy, evidence, remainingMs })
+            : 'Error: tool budget for this turn is spent; this call was not executed. Answer with what you have.'
         messages.push({ role: 'tool', tool_call_id: call.id, content: observation })
         trace.steps.push(agentTraceStep(call.function.name, observation))
         loopSteps.push({ action: actionKey(call.function.name, call.function.arguments), observation, error: observationIsError(observation) })
+        const addedEvidence = allowed && !observationIsError(observation) && !seenObservations.has(observation)
+        if (allowed) seenObservations.add(observation)
+        unproductiveSteps = addedEvidence ? 0 : unproductiveSteps + 1
+        const progress = decideCosLoopContinuation({
+          repeatedUnproductiveSteps: unproductiveSteps,
+          latestStepChangedArtifact: false,
+          latestStepAddedEvidence: addedEvidence,
+          budgetRemaining: remainingMs() > answerReserveMs(policy) + MIN_ROUND_MS && toolCalls.length < MAX_TOOL_CALLS,
+        })
+        if (progress !== 'continue') {
+          forceAnswer = true
+          messages.push({ role: 'user', content: progress === 'stop-budget'
+            ? 'HARNESS: tool execution budget is exhausted. Answer from verified evidence and identify remaining gaps.'
+            : 'HARNESS: recent tool calls added no new evidence. Do not repeat tool calls; answer from verified evidence and identify remaining gaps.' })
+        }
       }
       const stuck = detectStuck(loopSteps)
       if (stuck) {

@@ -660,7 +660,7 @@ Canonical latency rules:
 - `cos_interactive_answer`, interactive authoring, and direct text transformations may bypass RunPod-primary routing and use the configured DeepInfra/`LOCAL_AI_*` fallback directly as a bounded latency exception; this does not redefine DeepInfra as primary;
 - DeepInfra interactive generation defaults to low reasoning effort unless `COS_INTERACTIVE_REASONING_EFFORT` explicitly overrides it;
 - interactive model transport is bounded by `COS_INTERACTIVE_MODEL_TIMEOUT_MS` (default 20 seconds, never above the configured provider timeout);
-- interactive answer generation is capped by `COS_INTERACTIVE_REASONER_MAX_TOKENS` (default 2,000, also bounded by the global reasoner ceiling);
+- the answer the user reads gets the same window for every request (`USER_ANSWER_TIMEOUT_MS` 120 s inside the turn deadline, `USER_ANSWER_MAX_TOKENS` 4,000, bounded by the global reasoner ceiling); the window is never chosen by guessing the request's kind from its wording;
 - semantic knowledge/corpus retrieval gets a short response-path budget (`COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS`, default 1.5 seconds) and falls back to lexical retrieval rather than blocking the user;
 - University exams, controlled evaluations, training/distillation, Builder batch work, and other non-interactive workloads keep their own routing and evaluation policies.
 

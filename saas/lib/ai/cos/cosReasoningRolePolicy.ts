@@ -153,16 +153,6 @@ function attachedSourceIsTheJob(prompt: string, context?: CosCodingRoutingContex
   return true
 }
 
-// A request that lists several analysis deliverables ("1. List every plausible root cause. 2. Rank causes by
-// probability. …", "Identify root cause — …", "Recommend fixes — …") needs a long answer. Production 2026-10-25: an
-// 8-task incident analysis hit the 20 s / 2,000-token one-pass chat answer limit, the cut-off answer was discarded,
-// the 9 s last-chance retry failed too, and the owner got a canned "I need more readings" sentence.
-const DELIVERABLE_LINE = /^\s*(?:[-*•]\s*|\d{1,2}[.)]\s*)?(?:list|rank|identify|describe|explain|produce|design|analy[sz]e|recommend|propose|state|compare|trace|detect|audit|validate|simulate|evaluate|assess|summari[sz]e|outline|estimate|prioriti[sz]e|determine|investigate|diagnose|predict|provide)\b/i
-
-export function isLongFormAnalysisRequest(prompt: string): boolean {
-  return String(prompt || '').split(/\r?\n/).filter(line => DELIVERABLE_LINE.test(line)).length >= 3
-}
-
 export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
   if (excludedFromBuilder(prompt, context)) return false
   const objective = cosRoutingObjective(prompt)

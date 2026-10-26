@@ -125,8 +125,8 @@ export function toLocalModelCallArgs(request: CosReasoningRequest, role: CosSpec
     ...(request.presencePenalty === undefined ? {} : { presencePenalty: request.presencePenalty }),
     ...(request.disableThinking === undefined ? {} : { disableThinking: request.disableThinking }),
     ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
-    // Codex on #4879: without this the long-form window never reached inference.
-    ...(request.longForm === undefined ? {} : { longForm: request.longForm }),
+    // Codex on #4879: without this the answer window never reached inference.
+    ...(request.writesUserAnswer === undefined ? {} : { writesUserAnswer: request.writesUserAnswer }),
     ...(request.allowConfiguredFallback === undefined ? {} : { allowConfiguredFallback: request.allowConfiguredFallback }),
     ...(request.allowTruncatedText === undefined ? {} : { allowTruncatedText: request.allowTruncatedText }),
     ...(request.persistUsage === undefined ? {} : { persistUsage: request.persistUsage }),

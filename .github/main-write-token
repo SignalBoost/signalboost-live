@@ -1,2 +1,2 @@
-base_sha=a0c5d7bf95d4bc87a626184a9372ae754027000e
-branch=fix/cos-release-guard-reconcile-20261026
+base_sha=9a9175849cf0827e90d25bf34a49d7a42066abf3
+branch=fix/builder-v2-inline-verification-repair-20261026

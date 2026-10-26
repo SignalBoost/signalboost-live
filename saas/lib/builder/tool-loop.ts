@@ -710,6 +710,21 @@ export class BuilderToolLoop {
         if (!String(item.error || '').startsWith('builder_repeated_tool_call:')) break
         consecutiveRepeatRejections += 1
       }
+      // A blocked repository-wide test is not verification evidence. Combined with
+      // an already rejected repeated inspection, this is a non-productive diagnostic
+      // cycle, not a reason to buy more provider rounds on unchanged source.
+      // Exit with the retained trace so an operator can supply a focused proof.
+      const diagnosticWindow = trace.slice(lastWorkspaceChange + 1)
+      const rejectedBroadTest = diagnosticWindow.some(item => item.toolId === 'run'
+        && !item.ok && item.error === 'builder_repository_broad_test_blocked')
+      const rejectedRepeatedInspection = diagnosticWindow.some(item =>
+        (item.toolId === 'read_file' || item.toolId === 'search_files' || item.toolId === 'list_files')
+        && !item.ok && String(item.error || '').startsWith('builder_repeated_tool_call:'))
+      if (repairObjective && rejectedBroadTest && rejectedRepeatedInspection
+        && !diagnosticWindow.some(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
+        && !diagnosticWindow.some(item => item.toolId === 'run' && item.ok && isBuilderTestRunnerCommand(item.input.command))) {
+        return { ok: false, error: 'builder_unproductive_diagnostic_budget_guard', trace }
+      }
       if (!missingBuildDeliverables && consecutiveRepeatRejections >= MAX_CONSECUTIVE_REPEAT_REJECTIONS) {
         return { ok: false, error: passingProofBeforeChange ? 'builder_regression_not_reproduced' : 'builder_stalled_repeated_inspection', trace }
       }

@@ -190,3 +190,39 @@ test('COS reasoner blocks release when completion verification is incomplete', (
   const guard = source.indexOf("if (!completion || completion.stopped !== 'complete')")
   assert.ok(guard > 0 && guard < source.indexOf('const finalParsedForPolicy = parseLocalResult(text)'))
 })
+
+
+test('verification can pass when time remains for a check but not a repair round', async () => {
+  const receipts: boolean[] = []
+  let repaired = false
+  const result = await runAnswerCompletionLoop({
+    request: 'Explain a verified fact',
+    answer: 'Grounded explanation',
+    ports: {
+      remainingMs: () => 10_000,
+      check: async () => [],
+      verify: async () => ({ passed: true, failures: [] }),
+      persistVerification: async receipt => { receipts.push(receipt.passed) },
+      complete: async () => { repaired = true; return null },
+    },
+  })
+  assert.equal(result.stopped, 'complete')
+  assert.deepEqual(receipts, [true])
+  assert.equal(repaired, false)
+})
+
+test('insufficient repair budget remains fail-closed after checking deficiencies', async () => {
+  let checked = false
+  const result = await runAnswerCompletionLoop({
+    request: 'Supply three substantive findings',
+    answer: 'One finding',
+    ports: {
+      remainingMs: () => 10_000,
+      check: async () => { checked = true; return ['two findings missing'] },
+      complete: async () => { throw Error('repair must not run') },
+    },
+  })
+  assert.equal(checked, true)
+  assert.equal(result.stopped, 'budget')
+  assert.deepEqual(result.missing, ['two findings missing'])
+})

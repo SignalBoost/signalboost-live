@@ -1,2 +1,2 @@
-base_sha=d9268b4b28c19cf00f12eab72ae024391eb50259
-branch=fix/builder-starts-on-facts-not-words-20261026
+base_sha=ebb90ea3eb5e1e07ff58e843541a51294a15ae8d
+branch=fix/cos-multilingual-context-constraints-20261026

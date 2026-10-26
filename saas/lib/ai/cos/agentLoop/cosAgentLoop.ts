@@ -379,7 +379,7 @@ export async function runCosAgentLoop(input: {
   const conversation = input.conversation || []
   const history = conversation.slice(-6).map(message => ({ role: message.role, content: String(message.content || '').slice(0, 4_000) }))
   const older = conversation.slice(0, Math.max(0, conversation.length - 6))
-  const constraintPattern = /\b(?:do not|don't|never|must not|only|without|limit|budget|deadline|require|shall not|cannot|can't)\b/i
+  const constraintPattern = /(?:\b(?:do not|don't|never|must not|only|without|limit|budget|deadline|require|shall not|cannot|can't|no|nunca|jamás|somente|apenas|nunca|não|nao|proibido|zakaz|nigdy|tylko|nie wolno|без|нельзя|никогда|только|запрещено|бюджет|срок)\b|(?:não|nunca|jamás|proibido|nie wolno|zakaz|nigdy|tylko|нельзя|никогда|только|запрещено|бюджет|срок))/iu
   const priorConstraints = older.filter(message => message.role === 'user')
     .flatMap(message => String(message.content || '').split(/\n+/))
     .map(line => line.trim())

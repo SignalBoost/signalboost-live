@@ -63,7 +63,7 @@ export function selfHealingCapacityJob(job: BuilderJobRecord): boolean {
   )
 }
 
-type SelfHealingDeferralReason = 'builder_runpod_primary_busy' | 'builder_turn_timeout' | 'builder_model_round_timeout'
+type SelfHealingDeferralReason = 'builder_runpod_primary_busy' | 'builder_turn_timeout' | 'builder_model_round_timeout' | 'harness_provider_cost_budget_exceeded'
 
 function metadataCount(job: BuilderJobRecord, key: string): number {
   const value = Number(job.metadata[key])
@@ -72,12 +72,12 @@ function metadataCount(job: BuilderJobRecord, key: string): number {
 
 function capacityDeferrable(job: BuilderJobRecord, error: string | null): error is SelfHealingDeferralReason {
   if (error === 'builder_runpod_primary_busy') return true
-  if (error !== BUILDER_TURN_TIMEOUT_ERROR && error !== 'builder_model_round_timeout') return false
+  if (error !== BUILDER_TURN_TIMEOUT_ERROR && error !== 'builder_model_round_timeout' && error !== 'harness_provider_cost_budget_exceeded') return false
   return metadataCount(job, 'builderExecutionTimeoutDeferrals') < MAX_SELF_HEALING_EXECUTION_TIMEOUT_DEFERRALS
 }
 
 async function deferSelfHealingCapacity(job: BuilderJobRecord, error: string | null, trace: readonly unknown[], checkpoint: BuilderLoopCheckpoint | null = null): Promise<boolean> {
-  const standardBusy = job.jobKind === 'standard' && (error === 'builder_runpod_primary_busy' || error === 'builder_model_round_timeout' || error === BUILDER_TURN_TIMEOUT_ERROR)
+  const standardBusy = job.jobKind === 'standard' && (error === 'builder_runpod_primary_busy' || error === 'builder_model_round_timeout' || error === BUILDER_TURN_TIMEOUT_ERROR || error === 'harness_provider_cost_budget_exceeded')
     && metadataCount(job, 'builderCapacityDeferrals') < MAX_STANDARD_CAPACITY_DEFERRALS
   if (!standardBusy && (!selfHealingCapacityJob(job) || !capacityDeferrable(job, error))) return false
   const deferred = await deferBuilderJobForCapacity({ job, reason: error, checkpoint })
@@ -862,10 +862,10 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
     const trace = publicTrace(result.trace)
     // Model capacity is not work: re-queue with this slice's progress before spending a work slice.
-    if (result.ok === false && (result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout' || result.error === BUILDER_TURN_TIMEOUT_ERROR)
+    if (result.ok === false && (result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout' || result.error === BUILDER_TURN_TIMEOUT_ERROR || result.error === 'harness_provider_cost_budget_exceeded')
       && await deferSelfHealingCapacity(job, result.error, trace, result.checkpoint ?? null)) return
     if (result.ok === false && result.checkpoint && builderMayContinue(job, result.checkpoint,
-      result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout' || result.error === BUILDER_TURN_TIMEOUT_ERROR)) {
+      result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout' || result.error === BUILDER_TURN_TIMEOUT_ERROR || result.error === 'harness_provider_cost_budget_exceeded')) {
       const reply = historyReply(result.checkpoint.verificationPending
         ? 'Files written — verifying changes. Builder will continue automatically.'
         : 'Builder saved its progress and will continue automatically. Verification is not complete yet.', job.workspaceId, files)

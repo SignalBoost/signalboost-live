@@ -430,7 +430,7 @@ export async function runCosAgentLoop(input: {
         // Every call the model issued gets a tool result (the protocol requires it); only calls
         // within the host budget and deadline execute.
         const permitted = permittedToolNames.has(call.function.name)
-        const allowed = permitted && index < MAX_CALLS_PER_ROUND && toolCalls.length < MAX_TOOL_CALLS && remainingMs() > MIN_ROUND_MS
+        const allowed = permitted && !forceAnswer && index < MAX_CALLS_PER_ROUND && toolCalls.length < MAX_TOOL_CALLS && remainingMs() > MIN_ROUND_MS
         if (allowed) toolCalls.push(call.function.name)
         const observation = !permitted
           ? 'Error: tool is not authorized for this request; this call was not executed.'

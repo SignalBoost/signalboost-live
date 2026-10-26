@@ -1,6 +1,7 @@
 // saas/tests/builderToolLoopSpendCeilingPauses.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import type { BuilderAiPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
@@ -39,3 +40,13 @@ test('without a slice scheduler the spend ceiling is still reported, not hidden'
   assert.equal(result.ok, false)
   if (result.ok === false) assert.equal(result.error, 'harness_provider_cost_budget_exceeded')
 })
+
+test('unproductive repair diagnostics are stopped before another paid model round', () => {
+  const source = requireSource()
+  assert.match(source, /error: 'builder_unproductive_diagnostic_budget_guard'/)
+  assert.match(source, /rejectedBroadTest && rejectedRepeatedInspection/)
+  assert.match(source, /!diagnosticWindow\.some\(item => item\.ok && \(item\.toolId === 'write_file'/)
+})
+function requireSource(): string {
+  return readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
+}

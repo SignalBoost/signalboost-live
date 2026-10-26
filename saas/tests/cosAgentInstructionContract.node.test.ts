@@ -3,7 +3,14 @@ import test from 'node:test'
 import { runCosAgentLoop, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
 import type { AgentToolPorts } from '../lib/ai/cos/agentLoop/cosAgentTools.ts'
 
-const ports = {} as AgentToolPorts // No tools execute in these admission checks.
+const ports: AgentToolPorts = {
+  search: async () => [],
+  fetchPublic: async url => ({ status: 404, text: '', finalUrl: url, contentType: 'text/plain' }),
+  python: {
+    async run() { throw new Error('Unexpected Python execution in contract verification') },
+    async close() {},
+  },
+}
 
 async function inspect(request: string) {
   let seen: { prompt: string; tools: string[] } | null = null
@@ -49,7 +56,7 @@ test('a model-issued forbidden call is blocked at execution, even if the model i
   const result = await runCosAgentLoop({
     request: 'Investigate this discrepancy. Do not execute code or run tests.',
     language: 'en', model,
-    ports: { ...ports, python: { run: async () => { attemptedExecution = true; throw new Error('unexpected execution') } } } as unknown as AgentToolPorts,
+    ports: { ...ports, python: { run: async () => { attemptedExecution = true; throw new Error('unexpected execution') }, close: async () => {} } } as AgentToolPorts,
     policy: { maxPythonRuns: 3, browserAllowed: false },
     deadlineAt: Date.now() + 90_000,
   })

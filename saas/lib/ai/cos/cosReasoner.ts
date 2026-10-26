@@ -1,3 +1,4 @@
+import { cosExecutionEnvelope, cosAnswerProgress } from './cosExecutionEnvelope.ts'
 //
 // COS'S OWN REASONER — strict independence boundary.
 //
@@ -164,7 +165,13 @@ export async function callRawCosReasoner(
   try {
     await touchRunpodActivityLease('qwen_reasoning')
 
-    let effectiveArgs = args
+    // Preserve the same user objective, prohibitions and deliverables across
+    // prompt compilation, model inference, critic repair, and the completion loop.
+    const execution = cosExecutionEnvelope(args.prompt)
+    let effectiveArgs = execution.contract.requestsAnalysis ? {
+      ...args,
+      systemPrompt: [String(args.systemPrompt ?? ''), execution.instructionBlock].filter(Boolean).join('\n\n'),
+    } : args
     const scriptDirective = scriptRequestDirective(args.prompt)
     if (scriptDirective) {
       effectiveArgs = {
@@ -313,7 +320,7 @@ export async function callRawCosReasoner(
     const firstAdvisoryDefects = advisoryDiagnosis && firstParsedForPolicy
       ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, firstParsedForPolicy.answer)
       : []
-    const firstTaskGaps = firstParsedForPolicy ? missingAnalyticalTasks(effectiveArgs.prompt, firstParsedForPolicy.answer) : []
+    const firstTaskGaps = firstParsedForPolicy ? cosAnswerProgress(args.prompt, firstParsedForPolicy.answer).missing : []
     const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, initialDraft) || firstAdvisoryDefects.length > 0 || firstTaskGaps.length > 0
     const qualityRepairAffordable = hasBudgetFor(budget, localCallEstimateMs())
       || (firstTaskGaps.length > 0 && remainingMs(budget) >= 8_000)
@@ -355,7 +362,16 @@ export async function callRawCosReasoner(
         return null
       })
 
+      // Loop controller compares actual deliverable coverage; a non-progressing
+      // repair cannot silently become a verified completion.
       const repairedParsedForPolicy = repaired ? parseLocalResult(repaired) : null
+      if (repairedParsedForPolicy && firstTaskGaps.length) {
+        const progress = cosAnswerProgress(args.prompt, repairedParsedForPolicy.answer, firstTaskGaps.length)
+        console.info('[cos-task-loop-progress]', JSON.stringify({
+          turnId, previousMissing: firstTaskGaps.length, remainingMissing: progress.missing.length,
+          decision: progress.decision, completed: progress.complete,
+        }))
+      }
       const repairedAdvisoryDefects = advisoryDiagnosis && repairedParsedForPolicy
         ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, repairedParsedForPolicy.answer)
         : []

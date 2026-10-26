@@ -381,7 +381,7 @@ export async function runCosAgentLoop(input: {
   const older = conversation.slice(0, Math.max(0, conversation.length - 6))
   // Keep explicit restrictions from all eleven supported locales, including scripts for
   // which JavaScript's ASCII word boundaries do not apply (Japanese/Korean/Arabic).
-  const constraintPattern = /(?:\b(?:do not|don't|never|must not|only|without|limit|budget|deadline|require|shall not|cannot|can't|no|nunca|jamás|somente|apenas|nao|proibido|zakaz|nigdy|tylko|nie wolno|nicht|niemals|verboten|nur|ohne|budget|frist|ne jamais|interdit|uniquement|sans|seulement|mai|vietato|solo|senza|non|scadenza)\b|(?:não|jamás|nie wolno|нельзя|никогда|только|запрещено|бюджет|срок|しないで|禁止|絶対に|のみ|しないこと|してはいけない|하지 마|금지|절대|하지 말|해서는 안|만 허용|하지마|ممنوع|لا تفعل|لا تشارك|لا تكشف|أبداً|يُحظر|فقط|بدون))/iu
+  const constraintPattern = /(?:\b(?:do not|don't|never|must not|only|without|limit|budget|deadline|require|shall not|cannot|can't|no|nunca|jamás|somente|apenas|nao|proibido|zakaz|nigdy|tylko|nie wolno|nicht|niemals|verboten|nur|ohne|budget|frist|ne jamais|interdit|uniquement|sans|seulement|mai|vietato|solo|senza|non|scadenza)\b|(?:não|jamás|nie wolno|нельзя|никогда|только|запрещено|бюджет|срок|без|しないで|禁止|絶対に|のみ|しないこと|してはいけない|公開しない|共有しない|하지 마|금지|절대|하지 말|해서는 안|만 허용|하지마|ممنوع|لا تفعل|لا تشارك|لا تكشف|لا تذكر|لا تنشر|أبداً|يُحظر|فقط|بدون))/iu
   const priorConstraints = older.filter(message => message.role === 'user')
     .flatMap(message => String(message.content || '').split(/\n+/))
     .map(line => line.trim())

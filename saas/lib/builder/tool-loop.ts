@@ -565,6 +565,12 @@ export class BuilderToolLoop {
       const paused = await pause()
       return paused.ok === false && paused.checkpoint ? { ...paused, error: reason } : paused
     }
+    // The slice's time budget or its paid-provider spend ceiling running out ends this slice, not the job: each slice
+    // runs in its own Harness run with its own ceiling, so the job resumes from the checkpoint (bounded by the work-slice
+    // cap), as Builder V2 already does. Production 2026-10-26: two jobs (12:15Z, 12:58Z) failed outright on
+    // harness_provider_cost_budget_exceeded instead of continuing.
+    const endsSlice = (error: unknown): boolean => error instanceof Error
+      && (error.message === 'builder_turn_timeout' || error.message === 'harness_provider_cost_budget_exceeded')
     const capacityReason = (error: unknown): 'builder_runpod_primary_busy' | 'builder_model_round_timeout' | null =>
       error instanceof Error && (error.message === 'builder_runpod_primary_busy' || error.message === 'builder_model_round_timeout') ? error.message : null
     const deadlineAtMs = Number(input.deadlineAtMs)
@@ -941,7 +947,7 @@ export class BuilderToolLoop {
             }
           }
         } catch (error) {
-          if (input.shouldPause && error instanceof Error && error.message === 'builder_turn_timeout') return pause()
+          if (input.shouldPause && endsSlice(error)) return pause()
           // Production 2026-10-14 (OrderFlow job 7cc550aa): 69 of 110 Builder model calls hit the ~55s round deadline and
           // returned nothing; the longest completed output was 1,630 tokens. A response the deadline cannot finish is
           // retried once, while the slice has time, with an instruction whose output fits the deadline.
@@ -956,7 +962,7 @@ export class BuilderToolLoop {
           try {
             response = await generateControl(controlBudget * 2, 'OUTPUT LIMIT RECOVERY: The previous response was truncated and NOTHING from it was written. Do not repeat a whole large file. For a new file emit only one write_file append chunk of at most 2000 characters with the current saved offset and final:false; continue across later rounds. For an existing file emit one small edit_file search/replace. Return one complete compact JSON object.')
           } catch (retryError) {
-            if (input.shouldPause && retryError instanceof Error && retryError.message === 'builder_turn_timeout') return pause()
+            if (input.shouldPause && endsSlice(retryError)) return pause()
             const retryCapacity = input.shouldPause ? capacityReason(retryError) : null
             if (retryCapacity) return capacityStop(retryCapacity)
             if (isOutputTruncation(retryError)) return { ok: false, error: 'builder_model_output_limit', trace }

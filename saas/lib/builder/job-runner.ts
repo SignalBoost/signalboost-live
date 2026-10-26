@@ -1017,6 +1017,14 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         })
         return false
       })) return
+      // A spent slice-level provider reservation is not evidence of a source defect.
+      // Continue only with a durable checkpoint and the existing bounded claim policy.
+      if (message === 'harness_provider_cost_budget_exceeded' && job.checkpoint && builderMayContinue(job, job.checkpoint)) {
+        const reply = historyReply('Builder reached the provider cost ceiling for this work slice. Saved progress will resume within the existing job limits; verification is still pending.', job.workspaceId, [])
+        await pauseBuilderJob({ job, checkpoint: job.checkpoint, reply,
+          result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files: [], trace } })
+        return
+      }
       await terminalFailure(job, message === BUILDER_TURN_TIMEOUT_ERROR ? BUILDER_TURN_TIMEOUT_ERROR : message, trace).catch(finishError => {
         console.error('[builder_job_terminal_persist_failed]', {
           jobId,

@@ -418,6 +418,14 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
     const check = async () => {
       try {
         const response = await window.fetch('/api/builder?observeOnly=true&jobId=' + encodeURIComponent(liveJob.jobId), { cache: 'no-store' })
+        if (response.status === 404 || response.status === 410) {
+          if (!disposed) {
+            setLiveJob(null)
+            setLiveProgress(null)
+            try { window.localStorage.removeItem(LIVE_BUILDER_KEY) } catch {}
+          }
+          return
+        }
         if (!response.ok && response.status !== 202) return
         const result = await response.json() as Record<string, unknown>
         if (disposed) return

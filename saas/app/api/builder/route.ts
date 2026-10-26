@@ -1,3 +1,4 @@
+import { compileCosInstructionContract } from '@/lib/ai/cos/instructionContract'
 import { builderAcceptanceReport } from '@/lib/builder/acceptance-report'
 import type { BuilderV2Receipt } from '@/lib/builder/agent-v2-dispatcher'
 import type { BuilderAcceptanceLedger } from '@/lib/builder/acceptance-ledger'
@@ -263,6 +264,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     objective = readBuilderObjective(body).objective
+    if (compileCosInstructionContract(objective).prohibitsExecution) return noStore({ error: 'builder_analysis_only', execution_allowed: false }, { status: 422 })
     const copiedTranscript = builderCopiedTranscriptBlocker(objective)
     if (copiedTranscript) return noStore(copiedTranscript, { status: 422 })
     const admissionBlocker = builderExecutionAdmissionBlocker(objective)

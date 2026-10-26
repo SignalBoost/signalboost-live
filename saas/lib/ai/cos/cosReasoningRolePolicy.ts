@@ -1,4 +1,5 @@
 // saas/lib/ai/cos/cosReasoningRolePolicy.ts
+import { compileCosInstructionContract } from './instructionContract.ts'
 import { MAX_BUILDER_OBJECTIVE_CHARS } from '../../builder/request-contract.ts'
 import { isOperationalLogEvidence } from './pastedOperationalLog.ts'
 import { isContentGenerationRequest } from './contentGenerationIntent.ts'
@@ -214,11 +215,19 @@ export function classifyCosSoftwareDelivery(prompt: string): CosSoftwareDelivery
 }
 
 export function isConciergeBuilderObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
+  if (compileCosInstructionContract(prompt).prohibitsExecution) return false
   // An explicit analysis-only instruction is not authorization for project execution.
   // Negated verbs such as "do not create files" must not count as Builder intent.
   const analysisOnly = /\b(?:investigat(?:e|ion)|analy[sz](?:e|is)|forensic|incident commander|root causes?|hypotheses)\b/i.test(prompt)
     && /\b(?:do\s+not|don't|never|no)\s+(?:(?:write|generate|create|build|modify|execute|run)\s+(?:any\s+)?(?:code|files?|projects?|tests?)|(?:generate|create|build)\s+(?:a\s+)?project)\b/i.test(prompt)
   if (analysisOnly && classifyCosSoftwareDelivery(prompt) === 'analysis') return false
+  // A quoted test command is evidence in an analytical specification, not permission
+  // to launch a paid Builder job. Require an affirmative software-delivery objective
+  // before applying Builder-specific evidence rules; embedded runbooks and campaign
+  // fixtures are not executable authorization.
+  // A broad analysis label cannot veto affirmative Builder evidence: real source
+  // attachments, named files, repair commands and isolated projects remain executable.
+  // The shared instruction contract above is the authoritative non-execution fence.
   if (excludedFromBuilder(prompt, context)) return false
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true

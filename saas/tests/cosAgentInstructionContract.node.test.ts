@@ -99,3 +99,28 @@ test('historical constraints are bounded and do not transform the latest request
   assert.ok(content.length < 30_000)
   assert.match(content, /Never expose API credentials/)
 })
+
+test('historical constraints in every required COS language reach the model', async () => {
+  const requirements = [
+    'Do not share secrets with vendors.',
+    'Nunca compartas contraseñas con terceros.',
+    'Não divulgue credenciais particulares.',
+    'Nigdy nie ujawniaj poufnych danych.',
+    'Никогда не раскрывайте секретные данные.',
+  ]
+  let captured = ''
+  const model: AgentModelTurn = async input => {
+    captured = input.messages.map(message => message.content || '').join(' ')
+    return { content: 'Done.', toolCalls: [], finishReason: 'stop', provider: 'test', model: 'test' }
+  }
+  await runCosAgentLoop({
+    request: 'Review the summary.',
+    conversation: [
+      ...requirements.map(content => ({ role: 'user' as const, content })),
+      ...Array.from({ length: 7 }, (_, i) => ({ role: 'assistant' as const, content: 'Routine follow-up ' + i })),
+    ],
+    language: 'en', model, ports, policy: { maxPythonRuns: 2, browserAllowed: false },
+    deadlineAt: Date.now() + 90_000,
+  })
+  for (const requirement of requirements) assert.ok(captured.includes(requirement), 'missing: ' + requirement)
+})

@@ -42,6 +42,8 @@ export type CosAgentDecision =
       capabilities: CosAgentCapability[]
       /** Self-contained web searches the planner wrote for live_web; empty when it wrote none. */
       searchQueries: string[]
+      /** One file to write and the command that proves it, when the planner gave both to software_specialist. */
+      verifiedTask?: Readonly<{ targetPath: string; verifyCommand: string }> | null
       reason: string
       reasonerLabel: string
     }>
@@ -63,6 +65,29 @@ const CAPABILITY_DESCRIPTIONS: Record<CosAgentCapability, string> = {
   repository_read: 'Inspect the authorized repository or codebase before answering.',
   software_specialist: 'Hand off work that must build, change, run, test, debug or deploy actual software, code, files or a website to the governed Software Specialist. Not for analysis, investigation, explanation, review or planning that is answered in writing, even when its subject is software.',
   external_action: 'Request an authorized action in an external system; host policy decides whether execution is allowed.',
+}
+
+// software_specialist may name one file and the command that proves it; the job then runs the shared verified task
+// loop (lib/builder/verified-task-loop.ts) instead of a whole Builder project.
+const SOFTWARE_SPECIALIST_PARAMETERS = Object.freeze({
+  type: 'object',
+  properties: Object.freeze({
+    targetPath: Object.freeze({ type: 'string', description: 'Only when the work is one file: its workspace path, e.g. lib/supabase-client.ts.' }),
+    verifyCommand: Object.freeze({ type: 'string', description: 'Only with targetPath: the command whose exit code 0 proves the file is done, e.g. node --test test/client.test.ts.' }),
+  }),
+  additionalProperties: false,
+})
+
+/** {targetPath, verifyCommand} from a software_specialist call, or null unless both are real strings. */
+export function verifiedTaskFromToolArguments(argumentsText: string | null | undefined): { targetPath: string; verifyCommand: string } | null {
+  try {
+    const parsed = JSON.parse(String(argumentsText || '{}')) as Record<string, unknown>
+    const targetPath = typeof parsed.targetPath === 'string' ? parsed.targetPath.trim() : ''
+    const verifyCommand = typeof parsed.verifyCommand === 'string' ? parsed.verifyCommand.trim() : ''
+    return targetPath && verifyCommand ? { targetPath, verifyCommand } : null
+  } catch {
+    return null
+  }
 }
 
 const LIVE_WEB_PARAMETERS = Object.freeze({
@@ -102,7 +127,9 @@ function toolCatalog(input: { surface: 'assistant' | 'concierge'; ownerAuthentic
     function: Object.freeze({
       name,
       description: CAPABILITY_DESCRIPTIONS[name],
-      parameters: name === 'live_web' ? LIVE_WEB_PARAMETERS : Object.freeze({ type: 'object', properties: Object.freeze({}), additionalProperties: false }),
+      parameters: name === 'live_web' ? LIVE_WEB_PARAMETERS
+        : name === 'software_specialist' ? SOFTWARE_SPECIALIST_PARAMETERS
+        : Object.freeze({ type: 'object', properties: Object.freeze({}), additionalProperties: false }),
     }),
   })))
 }
@@ -224,6 +251,7 @@ export async function decideCosAgentTurn(input: {
       'A function call is a capability request, NOT authorization. The host independently checks identity, scope, permissions, safety, and action policy.',
       'Do not call tools merely because a topic is sophisticated. A conceptual software question that stable knowledge can answer needs no tool.',
       'Read the whole request before choosing: decide what the user asks to have DONE, not which words appear in it. Request software_specialist only when the user wants software actually built, changed, run or repaired; an investigation, analysis, test plan or specification to discuss is answered by COS.',
+      'When that work is exactly one file and the request gives or clearly implies the command that proves it, pass targetPath and verifyCommand to software_specialist; otherwise call it without them.',
       'Request compute when the answer needs a chart, graph or plot, a calculation over real data, statistics, or anything that requires running code; COS then retrieves the data and runs the code itself.',
       'Current/future travel details such as transport, fares, opening hours, prices, availability, schedules, weather, or other mutable facts require live_web.',
       LIVE_WEB_PLANNING_RULES,
@@ -258,12 +286,14 @@ export async function decideCosAgentTurn(input: {
     )
     if (capabilities.length) {
       const liveWebCall = nativeTurn.toolCalls.find(call => String(call.function.name || '').trim() === 'live_web')
+      const softwareCall = nativeTurn.toolCalls.find(call => String(call.function.name || '').trim() === 'software_specialist')
       return {
         mode: 'orchestrate',
         answer: '',
         confidence: 1,
         capabilities,
         searchQueries: liveWebCall ? plannerSearchQueriesFromToolArguments(liveWebCall.function.arguments) : [],
+        verifiedTask: softwareCall ? verifiedTaskFromToolArguments(softwareCall.function.arguments) : null,
         reason: 'native_tool_request',
         reasonerLabel: turnReasonerLabel(nativeTurn),
       }

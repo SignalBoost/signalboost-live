@@ -37,11 +37,11 @@ test('POST creates a durable job, schedules work after the response, and returns
   assert.match(jobRunner, /executeSignalBoostRepositoryRepair/)
 })
 
-test('small attached repairs retain the debug protocol and project repairs use the verified loop', () => {
+test('small attached repairs run the shared verified task loop and project repairs use the verified loop', () => {
   assert.match(route, /const debugPlan = planDebugFileJob\(objective, files\)/)
   assert.match(route, /debugPaths: debugPlan\.files/)
   assert.match(route, /jobKind: debugPlan \? 'debug_file' : 'standard'/)
-  assert.match(jobRunner, /runDebugFileJob/)
+  assert.match(jobRunner, /runSingleFileVerifiedJob\(job, singleFile\)/)
   assert.match(jobRunner, /new BuilderToolLoop/)
 })
 
@@ -136,7 +136,7 @@ test('background execution is idempotently claimed and applies only validated so
   assert.match(jobRunner, /recordVerifiedCognitiveProductionOutcome/)
   assert.match(repositoryRepair, /cognitiveSkills: cognitive\.items/)
   assert.match(repositoryRepair, /cos_software_specialist_platform_engineer/)
-  assert.match(jobRunner, /runDebugFileJob/)
+  assert.match(jobRunner, /runVerifiedTaskLoop/)
   assert.match(jobRunner, /finishBuilderJob/)
 })
 

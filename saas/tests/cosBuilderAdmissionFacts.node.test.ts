@@ -72,3 +72,13 @@ test('a build request phrased as a question is not skipped as a stable knowledge
   assert.equal(stableKnowledgeQuestionNeedsNoPlanner('What I need you to build is a Python CLI in main.py that adds two numbers.'), false)
   assert.equal(stableKnowledgeQuestionNeedsNoPlanner('What is the difference between an Ingress and a Service in Kubernetes?'), true)
 })
+
+// The planner's single-file request becomes a verified-loop plan only for a valid path and one bounded command.
+test('a planner-named file and check become a single-file job plan', async () => {
+  const { verifiedTaskPlan } = await import('../lib/ai/cos/softwareSpecialist.ts')
+  assert.deepEqual(verifiedTaskPlan({ targetPath: 'lib/client.ts', verifyCommand: 'node --test test/client.test.ts' }),
+    { path: 'lib/client.ts', command: 'node --test test/client.test.ts', runtime: 'node', files: ['lib/client.ts'] })
+  assert.equal(verifiedTaskPlan({ targetPath: '../secrets.ts', verifyCommand: 'node x' }), null)
+  assert.equal(verifiedTaskPlan({ targetPath: 'a.ts', verifyCommand: '' }), null)
+  assert.equal(verifiedTaskPlan(null), null)
+})

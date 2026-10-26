@@ -831,7 +831,11 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const deterministic=tryDeterministicUtility({prompt:input,timezone:body?.context?.timezone||body?.context?.timeZone,locale:language==='pt'?'pt-BR':language==='es'?'es':language==='pl'?'pl':language==='ru'?'ru':language==='de'?'de-DE':language==='fr'?'fr-FR':language==='it'?'it-IT':language==='ja'?'ja-JP':language==='ko'?'ko-KR':language==='ar'?'ar-SA':'en-US',confidenceThreshold:confidenceThreshold()})
   if(deterministic){const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:deterministic.reply,source:'deterministic',confidence:deterministic.confidence,externalAiInvoked:false});await writeCosPrimaryProvenance(userId,deterministic.reply,deterministic.executionProvenance,deterministic.source,{prompt:input,answered:true,confidence:deterministic.confidence,branch:'deterministic'});return NextResponse.json({reply:deterministic.reply,source:deterministic.source,confidence_score:deterministic.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:deterministic.executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
-  const requestedAction=requestsExternalAction(input)
+  // An action request is delegated to the governed executor, which is reached only through the external fallback path.
+  // With that path off, delegation sent the turn straight to a refusal without COS ever answering (production
+  // 2026-10-26: no chat model call for 12 hours; "Create a campaign plan for our launch" was refused). COS answers it
+  // itself instead; its reasoner never claims an action it did not execute.
+  const requestedAction=externalFallbackEnabled()&&requestsExternalAction(input)
   const agentCapabilities=new Set(
     String(req.headers.get('x-signalboost-agent-capabilities')||'')
       .split(',')

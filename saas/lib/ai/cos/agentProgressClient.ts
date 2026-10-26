@@ -471,12 +471,15 @@ export async function postWithAgentProgress(args: {
     || receivedReply === transportFailureReply(requestBody)
     || ['concierge-browser-deadline', 'assistant-transport-unconfirmed', 'cos-browser-turn-deadline'].includes(String(data?.source || ''))
   if (historyWatchEligible && transportFailed && !args.signal.aborted) {
-    const saved = await recoverSavedTurnOnce({
+    // A server/gateway timeout envelope may arrive before History is committed.
+    // The already-started read-only watch was stopped when the HTTP race ended,
+    // so continue bounded recovery here without a duplicate POST.
+    const saved = await watchHistoryForCompletedTurn({
       conversationId: conversationIdForTurn,
       userText: userTextForTurn,
       sentAtMs: startedAt,
       signal: args.signal,
-    })
+    }).catch(() => null)
     if (saved) {
       report('complete', say(PROGRESS_READY))
       return { ok: true, status: 200, data: historyRecoveryData(saved) }

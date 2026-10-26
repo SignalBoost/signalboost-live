@@ -69,3 +69,24 @@ Acceptance sequence:
 4. Report PASS only after every step is verified.`
   assert.equal(isConciergeBuilderObjective(prompt), true)
 })
+
+
+test('acceptance campaign instructions and embedded test commands are not Builder authorization', () => {
+  const prompt = [
+    '# iTMounts / COS — Production Acceptance Campaign',
+    'Campaign ID: COS-PAC-001',
+    'Goal: verify actual COS analysis, tests, observability, and browser History.',
+    'Review the campaign and report PASS / FAIL evidence for each verification.',
+    'Primary forensic reasoning test — identify ranked hypotheses and missing evidence.',
+    'PAC-18 Builder V2 integration fixture (not authorization to build this campaign).',
+    'Test command in fixture: run: node --test test/*.test.js',
+    'A disposable repository is part of a test case, not the requested output.',
+  ].join('\n')
+  assert.equal(classifyCosSoftwareDelivery(prompt), 'analysis')
+  assert.equal(isConciergeBuilderObjective(prompt), false)
+})
+
+test('an affirmative runnable software repair still routes to Builder', () => {
+  const prompt = 'Fix the broken project in src/index.js and execute run: node --test test/index.test.js'
+  assert.equal(isConciergeBuilderObjective(prompt), true)
+})

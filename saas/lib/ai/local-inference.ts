@@ -477,7 +477,10 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   const harnessContext = currentHarnessExecutionContext()
   const abortFromHarness = () => controller.abort(harnessContext?.signal.reason)
   const abortFromCaller = () => controller.abort(args.signal?.reason)
-  args.signal?.addEventListener('abort', abortFromCaller, { once: true })
+  // A caller may have cancelled before entering inference. Subscribing alone misses
+  // that event and lets a stale operation reach the provider despite its revoked work.
+  if (args.signal?.aborted) controller.abort(args.signal.reason)
+  else args.signal?.addEventListener('abort', abortFromCaller, { once: true })
   if (harnessContext?.signal.aborted) controller.abort()
   else harnessContext?.signal.addEventListener('abort', abortFromHarness, { once: true })
 

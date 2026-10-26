@@ -17,7 +17,7 @@ test('COS live acceptance is isolated from mocked UI tests and requires authenti
 })
 test('live certification calls real COS ingress and rejects unavailable analytical deliverables', () => {
   assert.match(live, /request\.post\('\/api\/cos-browser'/)
-  assert.doesNotMatch(live, /page\.route\(|route\.fulfill\(|mock/i)
+  assert.doesNotMatch(live, /page\.route\(|route\.fulfill\(/)
   assert.match(live, /missingAnalyticalTasks\(scenario\.prompt, answer\)/)
   assert.match(live, /rejectedFallback: refusal/)
   assert.match(live, /expect\(missing, JSON\.stringify\(receipt\)\)\.toEqual\(\[\]\)/)

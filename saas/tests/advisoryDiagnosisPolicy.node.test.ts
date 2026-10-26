@@ -10,7 +10,7 @@ import {
   isAdvisoryDiagnosisPrompt,
   selectOfficialDiagnosticReferences,
 } from '../lib/ai/cos/advisoryDiagnosisPolicy.ts'
-import { buildHonestRefusalReply, missingInputKeys } from '../lib/ai/cos/honestRefusalReply.ts'
+import { buildHonestRefusalReply } from '../lib/ai/cos/honestRefusalReply.ts'
 import { semanticCacheAllowedForPrompt } from '../lib/ai/cos/cacheSafetyPolicy.ts'
 import { stripInternalEvidenceIds } from '../lib/ai/cos/answerEvidenceIdHygiene.ts'
 import {
@@ -87,22 +87,12 @@ test('owner policy requires a labeled discrimination brief and puts uncertainty 
   assert.deepEqual(advisoryDiagnosisBriefDefects(METHOD_PROMPT, good), [])
 })
 
-test('hard diagnosis fallback does useful work first and uncertainty is the last sentence', () => {
-  const reply = buildHonestRefusalReply({ prompt: 'Why did GEN-2 fail during the test? Give leading hypotheses.', language: 'en' })
-  assert.doesNotMatch(reply.slice(0, 80), /cannot stand behind|did not release|do not know/i)
-  assert.match(reply, /readings that separate the candidate causes/)
-  assert.match(reply, /baseline/)
-  assert.match(reply, /discrimination, not guessing a failed part/i)
-  assert.match(reply, /I still cannot stand behind a single cause yet\.$/)
-})
-
-test('diagnosis fallback never asks again for readings and baseline already supplied', () => {
-  const prompt = 'Why did GEN-2 fail? The logged reading was 0 V during the event and the historical baseline was 24 V.'
-  assert.deepEqual(missingInputKeys(prompt), [])
-  const reply = buildHonestRefusalReply({ prompt, language: 'en' })
-  assert.match(reply, /already supplies incident readings and a baseline/i)
-  assert.doesNotMatch(reply, /To answer it properly I need/i)
-  assert.match(reply, /I still cannot stand behind a single cause yet\.$/)
+// Production 2026-10-26: a canned readings-and-baselines paragraph assembled from keywords read as COS refusing to
+// work. The diagnosis policy above governs real answers; an unanswered request gets the one honest reply.
+test('an unanswered diagnosis request never gets a canned readings checklist', () => {
+  const reply = buildHonestRefusalReply({ prompt: 'Why did GEN-2 fail? The logged reading was 0 V during the event and the historical baseline was 24 V.', language: 'en' })
+  assert.doesNotMatch(reply, /readings|baseline|discrimination|single cause|To answer it properly I need/i)
+  assert.match(reply, /not giving you a guessed one/)
 })
 
 test('execution order is internal retrieval first, then bounded published research, then model draft', () => {

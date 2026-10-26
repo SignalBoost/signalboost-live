@@ -32,6 +32,10 @@ export type AnswerCompletionPorts = Readonly<{
   /** Only the missing parts, written to follow the existing answer; null or empty when nothing was written. */
   complete: (request: string, answer: string, missing: readonly string[]) => Promise<string | null>
   remainingMs: () => number
+  /** Optional trusted host verifier (existing test runner, linter, schema validator); never an LLM-supplied shell string. */
+  verify?: (request: string, answer: string) => Promise<{ passed: boolean; failures: readonly string[] } | null>
+  /** Durable receipt hook; failures fail closed rather than claiming success. */
+  persistVerification?: (receipt: { round: number; passed: boolean; failures: readonly string[] }) => Promise<void>
 }>
 
 function unique(items: readonly string[]): string[] {
@@ -65,6 +69,16 @@ export async function runAnswerCompletionLoop(input: Readonly<{
     const floor = input.deterministicMissing ? [...input.deterministicMissing(answer)] : []
     if (checked === null && !floor.length) return { answer, rounds: round, missing: floor, stopped: 'checker_unavailable' }
     missing = unique([...floor, ...(checked ?? [])])
+    if (!missing.length && input.ports.verify) {
+      const result = await input.ports.verify(input.request, answer).catch(() => null)
+      const failures = result && Array.isArray(result.failures) ? unique(result.failures) : []
+      const passed = result?.passed === true && failures.length === 0
+      const receipt = { round, passed, failures: result ? failures : ['trusted_verifier_unavailable'] }
+      if (input.ports.persistVerification) {
+        try { await input.ports.persistVerification(receipt) } catch { return { answer, rounds: round, missing: receipt.failures.length ? receipt.failures : ['verification_receipt_persistence_failed'], stopped: 'checker_unavailable' } }
+      }
+      if (!passed) missing = receipt.failures.length ? [...receipt.failures] : ['trusted_verification_failed']
+    }
     if (!missing.length) return { answer, rounds: round, missing, stopped: 'complete' }
     // A round that left as much missing as before is a loop going in circles: stop instead of paying for another.
     if (previousMissing !== null && missing.length >= previousMissing) return { answer, rounds: round, missing, stopped: 'no_progress' }

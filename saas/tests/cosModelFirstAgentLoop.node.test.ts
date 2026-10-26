@@ -101,3 +101,13 @@ test('public Concierge receives only the public-safe live_web, compute and Softw
   assert.match(decision, /input\.surface === 'concierge'\s*\? \['live_web', 'compute', 'software_specialist'\]/)
   assert.match(decision, /input\.ownerAuthenticated\s*\? COS_AGENT_CAPABILITIES/)
 })
+
+test('native and compatibility planners share one bounded deadline', () => {
+  const planner = decision.slice(decision.indexOf('export async function decideCosAgentTurn('), decision.indexOf('export async function runCosAgentToolTurn('))
+  assert.match(planner, /const planningDeadlineAt = Date\.now\(\) \+ timeoutMs/)
+  assert.match(planner, /if \(planningRemainingMs\(\) < 1_000\) return null/)
+  const compatibility = planner.slice(planner.indexOf('agent_answer_or_capability_plan_compat'))
+  assert.match(compatibility, /timeoutMs: planningRemainingMs\(\)/)
+  assert.match(compatibility, /\{ \.\.\.config, timeoutMs: planningRemainingMs\(\) \}/)
+  assert.ok(planner.indexOf('planningDeadlineAt') < planner.indexOf('callLocalModelTurn({'))
+})

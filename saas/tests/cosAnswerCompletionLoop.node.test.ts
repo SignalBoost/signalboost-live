@@ -107,3 +107,79 @@ test('the reasoner runs the loop only for the answer the person reads, and never
   // The check itself is a helper call, not an answer: it never gets the answer window.
   assert.match(reasoner, /writesUserAnswer: false,\s*\n\s*temperature: 0,\s*\n\s*maxTokens: 400,/)
 })
+
+test('trusted host verifier must pass before the COS loop declares completion', async () => {
+  let validations = 0
+  let repairs = 0
+  const receipts: Array<{ round: number; passed: boolean; failures: readonly string[] }> = []
+  const result = await runAnswerCompletionLoop({
+    request: 'Repair and validate the existing module',
+    answer: 'initial implementation',
+    ports: {
+      remainingMs: plenty,
+      check: async () => [],
+      verify: async (_request, answer) => {
+        validations++
+        return answer.includes('verified correction')
+          ? { passed: true, failures: [] }
+          : { passed: false, failures: ['targeted_test_failed'] }
+      },
+      persistVerification: async receipt => { receipts.push(receipt) },
+      complete: async () => { repairs++; return 'verified correction' },
+    },
+  })
+  assert.equal(result.stopped, 'complete')
+  assert.equal(result.rounds, 1)
+  assert.equal(validations, 2)
+  assert.equal(repairs, 1)
+  assert.deepEqual(receipts.map(receipt => receipt.passed), [false, true])
+})
+
+test('unavailable trusted verifier fails closed without claiming completion', async () => {
+  const result = await runAnswerCompletionLoop({
+    request: 'Validate the schema',
+    answer: 'draft',
+    ports: {
+      remainingMs: plenty,
+      check: async () => [],
+      verify: async () => null,
+      complete: async () => null,
+    },
+  })
+  assert.notEqual(result.stopped, 'complete')
+  assert.deepEqual(result.missing, ['trusted_verifier_unavailable'])
+})
+
+test('verification receipt persistence failure cannot be reported as a pass', async () => {
+  const result = await runAnswerCompletionLoop({
+    request: 'Verify deployment',
+    answer: 'draft',
+    ports: {
+      remainingMs: plenty,
+      check: async () => [],
+      verify: async () => ({ passed: true, failures: [] }),
+      persistVerification: async () => { throw new Error('durable store unavailable') },
+      complete: async () => 'unused',
+    },
+  })
+  assert.equal(result.stopped, 'checker_unavailable')
+  assert.deepEqual(result.missing, ['verification_receipt_persistence_failed'])
+})
+
+test('host validation cannot exceed the built-in three correction rounds', async () => {
+  let writes = 0
+  const result = await runAnswerCompletionLoop({
+    request: 'Fix failing tests',
+    answer: 'initial code',
+    ports: {
+      remainingMs: plenty,
+      check: async () => [],
+      verify: async () => ({ passed: false, failures: ['tests_still_fail'] }),
+      complete: async () => { writes++; return 'attempt' + writes },
+    },
+    maxRounds: 100,
+  })
+  assert.equal(writes, 1)
+  assert.equal(result.stopped, 'no_progress')
+  assert.ok(result.rounds <= ANSWER_COMPLETION_MAX_ROUNDS)
+})

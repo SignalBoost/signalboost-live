@@ -229,6 +229,10 @@ export async function decideCosAgentTurn(input: {
     ? Math.max(4_000, Math.min(15_000, Math.floor(configuredTimeout)))
     : 10_000
 
+  // Native and compatibility planning share one absolute clock. A timed-out first
+  // transport cannot buy a second full deadline at the expense of answer execution.
+  const planningDeadlineAt = Date.now() + timeoutMs
+  const planningRemainingMs = () => Math.max(0, planningDeadlineAt - Date.now())
   const tools = toolCatalog({ surface: input.surface, ownerAuthenticated: input.ownerAuthenticated })
   const nativeTurn = await callLocalModelTurn({
     usageContext: { feature: 'cos_interactive_answer', purpose: 'agent_native_tool_choice' },
@@ -301,6 +305,10 @@ export async function decideCosAgentTurn(input: {
     if (direct?.mode === 'answer') return direct
   }
 
+  // If native planning exhausted its budget, leave the request to governed COS
+  // reasoning rather than spending a second full window on compatibility probing.
+  if (planningRemainingMs() < 1_000) return null
+
   // Compatibility fallback for OpenAI-compatible endpoints that do not implement native tools.
   // This is still one answer-or-plan model turn, never a classifier followed by another answer call.
   const raw = await callLocalModel({
@@ -309,7 +317,7 @@ export async function decideCosAgentTurn(input: {
     // Planner output is a tool call or a fixed one-line JSON; it never writes the user's answer.
     maxTokens: 300,
     disableThinking: true,
-    timeoutMs,
+    timeoutMs: planningRemainingMs(),
     jsonObject: true,
     allowConfiguredFallback: false,
     persistUsage: false,
@@ -332,7 +340,7 @@ export async function decideCosAgentTurn(input: {
       `CURRENT USER REQUEST:\\n${prompt}`,
       'Choose NO TOOL or ORCHESTRATE now.',
     ].filter(Boolean).join('\\n\\n'),
-  }, { ...config, timeoutMs }).catch(error => {
+  }, { ...config, timeoutMs: planningRemainingMs() }).catch(error => {
     console.warn('[cos-agent-decision] compatibility fallback unavailable', error instanceof Error ? error.message : String(error))
     return null
   })

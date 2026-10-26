@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { runCosAgentLoop, type AgentModelTurn } from '../lib/ai/cos/agentLoop/cosAgentLoop.ts'
 import type { AgentToolPorts } from '../lib/ai/cos/agentLoop/cosAgentTools.ts'
+import { SUPPORTED_LANGUAGES } from '../lib/i18n/supportedLanguages.ts'
 
 const ports: AgentToolPorts = {
   search: async () => [],
@@ -107,7 +108,15 @@ test('historical constraints in every required COS language reach the model', as
     'Não divulgue credenciais particulares.',
     'Nigdy nie ujawniaj poufnych danych.',
     'Никогда не раскрывайте секретные данные.',
+    'Niemals vertrauliche Kundendaten veröffentlichen.',
+    'Ne jamais partager les données confidentielles.',
+    'Non divulgare informazioni riservate.',
+    '顧客の秘密情報を公開しないでください。',
+    '고객의 비밀 정보를 공유하지 마세요.',
+    'لا تشارك معلومات العملاء السرية.',
   ]
+  assert.deepEqual([...SUPPORTED_LANGUAGES], ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'])
+  assert.equal(requirements.length, SUPPORTED_LANGUAGES.length)
   let captured = ''
   const model: AgentModelTurn = async input => {
     captured = input.messages.map(message => message.content || '').join(' ')
@@ -123,4 +132,52 @@ test('historical constraints in every required COS language reach the model', as
     deadlineAt: Date.now() + 90_000,
   })
   for (const requirement of requirements) assert.ok(captured.includes(requirement), 'missing: ' + requirement)
+})
+
+test('missing-data diagnosis runs bounded read-only retrieval before answering', async () => {
+  let turns = 0
+  let reads = 0
+  const model: AgentModelTurn = async input => {
+    turns += 1
+    if (turns === 1) return {
+      content: 'To answer it properly I need power draw, bandwidth and unit price. I cannot stand behind one cause yet.',
+      toolCalls: [], finishReason: 'stop', provider: 'test', model: 'test',
+    }
+    if (turns === 2) return {
+      content: '',
+      toolCalls: [{
+        id: 'search-one', type: 'function',
+        function: { name: 'web_search', arguments: JSON.stringify({ query: 'power incident diagnosis methods' }) },
+      }], finishReason: 'tool_calls', provider: 'test', model: 'test',
+    }
+    assert.ok(input.messages.some(message => message.role === 'tool'))
+    return {
+      content: 'Observed facts: source measurements have not been verified. Candidate hypotheses: synchronized load or measurement artifact. Distinguishing checks: compare same-window load and meter readings. Missing readings: correlated power traces.',
+      toolCalls: [], finishReason: 'stop', provider: 'test', model: 'test',
+    }
+  }
+  const result = await runCosAgentLoop({
+    request: 'Diagnose the GPU power incident and rank candidate hypotheses.',
+    language: 'en', model,
+    ports: { ...ports, search: async () => { reads += 1; return [] } },
+    policy: { maxPythonRuns: 0, browserAllowed: false },
+    deadlineAt: Date.now() + 90_000,
+  })
+  assert.ok(turns >= 3)
+  assert.equal(reads, 1)
+  assert.match(result?.reply || '', /Candidate hypotheses/)
+})
+
+test('missing-data recovery cannot spin indefinitely', async () => {
+  let turns = 0
+  const model: AgentModelTurn = async () => {
+    turns += 1
+    return { content: 'I cannot stand behind a single cause yet.', toolCalls: [], finishReason: 'stop', provider: 'test', model: 'test' }
+  }
+  await runCosAgentLoop({
+    request: 'Diagnose a power incident.', language: 'en', model, ports,
+    policy: { maxPythonRuns: 0, browserAllowed: false },
+    deadlineAt: Date.now() + 90_000,
+  })
+  assert.ok(turns <= 2)
 })

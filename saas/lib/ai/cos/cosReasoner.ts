@@ -1,3 +1,4 @@
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosExecutionEnvelope, cosAnswerProgress } from './cosExecutionEnvelope.ts'
 //
 // COS'S OWN REASONER — strict independence boundary.
@@ -415,6 +416,35 @@ export async function callRawCosReasoner(
         deterministicMissing: answer => missingAnalyticalTasks(args.prompt, answer),
         ports: {
           remainingMs: () => remainingMs(budget),
+          // Deterministic host-side quality gate. A model's self-verdict cannot override these defects.
+          verify: async (request, answer) => {
+            const failures = [
+              ...missingAnalyticalTasks(request, answer),
+              ...(advisoryDiagnosis ? advisoryDiagnosisBriefDefects(request, answer) : []),
+            ]
+            return { passed: failures.length === 0, failures }
+          },
+          persistVerification: async receipt => {
+            const db = cosServiceDb()
+            if (!db) throw new Error('cos_verification_audit_database_unavailable')
+            const eventId = randomUUID()
+            const persisted = await db.from('supervisor_audit_events').insert({
+              event_id: eventId,
+              execution_id: turnId,
+              incident_id: turnId,
+              event_type: 'cos_answer_completion_verification',
+              occurred_at: new Date().toISOString(),
+              payload: {
+                round: receipt.round,
+                passed: receipt.passed,
+                failureCodes: [...receipt.failures],
+                verifier: 'cos_deterministic_answer_contract',
+                outputReleased: false,
+              },
+              schema_version: 'cos-answer-completion-verification-v1',
+            })
+            if (persisted.error) throw new Error('cos_verification_audit_persist_failed')
+          },
           check: async (request, answer) => parseAnswerCompletionCheck(await callLocalModel({
             ...effectiveArgs,
             writesUserAnswer: false,

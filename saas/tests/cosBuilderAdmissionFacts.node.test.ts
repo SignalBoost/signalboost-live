@@ -46,7 +46,9 @@ test('chat consults the Software Specialist before the planner only on facts', (
   assert.match(gate, /hasSourceAttachment \|\| explicitOperationalRepair\s*\n\s*\|\| Boolean\(ownerRepairFollowup\)\s*\n\s*\|\| pastedSourceCode\(prompt\)/)
   assert.doesNotMatch(gate, /softwareRepairRequest|isConciergeBuilderObjective|isSoftwareRepairRequest/)
   // The planner's handoff is what admits a request described only in words.
-  assert.equal(browser.match(/plannerRequested: true,/g)?.length, 3)
+  // Only a software_specialist request admits software work; repository_read alone is inspection (Codex on #4916).
+  assert.equal(browser.match(/plannerRequested: agentDecision\.capabilities\.includes\('software_specialist'\),/g)?.length, 3)
+  assert.doesNotMatch(browser, /plannerRequested: true/)
   assert.match(browser, /confirmedRepairContinuation: Boolean\(ownerRepairFollowup\) && specialistObjective === ownerRepairFollowup,/)
 })
 
@@ -62,4 +64,11 @@ test('the browser sends the campaign to COS, not straight to Builder', async () 
   const { conciergeBuilderRequest } = await import('../lib/ai/cos/agentProgressClient.ts')
   const body = { messages: [{ role: 'user', content: campaign }], context: { conversationId: '00000000-0000-4000-8000-000000000001', language: 'en' } }
   assert.equal(conciergeBuilderRequest(body), null)
+})
+
+// Codex on #4916: a build request phrased as a question still reaches the planner that hands it to the Specialist.
+test('a build request phrased as a question is not skipped as a stable knowledge question', async () => {
+  const { stableKnowledgeQuestionNeedsNoPlanner } = await import('../lib/ai/cos/cosAgentDecision.ts')
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('What I need you to build is a Python CLI in main.py that adds two numbers.'), false)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('What is the difference between an Ingress and a Service in Kubernetes?'), true)
 })

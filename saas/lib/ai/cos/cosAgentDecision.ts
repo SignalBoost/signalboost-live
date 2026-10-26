@@ -182,7 +182,7 @@ export function stableKnowledgeQuestionNeedsNoPlanner(prompt: string, previousAs
   if (/^(?:what(?: is|'s)|define|explain)\\s+[A-Z][A-Z0-9-]{1,9}(?:\\s*[?.!]|$)/.test(String(prompt || '').trim())) return false
   const questionShape = /^(?:what|why|how|explain|define|describe|compare|when|where)\b/.test(text)
   if (!questionShape) return false
-  if (/\b(?:today|current|currently|latest|live|now|this (?:week|month|year)|price|weather|schedule|availability|near me|my (?:account|email|calendar|files?|repo|repository|project)|deploy|commit|merge|pull request|pr\b|fix|change|create|send|book|buy|cancel|delete|update)\b/.test(text)) return false
+  if (/\b(?:today|current|currently|latest|live|now|this (?:week|month|year)|price|weather|schedule|availability|near me|my (?:account|email|calendar|files?|repo|repository|project)|deploy|commit|merge|pull request|pr\b|fix|change|create|send|book|buy|cancel|delete|update|build|implement|write|code|develop|run|debug|repair|test)\b/.test(text)) return false
   return true
 }
 

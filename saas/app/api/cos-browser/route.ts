@@ -541,14 +541,15 @@ async function executeBrowserTurn(req: NextRequest) {
     }))
 
     // Software/repository capability requests are handoffs, not authority grants. The existing
-    // Software Specialist re-checks owner identity and repository permissions before any action.
+    // Software Specialist re-checks owner identity and repository permissions before any action. Only a request for
+    // software_specialist admits software work; repository_read alone is inspection (Codex on #4916).
     if (agentDecision.capabilities.includes('software_specialist') || agentDecision.capabilities.includes('repository_read')) {
       const specialist = authenticatedOwner
         ? await tryCosSoftwareSpecialist({
             body,
             objective: prompt,
             surface: browserSurface,
-            plannerRequested: true,
+            plannerRequested: agentDecision.capabilities.includes('software_specialist'),
             allowRepositoryRepair: ownerSoftwareAuthority.allowRepositoryRepair,
             signalBoostDeploymentContext: isSignalBoostDeploymentContext(req),
             deployment,
@@ -558,7 +559,7 @@ async function executeBrowserTurn(req: NextRequest) {
               body,
               objective: prompt,
               surface: 'assistant',
-              plannerRequested: true,
+              plannerRequested: agentDecision.capabilities.includes('software_specialist'),
               allowRepositoryRepair: false,
               signalBoostDeploymentContext: false,
               deployment,
@@ -567,7 +568,7 @@ async function executeBrowserTurn(req: NextRequest) {
               body,
               objective: prompt,
               surface: 'concierge',
-              plannerRequested: true,
+              plannerRequested: agentDecision.capabilities.includes('software_specialist'),
               allowRepositoryRepair: false,
               signalBoostDeploymentContext: false,
               deployment,

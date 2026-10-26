@@ -1385,6 +1385,18 @@ export class BuilderToolLoop {
           completedRunsInCurrentWorkspaceState.add(fingerprint)
           const details = diagnose(`${(output as ReturnType<typeof summarizeRun>).stderr}\n${(output as ReturnType<typeof summarizeRun>).stdout}`, workspacePaths)
           trace.push({ round, toolId: action.toolId, input: action.input, ok: false, output, error: `builder_command_failed: exit ${(output as ReturnType<typeof summarizeRun>).exitCode}`, ...details })
+          // Keep the executed command's failure receipt in trace for the next model round.
+          // Initial reproduction is not a repair attempt; count only failures after a
+          // successful source mutation since the preceding failed verification.
+          const failedChecks = trace.map((item, index) => ({ item, index }))
+            .filter(({ item }) => item.toolId === 'run' && !item.ok
+              && String(item.error || '').startsWith('builder_command_failed:'))
+          const failedRepairAttempts = failedChecks.filter(({ index }, i) => i > 0
+            && trace.slice(failedChecks[i - 1]!.index + 1, index).some(item =>
+              item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file')))
+          if (failedRepairAttempts.length >= 3) {
+            return { ok: false, error: 'builder_repair_attempts_exhausted', trace }
+          }
           continue
         }
         if ((action.toolId === 'write_file' || action.toolId === 'edit_file') && (output as { alreadyPresent?: boolean } | undefined)?.alreadyPresent !== true) {

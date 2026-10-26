@@ -26,8 +26,7 @@ import { semanticCacheAllowedForPrompt } from './cacheSafetyPolicy.ts'
 import { normativeAnswerContractViolations } from './normativeAnswerPolicy.ts'
 import { INSTRUCTION_NARRATION_SIGNAL, instructionNarrationSignals, stripInstructionNarration } from './cosInstructionNarration.ts'
 import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
-import { LONG_FORM_ANSWER_MAX_TOKENS, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
-import { isLongFormAnalysisRequest } from './cosReasoningRolePolicy.ts'
+import { USER_ANSWER_MAX_TOKENS, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { learnedEvidenceUseRequired } from './learnedEvidencePolicy.ts'
 import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { classifyRunpodFailure, runpodCapacityUnavailableReason } from '@/lib/ai/cos/runpodCapacityError'
@@ -203,15 +202,9 @@ function reasonerGlobalTokenCeiling():number {
   return Number.isFinite(globalCeiling) ? Math.max(768, globalCeiling) : 6000
 }
 
-function interactiveReasonerMaxTokens():number {
-  const configured = Number(process.env.COS_INTERACTIVE_REASONER_MAX_TOKENS || '2000')
-  const bounded = Number.isFinite(configured) ? Math.max(768, Math.min(3000, configured)) : 2000
-  return Math.min(bounded, reasonerGlobalTokenCeiling())
-}
-
-/** A multi-part analysis gets more room, never above the configured global ceiling (Codex on #4879). */
-export function longFormReasonerMaxTokens():number {
-  return Math.min(Math.max(interactiveReasonerMaxTokens(), LONG_FORM_ANSWER_MAX_TOKENS), reasonerGlobalTokenCeiling())
+/** Room for the answer the user reads, the same for every request, never above the configured global ceiling. */
+export function userAnswerMaxTokens():number {
+  return Math.min(USER_ANSWER_MAX_TOKENS, reasonerGlobalTokenCeiling())
 }
 
 function interactiveReasonerFeature(prompt:string):'cos_interactive_answer'|'cos_interactive_authoring' {
@@ -1101,10 +1094,9 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     // reason in the visible answer instead of hidden scratch work.
     disableThinking:true,
     temperature:Number(process.env.COS_REASONER_TEMPERATURE ?? '0'),
-    // A multi-part analysis gets the time and room to finish (local-inference LONG_FORM_ANSWER_*).
-    ...(isLongFormAnalysisRequest(input.prompt)
-      ? { longForm:true, maxTokens:longFormReasonerMaxTokens() }
-      : { maxTokens:interactiveReasonerMaxTokens() }),
+    // Every request gets the same time and room (local-inference USER_ANSWER_*); the model decides the length.
+    writesUserAnswer:true,
+    maxTokens:userAnswerMaxTokens(),
     systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English', { privileged: audience === 'owner', audience, question: input.prompt }),
     // COMPANY KNOWLEDGE BLOCK (2026-09-26). Every audience gets the owner-approved company identity and
     // public catalog directly in the prompt for questions about iTMounts. When the identity was only one
@@ -1189,7 +1181,9 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     const repair = await callCosReasoner({
       usageContext:{ feature:interactiveReasonerFeature(input.prompt), purpose:'user_facing_release_repair' },
       temperature: 0,
-      maxTokens: interactiveReasonerMaxTokens(),
+      // The repair rewrites the whole answer, so it needs the same room as the answer.
+      writesUserAnswer: true,
+      maxTokens: userAnswerMaxTokens(),
       systemPrompt: 'EXECUTIVE RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Rewrite the draft using only the supplied facts and the supplied internal evidence. Remove unsupported commercial certainty and invented numeric limits, timelines, feature gates, market claims, legal conclusions, forecasts, and unstated security frameworks. For a normative or public-policy question, never begin with Yes or No: give at least 100 words of neutral analysis separating descriptive facts from the strongest material supporting and opposing frameworks, then state what evidence establishes and what remains value-dependent. If selected full-content learned-corpus evidence is supplied, use it materially and cite its [CL#] label in the draft. This applies to owner-fed documents, videos, scientific articles, and other approved learning. Answer the question itself: never describe your instructions or guidelines, what the answer should be, or what you must avoid, and never refer to yourself by name. Deliver the complete memo; do not mention this repair.',
       prompt: `INTERNAL EVIDENCE:\n${internalContext || 'None'}\n\nORIGINAL QUESTION:\n${input.prompt}\n\nREJECTED DRAFT:\n${parsed.answer}`,
     }).catch(() => null)

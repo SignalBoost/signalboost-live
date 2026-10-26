@@ -98,12 +98,13 @@ test('interactive retained-learning path is bounded and does not turn semantic m
   assert.match(semanticLearned, /return rows/)
 })
 
-test('completion rescue is deterministic and latency bounded', async () => {
+// The rescue writes the user's answer: it gets the same answer window as every answer, bounded by the turn deadline.
+test('completion rescue is deterministic and gets the user-answer window', async () => {
   const route = await readFile(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
   const start = route.indexOf('async function runCompletionFirstRescue')
   const end = route.indexOf('function completionFirstResponse', start)
   const rescue = route.slice(start, end)
   assert.match(rescue, /temperature:0/)
-  assert.match(rescue, /maxTokens:1400/)
-  assert.match(rescue, /timeoutMs:9_000/)
+  assert.match(rescue, /writesUserAnswer:true/)
+  assert.match(rescue, /maxTokens:userAnswerMaxTokens\(\)/)
 })

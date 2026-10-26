@@ -17,8 +17,8 @@ export type CosReasoningRequest = {
   presencePenalty?: number
   disableThinking?: boolean
   timeoutMs?: number
-  /** A multi-part analysis answer keeps its long-form transport window through worker selection. */
-  longForm?: boolean
+  /** The call writing the user's answer keeps its full answer window through worker selection. */
+  writesUserAnswer?: boolean
   allowConfiguredFallback?: boolean
   allowTruncatedText?: boolean
   persistUsage?: boolean

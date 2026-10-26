@@ -3,16 +3,16 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { interactiveRunpodMaxTokens } from '../lib/ai/local-inference.ts'
 
-test('short interactive answers retain the existing default 1000-token cap', () => {
+test('short helper calls retain the existing default 1000-token cap', () => {
   assert.equal(interactiveRunpodMaxTokens(1400), 1000)
   assert.equal(interactiveRunpodMaxTokens(700), 700)
 })
-test('multi-part analytical answers can use their requested long-form output budget', () => {
+test('the answer the user reads can use its full requested output budget', () => {
   assert.equal(interactiveRunpodMaxTokens(3500, true), 3500)
   assert.equal(interactiveRunpodMaxTokens(8000, true), 4000)
   assert.equal(interactiveRunpodMaxTokens(1400, true), 1400)
 })
-test('a low short-chat configuration does not truncate long-form requests', () => {
+test('a low helper-call configuration does not truncate the user answer', () => {
   const old = process.env.COS_INTERACTIVE_RUNPOD_MAX_TOKENS
   try {
     process.env.COS_INTERACTIVE_RUNPOD_MAX_TOKENS = '800'
@@ -23,7 +23,7 @@ test('a low short-chat configuration does not truncate long-form requests', () =
     else process.env.COS_INTERACTIVE_RUNPOD_MAX_TOKENS = old
   }
 })
-test('actual RunPod interactive call propagates longForm flag into its token cap', () => {
+test('actual RunPod interactive call propagates the user-answer flag into its token cap', () => {
   const src = readFileSync(new URL('../lib/ai/local-inference.ts', import.meta.url),'utf8')
-  assert.match(src, /interactiveRunpodMaxTokens\(args\.maxTokens, args\.longForm === true\)/)
+  assert.match(src, /interactiveRunpodMaxTokens\(args\.maxTokens, args\.writesUserAnswer === true\)/)
 })

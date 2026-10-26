@@ -70,8 +70,11 @@ export interface LocalModelCallArgs {
   disableThinking?: boolean
   /** Caller-specific hard transport deadline. The lower of this value and config.timeoutMs wins. */
   timeoutMs?: number
-  /** A multi-part analysis answer: gets LONG_FORM_ANSWER_TIMEOUT_MS instead of the one-pass chat answer limit. */
-  longForm?: boolean
+  /**
+   * This call writes the answer the user reads. It gets USER_ANSWER_TIMEOUT_MS and USER_ANSWER_MAX_TOKENS
+   * whatever the request looks like, so the model, not a guess from the wording, decides how long the answer is.
+   */
+  writesUserAnswer?: boolean
   /** Disable configured-model fallback after an owned-primary failure for latency-critical calls. */
   allowConfiguredFallback?: boolean
   /** Return non-empty text on finish_reason=length so a caller with a dedicated salvage parser can recover it. */
@@ -238,32 +241,32 @@ function agentToolLoopRound(args: LocalModelCallArgs): boolean {
   return String(args.usageContext?.purpose || '').trim().toLowerCase() === 'agent_tool_loop'
 }
 
-/** One long-form analysis answer, inside the 150 s browser-turn model deadline (app/api/cos-browser). */
-export const LONG_FORM_ANSWER_TIMEOUT_MS = 120_000
-/** Output room for a multi-part analysis; the reasoning role's own token cap still applies. */
-export const LONG_FORM_ANSWER_MAX_TOKENS = 4_000
+/** Time for the answer the user reads, inside the 150 s browser-turn model deadline (app/api/cos-browser). */
+export const USER_ANSWER_TIMEOUT_MS = 120_000
+/** Output room for the answer the user reads; the configured global reasoner ceiling still applies. */
+export const USER_ANSWER_MAX_TOKENS = 4_000
 
 function interactiveModelTimeoutMs(args: LocalModelCallArgs, configTimeoutMs: number): number {
   // An agent-loop round may write a whole analysis program; the loop owns its per-round bound
   // (cosAgentLoop ROUND_TIMEOUT_MS) inside the turn deadline. Production 2026-10-16: the 20 s
   // one-pass answer clamp cut the code-writing round ("Inference transport deadline exceeded").
   if (agentToolLoopRound(args)) return Math.min(configTimeoutMs, 60_000)
-  // A multi-part analysis cannot be written in the one-pass limit; it is still clamped to the turn deadline.
-  if (args.longForm === true) return Math.min(configTimeoutMs, LONG_FORM_ANSWER_TIMEOUT_MS)
+  // The answer the user reads gets the same window for every request, still clamped to the turn deadline.
+  // Production 2026-10-25: the window used to be chosen by guessing the request's kind from its wording
+  // (edit, simple fact, travel, "analysis with numbered asks", other: 7-20 s); any request that matched no
+  // pattern had its real answer cut off and discarded, and the user got a refusal.
+  if (args.writesUserAnswer === true) return Math.min(configTimeoutMs, USER_ANSWER_TIMEOUT_MS)
   const directEdit = directTextTransformation(args)
-  const authoring = interactiveAuthoring(args)
   const simpleKnowledge = simpleKnowledgeResponse(args)
   const travelPlan = interactiveTravelPlan(args)
   const variable = directEdit
     ? 'COS_DIRECT_TEXT_TIMEOUT_MS'
-    : authoring
-      ? 'COS_INTERACTIVE_AUTHORING_TIMEOUT_MS'
-      : simpleKnowledge
-        ? 'COS_SIMPLE_KNOWLEDGE_TIMEOUT_MS'
-        : travelPlan
-          ? 'COS_INTERACTIVE_TRAVEL_TIMEOUT_MS'
-          : 'COS_INTERACTIVE_MODEL_TIMEOUT_MS'
-  const fallback = directEdit ? 12000 : authoring ? 20000 : simpleKnowledge ? 7000 : travelPlan ? 18000 : 20000
+    : simpleKnowledge
+      ? 'COS_SIMPLE_KNOWLEDGE_TIMEOUT_MS'
+      : travelPlan
+        ? 'COS_INTERACTIVE_TRAVEL_TIMEOUT_MS'
+        : 'COS_INTERACTIVE_MODEL_TIMEOUT_MS'
+  const fallback = directEdit ? 12000 : simpleKnowledge ? 7000 : travelPlan ? 18000 : 20000
   const configured = Number(process.env[variable] || String(fallback))
   const bounded = Number.isFinite(configured) ? Math.max(3000, Math.min(60000, configured)) : fallback
   return Math.min(configTimeoutMs, bounded)
@@ -781,13 +784,12 @@ function ownedReasonerContextWindowTokens(config: LocalInferenceConfig): number 
   return Number.isFinite(configured) && configured >= 1024 ? Math.floor(configured) : 16384
 }
 
-/** Chat answers are short; this cap keeps a runaway owned answer from holding the chat for a minute. */
-export function interactiveRunpodMaxTokens(requested: number | undefined, longForm = false): number {
+/** Helper calls (intent, review, planning) are short; this cap keeps one from holding the RunPod slot for a minute. */
+export function interactiveRunpodMaxTokens(requested: number | undefined, writesUserAnswer = false): number {
   const configured = Number(process.env.COS_INTERACTIVE_RUNPOD_MAX_TOKENS || '1000')
   const chatCap = Number.isFinite(configured) ? Math.max(512, Math.min(4000, Math.floor(configured))) : 1000
-  // Long-form investigations must not inherit the short-chat ceiling. The
-  // request still has a hard bound, and its existing deadline is unchanged.
-  const cap = longForm ? 4000 : chatCap
+  // The answer the user reads never inherits the short helper-call ceiling; it keeps a hard bound.
+  const cap = writesUserAnswer ? USER_ANSWER_MAX_TOKENS : chatCap
   return Math.min(requested ?? cap, cap)
 }
 
@@ -872,7 +874,7 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
       const contextWindowTokens = ownedReasonerContextWindowTokens(runpodConfig)
       try {
         const turn = await callConfiguredModelTurn(
-          { ...args, maxTokens: interactiveRunpodMaxTokens(args.maxTokens, args.longForm === true) },
+          { ...args, maxTokens: interactiveRunpodMaxTokens(args.maxTokens, args.writesUserAnswer === true) },
           {
             ...runpodConfig,
             ...(contextWindowTokens ? { contextWindowTokens } : {}),

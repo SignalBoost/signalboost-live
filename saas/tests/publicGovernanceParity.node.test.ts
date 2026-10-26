@@ -19,7 +19,7 @@ const ENTRYPOINT = readFileSync('lib/ai/cos/cosFirstAnswer.ts', 'utf8')
 test('public questions run the same COS pipeline as the owner, then the public release step', () => {
   const branch = PUBLIC.slice(PUBLIC.indexOf('if (isPublicDeliveryScope()) {\n    // ONE COS PIPELINE'))
   assert.match(branch, /const brain = await tryEnterpriseCOSFirstAnswer\(input\)/)
-  assert.match(branch, /return learnFromTurn\(input, await releaseToPublic\(input, brain\)\)/)
+  assert.match(branch, /return learnFromTurn\(input, await releasePublic\(brain\)\)/)
   assert.doesNotMatch(PUBLIC, /tryPublicStatelessAnswer/, 'the separate public-only pipeline must not return')
 })
 
@@ -60,7 +60,7 @@ test('audiences never share cached answers', () => {
 test('every public request is reasoned whole and released only through the public release gate', () => {
   const branchAt = PUBLIC.indexOf('if (isPublicDeliveryScope()) {\n    // ONE COS PIPELINE')
   const call = PUBLIC.indexOf('const brain = await tryEnterpriseCOSFirstAnswer(input)', branchAt)
-  const release = PUBLIC.indexOf('return learnFromTurn(input, await releaseToPublic(input, brain))', call)
+  const release = PUBLIC.indexOf('return learnFromTurn(input, await releasePublic(brain))', call)
   assert.ok(branchAt > 0 && call > branchAt && release > call)
   assert.doesNotMatch(PUBLIC.slice(branchAt, call), /asksAboutServiceIdentity|return learnFromTurn/)
 })

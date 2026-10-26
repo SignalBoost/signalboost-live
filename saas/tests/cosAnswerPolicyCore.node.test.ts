@@ -23,7 +23,7 @@ test('public answers are reasoned by the one COS answer prompt that carries the 
   const promptAt = owner.indexOf('export function COS_REASONER_SYSTEM_PROMPT(')
   const spliceAt = owner.indexOf('...QUANTITATIVE_ANSWER_POLICY,', promptAt)
   assert.ok(promptAt > 0 && spliceAt > promptAt, 'policy must be inside the one answer prompt')
-  assert.match(core, /const brain = await tryEnterpriseCOSFirstAnswer\(input\)\n\s*return learnFromTurn\(input, await releaseToPublic\(input, brain\)\)/)
+  assert.match(core, /const brain = await tryEnterpriseCOSFirstAnswer\(input\)\n\s*return learnFromTurn\(input, await releasePublic\(brain\)\)/)
 })
 
 test('the rules that were validated in production are present', () => {

@@ -94,7 +94,8 @@ test('public answers use the one claim gate, not a second copy of it', () => {
   const calls = core.split('\n')
     .filter(line => /executiveDecisionUnsupportedClaims\(\s*\w/.test(line) && !line.trim().startsWith('//'))
   assert.equal(calls.length, 0, 'a second claim gate would let the two audiences drift apart again')
-  assert.match(core, /await releaseToPublic\(input, brain\)/)
+  assert.match(core, /await releasePublic\(brain\)/)
+  assert.match(core, /publicScope \? releaseToPublic\(input, result, selfDisclosure === 'part'\) : result/)
 })
 
 test('this file is a test, not a module pasted over one', () => {

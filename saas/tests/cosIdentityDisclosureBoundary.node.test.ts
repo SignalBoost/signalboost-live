@@ -45,10 +45,11 @@ test('trusted runtime context reports RunPod primary separately from DeepInfra f
   assert.match(topology, /fallback/)
 })
 
-test('public disclosure is enforced on the answer; only the owner channel intercepts identity questions', () => {
+test('public identity is decided by meaning; the owner channel keeps its runtime-topology answer', () => {
   assert.match(core, /if \(!isPublicDeliveryScope\(\) && \(isPlatformStackQuestion\(input\.prompt\) \|\| asksAboutServiceIdentity\(input\.prompt\)\)\)/)
-  assert.doesNotMatch(core, /publicImplementationDisclosureReply/)
-  assert.match(enterprise, /Do not identify the underlying model\/provider or internal implementation/)
+  assert.match(core, /\(await classifyPublicSelfDisclosure\(publicRequest\)\) \?\? \(asksAboutServiceIdentity\(publicRequest\) \? 'only' : 'none'\)/)
+  assert.match(core, /publicImplementationDisclosureReply\(input\.language\)/)
+  assert.doesNotMatch(enterprise, /publicImplementationDisclosureReply/)
 })
 
 test('owner runtime topology remains host-owned and public disclosure stays separate', () => {

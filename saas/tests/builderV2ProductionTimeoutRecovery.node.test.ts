@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { runBuilderV2JobCycle } from '../lib/builder/agent-v2-job-cycle.ts'
 import type { BuilderV2Checkpoint } from '../lib/builder/agent-v2.ts'
 import type { BuilderV2Agent } from '../lib/builder/agent-v2.ts'
@@ -89,3 +90,12 @@ for (const summary of ['inference_transport_deadline', 'timeout:inference_transp
     assert.equal(result.result?.checkpoint?.revision, 1)
   })
 }
+
+test('standard Builder job checkpoints provider cost exhaustion rather than treating it as source failure', () => {
+  const source = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  const guard = source.indexOf("message === 'harness_provider_cost_budget_exceeded' && job.checkpoint && builderMayContinue(job, job.checkpoint)")
+  const pause = source.indexOf('await pauseBuilderJob({ job, checkpoint: job.checkpoint', guard)
+  const terminal = source.indexOf('await terminalFailure(job,', guard)
+  assert.ok(guard > 0 && pause > guard && terminal > pause)
+  assert.match(source.slice(guard, terminal), /verification is still pending/)
+})

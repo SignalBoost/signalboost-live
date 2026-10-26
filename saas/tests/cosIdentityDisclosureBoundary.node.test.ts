@@ -45,10 +45,10 @@ test('trusted runtime context reports RunPod primary separately from DeepInfra f
   assert.match(topology, /fallback/)
 })
 
-test('public disclosure remains a deterministic safety boundary, separate from owner reasoning', () => {
-  assert.match(core, /if \(asksAboutServiceIdentity\(userRequest\)\)/)
-  assert.match(core, /publicImplementationDisclosureReply\(input\.language\)/)
-  assert.doesNotMatch(enterprise, /publicImplementationDisclosureReply/)
+test('public disclosure is enforced on the answer; only the owner channel intercepts identity questions', () => {
+  assert.match(core, /if \(!isPublicDeliveryScope\(\) && \(isPlatformStackQuestion\(input\.prompt\) \|\| asksAboutServiceIdentity\(input\.prompt\)\)\)/)
+  assert.doesNotMatch(core, /publicImplementationDisclosureReply/)
+  assert.match(enterprise, /Do not identify the underlying model\/provider or internal implementation/)
 })
 
 test('owner runtime topology remains host-owned and public disclosure stays separate', () => {

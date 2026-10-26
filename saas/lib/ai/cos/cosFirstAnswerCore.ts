@@ -61,7 +61,7 @@ function withComputedArithmetic<T extends { answer: string } | null>(parsed: T):
   return { ...parsed, answer: resolved.text }
 }
 
-import { publicDisclosureViolations, asksAboutServiceIdentity, publicImplementationDisclosureReply } from './publicDisclosureGate.ts'
+import { publicDisclosureViolations, asksAboutServiceIdentity } from './publicDisclosureGate.ts'
 import { publicScenarioScopeViolations, publicUserRequestText } from './publicScenarioScope.ts'
 import {
   tryCOSFirstAnswer as tryEnterpriseCOSFirstAnswer,
@@ -245,9 +245,6 @@ async function releaseToPublic(
   }
 
   const disclosures = publicDisclosureViolations(answer, userRequest)
-  if (disclosures.length && asksAboutServiceIdentity(userRequest)) {
-    return { ...result, reply: publicImplementationDisclosureReply(input.language), confidence: 1 }
-  }
   if (disclosures.length) {
     // Labeled interactive call with thinking off (2026-09-27): production 19:56 ET this redaction ran unlabeled on
     // the background RunPod reasoner with hidden thinking — 36.1s and 1,311 tokens for one public answer.
@@ -844,17 +841,13 @@ export async function tryCOSFirstAnswer(input: {
     return learnFromTurn(input, await tryLiveNamedCatalog(input))
   }
 
-  // Any identity/model/provider question is answered deterministically and scope-aware, BEFORE the
-  // enterprise reasoner runs — otherwise the owner's phrasing can slip past the narrow platform-stack
-  // detector, reach the model, and get the public non-disclosure deflection on the owner's own
-  // channel. Public scope still gets the non-disclosure boundary; the owner gets the real stack.
-  if (isPlatformStackQuestion(input.prompt) || asksAboutServiceIdentity(input.prompt)) {
-    const reply = isPublicDeliveryScope()
-      ? publicImplementationDisclosureReply(input.language)
-      : ownerPlatformStackReply(input.language)
+  // The owner's identity/model/provider question is answered from the verified runtime topology BEFORE the
+  // enterprise reasoner runs, so the owner gets the real stack rather than the model's memory of itself.
+  // Public scope is not intercepted here: see the public branch below.
+  if (!isPublicDeliveryScope() && (isPlatformStackQuestion(input.prompt) || asksAboutServiceIdentity(input.prompt))) {
     return learnFromTurn(input, {
       handled: true,
-      reply,
+      reply: ownerPlatformStackReply(input.language),
       confidence: 1,
       provenance: { responseSource: 'cos_local_primary', selfKnowledgeDeterministic: true } as any,
     })
@@ -912,17 +905,11 @@ export async function tryCOSFirstAnswer(input: {
     // in the public audience: public-safe retrieval, the public boundary, and this release gate. The
     // separate public-only pipeline that used to answer company questions has been removed.
     //
-    // SELF-IDENTITY IS A RELEASE RULE, ANSWERED BEFORE INFERENCE (2026-08-26): "what model powers
-    // this?" has exactly one correct public answer, so the model is never asked.
-    const userRequest = publicUserRequestText(input.prompt)
-    if (asksAboutServiceIdentity(userRequest)) {
-      return learnFromTurn(input, {
-        handled: true,
-        reply: publicImplementationDisclosureReply(input.language),
-        confidence: 1,
-        provenance: { responseSource: 'cos_local_primary', selfKnowledgeDeterministic: true } as any,
-      })
-    }
+    // EVERY PUBLIC REQUEST IS REASONED WHOLE (owner decision 2026-10-26). A word rule on the request used to swap the
+    // whole answer for a fixed "implementation details are not public" reply before COS reasoned, so a request that
+    // merely mentioned which models or providers do something ("write a post about which AI models power chatbots")
+    // got no answer. The boundary is enforced on the ANSWER instead: the public audience instructs COS never to name
+    // its model or provider, and releaseToPublic() redacts any internal it still finds or releases nothing.
     const brain = await tryEnterpriseCOSFirstAnswer(input)
     return learnFromTurn(input, await releaseToPublic(input, brain))
   }

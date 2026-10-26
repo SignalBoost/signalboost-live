@@ -484,6 +484,7 @@ const tests = [
   'tests/localInferenceSettlementKeepsAnswer.node.test.ts',
   'tests/builderToolLoopSpendCeilingPauses.node.test.ts',
   'tests/cosAnswersActionRequestsWithoutExecutor.node.test.ts',
+  'tests/cosPublicAnswersWholeRequest.node.test.ts',
   'tests/cosSubstantiveAnalysisRelease.node.test.ts',
 
   'tests/visualObjectiveContract.node.test.ts',

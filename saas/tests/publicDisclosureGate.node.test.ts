@@ -7,7 +7,6 @@ import {
   isPublicReleasable,
   asksWhatPowersTheService,
   asksAboutServiceIdentity,
-  publicImplementationDisclosureReply,
 } from '../lib/ai/cos/publicDisclosureGate.ts'
 
 const PUBLIC_PIPELINE = 'lib/ai/cos/cosFirstAnswerCore.ts'
@@ -102,33 +101,12 @@ test('ordinary questions containing the same words are not self-referential', ()
   ]) assert.equal(asksWhatPowersTheService(prompt), false, prompt)
 })
 
-test('the implementation reply passes the gate it exists to satisfy', () => {
-  for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
-    const reply = publicImplementationDisclosureReply(language)
-    assert.deepEqual(publicDisclosureViolations(reply), [], language)
-    assert.ok(reply.length > 80, language)
-  }
-})
-
-test('the implementation reply states a boundary, not an outage', () => {
-  const reply = publicImplementationDisclosureReply('en')
-  assert.ok(!/unavailable|try again|error|temporarily/i.test(reply))
-  assert.match(reply, /do not publish|not publish/i)
-})
-
-test('unknown language falls back to English', () => {
-  assert.equal(publicImplementationDisclosureReply('xx'), publicImplementationDisclosureReply('en'))
-  assert.equal(publicImplementationDisclosureReply(null), publicImplementationDisclosureReply('en'))
-})
-
-test('the public self-referential branch runs before the redaction attempt', () => {
+test('a disclosing public answer is redacted, never swapped for a fixed reply', () => {
   const source = readFileSync(PUBLIC_PIPELINE, 'utf8')
   const releaseAt = source.indexOf('async function releaseToPublic(')
-  const branchAt = source.indexOf('if (disclosures.length && asksAboutServiceIdentity(userRequest))', releaseAt)
   const redactAt = source.indexOf('You are COS repairing a public answer that disclosed', releaseAt)
-  assert.ok(releaseAt > 0 && branchAt > releaseAt && redactAt > branchAt, 'boundary reply must pre-empt the redaction pass')
-  const branch = source.slice(branchAt, branchAt + 400)
-  assert.match(branch, /reply: publicImplementationDisclosureReply\(/)
+  assert.ok(releaseAt > 0 && redactAt > releaseAt)
+  assert.doesNotMatch(source.slice(releaseAt, redactAt), /asksAboutServiceIdentity/)
 })
 
 test('the false-attribution answer that shipped to production is now caught', () => {
@@ -157,14 +135,13 @@ test('questions about other people building other things are not identity questi
   ]) assert.equal(asksAboutServiceIdentity(prompt), false, prompt)
 })
 
-test('PUBLIC identity is answered before the public reasoner is called', () => {
+test('PUBLIC requests reach the reasoner whole; identity is enforced on the answer (owner decision 2026-10-26)', () => {
   const source = readFileSync(PUBLIC_PIPELINE, 'utf8')
   const branchAt = source.indexOf('if (isPublicDeliveryScope()) {\n    // ONE COS PIPELINE')
-  const interceptAt = source.indexOf('if (asksAboutServiceIdentity(userRequest)) {', branchAt)
   const reasonerAt = source.indexOf('const brain = await tryEnterpriseCOSFirstAnswer(input)', branchAt)
   assert.ok(branchAt > 0, 'public branch must exist')
-  assert.ok(interceptAt > branchAt, 'public intercept must exist')
-  assert.ok(reasonerAt > interceptAt, 'public intercept must precede the COS reasoner call')
+  assert.ok(reasonerAt > branchAt)
+  assert.doesNotMatch(source.slice(branchAt, reasonerAt), /asksAboutServiceIdentity/)
 })
 
 test('a vendor the visitor named is part of the answer, not a stack disclosure (2026-09-27)', () => {

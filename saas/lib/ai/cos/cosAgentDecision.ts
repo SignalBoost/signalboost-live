@@ -20,6 +20,7 @@ export const COS_AGENT_CAPABILITIES = [
   'platform_runtime',
   'repository_read',
   'software_specialist',
+  'verification_campaign',
   'external_action',
 ] as const
 
@@ -63,6 +64,7 @@ const CAPABILITY_DESCRIPTIONS: Record<CosAgentCapability, string> = {
   repository_read: 'Inspect the authorized repository or codebase before answering.',
   software_specialist: 'Hand off work that must build, change, run, test, debug or deploy actual software, code, files or a website to the governed Software Specialist. Not for analysis, investigation, explanation, review or planning that is answered in writing, even when its subject is software.',
   external_action: 'Request an authorized action in an external system; host policy decides whether execution is allowed.',
+  verification_campaign: 'Run the production acceptance campaign: a durable background job that executes the numbered acceptance checks against the live site itself (real requests, deployment facts, release checks, traces) and reports a per-check PASS/FAIL/BLOCKED evidence package. Request it only when the owner asks for the campaign, acceptance checks or certification to be EXECUTED against production, not analysed or reviewed in writing.',
 }
 
 const LIVE_WEB_PARAMETERS = Object.freeze({

@@ -1,2 +1,2 @@
-base_sha=bddad74b1a76eb04a7b310bcd34ef5bce628ad09
-branch=fix/answer-loop-keeps-only-verified-additions-20261027
+base_sha=afb65998f95da3e0d866d50d494c11eea9da4543
+branch=feat/verification-campaign-job-20261027

@@ -495,9 +495,18 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   const remainingBounds = [turnDeadlineRemainingMs(), harnessDeadlineRemainingMs()]
     .filter((value): value is number => value !== null)
   const outerRemainingMs = remainingBounds.length ? Math.min(...remainingBounds) : null
-  const timeoutMs = outerRemainingMs === null
+  // Reserve a real inference window for the eventual user answer. Optional semantic
+  // classifiers and planning calls must not consume the entire shared browser-turn clock.
+  // The explicit user-facing answer, tool execution, and isolated noninteractive jobs
+  // retain their existing independent budgets.
+  const answerReserveMs = interactiveUserResponse(args) && args.writesUserAnswer !== true
+    && !agentToolLoopRound(args) && turnDeadlineRemainingMs() !== null ? 60_000 : 0
+  const optionalRemainingMs = outerRemainingMs === null ? null : outerRemainingMs - answerReserveMs
+  if (optionalRemainingMs !== null && optionalRemainingMs <= 0)
+    throw new Error('cos_answer_budget_reserved')
+  const timeoutMs = optionalRemainingMs === null
     ? callerBoundTimeoutMs
-    : Math.max(1, Math.min(callerBoundTimeoutMs, outerRemainingMs))
+    : Math.max(1, Math.min(callerBoundTimeoutMs, optionalRemainingMs))
   const timeout = setTimeout(() => controller.abort(new DOMException('Inference transport deadline exceeded', 'TimeoutError')), timeoutMs)
   try {
     controller.signal.throwIfAborted()

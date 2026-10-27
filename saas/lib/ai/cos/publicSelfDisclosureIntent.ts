@@ -67,7 +67,7 @@ const SYSTEM_PROMPT = [
   '"none": the request does not ask about this assistant\'s implementation or creator.',
 ].join(' ')
 
-export async function classifyPublicSelfDisclosure(
+async function classifyWindow(
   request: string,
   callImpl: SelfDisclosureReasoner = defaultReasoner,
   deadlineMs = SELF_DISCLOSURE_JUDGE_MS,
@@ -93,25 +93,44 @@ export async function classifyPublicSelfDisclosure(
   }
 }
 
+/** A request longer than this many windows is not judged; the caller's conservative fallback decides. */
+export const PUBLIC_SELF_DISCLOSURE_MAX_WINDOWS = 8
+
+/**
+ * The judge reads the WHOLE request, one window at a time, in parallel (each window has its own deadline). A request
+ * that fits one window gets that window's verdict. A longer request is "only" never (it holds more than one ask) and
+ * is "part" when any window asks about this service, otherwise "none". If any window gets no verdict, or the request
+ * exceeds the window cap, there is no verdict and the caller's conservative fallback decides.
+ * Production 2026-10-27: the judge saw only the first window of an 11,600-character brief, so the rest could never
+ * clear it and the brief was forced through the strict disclosure gate, which cannot pass an answer that names a
+ * vendor the brief itself names.
+ */
+export async function classifyPublicSelfDisclosure(
+  request: string,
+  callImpl: SelfDisclosureReasoner = defaultReasoner,
+  deadlineMs = SELF_DISCLOSURE_JUDGE_MS,
+): Promise<PublicSelfDisclosureIntent | null> {
+  const value = String(request || '').trim()
+  if (value.length <= PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS) return classifyWindow(value, callImpl, deadlineMs)
+  const windows: string[] = []
+  for (let at = 0; at < value.length; at += PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS) windows.push(value.slice(at, at + PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS))
+  if (windows.length > PUBLIC_SELF_DISCLOSURE_MAX_WINDOWS) return null
+  const verdicts = await Promise.all(windows.map(window => classifyWindow(window, callImpl, deadlineMs)))
+  if (verdicts.some(verdict => verdict === null)) return null
+  return verdicts.some(verdict => verdict !== 'none') ? 'part' : 'none'
+}
+
 /**
  * Settles the final verdict from the judge's verdict and the word rules (the safety net). A fixed boundary reply
- * replaces the WHOLE answer, so "only" is granted just when the request is plainly nothing but the identity question:
- * the judge must have seen all of it, and without a judge verdict the request must also be a single line. Anything
- * else that the word rules flag is answered whole and released under the strict self-disclosure gate ("part"), which
- * keeps the boundary without discarding the user's work. Production 2026-10-27: an 11,600-character Builder
- * acceptance brief that merely said "provider stub. COS must respect..." received the fixed reply and was never built.
+ * replaces the WHOLE answer, so without a judge verdict it is granted only to a single short line; any longer or
+ * multi-line request the word rules flag is answered whole under the strict self-disclosure gate ("part").
  */
 export function settlePublicSelfDisclosure(
   judged: PublicSelfDisclosureIntent | null,
   wordRule: boolean,
   request: string,
 ): PublicSelfDisclosureIntent {
-  const seenWhole = request.length <= PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS
-  if (judged === null) {
-    if (!wordRule) return 'none'
-    return seenWhole && !/[\r\n]/.test(request) ? 'only' : 'part'
-  }
-  if (judged === 'only') return seenWhole ? 'only' : 'part'
-  if (judged === 'none' && wordRule && !seenWhole) return 'part'
-  return judged
+  if (judged !== null) return judged
+  if (!wordRule) return 'none'
+  return request.length <= PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS && !/[\r\n]/.test(request) ? 'only' : 'part'
 }

@@ -208,3 +208,11 @@ test('insufficient repair time still reports missing work', async () => {
   assert.equal(result.stopped,'budget')
   assert.deepEqual(result.missing,['two missing'])
 })
+
+test('COS reasoner retains complete draft only on optional budget exhaustion, never on audit failure', () => {
+  const source = readFileSync(join(process.cwd(), 'lib/ai/cos/cosReasoner.ts'), 'utf8')
+  assert.match(source, /completion\?\.stopped === 'budget'/)
+  assert.match(source, /remaining\.length === 0 && qualityDefects\.length === 0/)
+  assert.match(source, /releasableAnalyticalAnswer\(effectiveArgs\.prompt, candidate\)/)
+  assert.match(source, /if \(!safeToRelease\) return null/)
+})

@@ -281,6 +281,10 @@ University Residency is the educational use of this shared platform world. Resid
 See `docs/PLATFORM-HARNESS.md` and `saas/platform-harness/`.
 
 
+## Verification campaign job (Builder engine `campaign`) — 2026-10-27
+
+The owner's production acceptance campaign (COS-PAC-001, twenty numbered checks) is executed by a durable Builder job with metadata `builderEngine: 'campaign'` (`saas/lib/builder/campaign/`). It is read-only against the live production path: an analysis item is one real HTTP request to the public Concierge ingress of the live site, judged by the deterministic answer contract the production path itself uses; the deployed commit is read from the deployment and compared with `main`; release checks are read from GitHub for that commit; traces are read back from the production records by turn id. A campaign never opens a workspace, never edits a repository, never substitutes canned answers, and never modifies a prompt. Admission is the planner capability `verification_campaign` (the model reads the request; no word rule), owner on the Assistant surface only. State lives in the job checkpoint; slices resume through the continuation cron; the History reply is the Section 13 evidence package with the Section 14 decision. An item whose host port does not exist (isolated fault injection, a browser runner with a test account, governance read-back, the Builder fixture) is BLOCKED with that cause, never PASS and never skipped.
+
 ## Builder Engineering Control Plane invariant — 2026-09-27
 
 Builder is a **goal-oriented, model-agnostic engineering agent inside the Platform Harness**, not a chat model that stops after generating code. The engineering outcome and its independently observable acceptance criteria are the unit of completion.

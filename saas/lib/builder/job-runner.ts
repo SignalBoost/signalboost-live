@@ -1,3 +1,5 @@
+import { CAMPAIGN_ENGINE, runCampaignJobSlice, type CampaignSliceOutcome } from './campaign/job.ts'
+import { createCampaignHostPorts } from './campaign/hostPorts.ts'
 import { builderAcceptanceReport } from './acceptance-report.ts'
 import { builderFinalProof } from './final-proof.ts'
 import { builderAcceptanceLedger } from './acceptance-ledger.ts'
@@ -503,6 +505,50 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     if (job.claimGeneration === 1 && typeof job.metadata.approvedProposalFingerprint === 'string'
       && await readBuilderWorkspaceFingerprint(job.userId, job.workspaceId) !== job.metadata.approvedProposalFingerprint) {
       await terminalFailure(job, 'builder_proposal_source_changed')
+      return
+    }
+
+    // VERIFICATION CAMPAIGN (2026-10-27): read-only checks against the live production path, never a workspace or a
+    // repository. State lives in the checkpoint; the continuation cron resumes a paused campaign like any job.
+    if (job.jobKind === 'standard' && job.metadata.builderEngine === CAMPAIGN_ENGINE) {
+      if (builderJobOverTotalDeadline(job.createdAt, Date.now(), BUILDER_JOB_TOTAL_DEADLINE_MS)) {
+        await terminalFailure(job, 'builder_v2_total_deadline_exceeded')
+        return
+      }
+      const sliceStartedAt = Date.now()
+      const sliceController = new AbortController()
+      const sliceTimer = setTimeout(() => sliceController.abort(new Error('builder_campaign_slice_deadline')), BUILDER_SLICE_HARD_DEADLINE_MS)
+      sliceTimer.unref?.()
+      let outcome: CampaignSliceOutcome
+      try {
+        outcome = await runCampaignJobSlice({
+          checkpoint: job.checkpoint, ports: createCampaignHostPorts(), signal: sliceController.signal,
+          remainingMs: () => Math.max(0, sliceStartedAt + BUILDER_SLICE_HARD_DEADLINE_MS - Date.now()),
+        })
+      } catch (error) {
+        clearTimeout(sliceTimer)
+        await terminalFailure(job, `builder_campaign_slice_failed: ${error instanceof Error ? error.message : String(error)}`)
+        return
+      }
+      clearTimeout(sliceTimer)
+      if (outcome.status === 'paused') {
+        if (job.claimGeneration >= MAX_WORK_SLICES) {
+          await terminalFailure(job, 'builder_continuation_budget_exhausted')
+          return
+        }
+        const { error } = await db.rpc('pause_builder_job_slice', {
+          p_job_id: job.id, p_user_id: job.userId, p_generation: job.claimGeneration,
+          p_checkpoint: outcome.checkpoint, p_reply: outcome.reply,
+          p_result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply: outcome.reply, files: [], engine: CAMPAIGN_ENGINE, campaignProgress: { done: outcome.done, total: outcome.total } },
+        })
+        if (error) throw new Error(`builder_campaign_checkpoint_persist_failed: ${error.message}`)
+        return
+      }
+      await finishBuilderJob({
+        jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
+        status: outcome.status, reply: outcome.reply, error: outcome.status === 'failed' ? `builder_campaign_${outcome.outcome.toLowerCase()}` : null,
+        result: { jobId: job.id, workspaceId: job.workspaceId, status: outcome.status, reply: outcome.reply, files: [], engine: CAMPAIGN_ENGINE, ...outcome.result },
+      })
       return
     }
 

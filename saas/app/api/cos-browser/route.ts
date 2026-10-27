@@ -45,6 +45,7 @@ import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioS
 import { mentionsPlatformConcept } from '@/lib/ai/cos/cosPlatformGlossary'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isSoftwareRepairRequest } from '@/lib/ai/cos/softwareRepairIntent'
+import { startVerificationCampaign } from '@/lib/builder/campaign/start'
 import { recordCosLatencyStage, timeCosStage } from '@/lib/ai/cos/cosLatencyStages'
 import { runWithTurnDeadline, turnDeadlineRemainingMs, USER_ANSWER_WINDOW_MS } from '@/lib/ai/cos/cosTurnBudget'
 
@@ -539,6 +540,29 @@ async function executeBrowserTurn(req: NextRequest) {
       reasoner: agentDecision.reasonerLabel,
       decisionMs: Math.max(0, Date.now() - ingressStartedAt),
     }))
+
+    // VERIFICATION CAMPAIGN (2026-10-27): the planner asked for the production acceptance campaign to be executed.
+    // Only the signed-in owner on the Assistant surface may start it; for anyone else the request is answered by COS.
+    if (agentDecision.capabilities.includes('verification_campaign') && authenticatedOwner && browserSurface === 'assistant' && access?.userId) {
+      try {
+        const started = await startVerificationCampaign({
+          userId: access.userId,
+          conversationId: String(body?.context?.conversationId || '') || null,
+          objective: prompt,
+          responseLanguage: language,
+        })
+        return NextResponse.json({
+          reply: started.reply, source: 'cos-verification-campaign', jobId: started.jobId, conversationId: started.conversationId,
+          status: 'queued', execution_allowed: true, external_action_taken: false, external_ai_invoked: false, local_model_invoked: false,
+        }, { status: 202 })
+      } catch (error) {
+        console.error('[cos-verification-campaign-start-failed]', error instanceof Error ? error.message : String(error))
+        return NextResponse.json({
+          reply: 'The verification campaign could not be started; nothing was run.',
+          source: 'cos-verification-campaign-start-failed', execution_allowed: false, external_action_taken: false,
+        }, { status: 503 })
+      }
+    }
 
     // Software/repository capability requests are handoffs, not authority grants. The existing
     // Software Specialist re-checks owner identity and repository permissions before any action. Only a request for

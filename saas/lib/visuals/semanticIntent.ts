@@ -56,11 +56,14 @@ export function shouldResolveSemanticVisualRequest(
 ): boolean {
   const current = String(latestPrompt || '').trim()
   if (!current || isConciergeVisualObjective(current)) return false
+  // A full document or acceptance campaign can mention visual actions while asking for
+  // text, analysis, or execution. It is not an elliptical visual chat follow-up.
+  // Long explicit image objectives already use isConciergeVisualObjective above.
+  if (current.length > 320) return false
   if (hasVisualActionToken(current) || SEMANTIC_VISUAL_ACTION_HINT.test(current)) return true
 
   // Short elliptical follow-ups deserve semantic continuity only when recent USER context was
   // already visual-shaped. Ordinary questions never pay this classifier cost.
-  if (current.length > 320) return false
   const turns = boundedRecentUserTurns(messages, current)
   return turns.slice(0, -1).some(turn => isConciergeVisualObjective(turn) || hasVisualActionToken(turn))
 }

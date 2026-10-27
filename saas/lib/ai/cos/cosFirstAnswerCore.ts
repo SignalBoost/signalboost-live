@@ -62,7 +62,7 @@ function withComputedArithmetic<T extends { answer: string } | null>(parsed: T):
 }
 
 import { publicDisclosureViolations, asksAboutServiceIdentity, publicImplementationDisclosureReply } from './publicDisclosureGate.ts'
-import { classifyPublicSelfDisclosure, PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS } from './publicSelfDisclosureIntent.ts'
+import { classifyPublicSelfDisclosure, isSubstantiveInvestigationRequest, PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS } from './publicSelfDisclosureIntent.ts'
 import { publicScenarioScopeViolations, publicUserRequestText } from './publicScenarioScope.ts'
 import {
   tryCOSFirstAnswer as tryEnterpriseCOSFirstAnswer,
@@ -81,6 +81,10 @@ function isPlatformStackQuestion(prompt: unknown): boolean {
 
 async function decidePublicSelfDisclosure(request: string): Promise<'only' | 'part' | 'none'> {
   const judged = await classifyPublicSelfDisclosure(request)
+  // An analytical task cannot be replaced by a canned identity reply even when
+  // the classifier mistakes a quoted transcript for the user's actual request.
+  // Use 'part' so public disclosure protection remains active on its full answer.
+  if (isSubstantiveInvestigationRequest(request) && judged === 'only') return 'part'
   const wordRule = asksAboutServiceIdentity(request) || isPlatformStackQuestion(request)
   if (judged === null) return wordRule ? 'only' : 'none'
   if (judged === 'none' && wordRule && request.length > PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS) return 'part'

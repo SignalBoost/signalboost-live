@@ -219,3 +219,43 @@ test('deadline expiry during file lookup prevents stale workspace writes and edi
   assert.equal((await originalRead('w', 'src/new.js')), null)
   assert.equal((await originalRead('w', 'src/existing.js'))?.content, 'before')
 })
+
+test('deadline expiry while preparing tools blocks late browser and test execution', async () => {
+  const { withBuilderInferenceBudget } = await import('../lib/builder/inference-budget.ts')
+  const workspace = new InMemoryBuilderWorkspace()
+  const originalList = workspace.listFiles.bind(workspace)
+  workspace.listFiles = async (...args) => {
+    await new Promise(resolve => setTimeout(resolve, 30))
+    return originalList(...args)
+  }
+  let testRuns = 0
+  let browserRuns = 0
+  const dispatcher = new BuilderV2Dispatcher(
+    workspace,
+    { async run() { testRuns++; return { exitCode: 0, stdout: '', stderr: '', timedOut: false } } },
+    undefined,
+    {
+      async capabilities() {
+        await new Promise(resolve => setTimeout(resolve, 30))
+        return { actions: ['snapshot' as const], allowedOrigins: [] }
+      },
+      async invoke() {
+        browserRuns++
+        return { ok: true, action: 'snapshot' as const, exitCode: 0, stdout: '', stderr: '', timedOut: false }
+      },
+      async close() {},
+    },
+  )
+  const store = {
+    async reserve() { throw new Error('no inference expected') },
+    async settle() { throw new Error('no inference expected') },
+  }
+  const browser = await withBuilderInferenceBudget(store, Date.now() + 5, () =>
+    dispatcher.dispatch('w', { tool: 'browser_cli', action: 'snapshot' }))
+  const tests = await withBuilderInferenceBudget(store, Date.now() + 5, () =>
+    dispatcher.dispatch('w', { tool: 'run_tests', command: 'node --test' }))
+  assert.equal(browser.error, 'builder_budget_time_exhausted')
+  assert.equal(tests.error, 'builder_budget_time_exhausted')
+  assert.equal(browserRuns, 0)
+  assert.equal(testRuns, 0)
+})

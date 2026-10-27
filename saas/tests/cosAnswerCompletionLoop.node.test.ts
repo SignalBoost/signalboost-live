@@ -4,6 +4,7 @@
 // with parts missing, and nothing went around again to finish it before release.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import test from 'node:test'
 import {
   ANSWER_COMPLETION_MAX_ROUNDS,
@@ -207,4 +208,12 @@ test('insufficient repair time still reports missing work', async () => {
   assert.equal(checked,true)
   assert.equal(result.stopped,'budget')
   assert.deepEqual(result.missing,['two missing'])
+})
+
+test('COS reasoner retains complete draft only on optional budget exhaustion, never on audit failure', () => {
+  const source = readFileSync(join(process.cwd(), 'lib/ai/cos/cosReasoner.ts'), 'utf8')
+  assert.match(source, /completion\?\.stopped === 'budget'/)
+  assert.match(source, /remaining\.length === 0 && qualityDefects\.length === 0/)
+  assert.match(source, /releasableAnalyticalAnswer\(effectiveArgs\.prompt, candidate\)/)
+  assert.match(source, /if \(!safeToRelease\) return null/)
 })

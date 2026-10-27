@@ -20,7 +20,7 @@ test('a settlement that fails closed keeps the paid answer and its usage record'
       load(url,context,next){
         const modules={
           'mock:localInferenceUsage.ts':'export async function recordLocalInferenceUsage(row){globalThis.__settlement.rows.push(row)}',
-          'mock:cosTurnBudget.ts':'export function turnDeadlineRemainingMs(){return null}',
+          'mock:cosTurnBudget.ts':'export function turnDeadlineRemainingMs(){return null};export function helperDeadlineRemainingMs(){return null};export function markUserAnswerStarted(){};export const USER_ANSWER_WINDOW_MS=120000',
           'mock:modelRuntimeAssignment.ts':'export async function tryAssignedPlatformModelTurn(){return {attempted:false}}',
           'mock:execution-context.ts':'const signal=new AbortController().signal;export function currentHarnessExecutionContext(){return {signal,manifest:{runId:"run-1"},providerCostLedger:{maxCostUsd:0.24,reservedCostUsd:0}}};export function harnessDeadlineRemainingMs(){return null};export function reserveHarnessProviderCostUsd(){globalThis.__settlement.reserved++};export function settleHarnessProviderCostUsd(){globalThis.__settlement.settled++;throw new Error("harness_provider_cost_budget_exceeded")}',
         };

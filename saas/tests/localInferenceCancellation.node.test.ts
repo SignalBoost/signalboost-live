@@ -16,7 +16,7 @@ test('local inference cancellation aborts fetch; expired work emits no phantom p
       load(url,context,next){
         const modules={
           'mock:localInferenceUsage.ts':'export async function recordLocalInferenceUsage(row){globalThis.__localCancellation.rows.push(row)}',
-          'mock:cosTurnBudget.ts':'export function turnDeadlineRemainingMs(){return globalThis.__localCancellation.remaining}',
+          'mock:cosTurnBudget.ts':'export function turnDeadlineRemainingMs(){return globalThis.__localCancellation.remaining};export function helperDeadlineRemainingMs(){return globalThis.__localCancellation.remaining};export function markUserAnswerStarted(){};export const USER_ANSWER_WINDOW_MS=120000',
           'mock:modelRuntimeAssignment.ts':'export async function tryAssignedPlatformModelTurn(){throw Error("unexpected assigned fallback")}',
           'mock:execution-context.ts':'export function currentHarnessExecutionContext(){return null};export function harnessDeadlineRemainingMs(){return null};export function reserveHarnessProviderCostUsd(){throw Error("unexpected reservation")};export function settleHarnessProviderCostUsd(){throw Error("unexpected settlement")}',
         };

@@ -107,9 +107,13 @@ test('the judge reads the whole of a long request, not only its first window', a
   assert.equal(await classifyPublicSelfDisclosure('x'.repeat(PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS * 9), verdictFor([])), null)
 })
 
-test('without any verdict, a long or multi-line request is never replaced by the fixed boundary reply', () => {
+test('without any verdict, a long or multi-line request is answered whole under the normal public gate', () => {
   const brief = readFileSync(new URL('./fixtures/builderAcceptanceBrief.txt', import.meta.url), 'utf8')
-  assert.equal(settlePublicSelfDisclosure(null, true, brief), 'part')
-  assert.equal(settlePublicSelfDisclosure(null, true, 'What model\npowers you?'), 'part')
+  assert.equal(settlePublicSelfDisclosure(null, true, brief), 'none')
+  assert.equal(settlePublicSelfDisclosure(null, true, 'What model\npowers you?'), 'none')
+  assert.equal(settlePublicSelfDisclosure('part', true, brief), 'part')
   assert.equal(settlePublicSelfDisclosure('none', true, brief), 'none')
+  // The normal gate still refuses a self-attributed stack in the answer to such a request.
+  assert.ok(publicDisclosureViolations('COS runs on RunPod with Qwen.', brief).length > 0)
+  assert.equal(publicDisclosureViolations('PAC-07: stub the RunPod provider and confirm the request is queued, not relaunched.', brief).length, 0)
 })

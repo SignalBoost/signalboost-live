@@ -13,7 +13,7 @@ import {
 import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProvenance.ts'
 import { recordLatestUserTurnProvenance } from '@/lib/ai/cos/supportTurnProvenance.ts'
 import { enqueueDurableCosTurn, finishDurableCosTurn } from '@/lib/ai/cos/durableCosTurn.ts'
-import { runWithTurnDeadline } from '@/lib/ai/cos/cosTurnBudget.ts'
+import { runWithTurnDeadline, USER_ANSWER_WINDOW_MS } from '@/lib/ai/cos/cosTurnBudget.ts'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy.ts'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory.ts'
 import { provenanceWithDeliveredVisual } from '@/lib/concierge/deliveredVisual.ts'
@@ -269,6 +269,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             const worker = runWithTurnDeadline(
               requestStartedAt + DURABLE_TURN_MODEL_DEADLINE_MS,
               () => cosBrowserPost(downstreamRequest(req, body)),
+              { answerReserveMs: USER_ANSWER_WINDOW_MS },
             )
             worker.catch(() => undefined)
             const workerResponse = await Promise.race([worker, watchdog])
@@ -345,6 +346,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     const syncWorker = runWithTurnDeadline(
       requestStartedAt + DURABLE_TURN_MODEL_DEADLINE_MS,
       () => cosBrowserPost(downstreamRequest(req, body)),
+      { answerReserveMs: USER_ANSWER_WINDOW_MS },
     )
     syncWorker.catch(() => undefined)
     response = await Promise.race([syncWorker, syncWatchdog])

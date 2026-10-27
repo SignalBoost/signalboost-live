@@ -45,8 +45,8 @@ import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioS
 import { mentionsPlatformConcept } from '@/lib/ai/cos/cosPlatformGlossary'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isSoftwareRepairRequest } from '@/lib/ai/cos/softwareRepairIntent'
-import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
-import { runWithTurnDeadline, turnDeadlineRemainingMs } from '@/lib/ai/cos/cosTurnBudget'
+import { recordCosLatencyStage, timeCosStage } from '@/lib/ai/cos/cosLatencyStages'
+import { runWithTurnDeadline, turnDeadlineRemainingMs, USER_ANSWER_WINDOW_MS } from '@/lib/ai/cos/cosTurnBudget'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -271,7 +271,7 @@ async function executeBrowserTurn(req: NextRequest) {
     const deterministicIdentity = publicConciergeIdentityReply(prompt)
     const semanticIdentityEligible = !deterministicIdentity && shouldResolveSemanticPublicIdentity(prompt)
     semanticIdentityInvoked = semanticIdentityEligible
-    const semanticIdentity = semanticIdentityEligible ? await resolveSemanticPublicIdentity(prompt) : null
+    const semanticIdentity = semanticIdentityEligible ? await timeCosStage(`${browserSurface}:identity_router`, () => resolveSemanticPublicIdentity(prompt)) : null
     const identity = deterministicIdentity || (semanticIdentity
       ? publicConciergeIdentityReplyForIntent(semanticIdentity.intent, semanticIdentity.language)
       : null)
@@ -304,7 +304,7 @@ async function executeBrowserTurn(req: NextRequest) {
   const answeringOurRepairOffer = !followupOperationalRepair
     && isPastedOperationalLog(previousUserPrompt)
     && isOperationalLogRepairOffer(priorAnswer)
-  const confirmedRepairOffer = answeringOurRepairOffer && await isRepairConfirmation(prompt)
+  const confirmedRepairOffer = answeringOurRepairOffer && await timeCosStage(`${browserSurface}:repair_confirmation`, () => isRepairConfirmation(prompt))
   const reverseImmediateOperationalRepair = isPastedOperationalLog(prompt)
     && immediatePreviousMessage?.role === 'user'
     && typeof immediatePreviousMessage?.content === 'string'
@@ -338,7 +338,7 @@ async function executeBrowserTurn(req: NextRequest) {
     && ownerSoftwareAuthority.allowRepositoryRepair
     && (!operationalEvidence || explicitOperationalRepair)
   const softwareSpecialist = shouldConsultSoftwareSpecialist
-    ? authenticatedOwner
+    ? await timeCosStage(`${browserSurface}:software_specialist`, async () => authenticatedOwner
       ? await tryCosSoftwareSpecialist({
           body,
           objective: specialistObjective,
@@ -358,7 +358,7 @@ async function executeBrowserTurn(req: NextRequest) {
             signalBoostDeploymentContext: false,
             deployment,
           })
-        : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => tryCosSoftwareSpecialist({ body, objective: specialistObjective, surface: 'concierge', allowRepositoryRepair: false, signalBoostDeploymentContext: false, deployment })))
+        : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => tryCosSoftwareSpecialist({ body, objective: specialistObjective, surface: 'concierge', allowRepositoryRepair: false, signalBoostDeploymentContext: false, deployment }))))
     : null
   if (softwareSpecialist) {
     return browserSurface === 'concierge'
@@ -428,7 +428,7 @@ async function executeBrowserTurn(req: NextRequest) {
       && shouldResolveSemanticVisualRequest(messages, prompt)
     semanticVisualInvoked = semanticVisualEligible
     const semanticResolution = semanticVisualEligible
-      ? await resolveSemanticVisualRequest(messages, prompt)
+      ? await timeCosStage(`${browserSurface}:visual_router`, () => resolveSemanticVisualRequest(messages, prompt))
       : null
     const visualObjective = browserSurface === 'assistant'
       ? null
@@ -690,9 +690,11 @@ export async function POST(req: NextRequest) {
         Math.max(1_000, startedAt + BROWSER_TURN_WATCHDOG_MS - Date.now()),
       )
     })
+    // The answer window is reserved out of the model deadline: helpers in front of the answer share the surplus.
     const worker = runWithTurnDeadline(
       startedAt + BROWSER_TURN_MODEL_DEADLINE_MS,
       () => executeBrowserTurn(req),
+      { answerReserveMs: USER_ANSWER_WINDOW_MS },
     )
     // The loser of the race must not surface as an unhandled rejection.
     worker.catch(() => undefined)

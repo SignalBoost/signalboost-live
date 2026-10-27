@@ -471,19 +471,15 @@ export async function callRawCosReasoner(
         return null
       })
       if (!completion || completion.stopped !== 'complete') {
-        // Optional model verification can run out of time after a valid draft was produced.
-        // Keep that work only when the independent task-completeness and quality guards pass.
-        const candidate = completion?.answer || loopDraft.answer
-        const remaining = missingAnalyticalTasks(effectiveArgs.prompt, candidate)
-        const qualityDefects = advisoryDiagnosis ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, candidate) : []
-        const safeToRelease = completion?.stopped === 'budget' && remaining.length === 0 && qualityDefects.length === 0
-          && releasableAnalyticalAnswer(effectiveArgs.prompt, candidate)
-        console.warn('[cos-answer-verification-blocked]', {
-          turnId, status: completion?.stopped ?? 'unavailable',
-          draftPreserved: safeToRelease, missingCount: remaining.length,
-        })
-        if (!safeToRelease) return null
-        text = JSON.stringify({ answer: candidate, confidence: loopDraft.confidence })
+        // THE LOOP IMPROVES THE ANSWER; IT NEVER VETOES IT. Whatever stopped it (no time, checker busy or timed out,
+        // no progress, round cap, completion unavailable), the answer COS already wrote goes through the same
+        // deterministic release gates below as every answer: the task contract and the quality defects. Production
+        // 2026-10-27 16:51 UTC: a finished 281-token answer was discarded because the optional checker found RunPod
+        // busy and DeepInfra timed out (stopped: checker_unavailable); #4967 had kept the draft only for 'budget'.
+        console.warn('[cos-answer-verification-incomplete]', JSON.stringify({
+          turnId, status: completion?.stopped ?? 'unavailable', rounds: completion?.rounds ?? 0, stillMissing: completion?.missing.length ?? null,
+        }))
+        text = JSON.stringify({ answer: completion?.answer || loopDraft.answer, confidence: loopDraft.confidence })
       } else {
         console.info('[cos-answer-completion-loop]', JSON.stringify({ turnId, rounds: completion.rounds, stopped: completion.stopped, stillMissing: completion.missing.length }))
         if (completion.rounds > 0) text = JSON.stringify({ answer: completion.answer, confidence: loopDraft.confidence })

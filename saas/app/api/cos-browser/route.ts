@@ -700,7 +700,32 @@ const BROWSER_TURN_DEADLINE_REPLY: Record<string, string> = {
 
 class BrowserTurnWatchdogElapsed extends Error {}
 
+/**
+ * The revision serving this response, so a verification campaign (lib/builder/campaign/hostPorts.ts, which names the
+ * same header) attributes its evidence to the deployment that produced it. A Next route file may export only handlers,
+ * so the name lives here as a local constant.
+ */
+const SERVING_REVISION_HEADER = 'x-itmounts-revision'
+
+function withServingRevision(response: Response): Response {
+  const revision = String(process.env.VERCEL_GIT_COMMIT_SHA || '').trim()
+  if (!revision) return response
+  try {
+    response.headers.set(SERVING_REVISION_HEADER, revision)
+    return response
+  } catch {
+    // Immutable headers (a passed-through fetch Response): rebuild with the same body, status and headers.
+    const headers = new Headers(response.headers)
+    headers.set(SERVING_REVISION_HEADER, revision)
+    return new NextResponse(response.body, { status: response.status, statusText: response.statusText, headers })
+  }
+}
+
 export async function POST(req: NextRequest) {
+  return withServingRevision(await postBrowserTurn(req))
+}
+
+async function postBrowserTurn(req: NextRequest) {
   // /api/cos-provenance-browser already opened a whole-turn deadline and runs its own watchdog
   // before delegating here. Nesting a second pair would only duplicate an existing bound.
   if (turnDeadlineRemainingMs() !== null) return executeBrowserTurn(req)

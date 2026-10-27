@@ -15,8 +15,25 @@ import { pendingItems } from './ledger.ts'
 import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
 import { missingAnalyticalTasks } from '../../ai/cos/answerTaskContract.ts'
 
-/** Time a single item is expected to need; the slice stops before an item it cannot finish. */
+/**
+ * SLICE SCHEDULING. Before any request has completed, an item needs at least one minute. Afterwards the reserve is the
+ * shortest completed request: a request that may fit is started, and one the slice deadline does cut is an
+ * interruption, never a production result: it is not recorded and runs again in the next slice. The item that was
+ * just interrupted is started again only when the longest completed request fits, so the same request is not cut
+ * twice in a row. (Codex on #4973 and #4974: reserving the longest request on every item let a 240 s slice run one
+ * 116 s request, and the twenty-eight requests of the catalog outran the 24-slice continuation budget.)
+ */
 export const CAMPAIGN_ITEM_RESERVE_MS = 60_000
+
+/**
+ * No overhead is added: the slice clock the job runner hands the campaign is its 240 s hard deadline, and the
+ * checkpoint write runs after that clock, inside the function's 300 s ceiling. Two 116 s requests therefore fit one
+ * slice, which keeps the catalog's twenty-eight requests inside the continuation budget.
+ */
+export function itemReserveMs(timings: Readonly<{ shortestRequestMs: number; longestRequestMs: number }>, afterInterruption: boolean): number {
+  const basis = afterInterruption ? timings.longestRequestMs : timings.shortestRequestMs
+  return Math.max(CAMPAIGN_ITEM_RESERVE_MS, basis)
+}
 
 export type CampaignSliceResult = Readonly<{
   ledger: CampaignLedger
@@ -28,6 +45,11 @@ export type ReliabilityProgress = Readonly<{ testId: string; completed: number; 
 export type CampaignState = Readonly<{
   ledger: CampaignLedger
   reliability: ReliabilityProgress | null
+  /** Shortest and longest completed production requests in this campaign, the basis of the per-item reserve. */
+  shortestRequestMs?: number
+  longestRequestMs?: number
+  /** The item the previous slice interrupted, if any: it is started again only when the longest request fits. */
+  interruptedItem?: string | null
 }>
 
 /** Production-path sources that mean the request did not get a released answer. Read from the response, not the reply text. */
@@ -60,6 +82,14 @@ export function analysisEvidence(outcome: AnalysisOutcome): CampaignEvidence[] {
   }]
 }
 
+/** Record the revision the live site reported for a request: the first one is the production commit under test. */
+function noteServedRevision(ledger: CampaignLedger, servedCommit: string | null): CampaignLedger {
+  if (!servedCommit) return ledger
+  if (!ledger.productionCommit) return { ...ledger, productionCommit: servedCommit }
+  if (servedCommit === ledger.productionCommit || ledger.revisionChanges.includes(servedCommit)) return ledger
+  return { ...ledger, revisionChanges: [...ledger.revisionChanges, servedCommit] }
+}
+
 function row(item: CampaignItem, ledger: CampaignLedger, executedAt: string, now: () => number, result: PortResult, scenario: string): CampaignLedgerRow {
   return {
     testId: item.id,
@@ -83,36 +113,51 @@ function blocked(cause: string): PortResult {
   return { verdict: 'BLOCKED', actual: `Not executed: ${cause}.`, evidence: [{ kind: 'note', label: 'Capability', detail: cause }], failureCause: cause }
 }
 
-async function executeItem(item: CampaignItem, ports: CampaignPorts, ledger: CampaignLedger, signal: AbortSignal | undefined): Promise<Readonly<{ result: PortResult; scenario: string }>> {
+type Executed = Readonly<{ result: PortResult; scenario: string; servedCommit?: string | null; requestMs?: number; interrupted?: boolean }>
+
+async function executeItem(item: CampaignItem, ports: CampaignPorts, ledger: CampaignLedger, signal: AbortSignal | undefined): Promise<Executed> {
   switch (item.port) {
     case 'analysis': {
       if (!ports.analysis) return { result: blocked('no production-path analysis port on this host'), scenario: item.prompt || '' }
       const outcome = await ports.analysis(item.prompt || '', signal)
+      if (signal?.aborted) return { result: blocked('interrupted'), scenario: item.prompt || '', interrupted: true }
       const judged = judgeAnalysis(item.prompt || '', outcome)
-      return { scenario: item.prompt || '', result: { ...judged, correlationId: outcome.correlationId, evidence: analysisEvidence(outcome) } }
+      return { scenario: item.prompt || '', servedCommit: outcome.servedCommit, requestMs: outcome.latencyMs, result: { ...judged, correlationId: outcome.correlationId, evidence: analysisEvidence(outcome) } }
     }
     case 'routing': {
       if (!ports.routing) return { result: blocked('no routing read-back port on this host'), scenario: item.prompt || '' }
       const { outcome, enteredBuilder } = await ports.routing(item.prompt || '', signal)
+      if (signal?.aborted) return { result: blocked('interrupted'), scenario: item.prompt || '', interrupted: true }
       const judged = judgeAnalysis(item.prompt || '', outcome)
       const evidence = [...analysisEvidence(outcome), { kind: 'record' as const, label: 'Routing', detail: enteredBuilder ? 'entered Builder as coding work' : 'answered as analysis, no Builder job' }]
-      if (enteredBuilder) return { scenario: item.prompt || '', result: { verdict: 'FAIL', actual: 'The investigation entered the Builder as coding work.', correlationId: outcome.correlationId, evidence, failureCause: 'misrouted to Builder' } }
-      return { scenario: item.prompt || '', result: { ...judged, correlationId: outcome.correlationId, evidence } }
+      if (enteredBuilder) return { scenario: item.prompt || '', servedCommit: outcome.servedCommit, requestMs: outcome.latencyMs, result: { verdict: 'FAIL', actual: 'The investigation entered the Builder as coding work.', correlationId: outcome.correlationId, evidence, failureCause: 'misrouted to Builder' } }
+      return { scenario: item.prompt || '', servedCommit: outcome.servedCommit, requestMs: outcome.latencyMs, result: { ...judged, correlationId: outcome.correlationId, evidence } }
     }
-    case 'fault':
-      return { scenario: `fault: ${item.fault}`, result: ports.fault ? await ports.fault(item.fault!, signal) : blocked('no isolated fault-injection port on this host') }
-    case 'browser':
-      return { scenario: `browser workflow ${item.id}`, result: ports.browser ? await ports.browser(item.id, signal) : blocked('no browser runner with network and a test account on this host') }
+    case 'fault': {
+      const result = ports.fault ? await ports.fault(item.fault!, signal) : blocked('no isolated fault-injection port on this host')
+      return { scenario: `fault: ${item.fault}`, result, interrupted: Boolean(ports.fault && signal?.aborted) }
+    }
+    case 'browser': {
+      const result = ports.browser ? await ports.browser(item.id, signal) : blocked('no browser runner with network and a test account on this host')
+      return { scenario: `browser workflow ${item.id}`, result, interrupted: Boolean(ports.browser && signal?.aborted) }
+    }
     case 'observability': {
       const ids = ledger.rows.map(r => r.correlationId).filter((id): id is string => Boolean(id))
-      return { scenario: `trace of ${ids.length} executed request(s)`, result: ports.observability ? await ports.observability(ids, signal) : blocked('no production trace read-back port on this host') }
+      const result = ports.observability ? await ports.observability(ids, signal) : blocked('no production trace read-back port on this host')
+      return { scenario: `trace of ${ids.length} executed request(s)`, result, interrupted: Boolean(ports.observability && signal?.aborted) }
     }
-    case 'governance':
-      return { scenario: 'budget and deadline records of this campaign\'s requests', result: ports.governance ? await ports.governance(signal) : blocked('no governance read-back port on this host') }
-    case 'builder_fixture':
-      return { scenario: 'disposable fixture with one deliberately failing test', result: ports.builderFixture ? await ports.builderFixture(signal) : blocked('no Builder fixture port on this host') }
-    case 'release':
-      return { scenario: `release checks for ${ledger.productionCommit || 'unknown commit'}`, result: ports.release ? await ports.release(ledger.productionCommit, signal) : blocked('no release-check port on this host') }
+    case 'governance': {
+      const result = ports.governance ? await ports.governance(signal) : blocked('no governance read-back port on this host')
+      return { scenario: 'budget and deadline records of this campaign\'s requests', result, interrupted: Boolean(ports.governance && signal?.aborted) }
+    }
+    case 'builder_fixture': {
+      const result = ports.builderFixture ? await ports.builderFixture(signal) : blocked('no Builder fixture port on this host')
+      return { scenario: 'disposable fixture with one deliberately failing test', result, interrupted: Boolean(ports.builderFixture && signal?.aborted) }
+    }
+    case 'release': {
+      const result = ports.release ? await ports.release(ledger.productionCommit, signal) : blocked('no release-check port on this host')
+      return { scenario: `release checks for ${ledger.productionCommit || 'unknown commit'}`, result, interrupted: Boolean(ports.release && signal?.aborted) }
+    }
     case 'reliability':
       throw new Error('reliability items are executed by the slice loop')
   }
@@ -135,13 +180,24 @@ export async function runCampaignSlice(input: Readonly<{
   const now = input.now ?? (() => Date.now())
   let ledger = input.state.ledger
   let reliability = input.state.reliability
-  if (!ledger.productionCommit && !ledger.mainCommit) {
+  let longestRequestMs = input.state.longestRequestMs ?? 0
+  let shortestRequestMs = input.state.shortestRequestMs ?? 0
+  let interruptedItem: string | null = input.state.interruptedItem ?? null
+  const noteRequest = (ms: number | undefined) => {
+    if (typeof ms !== 'number' || ms <= 0) return
+    if (ms > longestRequestMs) longestRequestMs = ms
+    if (!shortestRequestMs || ms < shortestRequestMs) shortestRequestMs = ms
+  }
+  const reserveFor = (testId: string) => itemReserveMs({ shortestRequestMs, longestRequestMs }, interruptedItem === testId)
+  const state = (stopped: 'complete' | 'budget' | 'aborted', progress: ReliabilityProgress | null = reliability, interrupted: string | null = null) =>
+    ({ ledger, reliability: progress, shortestRequestMs, longestRequestMs, interruptedItem: interrupted, stopped })
+  if (!ledger.mainCommit) {
     const facts = await input.ports.deployment()
-    ledger = { ...ledger, productionCommit: facts.productionCommit, mainCommit: facts.mainCommit }
+    ledger = { ...ledger, mainCommit: facts.mainCommit }
   }
   for (const item of pendingItems(ledger, input.catalog)) {
-    if (input.signal?.aborted) return { ledger, reliability, stopped: 'aborted' }
-    if (input.remainingMs() < CAMPAIGN_ITEM_RESERVE_MS) return { ledger, reliability, stopped: 'budget' }
+    if (input.signal?.aborted) return state('aborted', reliability, item.id)
+    if (input.remainingMs() < reserveFor(item.id)) return state('budget')
     const executedAt = new Date(now()).toISOString()
     if (item.port === 'reliability') {
       if (!input.ports.analysis) {
@@ -153,10 +209,15 @@ export async function runCampaignSlice(input: Readonly<{
       let progress: ReliabilityProgress = reliability?.testId === item.id ? reliability : { testId: item.id, completed: 0, correlationIds: [] }
       let failure: Readonly<{ at: number; cause: string; evidence: CampaignEvidence[]; correlationId: string | null }> | null = null
       while (progress.completed < required) {
-        if (input.signal?.aborted) return { ledger, reliability: progress, stopped: 'aborted' }
-        if (input.remainingMs() < CAMPAIGN_ITEM_RESERVE_MS) return { ledger, reliability: progress, stopped: 'budget' }
+        if (input.signal?.aborted) return state('aborted', progress, item.id)
+        if (input.remainingMs() < reserveFor(item.id)) return state('budget', progress)
         const prompt = prompts[progress.completed % prompts.length]
         const outcome = await input.ports.analysis(prompt, input.signal)
+        // Cut by the slice deadline: not a production result. The same request runs again in the next slice.
+        if (input.signal?.aborted) return state('aborted', progress, item.id)
+        interruptedItem = null
+        noteRequest(outcome.latencyMs)
+        ledger = noteServedRevision(ledger, outcome.servedCommit)
         const judged = judgeAnalysis(prompt, outcome)
         if (judged.verdict !== 'PASS') {
           failure = { at: progress.completed + 1, cause: judged.failureCause || judged.actual, evidence: analysisEvidence(outcome), correlationId: outcome.correlationId }
@@ -172,11 +233,15 @@ export async function runCampaignSlice(input: Readonly<{
       continue
     }
     const executed = await executeItem(item, input.ports, ledger, input.signal)
+    if (executed.interrupted) return state('aborted', reliability, item.id)
+    interruptedItem = null
+    noteRequest(executed.requestMs)
+    ledger = noteServedRevision(ledger, executed.servedCommit ?? null)
     ledger = { ...ledger, rows: [...ledger.rows, row(item, ledger, executedAt, now, executed.result, executed.scenario)] }
   }
-  return { ledger, reliability, stopped: 'complete' }
+  return state('complete')
 }
 
 export function emptyCampaignLedger(campaignId: string, now = Date.now()): CampaignLedger {
-  return { campaignId, productionCommit: null, mainCommit: null, startedAt: new Date(now).toISOString(), rows: [] }
+  return { campaignId, productionCommit: null, mainCommit: null, revisionChanges: [], startedAt: new Date(now).toISOString(), rows: [] }
 }

@@ -15,6 +15,8 @@ import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
 
 const GITHUB_API = 'https://api.github.com/repos/SignalBoost/signalboost-live'
+/** The live site reports the revision serving each response in this header (app/api/cos-browser/route.ts). */
+export const SERVING_REVISION_HEADER = 'x-itmounts-revision'
 /** One production request may take the whole browser-turn window plus the page's margin. */
 export const CAMPAIGN_REQUEST_TIMEOUT_MS = 180_000
 
@@ -41,7 +43,7 @@ export async function productionAnalysis(prompt: string, signal?: AbortSignal, f
       signal: withTimeout(signal, CAMPAIGN_REQUEST_TIMEOUT_MS),
     })
   } catch {
-    return { status: null, ok: false, reply: '', source: 'request_not_completed', correlationId: null, latencyMs: Date.now() - startedAt, model: null, localModelInvoked: null, executionAllowed: null }
+    return { status: null, ok: false, reply: '', source: 'request_not_completed', correlationId: null, latencyMs: Date.now() - startedAt, servedCommit: null, model: null, localModelInvoked: null, executionAllowed: null }
   }
   const payload = await response.json().catch(() => ({})) as Record<string, any>
   const provenance = payload?.execution_provenance && typeof payload.execution_provenance === 'object' ? payload.execution_provenance : {}
@@ -56,6 +58,7 @@ export async function productionAnalysis(prompt: string, signal?: AbortSignal, f
     source,
     correlationId: typeof provenance?.turnId === 'string' ? provenance.turnId : null,
     latencyMs: Date.now() - startedAt,
+    servedCommit: response.headers.get(SERVING_REVISION_HEADER)?.trim() || null,
     model: typeof provenance?.local_reasoning?.model === 'string' ? provenance.local_reasoning.model : typeof provenance?.reasonerLabel === 'string' ? provenance.reasonerLabel : null,
     localModelInvoked: typeof payload?.local_model_invoked === 'boolean' ? payload.local_model_invoked : null,
     executionAllowed: typeof payload?.execution_allowed === 'boolean' ? payload.execution_allowed : null,
@@ -74,7 +77,7 @@ export async function productionRouting(prompt: string, signal?: AbortSignal, fe
       signal: withTimeout(signal, CAMPAIGN_REQUEST_TIMEOUT_MS),
     })
   } catch {
-    return { outcome: { status: null, ok: false, reply: '', source: 'request_not_completed', correlationId: null, latencyMs: Date.now() - startedAt, model: null, localModelInvoked: null, executionAllowed: null } as AnalysisOutcome, enteredBuilder: false }
+    return { outcome: { status: null, ok: false, reply: '', source: 'request_not_completed', correlationId: null, latencyMs: Date.now() - startedAt, servedCommit: null, model: null, localModelInvoked: null, executionAllowed: null } as AnalysisOutcome, enteredBuilder: false }
   }
   const payload = await response.json().catch(() => ({})) as Record<string, any>
   const enteredBuilder = (response.status === 202 && typeof payload?.jobId === 'string') || payload?.specialist_family === 'software'
@@ -87,6 +90,7 @@ export async function productionRouting(prompt: string, signal?: AbortSignal, fe
     reply, source,
     correlationId: typeof provenance?.turnId === 'string' ? provenance.turnId : null,
     latencyMs: Date.now() - startedAt,
+    servedCommit: response.headers.get(SERVING_REVISION_HEADER)?.trim() || null,
     model: typeof provenance?.local_reasoning?.model === 'string' ? provenance.local_reasoning.model : null,
     localModelInvoked: typeof payload?.local_model_invoked === 'boolean' ? payload.local_model_invoked : null,
     executionAllowed: typeof payload?.execution_allowed === 'boolean' ? payload.execution_allowed : null,
@@ -94,9 +98,12 @@ export async function productionRouting(prompt: string, signal?: AbortSignal, fe
   return { outcome, enteredBuilder }
 }
 
-/** The commit this job runs on (the deployment) and the repository's current main. */
-export async function deploymentFacts(fetchImpl: typeof fetch = fetch): Promise<Readonly<{ productionCommit: string | null; mainCommit: string | null }>> {
-  const productionCommit = String(process.env.VERCEL_GIT_COMMIT_SHA || '').trim() || null
+/**
+ * The repository's current main. The production commit is never taken from this worker's environment (Codex on
+ * #4973: a campaign started from a preview would attribute production evidence to the preview); it is what the live
+ * site reports serving each request.
+ */
+export async function deploymentFacts(fetchImpl: typeof fetch = fetch): Promise<Readonly<{ mainCommit: string | null }>> {
   const headers = githubHeaders()
   let mainCommit: string | null = null
   if (headers) {
@@ -106,7 +113,7 @@ export async function deploymentFacts(fetchImpl: typeof fetch = fetch): Promise<
       mainCommit = response.ok && typeof payload?.sha === 'string' ? payload.sha : null
     } catch { mainCommit = null }
   }
-  return { productionCommit, mainCommit }
+  return { mainCommit }
 }
 
 /** GitHub check runs for the deployed commit: PASS only when checks exist and none failed or is pending. */

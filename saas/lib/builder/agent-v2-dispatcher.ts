@@ -149,6 +149,8 @@ export class BuilderV2Dispatcher {
             if (parsed.protocol !== 'https:' || !capabilities.allowedOrigins.includes(parsed.origin))
               return { tool: action.tool, ok: false, changed: false, error: 'builder_browser_origin_denied' }
           }
+          // Capability lookup may outlive the job deadline; prevent a late browser action.
+          checkBuilderInferenceDeadline()
           const observed = await this.browserCli.invoke({
             action: action.action,
             ...(action.url ? {url: action.url} : {}),
@@ -162,6 +164,8 @@ export class BuilderV2Dispatcher {
         const listed = await this.workspace.listFiles(workspaceId)
         const files = (await Promise.all(listed.map(item => this.workspace.readFile(workspaceId, item.path))))
           .filter((file): file is BuilderFile => file !== null)
+        // Gathering workspace files can consume the remaining budget; never start tests late.
+        checkBuilderInferenceDeadline()
         const result = await this.runner.run({ workspaceId, command: action.command, files })
         return {
           tool: action.tool, ok: result.exitCode === 0 && !result.timedOut, changed: false,

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { PAC_CATALOG, PAC_01_PROMPT, PAC_CAMPAIGN_ID } from '../lib/builder/campaign/catalog.ts'
 import { certifyCampaign, renderCampaignReport, pendingItems } from '../lib/builder/campaign/ledger.ts'
-import { runCampaignSlice, emptyCampaignLedger, judgeAnalysis, CAMPAIGN_ITEM_RESERVE_MS, CAMPAIGN_SLICE_OVERHEAD_MS, itemReserveMs } from '../lib/builder/campaign/runner.ts'
+import { runCampaignSlice, emptyCampaignLedger, judgeAnalysis, CAMPAIGN_ITEM_RESERVE_MS, itemReserveMs } from '../lib/builder/campaign/runner.ts'
 import type { AnalysisOutcome, CampaignPorts } from '../lib/builder/campaign/ports.ts'
 import { requestedAnalyticalTasks } from '../lib/ai/cos/answerTaskContract.ts'
 
@@ -112,10 +112,28 @@ test('a routing item fails when the investigation entered the Builder, and the c
   assert.equal(cert.outcome, 'BLOCKED', 'all PASS but production is not the tested release')
 })
 
-test('the item reserve grows to the longest completed request, plus checkpoint overhead', () => {
+test('the item reserve is the shortest completed request, or the longest right after an interruption', () => {
   assert.equal(CAMPAIGN_ITEM_RESERVE_MS, 60_000)
-  assert.equal(itemReserveMs(0), 60_000 + CAMPAIGN_SLICE_OVERHEAD_MS)
-  assert.equal(itemReserveMs(90_000), 90_000 + CAMPAIGN_SLICE_OVERHEAD_MS)
+  assert.equal(itemReserveMs({ shortestRequestMs: 0, longestRequestMs: 0 }, false), 60_000)
+  assert.equal(itemReserveMs({ shortestRequestMs: 40_000, longestRequestMs: 116_000 }, false), 60_000)
+  assert.equal(itemReserveMs({ shortestRequestMs: 90_000, longestRequestMs: 116_000 }, false), 90_000)
+  assert.equal(itemReserveMs({ shortestRequestMs: 40_000, longestRequestMs: 116_000 }, true), 116_000)
+})
+
+test('twenty-eight 116-second requests fit the 24-slice continuation budget (Codex on #4974)', async () => {
+  let clock = 0
+  const ports: CampaignPorts = { deployment, analysis: async prompt => { clock += 116_000; return released(prompt, { latencyMs: 116_000 }) }, routing: async prompt => { clock += 116_000; return { outcome: released(prompt, { latencyMs: 116_000 }), enteredBuilder: false } } }
+  let state: any = { ledger: emptyCampaignLedger(PAC_CAMPAIGN_ID), reliability: null }
+  let slices = 0
+  while (pendingItems(state.ledger, PAC_CATALOG).length && slices < 24) {
+    slices++
+    const start = clock
+    const result = await runCampaignSlice({ catalog: PAC_CATALOG, state, ports, remainingMs: () => 240_000 - (clock - start), reliabilityPrompts: [PAC_01_PROMPT] })
+    state = result
+    clock = start + 240_000
+  }
+  assert.equal(pendingItems(state.ledger, PAC_CATALOG).length, 0, `not finished after ${slices} slices`)
+  assert.ok(slices <= 15, `took ${slices} slices`)
 })
 
 test('a request cut by the slice deadline is an interruption: not recorded, run again next slice; the reserve then covers it', async () => {
@@ -137,13 +155,15 @@ test('a request cut by the slice deadline is an interruption: not recorded, run 
   assert.equal(first.stopped, 'aborted')
   assert.equal(first.ledger.rows.length, 0, 'the cut request left no FAIL row')
   assert.equal(first.longestRequestMs, 0, 'an interrupted request is not a completed one')
-  // Next slice: PAC-01 runs again. After the first 90 s completion the reserve is 100 s, so two requests fit a 240 s
-  // slice and the third item waits for the slice after; nothing is skipped and nothing is recorded as FAIL.
+  assert.equal(first.interruptedItem, 'PAC-01')
+  // Next slice: PAC-01 runs again. With 90 s requests the reserve is 90 s, so two fit a 240 s slice; the rest wait
+  // for the slice after; nothing is skipped and nothing is recorded as FAIL.
   const start2 = clock
   const second = await runCampaignSlice({ catalog: only, state: first, ports, remainingMs: () => 240_000 - (clock - start2) })
   assert.equal(second.stopped, 'budget')
   assert.deepEqual(second.ledger.rows.map(r => r.testId), ['PAC-01', 'PAC-02'])
   assert.equal(second.longestRequestMs, 90_000)
+  assert.equal(second.interruptedItem, null)
   const start3 = clock
   const third = await runCampaignSlice({ catalog: only, state: second, ports, remainingMs: () => 240_000 - (clock - start3) })
   assert.deepEqual(third.ledger.rows.map(r => r.testId), ['PAC-01', 'PAC-02', 'PAC-03', 'PAC-04'])

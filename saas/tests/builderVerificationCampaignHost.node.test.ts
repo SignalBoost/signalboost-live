@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { runCampaignJobSlice, campaignStateFromCheckpoint, CAMPAIGN_ENGINE } from '../lib/builder/campaign/job.ts'
+import { runCampaignJobSlice, campaignStateFromCheckpoint, CAMPAIGN_ENGINE, CAMPAIGN_TOTAL_DEADLINE_MS } from '../lib/builder/campaign/job.ts'
 import { PAC_01_PROMPT, PAC_CATALOG } from '../lib/builder/campaign/catalog.ts'
 import { requestedAnalyticalTasks } from '../lib/ai/cos/answerTaskContract.ts'
 import type { CampaignPorts } from '../lib/builder/campaign/ports.ts'
@@ -57,6 +57,8 @@ test('the job runner routes engine "campaign" to the campaign slice, checkpoints
   assert.ok(start > 0 && end > start)
   const block = runner.slice(start, end)
   assert.match(block, /runCampaignJobSlice\(\{/)
+  assert.match(block, /builderJobOverTotalDeadline\(job\.createdAt, Date\.now\(\), CAMPAIGN_TOTAL_DEADLINE_MS\)/)
+  assert.ok(CAMPAIGN_TOTAL_DEADLINE_MS <= 24 * 240_000, 'inside the 24-slice continuation budget')
   assert.match(block, /createCampaignHostPorts\(\)/)
   assert.match(block, /const \{ data, error \} = await db\.rpc\('pause_builder_job_slice'/)
   assert.match(block, /if \(data !== true\) \{ await terminalFailure\(job, 'builder_campaign_checkpoint_refused'\); return \}/)

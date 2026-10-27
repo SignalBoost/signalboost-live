@@ -16,17 +16,23 @@ import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
 import { missingAnalyticalTasks } from '../../ai/cos/answerTaskContract.ts'
 
 /**
- * Time a single item is expected to need before any request has completed; the slice stops before an item it cannot
- * finish. Once requests have completed, the reserve is the longest one seen in this campaign (Codex on #4973: two
- * 90 s requests left 60 s, a third started and was cut by the slice). A request the slice deadline does cut is an
- * interruption, never a production result: it is not recorded and runs again in the next slice.
+ * SLICE SCHEDULING. Before any request has completed, an item needs at least one minute. Afterwards the reserve is the
+ * shortest completed request: a request that may fit is started, and one the slice deadline does cut is an
+ * interruption, never a production result: it is not recorded and runs again in the next slice. The item that was
+ * just interrupted is started again only when the longest completed request fits, so the same request is not cut
+ * twice in a row. (Codex on #4973 and #4974: reserving the longest request on every item let a 240 s slice run one
+ * 116 s request, and the twenty-eight requests of the catalog outran the 24-slice continuation budget.)
  */
 export const CAMPAIGN_ITEM_RESERVE_MS = 60_000
-/** Checkpoint persistence and the final reply need this much after the last request. */
-export const CAMPAIGN_SLICE_OVERHEAD_MS = 10_000
 
-export function itemReserveMs(longestRequestMs: number): number {
-  return Math.max(CAMPAIGN_ITEM_RESERVE_MS, longestRequestMs) + CAMPAIGN_SLICE_OVERHEAD_MS
+/**
+ * No overhead is added: the slice clock the job runner hands the campaign is its 240 s hard deadline, and the
+ * checkpoint write runs after that clock, inside the function's 300 s ceiling. Two 116 s requests therefore fit one
+ * slice, which keeps the catalog's twenty-eight requests inside the continuation budget.
+ */
+export function itemReserveMs(timings: Readonly<{ shortestRequestMs: number; longestRequestMs: number }>, afterInterruption: boolean): number {
+  const basis = afterInterruption ? timings.longestRequestMs : timings.shortestRequestMs
+  return Math.max(CAMPAIGN_ITEM_RESERVE_MS, basis)
 }
 
 export type CampaignSliceResult = Readonly<{
@@ -39,8 +45,11 @@ export type ReliabilityProgress = Readonly<{ testId: string; completed: number; 
 export type CampaignState = Readonly<{
   ledger: CampaignLedger
   reliability: ReliabilityProgress | null
-  /** Longest completed production request in this campaign, the basis of the per-item reserve. */
+  /** Shortest and longest completed production requests in this campaign, the basis of the per-item reserve. */
+  shortestRequestMs?: number
   longestRequestMs?: number
+  /** The item the previous slice interrupted, if any: it is started again only when the longest request fits. */
+  interruptedItem?: string | null
 }>
 
 /** Production-path sources that mean the request did not get a released answer. Read from the response, not the reply text. */
@@ -172,15 +181,23 @@ export async function runCampaignSlice(input: Readonly<{
   let ledger = input.state.ledger
   let reliability = input.state.reliability
   let longestRequestMs = input.state.longestRequestMs ?? 0
-  const noteRequest = (ms: number | undefined) => { if (typeof ms === 'number' && ms > longestRequestMs) longestRequestMs = ms }
-  const state = (stopped: 'complete' | 'budget' | 'aborted', progress: ReliabilityProgress | null = reliability) => ({ ledger, reliability: progress, longestRequestMs, stopped })
+  let shortestRequestMs = input.state.shortestRequestMs ?? 0
+  let interruptedItem: string | null = input.state.interruptedItem ?? null
+  const noteRequest = (ms: number | undefined) => {
+    if (typeof ms !== 'number' || ms <= 0) return
+    if (ms > longestRequestMs) longestRequestMs = ms
+    if (!shortestRequestMs || ms < shortestRequestMs) shortestRequestMs = ms
+  }
+  const reserveFor = (testId: string) => itemReserveMs({ shortestRequestMs, longestRequestMs }, interruptedItem === testId)
+  const state = (stopped: 'complete' | 'budget' | 'aborted', progress: ReliabilityProgress | null = reliability, interrupted: string | null = null) =>
+    ({ ledger, reliability: progress, shortestRequestMs, longestRequestMs, interruptedItem: interrupted, stopped })
   if (!ledger.mainCommit) {
     const facts = await input.ports.deployment()
     ledger = { ...ledger, mainCommit: facts.mainCommit }
   }
   for (const item of pendingItems(ledger, input.catalog)) {
-    if (input.signal?.aborted) return state('aborted')
-    if (input.remainingMs() < itemReserveMs(longestRequestMs)) return state('budget')
+    if (input.signal?.aborted) return state('aborted', reliability, item.id)
+    if (input.remainingMs() < reserveFor(item.id)) return state('budget')
     const executedAt = new Date(now()).toISOString()
     if (item.port === 'reliability') {
       if (!input.ports.analysis) {
@@ -192,12 +209,13 @@ export async function runCampaignSlice(input: Readonly<{
       let progress: ReliabilityProgress = reliability?.testId === item.id ? reliability : { testId: item.id, completed: 0, correlationIds: [] }
       let failure: Readonly<{ at: number; cause: string; evidence: CampaignEvidence[]; correlationId: string | null }> | null = null
       while (progress.completed < required) {
-        if (input.signal?.aborted) return state('aborted', progress)
-        if (input.remainingMs() < itemReserveMs(longestRequestMs)) return state('budget', progress)
+        if (input.signal?.aborted) return state('aborted', progress, item.id)
+        if (input.remainingMs() < reserveFor(item.id)) return state('budget', progress)
         const prompt = prompts[progress.completed % prompts.length]
         const outcome = await input.ports.analysis(prompt, input.signal)
         // Cut by the slice deadline: not a production result. The same request runs again in the next slice.
-        if (input.signal?.aborted) return state('aborted', progress)
+        if (input.signal?.aborted) return state('aborted', progress, item.id)
+        interruptedItem = null
         noteRequest(outcome.latencyMs)
         ledger = noteServedRevision(ledger, outcome.servedCommit)
         const judged = judgeAnalysis(prompt, outcome)
@@ -215,7 +233,8 @@ export async function runCampaignSlice(input: Readonly<{
       continue
     }
     const executed = await executeItem(item, input.ports, ledger, input.signal)
-    if (executed.interrupted) return state('aborted')
+    if (executed.interrupted) return state('aborted', reliability, item.id)
+    interruptedItem = null
     noteRequest(executed.requestMs)
     ledger = noteServedRevision(ledger, executed.servedCommit ?? null)
     ledger = { ...ledger, rows: [...ledger.rows, row(item, ledger, executedAt, now, executed.result, executed.scenario)] }

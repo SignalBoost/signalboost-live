@@ -1,4 +1,4 @@
-import { CAMPAIGN_ENGINE, runCampaignJobSlice, type CampaignSliceOutcome } from './campaign/job.ts'
+import { CAMPAIGN_ENGINE, CAMPAIGN_TOTAL_DEADLINE_MS, runCampaignJobSlice, type CampaignSliceOutcome } from './campaign/job.ts'
 import { createCampaignHostPorts } from './campaign/hostPorts.ts'
 import { builderAcceptanceReport } from './acceptance-report.ts'
 import { builderFinalProof } from './final-proof.ts'
@@ -511,7 +511,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     // VERIFICATION CAMPAIGN (2026-10-27): read-only checks against the live production path, never a workspace or a
     // repository. State lives in the checkpoint; the continuation cron resumes a paused campaign like any job.
     if (job.jobKind === 'standard' && job.metadata.builderEngine === CAMPAIGN_ENGINE) {
-      if (builderJobOverTotalDeadline(job.createdAt, Date.now(), BUILDER_JOB_TOTAL_DEADLINE_MS)) {
+      if (builderJobOverTotalDeadline(job.createdAt, Date.now(), CAMPAIGN_TOTAL_DEADLINE_MS)) {
         await terminalFailure(job, 'builder_v2_total_deadline_exceeded')
         return
       }

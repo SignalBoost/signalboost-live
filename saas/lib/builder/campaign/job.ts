@@ -11,6 +11,12 @@ import { emptyCampaignLedger, runCampaignSlice, type CampaignState } from './run
 import type { CampaignPorts } from './ports.ts'
 
 export const CAMPAIGN_ENGINE = 'campaign'
+/**
+ * A campaign's whole-job deadline. Twenty-eight real production requests (seven analysis checks, one routing check,
+ * twenty reliability requests) at up to CAMPAIGN_REQUEST_TIMEOUT_MS each do not fit the Builder's 60-minute coding
+ * deadline; the continuation budget (24 slices of 240 s) is the binding limit and this deadline sits just inside it.
+ */
+export const CAMPAIGN_TOTAL_DEADLINE_MS = 95 * 60_000
 
 /**
  * The pause RPC (pause_builder_job_slice) persists a checkpoint only when it carries version '1' and the job's
@@ -22,7 +28,12 @@ export function campaignStateFromCheckpoint(checkpoint: unknown, now = Date.now(
   const stored = checkpoint && typeof checkpoint === 'object' ? (checkpoint as Record<string, unknown>).campaign : null
   if (stored && typeof stored === 'object') {
     const state = stored as CampaignState
-    if (state.ledger && Array.isArray(state.ledger.rows)) return { ledger: { ...state.ledger, revisionChanges: state.ledger.revisionChanges ?? [] }, reliability: state.reliability ?? null, longestRequestMs: state.longestRequestMs ?? 0 }
+    if (state.ledger && Array.isArray(state.ledger.rows)) {
+      return {
+        ledger: { ...state.ledger, revisionChanges: state.ledger.revisionChanges ?? [] }, reliability: state.reliability ?? null,
+        shortestRequestMs: state.shortestRequestMs ?? 0, longestRequestMs: state.longestRequestMs ?? 0, interruptedItem: state.interruptedItem ?? null,
+      }
+    }
   }
   return { ledger: emptyCampaignLedger(PAC_CAMPAIGN_ID, now), reliability: null }
 }
@@ -42,7 +53,10 @@ export async function runCampaignJobSlice(input: Readonly<{
   const state = campaignStateFromCheckpoint(input.checkpoint)
   const reliabilityPrompts = PAC_CATALOG.filter(item => item.port === 'analysis' && item.prompt).map(item => item.prompt as string)
   const slice = await runCampaignSlice({ catalog: PAC_CATALOG, state, ports: input.ports, remainingMs: input.remainingMs, signal: input.signal, reliabilityPrompts })
-  const next: CampaignState = { ledger: slice.ledger, reliability: slice.reliability, longestRequestMs: slice.longestRequestMs }
+  const next: CampaignState = {
+    ledger: slice.ledger, reliability: slice.reliability,
+    shortestRequestMs: slice.shortestRequestMs, longestRequestMs: slice.longestRequestMs, interruptedItem: slice.interruptedItem,
+  }
   if (slice.stopped !== 'complete') {
     const done = next.ledger.rows.length
     const total = PAC_CATALOG.length

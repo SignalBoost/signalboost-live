@@ -97,7 +97,7 @@ test('visual continuity intelligence is model-based while deterministic code sta
   assert.doesNotMatch(conversationSource, /VISUAL_REVISION_PATTERNS|TEXTUAL_DISCUSSION|isVisualRevisionRequest/)
   assert.match(semanticSource, /callCosReasoner/)
   assert.match(semanticSource, /resolveSemanticVisualRequest/)
-  assert.match(routeSource, /await timeCosStage\(`\$\{browserSurface\}:visual_router`, \(\) => resolveSemanticVisualRequest\(messages, prompt\)\)/)
+  assert.match(routeSource, /await resolveSemanticVisualRequest\(messages, prompt\)/)
   assert.doesNotMatch(routeSource, /resolveConciergeVisualObjective/)
 })
 
@@ -167,7 +167,7 @@ test('deep semantic identity routing separates current identity from naming work
   )
 
   const route = await readFile(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /await timeCosStage\(`\$\{browserSurface\}:identity_router`, \(\) => resolveSemanticPublicIdentity\(prompt\)\)/)
+  assert.match(route, /await resolveSemanticPublicIdentity\(prompt\)/)
   assert.match(route, /publicConciergeIdentityReplyForIntent\(semanticIdentity\.intent, semanticIdentity\.language\)/)
   assert.match(route, /identity_routing: deterministicIdentity \? 'deterministic' : 'deep-semantic'/)
 })
@@ -176,7 +176,7 @@ test('new semantic-only public visual requests still reach bounded semantic dete
   const source = await readFile(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.match(source, /const directVisual = !softwareExecutionObjective && isConciergeVisualObjective\(prompt\)/)
   assert.match(source, /const semanticVisualEligible =[\s\S]*shouldResolveSemanticVisualRequest\(messages, prompt\)/)
-  assert.match(source, /const semanticResolution = semanticVisualEligible[\s\S]*await timeCosStage\(`\$\{browserSurface\}:visual_router`, \(\) => resolveSemanticVisualRequest\(messages, prompt\)\)/)
+  assert.match(source, /const semanticResolution = semanticVisualEligible[\s\S]*await resolveSemanticVisualRequest\(messages, prompt\)/)
   assert.match(source, /const visualObjective = browserSurface === 'assistant'[\s\S]*\? null[\s\S]*: directVisual \? prompt : semanticResolution\?\.objective \?\? null/)
   assert.equal(shouldResolveSemanticVisualRequest([{ role: 'user', content: 'What is photosynthesis?' }], 'What is photosynthesis?'), false)
 })

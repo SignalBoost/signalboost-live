@@ -271,7 +271,7 @@ async function executeBrowserTurn(req: NextRequest) {
     const deterministicIdentity = publicConciergeIdentityReply(prompt)
     const semanticIdentityEligible = !deterministicIdentity && shouldResolveSemanticPublicIdentity(prompt)
     semanticIdentityInvoked = semanticIdentityEligible
-    const semanticIdentity = semanticIdentityEligible ? await timeCosStage(`${browserSurface}:identity_router`, () => resolveSemanticPublicIdentity(prompt)) : null
+    const semanticIdentity = semanticIdentityEligible ? await resolveSemanticPublicIdentity(prompt) : null
     const identity = deterministicIdentity || (semanticIdentity
       ? publicConciergeIdentityReplyForIntent(semanticIdentity.intent, semanticIdentity.language)
       : null)
@@ -304,7 +304,7 @@ async function executeBrowserTurn(req: NextRequest) {
   const answeringOurRepairOffer = !followupOperationalRepair
     && isPastedOperationalLog(previousUserPrompt)
     && isOperationalLogRepairOffer(priorAnswer)
-  const confirmedRepairOffer = answeringOurRepairOffer && await timeCosStage(`${browserSurface}:repair_confirmation`, () => isRepairConfirmation(prompt))
+  const confirmedRepairOffer = answeringOurRepairOffer && await isRepairConfirmation(prompt)
   const reverseImmediateOperationalRepair = isPastedOperationalLog(prompt)
     && immediatePreviousMessage?.role === 'user'
     && typeof immediatePreviousMessage?.content === 'string'
@@ -428,7 +428,7 @@ async function executeBrowserTurn(req: NextRequest) {
       && shouldResolveSemanticVisualRequest(messages, prompt)
     semanticVisualInvoked = semanticVisualEligible
     const semanticResolution = semanticVisualEligible
-      ? await timeCosStage(`${browserSurface}:visual_router`, () => resolveSemanticVisualRequest(messages, prompt))
+      ? await resolveSemanticVisualRequest(messages, prompt)
       : null
     const visualObjective = browserSurface === 'assistant'
       ? null

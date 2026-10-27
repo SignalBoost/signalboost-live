@@ -39,7 +39,7 @@ test('the answer window never depends on how the request is worded', () => {
 
 test('the answer window fits inside the browser turn deadline, so the turn still always answers', () => {
   const inference = source('../lib/ai/local-inference.ts')
-  assert.match(inference, /export const USER_ANSWER_TIMEOUT_MS = 120_000/)
+  assert.match(inference, /export const USER_ANSWER_TIMEOUT_MS = USER_ANSWER_WINDOW_MS/)
   assert.match(inference, /if \(args\.writesUserAnswer === true\) return Math\.min\(configTimeoutMs, USER_ANSWER_TIMEOUT_MS\)/)
   assert.doesNotMatch(inference, /COS_INTERACTIVE_AUTHORING_TIMEOUT_MS|longForm/)
   const browser = source('../app/api/cos-browser/route.ts')

@@ -476,7 +476,7 @@ export async function callRawCosReasoner(
         const candidate = completion?.answer || loopDraft.answer
         const remaining = missingAnalyticalTasks(effectiveArgs.prompt, candidate)
         const qualityDefects = advisoryDiagnosis ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, candidate) : []
-        const safeToRelease = remaining.length === 0 && qualityDefects.length === 0
+        const safeToRelease = completion?.stopped === 'budget' && remaining.length === 0 && qualityDefects.length === 0
           && releasableAnalyticalAnswer(effectiveArgs.prompt, candidate)
         console.warn('[cos-answer-verification-blocked]', {
           turnId, status: completion?.stopped ?? 'unavailable',

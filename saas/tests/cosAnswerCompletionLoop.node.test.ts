@@ -185,13 +185,20 @@ test('host validation cannot exceed the built-in three correction rounds', async
   assert.ok(result.rounds <= ANSWER_COMPLETION_MAX_ROUNDS)
 })
 
-test('COS reasoner blocks release when completion verification is incomplete', () => {
+test('COS reasoner never discards a written answer because the optional loop could not finish; the release gates decide', () => {
   const source = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
-  assert.match(source, /if \(!completion \|\| completion\.stopped !== 'complete'\)/)
   const guard = source.indexOf("if (!completion || completion.stopped !== 'complete')")
-  assert.ok(guard > 0 && guard < source.indexOf('const finalParsedForPolicy = parseLocalResult(text)'))
+  const gates = source.indexOf('const finalParsedForPolicy = parseLocalResult(text)')
+  assert.ok(guard > 0 && guard < gates)
+  const block = source.slice(guard, gates)
+  // Production 2026-10-27: checker_unavailable (RunPod busy, DeepInfra timeout) threw away a finished answer.
+  assert.doesNotMatch(block, /return null/)
+  assert.match(block, /text = JSON\.stringify\(\{ answer: completion\?\.answer \|\| loopDraft\.answer, confidence: loopDraft\.confidence \}\)/)
+  // The deterministic gates that follow are the only veto: task contract and advisory quality defects.
+  const after = source.slice(gates)
+  assert.match(after, /if \(remainingTaskGaps\.length && !\(finalParsedForPolicy && releasableAnalyticalAnswer\(effectiveArgs\.prompt, finalParsedForPolicy\.answer\)\)\)/)
+  assert.match(after, /if \(remainingAdvisoryDefects\.length\)/)
 })
-
 
 test('verification can pass when time remains for a check but not a repair round', async () => {
   const receipts: boolean[] = []
@@ -208,12 +215,4 @@ test('insufficient repair time still reports missing work', async () => {
   assert.equal(checked,true)
   assert.equal(result.stopped,'budget')
   assert.deepEqual(result.missing,['two missing'])
-})
-
-test('COS reasoner retains complete draft only on optional budget exhaustion, never on audit failure', () => {
-  const source = readFileSync(join(process.cwd(), 'lib/ai/cos/cosReasoner.ts'), 'utf8')
-  assert.match(source, /completion\?\.stopped === 'budget'/)
-  assert.match(source, /remaining\.length === 0 && qualityDefects\.length === 0/)
-  assert.match(source, /releasableAnalyticalAnswer\(effectiveArgs\.prompt, candidate\)/)
-  assert.match(source, /if \(!safeToRelease\) return null/)
 })

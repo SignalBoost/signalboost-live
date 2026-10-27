@@ -1,2 +1,2 @@
-base_sha=79822fe46088afbd9832f789360b9ead766ea502
-branch=fix/cos-draft-preservation-20261027
+base_sha=ec880cbf5844c234fe3008e3fd499eb9c10363ca
+branch=fix/answer-loop-never-discards-draft-20261027

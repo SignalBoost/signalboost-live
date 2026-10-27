@@ -471,10 +471,20 @@ export async function callRawCosReasoner(
         return null
       })
       if (!completion || completion.stopped !== 'complete') {
-        console.warn('[cos-answer-verification-blocked]', { turnId, status: completion?.stopped ?? 'unavailable' })
-        return null
-      }
-      if (completion) {
+        // Optional model verification can run out of time after a valid draft was produced.
+        // Keep that work only when the independent task-completeness and quality guards pass.
+        const candidate = completion?.answer || loopDraft.answer
+        const remaining = missingAnalyticalTasks(effectiveArgs.prompt, candidate)
+        const qualityDefects = advisoryDiagnosis ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, candidate) : []
+        const safeToRelease = remaining.length === 0 && qualityDefects.length === 0
+          && releasableAnalyticalAnswer(effectiveArgs.prompt, candidate)
+        console.warn('[cos-answer-verification-blocked]', {
+          turnId, status: completion?.stopped ?? 'unavailable',
+          draftPreserved: safeToRelease, missingCount: remaining.length,
+        })
+        if (!safeToRelease) return null
+        text = JSON.stringify({ answer: candidate, confidence: loopDraft.confidence })
+      } else {
         console.info('[cos-answer-completion-loop]', JSON.stringify({ turnId, rounds: completion.rounds, stopped: completion.stopped, stillMissing: completion.missing.length }))
         if (completion.rounds > 0) text = JSON.stringify({ answer: completion.answer, confidence: loopDraft.confidence })
       }

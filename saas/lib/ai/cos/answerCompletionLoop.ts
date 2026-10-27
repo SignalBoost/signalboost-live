@@ -61,20 +61,29 @@ export async function runAnswerCompletionLoop(input: Readonly<{
   const maxRounds = Math.max(0, Math.min(ANSWER_COMPLETION_MAX_ROUNDS, input.maxRounds ?? ANSWER_COMPLETION_MAX_ROUNDS))
   const reserve = Math.max(0, input.roundReserveMs ?? ANSWER_COMPLETION_ROUND_RESERVE_MS)
   let answer = String(input.answer || '')
+  // ONLY A VERIFIED ADDITION IS KEPT. A completion round's text joins the answer only once the next check shows it
+  // closed at least one gap; a round that closed nothing, or was never checked (time ran out), is dropped and the
+  // last accepted answer is returned. Production 2026-10-27 17:16 UTC: a round wrote a six-line critique of the
+  // answer ("1. The answer fails to execute…") instead of content, the next check found as much missing as before,
+  // and the loop returned the answer with the critique pasted at the end.
+  let accepted = answer
   let previousMissing: number | null = null
   let missing: string[] = []
   for (let round = 0; ; round++) {
     // Reserve time for optional repair, not the initial answer check. Otherwise a
     // completed draft is rejected before either checker or trusted verifier runs.
-    if (input.ports.remainingMs() <= 0) return { answer, rounds: round, missing, stopped: 'budget' }
+    if (input.ports.remainingMs() <= 0) return { answer: accepted, rounds: round, missing, stopped: 'budget' }
     const checked = await input.ports.check(input.request, answer).catch(() => null)
     const floor = input.deterministicMissing ? [...input.deterministicMissing(answer)] : []
+    // With no checker verdict, the deterministic floor is the verification: an addition that left no numbered
+    // deliverable missing is accepted on that evidence alone.
+    if (checked === null && input.deterministicMissing && !floor.length) accepted = answer
     if (checked === null && !floor.length) {
       // A model-checker outage is not a finding that the answer is incomplete.
       // A trusted host verifier can still certify it, but an absent verifier or
       // failed audit receipt must never be treated as a pass.
       if (!input.ports.verify || !input.ports.persistVerification) {
-        return { answer, rounds: round, missing: floor, stopped: 'checker_unavailable' }
+        return { answer: accepted, rounds: round, missing: floor, stopped: 'checker_unavailable' }
       }
       const result = await input.ports.verify(input.request, answer).catch(() => null)
       const failures = result && Array.isArray(result.failures) ? unique(result.failures) : []
@@ -83,10 +92,10 @@ export async function runAnswerCompletionLoop(input: Readonly<{
       try {
         await input.ports.persistVerification(receipt)
       } catch {
-        return { answer, rounds: round, missing: ['verification_receipt_persistence_failed'], stopped: 'checker_unavailable' }
+        return { answer: accepted, rounds: round, missing: ['verification_receipt_persistence_failed'], stopped: 'checker_unavailable' }
       }
       if (passed) return { answer, rounds: round, missing: [], stopped: 'complete' }
-      return { answer, rounds: round, missing: receipt.failures.length ? receipt.failures : ['trusted_verification_failed'], stopped: 'checker_unavailable' }
+      return { answer: accepted, rounds: round, missing: receipt.failures.length ? receipt.failures : ['trusted_verification_failed'], stopped: 'checker_unavailable' }
     }
     missing = unique([...floor, ...(checked ?? [])])
     if (!missing.length && input.ports.verify) {
@@ -100,8 +109,9 @@ export async function runAnswerCompletionLoop(input: Readonly<{
       if (!passed) missing = receipt.failures.length ? [...receipt.failures] : ['trusted_verification_failed']
     }
     if (!missing.length) return { answer, rounds: round, missing, stopped: 'complete' }
-    // A round that left as much missing as before is a loop going in circles: stop instead of paying for another.
-    if (previousMissing !== null && missing.length >= previousMissing) return { answer, rounds: round, missing, stopped: 'no_progress' }
+    // A round that left as much missing as before is a loop going in circles: its text is dropped and the loop stops.
+    if (previousMissing !== null && missing.length >= previousMissing) return { answer: accepted, rounds: round, missing, stopped: 'no_progress' }
+    accepted = answer
     if (round >= maxRounds) return { answer, rounds: round, missing, stopped: 'max_rounds' }
     if (input.ports.remainingMs() < reserve) return { answer, rounds: round, missing, stopped: 'budget' }
     const addition = String(await input.ports.complete(input.request, answer, missing).catch(() => null) ?? '').trim()

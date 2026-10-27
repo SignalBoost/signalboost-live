@@ -1,2 +1,2 @@
-base_sha=b8f4e19f9a75e7bd2b58c4850f3f0b8dd28aa0e2
-branch=fix/cos-public-answers-whole-request-20261026
+base_sha=e6b95e9ef8516097050b944b82768e5dc1e6d445
+branch=fix/builder-v2-deadline-tool-invocation-20261027

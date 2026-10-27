@@ -1,2 +1,2 @@
-base_sha=ec880cbf5844c234fe3008e3fd499eb9c10363ca
+base_sha=45dd5eb2e5b05ca6ac4a86f1b267a662fe6442b9
 branch=fix/answer-loop-never-discards-draft-20261027

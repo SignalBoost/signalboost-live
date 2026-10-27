@@ -69,7 +69,25 @@ export async function runAnswerCompletionLoop(input: Readonly<{
     if (input.ports.remainingMs() <= 0) return { answer, rounds: round, missing, stopped: 'budget' }
     const checked = await input.ports.check(input.request, answer).catch(() => null)
     const floor = input.deterministicMissing ? [...input.deterministicMissing(answer)] : []
-    if (checked === null && !floor.length) return { answer, rounds: round, missing: floor, stopped: 'checker_unavailable' }
+    if (checked === null && !floor.length) {
+      // A model-checker outage is not a finding that the answer is incomplete.
+      // A trusted host verifier can still certify it, but an absent verifier or
+      // failed audit receipt must never be treated as a pass.
+      if (!input.ports.verify || !input.ports.persistVerification) {
+        return { answer, rounds: round, missing: floor, stopped: 'checker_unavailable' }
+      }
+      const result = await input.ports.verify(input.request, answer).catch(() => null)
+      const failures = result && Array.isArray(result.failures) ? unique(result.failures) : []
+      const passed = result?.passed === true && failures.length === 0
+      const receipt = { round, passed, failures: result ? failures : ['trusted_verifier_unavailable'] }
+      try {
+        await input.ports.persistVerification(receipt)
+      } catch {
+        return { answer, rounds: round, missing: ['verification_receipt_persistence_failed'], stopped: 'checker_unavailable' }
+      }
+      if (passed) return { answer, rounds: round, missing: [], stopped: 'complete' }
+      return { answer, rounds: round, missing: receipt.failures.length ? receipt.failures : ['trusted_verification_failed'], stopped: 'checker_unavailable' }
+    }
     missing = unique([...floor, ...(checked ?? [])])
     if (!missing.length && input.ports.verify) {
       const result = await input.ports.verify(input.request, answer).catch(() => null)

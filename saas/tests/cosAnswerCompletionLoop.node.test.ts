@@ -4,6 +4,7 @@
 // with parts missing, and nothing went around again to finish it before release.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import test from 'node:test'
 import {
   ANSWER_COMPLETION_MAX_ROUNDS,

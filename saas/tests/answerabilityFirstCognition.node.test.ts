@@ -76,4 +76,6 @@ test('PAC analytical tasks bypass optional planner without bypassing safety rout
   assert.match(source, /!isCosCodingObjective\(prompt, routingContext\)/)
   assert.match(source, /!agentToolsRequired && !hasSourceAttachment/)
   assert.match(source, /!directAnalyticalAnswer && !operationalEvidence/)
+  assert.match(source, /requestedAnalyticalTasks\(prompt\)\.length < 3 && shouldResolveSemanticPublicIdentity\(prompt\)/)
+  assert.match(source, /!directVisual && requestedAnalyticalTasks\(prompt\)\.length < 3/)
 })

@@ -1,2 +1,2 @@
-base_sha=a42fba2c96769dc56cf0eac8dca4baaad67d5424
-branch=fix/cos-reserve-answer-inference-budget-20261027
+base_sha=73cf9a4ec06bae9f0d65801ec9d9d1c3342ed666
+branch=fix/cos-whole-turn-budget-build-gate-20261027

@@ -92,6 +92,35 @@ test('a checker that cannot answer is never read as "complete"; numbered deliver
   assert.match(floor.answer, /2\. Ranked/)
 })
 
+test('a completion round that closed nothing is dropped; the last verified answer is returned', async () => {
+  const critique = '1. The answer fails to execute the campaign.\n2. The answer does not provide the commit SHA.'
+  let checks = 0
+  const noProgress = await runAnswerCompletionLoop({
+    request: 'Execute the campaign and report the SHA', answer: 'I cannot execute it here; here is a review.',
+    ports: { remainingMs: () => 60_000, check: async () => { checks++; return ['execution', 'commit SHA'] }, complete: async () => critique },
+  })
+  assert.equal(noProgress.stopped, 'no_progress')
+  assert.equal(checks, 2)
+  assert.equal(noProgress.answer, 'I cannot execute it here; here is a review.', 'the critique never reaches the reader')
+  // An addition the next check never saw (time ran out) is dropped too.
+  let remaining = 60_000
+  const unchecked = await runAnswerCompletionLoop({
+    request: 'r', answer: 'base',
+    ports: { remainingMs: () => remaining, check: async () => ['x'], complete: async () => { remaining = 0; return 'unverified tail' } },
+  })
+  assert.equal(unchecked.stopped, 'budget')
+  assert.equal(unchecked.answer, 'base')
+  // An addition that closed a gap is kept.
+  let round = 0
+  const progress = await runAnswerCompletionLoop({
+    request: 'r', answer: 'base',
+    ports: { remainingMs: () => 60_000, check: async () => (round++ === 0 ? ['x', 'y'] : ['y']), complete: async () => 'wrote x' },
+    maxRounds: 1,
+  })
+  assert.equal(progress.stopped, 'max_rounds')
+  assert.equal(progress.answer, 'base\n\nwrote x')
+})
+
 test('the checker reply must be the agreed JSON', () => {
   assert.deepEqual(parseAnswerCompletionCheck('{"missing":["experiments"]}'), ['experiments'])
   assert.deepEqual(parseAnswerCompletionCheck('Sure! {"missing":[]}'), [])

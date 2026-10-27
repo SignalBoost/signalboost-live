@@ -92,3 +92,16 @@ export async function classifyPublicSelfDisclosure(
     return null
   }
 }
+
+/**
+ * A quoted service-identity question inside an investigation is evidence, not a
+ * request to disclose the service's own implementation. If an intent judge says
+ * "only" anyway, preserve the substantive task while retaining the stricter
+ * disclosure gate ("part") for the eventual answer.
+ */
+export function isSubstantiveInvestigationRequest(request: string): boolean {
+  const value = String(request ?? '')
+  const asksForAnalysis = /\b(?:investigat(?:e|ion)|analy[sz](?:e|is)|diagnos(?:e|is)|forensic|root[ -]?cause|causal|hypothes(?:is|es)|rank(?:ed)?\s+(?:causes|hypotheses)|propose\s+experiments|design\s+experiments|engineering\s+uncertainty|database\s+incident|incident\s+report)\b/i.test(value)
+  const requestsDeliverables = /\b(?:distinguish|compare|explain|identify|propose|design|rank|evaluate)\b[\s\S]{0,140}\b(?:causes|hypotheses|evidence|experiments|correlation|causation|measurements)\b/i.test(value)
+  return asksForAnalysis || requestsDeliverables
+}

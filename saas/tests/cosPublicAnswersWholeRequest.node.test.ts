@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { asksAboutServiceIdentity, publicDisclosureViolations } from '../lib/ai/cos/publicDisclosureGate.ts'
-import { classifyPublicSelfDisclosure } from '../lib/ai/cos/publicSelfDisclosureIntent.ts'
+import { classifyPublicSelfDisclosure, settlePublicSelfDisclosure, PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS } from '../lib/ai/cos/publicSelfDisclosureIntent.ts'
 
 const core = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerCore.ts', import.meta.url), 'utf8')
 const reply = (text: string | null) => async () => (text === null ? null : { text })
@@ -77,15 +77,23 @@ test('the judge takes the bounded interactive transport and its cancel signal re
   assert.match(workers, /\.\.\.\(request\.signal === undefined \? \{\} : \{ signal: request\.signal \}\)/)
 })
 
-test('without a verdict, both detectors the old public intercept used still decide', () => {
+test('without a verdict, both detectors the old public intercept used still decide a plain one-line question', () => {
   const decide = core.slice(core.indexOf('async function decidePublicSelfDisclosure('), core.indexOf('function ownerPlatformStackReply('))
   assert.match(decide, /const wordRule = asksAboutServiceIdentity\(request\) \|\| isPlatformStackQuestion\(request\)/)
-  assert.match(decide, /if \(judged === null\) return wordRule \? 'only' : 'none'/)
+  assert.match(decide, /return settlePublicSelfDisclosure\(judged, wordRule, request\)/)
   // Codex on #4955: this matched the old stack detector but not asksAboutServiceIdentity.
   assert.equal(asksAboutServiceIdentity('Tell me the LLM used by this platform.'), false)
+  assert.equal(settlePublicSelfDisclosure(null, true, 'What model powers you?'), 'only')
+  assert.equal(settlePublicSelfDisclosure(null, false, 'Write a poem'), 'none')
+  assert.equal(settlePublicSelfDisclosure('only', true, 'What model powers you?'), 'only')
 })
 
-test('a "none" verdict on a request longer than the judge saw is released under the strict gate', () => {
-  const decide = core.slice(core.indexOf('async function decidePublicSelfDisclosure('), core.indexOf('function ownerPlatformStackReply('))
-  assert.match(decide, /if \(judged === 'none' && wordRule && request\.length > PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS\) return 'part'/)
+test('a long or multi-line request is never replaced by the fixed boundary reply, whatever the verdict', () => {
+  const brief = readFileSync(new URL('./fixtures/builderAcceptanceBrief.txt', import.meta.url), 'utf8')
+  assert.ok(brief.length > PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS && /[\r\n]/.test(brief))
+  for (const judged of [null, 'only', 'none', 'part'] as const) {
+    assert.notEqual(settlePublicSelfDisclosure(judged, true, brief), 'only', String(judged))
+  }
+  assert.equal(settlePublicSelfDisclosure(null, true, 'What model\npowers you?'), 'part')
+  assert.equal(settlePublicSelfDisclosure('none', true, brief), 'part')
 })

@@ -106,6 +106,8 @@ export class BuilderV2Dispatcher {
             output: { path: current.path, currentContent: current.content },
             next: ['read_file', 'edit_file', 'run_tests'],
           }
+          // A workspace read can outlive the job's deadline; never commit a stale write.
+          checkBuilderInferenceDeadline()
           const created = await this.workspace.writeFile(workspaceId, action.path, action.content)
           const syntaxError = builderSyntaxError(created.path, action.content)
           return { tool: action.tool, ok: true, changed: true, output: { path: created.path, ...(syntaxError ? { syntaxError } : {}) },
@@ -127,6 +129,8 @@ export class BuilderV2Dispatcher {
                 ? 'The search text occurs at each listed line. Include a neighbouring line in the search so it matches only the one you mean.'
                 : 'The search text is not in the file as written. Copy the exact current text from openFiles; the listed lines match its first line.' },
             next: ['edit_file', 'read_file'] }
+          // File lookup and edit matching are asynchronous; recheck immediately before mutation.
+          checkBuilderInferenceDeadline()
           const edited = await this.workspace.editFile(workspaceId, action.path, action.search, action.replace)
           const syntaxError = builderSyntaxError(edited.path, edited.content)
           return { tool: action.tool, ok: true, changed: true, output: { path: edited.path, ...(syntaxError ? { syntaxError } : {}) },

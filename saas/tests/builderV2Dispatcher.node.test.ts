@@ -185,3 +185,37 @@ test('a refused edit tells the model where the search matched instead of a bare 
   assert.equal(landed.changed, true)
   assert.match((await workspace.readFile('test', 'src/stock.js'))!.content, /function b\(\) \{\n  return count - 1;/)
 })
+
+test('deadline expiry during file lookup prevents stale workspace writes and edits', async () => {
+  const { withBuilderInferenceBudget } = await import('../lib/builder/inference-budget.ts')
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('w', 'src/existing.js', 'before')
+  let mutations = 0
+  const originalRead = workspace.readFile.bind(workspace)
+  const originalWrite = workspace.writeFile.bind(workspace)
+  const originalEdit = workspace.editFile.bind(workspace)
+  workspace.readFile = async (...args) => {
+    await new Promise(resolve => setTimeout(resolve, 30))
+    return originalRead(...args)
+  }
+  workspace.writeFile = async (...args) => { mutations++; return originalWrite(...args) }
+  workspace.editFile = async (...args) => { mutations++; return originalEdit(...args) }
+  const dispatcher = new BuilderV2Dispatcher(workspace, {
+    async run() { throw new Error('tests must not execute') },
+  })
+  const store = {
+    async reserve() { throw new Error('no inference expected') },
+    async settle() { throw new Error('no inference expected') },
+  }
+  const write = await withBuilderInferenceBudget(store, Date.now() + 5, () =>
+    dispatcher.dispatch('w', { tool: 'write_file', path: 'src/new.js', content: 'new' }))
+  assert.equal(write.ok, false)
+  assert.equal(write.error, 'builder_budget_time_exhausted')
+  const edit = await withBuilderInferenceBudget(store, Date.now() + 5, () =>
+    dispatcher.dispatch('w', { tool: 'edit_file', path: 'src/existing.js', search: 'before', replace: 'after' }))
+  assert.equal(edit.ok, false)
+  assert.equal(edit.error, 'builder_budget_time_exhausted')
+  assert.equal(mutations, 0)
+  assert.equal((await originalRead('w', 'src/new.js')), null)
+  assert.equal((await originalRead('w', 'src/existing.js'))?.content, 'before')
+})

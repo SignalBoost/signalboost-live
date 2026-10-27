@@ -84,7 +84,7 @@ async function decidePublicSelfDisclosure(request: string): Promise<'only' | 'pa
   // An analytical task cannot be replaced by a canned identity reply even when
   // the classifier mistakes a quoted transcript for the user's actual request.
   // Use 'part' so public disclosure protection remains active on its full answer.
-  if (isSubstantiveInvestigationRequest(request) && judged === 'only') return 'part'
+  if (isSubstantiveInvestigationRequest(request) && judged !== 'none') return 'part'
   const wordRule = asksAboutServiceIdentity(request) || isPlatformStackQuestion(request)
   if (judged === null) return wordRule ? 'only' : 'none'
   if (judged === 'none' && wordRule && request.length > PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS) return 'part'

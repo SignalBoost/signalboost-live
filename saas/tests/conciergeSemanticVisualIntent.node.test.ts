@@ -159,3 +159,8 @@ test('the public Concierge uses the deep semantic visual gate while owner Assist
     after: '    const realPeople = await filterRealPeople(objective, extractNamedPeople(objective))',
   })
 })
+
+test('long nonvisual acceptance campaign never invokes optional semantic visual classifier', () => {
+  const campaign = 'Run production acceptance campaign. Record test status, commit SHA, and Playwright evidence. '.repeat(12)
+  assert.equal(shouldResolveSemanticVisualRequest([{ role: 'user', content: campaign }], campaign), false)
+})

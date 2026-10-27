@@ -122,11 +122,12 @@ export async function classifyPublicSelfDisclosure(
 
 /**
  * Settles the final verdict from the judge's verdict and the word rules (the safety net). A fixed boundary reply
- * replaces the WHOLE answer, so without a judge verdict it is granted only to a single short line. A longer or
- * multi-line request with no verdict is answered whole under the normal public gate, which already blocks any
- * self-attributed model or vendor and any vendor the request did not name; the strict gate is reserved for a judge
- * verdict of "part". Production 2026-10-27: the judge is skipped when the turn has no time to spare for helpers, and
- * forcing such a request through the strict gate discarded every answer that named a vendor the request itself named.
+ * replaces the WHOLE answer, so without a judge verdict it is granted only to a single short line. Without a verdict,
+ * a flagged request the judge could have read in one window stays under the strict gate ("part": a bare model name
+ * answering "What model / powers you?" must still be caught, Codex on #4965); a flagged request longer than one
+ * window is answered whole under the normal public gate, which still blocks self-attributed stacks and vendors the
+ * request did not name. Production 2026-10-27: forcing such a long brief through the strict gate discarded every
+ * answer that named a vendor the brief itself named.
  */
 export function settlePublicSelfDisclosure(
   judged: PublicSelfDisclosureIntent | null,
@@ -135,5 +136,6 @@ export function settlePublicSelfDisclosure(
 ): PublicSelfDisclosureIntent {
   if (judged !== null) return judged
   if (!wordRule) return 'none'
-  return request.length <= PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS && !/[\r\n]/.test(request) ? 'only' : 'none'
+  if (request.length > PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS) return 'none'
+  return /[\r\n]/.test(request) ? 'part' : 'only'
 }

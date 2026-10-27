@@ -110,7 +110,9 @@ test('the judge reads the whole of a long request, not only its first window', a
 test('without any verdict, a long or multi-line request is answered whole under the normal public gate', () => {
   const brief = readFileSync(new URL('./fixtures/builderAcceptanceBrief.txt', import.meta.url), 'utf8')
   assert.equal(settlePublicSelfDisclosure(null, true, brief), 'none')
-  assert.equal(settlePublicSelfDisclosure(null, true, 'What model\npowers you?'), 'none')
+  // A short flagged question the judge could have read in one window stays under the strict gate (Codex on #4965).
+  assert.equal(settlePublicSelfDisclosure(null, true, 'What model\npowers you?'), 'part')
+  assert.ok(publicDisclosureViolations('Qwen.', 'What model\npowers you?', { selfDisclosureRequest: true }).length > 0)
   assert.equal(settlePublicSelfDisclosure('part', true, brief), 'part')
   assert.equal(settlePublicSelfDisclosure('none', true, brief), 'none')
   // The normal gate still refuses a self-attributed stack in the answer to such a request.

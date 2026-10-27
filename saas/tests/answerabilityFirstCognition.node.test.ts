@@ -68,3 +68,12 @@ test('self-contained authoring selects deterministic or creative cognition inste
   assert.match(source, /temperature:cognitiveMode==='creative'\?\.75:\.35/)
   assert.match(source, /cognitive_mode:fast\.cognitiveMode/)
 })
+
+test('PAC analytical tasks bypass optional planner without bypassing safety routing', () => {
+  const source = read('../app/api/cos-browser/route.ts')
+  assert.match(source, /const directAnalyticalAnswer = requestedAnalyticalTasks\(prompt\)\.length >= 3/)
+  assert.match(source, /!requiresFreshExternalEvidence\(prompt\)/)
+  assert.match(source, /!isCosCodingObjective\(prompt, routingContext\)/)
+  assert.match(source, /!agentToolsRequired && !hasSourceAttachment/)
+  assert.match(source, /!directAnalyticalAnswer && !operationalEvidence/)
+})

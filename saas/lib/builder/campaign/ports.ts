@@ -22,6 +22,8 @@ export type AnalysisOutcome = Readonly<{
   source: string
   correlationId: string | null
   latencyMs: number
+  /** The revision the live site reported it served this request from (its own response header), or null. */
+  servedCommit: string | null
   /** Provenance fields the production path returns; recorded, never interpreted beyond what is listed here. */
   model: string | null
   localModelInvoked: boolean | null
@@ -29,8 +31,8 @@ export type AnalysisOutcome = Readonly<{
 }>
 
 export type CampaignPorts = Readonly<{
-  /** The deployed production commit and the current main commit, read from the deployment and the repository. */
-  deployment: () => Promise<Readonly<{ productionCommit: string | null; mainCommit: string | null }>>
+  /** The repository's current main commit. The production commit is what the live site reports serving each request. */
+  deployment: () => Promise<Readonly<{ mainCommit: string | null }>>
   /** One real request on the production path. */
   analysis?: (prompt: string, signal?: AbortSignal) => Promise<AnalysisOutcome>
   /** One real request whose routing decision is read back (did it enter the Builder?). */

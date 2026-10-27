@@ -522,7 +522,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       let outcome: CampaignSliceOutcome
       try {
         outcome = await runCampaignJobSlice({
-          checkpoint: job.checkpoint, ports: createCampaignHostPorts(), signal: sliceController.signal,
+          checkpoint: job.checkpoint, workspaceId: job.workspaceId, ports: createCampaignHostPorts(), signal: sliceController.signal,
           remainingMs: () => Math.max(0, sliceStartedAt + BUILDER_SLICE_HARD_DEADLINE_MS - Date.now()),
         })
       } catch (error) {
@@ -536,12 +536,15 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           await terminalFailure(job, 'builder_continuation_budget_exhausted')
           return
         }
-        const { error } = await db.rpc('pause_builder_job_slice', {
+        const { data, error } = await db.rpc('pause_builder_job_slice', {
           p_job_id: job.id, p_user_id: job.userId, p_generation: job.claimGeneration,
           p_checkpoint: outcome.checkpoint, p_reply: outcome.reply,
           p_result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply: outcome.reply, files: [], engine: CAMPAIGN_ENGINE, campaignProgress: { done: outcome.done, total: outcome.total } },
         })
         if (error) throw new Error(`builder_campaign_checkpoint_persist_failed: ${error.message}`)
+        // False means the RPC refused the checkpoint (claim fence or shape): a running job with no saved progress
+        // would never resume, so it ends here with the cause rather than hanging.
+        if (data !== true) { await terminalFailure(job, 'builder_campaign_checkpoint_refused'); return }
         return
       }
       await finishBuilderJob({

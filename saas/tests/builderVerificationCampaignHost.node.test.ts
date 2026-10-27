@@ -16,17 +16,20 @@ function fullAnswer(prompt: string): string {
 test('a campaign job slice pauses with its ledger in the checkpoint and resumes from it; the final reply is the evidence package', async () => {
   let clock = 0
   const ports: CampaignPorts = {
-    deployment: async () => ({ productionCommit: 'c0ffee', mainCommit: 'c0ffee' }),
-    analysis: async prompt => { clock += 45_000; return { status: 200, ok: true, reply: fullAnswer(prompt), source: 'cos-local-primary', correlationId: 'turn-' + clock, latencyMs: 45_000, model: 'owned', localModelInvoked: true, executionAllowed: false } },
+    deployment: async () => ({ mainCommit: 'c0ffee' }),
+    analysis: async prompt => { clock += 45_000; return { status: 200, ok: true, reply: fullAnswer(prompt), source: 'cos-local-primary', correlationId: 'turn-' + clock, latencyMs: 45_000, servedCommit: 'c0ffee', model: 'owned', localModelInvoked: true, executionAllowed: false } },
   }
   let checkpoint: unknown = null
   const outcomes: string[] = []
   for (let slice = 0; slice < 15; slice++) {
     const start = clock
-    const outcome = await runCampaignJobSlice({ checkpoint, ports, remainingMs: () => 240_000 - (clock - start) })
+    const outcome = await runCampaignJobSlice({ checkpoint, workspaceId: 'ws-1', ports, remainingMs: () => 240_000 - (clock - start) })
     outcomes.push(outcome.status)
     if (outcome.status === 'paused') {
       checkpoint = outcome.checkpoint
+      // The pause RPC persists only a checkpoint with version '1' and the job's workspaceId (Codex on #4973).
+      assert.equal(outcome.checkpoint.version, '1')
+      assert.equal(outcome.checkpoint.workspaceId, 'ws-1')
       assert.match(outcome.reply, /in progress: \d+ of 20 checks executed/)
       clock = start + 240_000
       continue
@@ -55,7 +58,8 @@ test('the job runner routes engine "campaign" to the campaign slice, checkpoints
   const block = runner.slice(start, end)
   assert.match(block, /runCampaignJobSlice\(\{/)
   assert.match(block, /createCampaignHostPorts\(\)/)
-  assert.match(block, /db\.rpc\('pause_builder_job_slice'/)
+  assert.match(block, /const \{ data, error \} = await db\.rpc\('pause_builder_job_slice'/)
+  assert.match(block, /if \(data !== true\) \{ await terminalFailure\(job, 'builder_campaign_checkpoint_refused'\); return \}/)
   assert.match(block, /finishBuilderJob\(\{/)
   assert.doesNotMatch(block, /createSupabaseBuilderWorkspace|publishIsolatedJobFiles|enqueueRepositoryRepair|BuilderV2Agent/)
   // The campaign runs before the V2 branch, so a campaign job never reaches the coding agent.
@@ -84,7 +88,7 @@ test('the host ports execute against the live production path and read facts bac
   const fetchImpl = (async (url: any, init: any) => {
     calls.push({ url: String(url), init })
     if (String(url).endsWith('/api/cos-browser')) {
-      return new Response(JSON.stringify({ reply: fullAnswer(PAC_01_PROMPT), source: 'cos-local-primary', local_model_invoked: true, execution_allowed: false, execution_provenance: { turnId: '11111111-1111-4111-8111-111111111111', local_reasoning: { model: 'owned-model' } } }), { status: 200, headers: { 'content-type': 'application/json' } })
+      return new Response(JSON.stringify({ reply: fullAnswer(PAC_01_PROMPT), source: 'cos-local-primary', local_model_invoked: true, execution_allowed: false, execution_provenance: { turnId: '11111111-1111-4111-8111-111111111111', local_reasoning: { model: 'owned-model' } } }), { status: 200, headers: { 'content-type': 'application/json', 'x-itmounts-revision': 'deadbeef' } })
     }
     if (/\/commits\/main$/.test(String(url))) return new Response(JSON.stringify({ sha: 'deadbeef' }), { status: 200 })
     if (/check-runs/.test(String(url))) return new Response(JSON.stringify({ check_runs: [{ name: 'SaaS CI', status: 'completed', conclusion: 'success' }, { name: 'Playwright', status: 'completed', conclusion: 'success' }] }), { status: 200 })
@@ -95,6 +99,10 @@ test('the host ports execute against the live production path and read facts bac
   assert.equal(outcome.ok, true)
   assert.equal(outcome.correlationId, '11111111-1111-4111-8111-111111111111')
   assert.equal(outcome.model, 'owned-model')
+  assert.equal(outcome.servedCommit, 'deadbeef', 'the revision comes from the live site\'s own response header')
+  assert.equal(host.SERVING_REVISION_HEADER, 'x-itmounts-revision')
+  assert.match(read('app/api/cos-browser/route.ts'), /const SERVING_REVISION_HEADER = 'x-itmounts-revision'/)
+  assert.match(read('app/api/cos-browser/route.ts'), /return withServingRevision\(await postBrowserTurn\(req\)\)/)
   assert.match(calls[0].url, /^https:\/\/itmounts\.com\/api\/cos-browser$/)
   assert.equal(JSON.parse(calls[0].init.body).messages[0].content, PAC_01_PROMPT, 'the prompt is sent unmodified')
   const routing = await host.productionRouting(PAC_01_PROMPT, undefined, fetchImpl)
@@ -102,8 +110,8 @@ test('the host ports execute against the live production path and read facts bac
   const builderFetch = (async () => new Response(JSON.stringify({ jobId: 'abc', reply: 'running', source: 'cos-builder' }), { status: 202 })) as typeof fetch
   assert.equal((await host.productionRouting(PAC_01_PROMPT, undefined, builderFetch)).enteredBuilder, true)
   process.env.GITHUB_TOKEN = 'test-token'
-  process.env.VERCEL_GIT_COMMIT_SHA = 'deadbeef'
-  assert.deepEqual(await host.deploymentFacts(fetchImpl), { productionCommit: 'deadbeef', mainCommit: 'deadbeef' })
+  process.env.VERCEL_GIT_COMMIT_SHA = 'preview-worker-sha'
+  assert.deepEqual(await host.deploymentFacts(fetchImpl), { mainCommit: 'deadbeef' }, 'the worker\'s own environment is never the production commit')
   const release = await host.releaseChecks('deadbeef', undefined, fetchImpl)
   assert.equal(release.verdict, 'PASS')
   const failing = (async () => new Response(JSON.stringify({ check_runs: [{ name: 'Unit tests', status: 'completed', conclusion: 'failure' }] }), { status: 200 })) as typeof fetch

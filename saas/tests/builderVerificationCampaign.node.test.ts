@@ -3,11 +3,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { PAC_CATALOG, PAC_01_PROMPT, PAC_CAMPAIGN_ID } from '../lib/builder/campaign/catalog.ts'
 import { certifyCampaign, renderCampaignReport, pendingItems } from '../lib/builder/campaign/ledger.ts'
-import { runCampaignSlice, emptyCampaignLedger, judgeAnalysis, CAMPAIGN_ITEM_RESERVE_MS } from '../lib/builder/campaign/runner.ts'
+import { runCampaignSlice, emptyCampaignLedger, judgeAnalysis, CAMPAIGN_ITEM_RESERVE_MS, CAMPAIGN_SLICE_OVERHEAD_MS, itemReserveMs } from '../lib/builder/campaign/runner.ts'
 import type { AnalysisOutcome, CampaignPorts } from '../lib/builder/campaign/ports.ts'
 import { requestedAnalyticalTasks } from '../lib/ai/cos/answerTaskContract.ts'
 
-const deployment = async () => ({ productionCommit: 'abc123', mainCommit: 'abc123' })
+const deployment = async () => ({ mainCommit: 'abc123' })
 
 function fullAnswer(prompt: string): string {
   // One substantive section per numbered deliverable, each with its own vocabulary, so the deterministic contract is met.
@@ -17,7 +17,7 @@ function fullAnswer(prompt: string): string {
 
 const released = (prompt: string, over: Partial<AnalysisOutcome> = {}): AnalysisOutcome => ({
   status: 200, ok: true, reply: fullAnswer(prompt), source: 'cos-local-primary', correlationId: 'corr-' + Math.random().toString(36).slice(2, 8),
-  latencyMs: 1200, model: 'owned', localModelInvoked: true, executionAllowed: false, ...over,
+  latencyMs: 1200, servedCommit: 'abc123', model: 'owned', localModelInvoked: true, executionAllowed: false, ...over,
 })
 
 test('the catalog is the brief: twenty items, PAC-01 keeps the original Kafka prompt, every analysis prompt has numbered deliverables', () => {
@@ -97,9 +97,9 @@ test('one failed request in the reliability loop is FAIL with the count reached;
 
 test('a routing item fails when the investigation entered the Builder, and the certification needs production to match main', async () => {
   const ports: CampaignPorts = {
-    deployment: async () => ({ productionCommit: 'abc', mainCommit: 'def' }),
-    analysis: async prompt => released(prompt),
-    routing: async prompt => ({ outcome: released(prompt), enteredBuilder: true }),
+    deployment: async () => ({ mainCommit: 'def' }),
+    analysis: async prompt => released(prompt, { servedCommit: 'abc' }),
+    routing: async prompt => ({ outcome: released(prompt, { servedCommit: 'abc' }), enteredBuilder: true }),
   }
   const only = PAC_CATALOG.filter(item => item.id === 'PAC-12' || item.id === 'PAC-01')
   const result = await runCampaignSlice({ catalog: only, state: { ledger: emptyCampaignLedger(PAC_CAMPAIGN_ID), reliability: null }, ports, remainingMs: () => 10 * 60_000 })
@@ -112,6 +112,55 @@ test('a routing item fails when the investigation entered the Builder, and the c
   assert.equal(cert.outcome, 'BLOCKED', 'all PASS but production is not the tested release')
 })
 
-test('the slice reserve is one minute per item', () => {
+test('the item reserve grows to the longest completed request, plus checkpoint overhead', () => {
   assert.equal(CAMPAIGN_ITEM_RESERVE_MS, 60_000)
+  assert.equal(itemReserveMs(0), 60_000 + CAMPAIGN_SLICE_OVERHEAD_MS)
+  assert.equal(itemReserveMs(90_000), 90_000 + CAMPAIGN_SLICE_OVERHEAD_MS)
+})
+
+test('a request cut by the slice deadline is an interruption: not recorded, run again next slice; the reserve then covers it', async () => {
+  let clock = 0
+  let calls = 0
+  const controller = new AbortController()
+  const ports: CampaignPorts = {
+    deployment,
+    analysis: async prompt => {
+      calls++
+      if (calls === 1) { clock += 250_000; controller.abort(); return released(prompt, { status: null, ok: false, source: 'request_not_completed', reply: '', latencyMs: 250_000 }) }
+      clock += 90_000
+      return released(prompt, { latencyMs: 90_000 })
+    },
+  }
+  const only = PAC_CATALOG.filter(item => ['PAC-01', 'PAC-02', 'PAC-03', 'PAC-04'].includes(item.id))
+  const start = clock
+  const first = await runCampaignSlice({ catalog: only, state: { ledger: emptyCampaignLedger(PAC_CAMPAIGN_ID), reliability: null }, ports, remainingMs: () => 240_000 - (clock - start), signal: controller.signal })
+  assert.equal(first.stopped, 'aborted')
+  assert.equal(first.ledger.rows.length, 0, 'the cut request left no FAIL row')
+  assert.equal(first.longestRequestMs, 0, 'an interrupted request is not a completed one')
+  // Next slice: PAC-01 runs again. After the first 90 s completion the reserve is 100 s, so two requests fit a 240 s
+  // slice and the third item waits for the slice after; nothing is skipped and nothing is recorded as FAIL.
+  const start2 = clock
+  const second = await runCampaignSlice({ catalog: only, state: first, ports, remainingMs: () => 240_000 - (clock - start2) })
+  assert.equal(second.stopped, 'budget')
+  assert.deepEqual(second.ledger.rows.map(r => r.testId), ['PAC-01', 'PAC-02'])
+  assert.equal(second.longestRequestMs, 90_000)
+  const start3 = clock
+  const third = await runCampaignSlice({ catalog: only, state: second, ports, remainingMs: () => 240_000 - (clock - start3) })
+  assert.deepEqual(third.ledger.rows.map(r => r.testId), ['PAC-01', 'PAC-02', 'PAC-03', 'PAC-04'])
+  assert.ok(third.ledger.rows.every(r => r.verdict === 'PASS'))
+  assert.equal(calls, 5)
+})
+
+test('the production commit is what the live site reported serving the first request; a change mid-campaign blocks certification', async () => {
+  let n = 0
+  const ports: CampaignPorts = { deployment: async () => ({ mainCommit: 'rev-a' }), analysis: async prompt => released(prompt, { servedCommit: ++n <= 2 ? 'rev-a' : 'rev-b' }) }
+  const only = PAC_CATALOG.filter(item => ['PAC-01', 'PAC-02', 'PAC-03'].includes(item.id))
+  const result = await runCampaignSlice({ catalog: only, state: { ledger: emptyCampaignLedger(PAC_CAMPAIGN_ID), reliability: null }, ports, remainingMs: () => 10 * 60_000 })
+  assert.equal(result.ledger.productionCommit, 'rev-a')
+  assert.deepEqual(result.ledger.revisionChanges, ['rev-b'])
+  const cert = certifyCampaign(result.ledger, only)
+  assert.equal(cert.passed, 3)
+  assert.equal(cert.productionChanged, true)
+  assert.equal(cert.outcome, 'BLOCKED')
+  assert.match(renderCampaignReport(result.ledger, only), /Production changed during the campaign: yes \(rev-b\)/)
 })

@@ -34,8 +34,11 @@ export type CampaignLedgerRow = Readonly<{
 
 export type CampaignLedger = Readonly<{
   campaignId: string
+  /** The revision the live site reported serving the campaign's first request. */
   productionCommit: string | null
   mainCommit: string | null
+  /** Revisions the live site reported after the first one differed: production changed during the campaign. */
+  revisionChanges: readonly string[]
   startedAt: string
   rows: readonly CampaignLedgerRow[]
 }>
@@ -49,6 +52,8 @@ export type CampaignCertification = Readonly<{
   total: number
   /** Section 14: production behaviour must match the tested release. */
   deployedMatchesMain: boolean | null
+  /** The live site changed revision while the campaign ran; its evidence spans more than one release. */
+  productionChanged: boolean
 }>
 
 /** The verdict a row carries after a retest, if one ran. */
@@ -68,12 +73,14 @@ export function certifyCampaign(ledger: CampaignLedger, catalog: readonly Campai
     else blocked++
   }
   const deployedMatchesMain = ledger.productionCommit && ledger.mainCommit ? ledger.productionCommit === ledger.mainCommit : null
+  const productionChanged = ledger.revisionChanges.length > 0
   const total = catalog.length
-  // Section 14: certified PASS only when every mandatory case meets its criteria and production matches the release.
+  // Section 14: certified PASS only when every mandatory case meets its criteria, production matches the release,
+  // and the release did not change under the campaign.
   const outcome: CampaignVerdict = failed > 0 ? 'FAIL'
-    : (blocked > 0 || pending > 0 || deployedMatchesMain !== true) ? 'BLOCKED'
+    : (blocked > 0 || pending > 0 || deployedMatchesMain !== true || productionChanged) ? 'BLOCKED'
     : 'PASS'
-  return { outcome, passed, failed, blocked, pending, total, deployedMatchesMain }
+  return { outcome, passed, failed, blocked, pending, total, deployedMatchesMain, productionChanged }
 }
 
 export function pendingItems(ledger: CampaignLedger, catalog: readonly CampaignItem[]): CampaignItem[] {
@@ -113,6 +120,7 @@ export function renderCampaignReport(ledger: CampaignLedger, catalog: readonly C
     line('Production commit', ledger.productionCommit),
     line('main commit', ledger.mainCommit),
     line('Production matches main', certification.deployedMatchesMain === null ? 'unknown' : certification.deployedMatchesMain ? 'yes' : 'no'),
+    line('Production changed during the campaign', certification.productionChanged ? `yes (${ledger.revisionChanges.map(sha => sha.slice(0, 7)).join(', ')})` : 'no'),
     `Results: ${certification.passed} PASS, ${certification.failed} FAIL, ${certification.blocked} BLOCKED, ${certification.pending} not run, of ${certification.total}`,
     `Final certification outcome: ${certification.outcome}`,
   ].join('\n')

@@ -45,9 +45,8 @@ import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioS
 import { mentionsPlatformConcept } from '@/lib/ai/cos/cosPlatformGlossary'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isSoftwareRepairRequest } from '@/lib/ai/cos/softwareRepairIntent'
-import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
-import { runWithTurnDeadline, turnDeadlineRemainingMs } from '@/lib/ai/cos/cosTurnBudget'
-import { requestedAnalyticalTasks } from '@/lib/ai/cos/answerTaskContract'
+import { recordCosLatencyStage, timeCosStage } from '@/lib/ai/cos/cosLatencyStages'
+import { runWithTurnDeadline, turnDeadlineRemainingMs, USER_ANSWER_WINDOW_MS } from '@/lib/ai/cos/cosTurnBudget'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -270,7 +269,7 @@ async function executeBrowserTurn(req: NextRequest) {
 
   if (browserSurface === 'concierge' && !softwareRepairRequest && !isConciergeBuilderObjective(prompt, routingContext)) {
     const deterministicIdentity = publicConciergeIdentityReply(prompt)
-    const semanticIdentityEligible = !deterministicIdentity && requestedAnalyticalTasks(prompt).length < 3 && shouldResolveSemanticPublicIdentity(prompt)
+    const semanticIdentityEligible = !deterministicIdentity && shouldResolveSemanticPublicIdentity(prompt)
     semanticIdentityInvoked = semanticIdentityEligible
     const semanticIdentity = semanticIdentityEligible ? await resolveSemanticPublicIdentity(prompt) : null
     const identity = deterministicIdentity || (semanticIdentity
@@ -339,7 +338,7 @@ async function executeBrowserTurn(req: NextRequest) {
     && ownerSoftwareAuthority.allowRepositoryRepair
     && (!operationalEvidence || explicitOperationalRepair)
   const softwareSpecialist = shouldConsultSoftwareSpecialist
-    ? authenticatedOwner
+    ? await timeCosStage(`${browserSurface}:software_specialist`, async () => authenticatedOwner
       ? await tryCosSoftwareSpecialist({
           body,
           objective: specialistObjective,
@@ -359,7 +358,7 @@ async function executeBrowserTurn(req: NextRequest) {
             signalBoostDeploymentContext: false,
             deployment,
           })
-        : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => tryCosSoftwareSpecialist({ body, objective: specialistObjective, surface: 'concierge', allowRepositoryRepair: false, signalBoostDeploymentContext: false, deployment })))
+        : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => tryCosSoftwareSpecialist({ body, objective: specialistObjective, surface: 'concierge', allowRepositoryRepair: false, signalBoostDeploymentContext: false, deployment }))))
     : null
   if (softwareSpecialist) {
     return browserSurface === 'concierge'
@@ -398,13 +397,6 @@ async function executeBrowserTurn(req: NextRequest) {
     return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
   }
 
-  // PAC incident analysis has a fully specified, non-executable task contract.
-  // Do not spend the interactive answer budget on a model-based capability planner.
-  // Live evidence, software execution, attachments, and host-required tools still use routing.
-  const directAnalyticalAnswer = requestedAnalyticalTasks(prompt).length >= 3
-    && !requiresFreshExternalEvidence(prompt) && !requiresLiveTravelPlanningEvidence(prompt)
-    && !isCosCodingObjective(prompt, routingContext) && !agentToolsRequired && !hasSourceAttachment
-
   const routedHeaders = new Headers(req.headers)
   routedHeaders.set('content-type', 'application/json')
   routedHeaders.delete('content-length')
@@ -431,7 +423,7 @@ async function executeBrowserTurn(req: NextRequest) {
     // preserves the user's exact words; it does not infer the continuation itself.
     const softwareExecutionObjective = isCosCodingObjective(prompt, routingContext)
     const directVisual = !softwareExecutionObjective && isConciergeVisualObjective(prompt)
-    const semanticVisualEligible = !softwareExecutionObjective && !directVisual && requestedAnalyticalTasks(prompt).length < 3
+    const semanticVisualEligible = !softwareExecutionObjective && !directVisual
       && browserSurface === 'concierge'
       && shouldResolveSemanticVisualRequest(messages, prompt)
     semanticVisualInvoked = semanticVisualEligible
@@ -477,7 +469,7 @@ async function executeBrowserTurn(req: NextRequest) {
     || (browserSurface !== 'concierge' && authenticatedOwner && mentionsPlatformConcept(prompt))
   if (agentToolsRequired && !operationalEvidence) {
     agentDecision = { mode: 'orchestrate', answer: '', confidence: 1, capabilities: ['compute'], searchQueries: [], reason: 'host_compute_guard', reasonerLabel: 'host' }
-  } else if (!directAnalyticalAnswer && !operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !stableKnowledgeQuestionNeedsNoPlanner(prompt, priorAnswer)) {
+  } else if (!operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !stableKnowledgeQuestionNeedsNoPlanner(prompt, priorAnswer)) {
     const plannerStartedAt = Date.now()
     agentDecision = await decideCosAgentTurn({
       prompt,
@@ -698,9 +690,11 @@ export async function POST(req: NextRequest) {
         Math.max(1_000, startedAt + BROWSER_TURN_WATCHDOG_MS - Date.now()),
       )
     })
+    // The answer window is reserved out of the model deadline: helpers in front of the answer share the surplus.
     const worker = runWithTurnDeadline(
       startedAt + BROWSER_TURN_MODEL_DEADLINE_MS,
       () => executeBrowserTurn(req),
+      { answerReserveMs: USER_ANSWER_WINDOW_MS },
     )
     // The loser of the race must not surface as an unhandled rejection.
     worker.catch(() => undefined)

@@ -53,16 +53,57 @@ export function turnBudgetMs(): number {
   return Math.min(configured, PLATFORM_CEILING_MS - RESERVED_OVERHEAD_MS)
 }
 
-const turnDeadlineScope = new AsyncLocalStorage<{ deadlineAt: number }>()
+/**
+ * Time the answer the user reads is guaranteed inside a turn that reserves it (USER_ANSWER_TIMEOUT_MS in
+ * lib/ai/local-inference.ts is this same number). Production 2026-10-27, 11,600-character acceptance brief: the
+ * routing in front of COS spent 107 s of a 150 s turn, a classifier inside COS spent 18 s more, and the answer was
+ * started with 0.5 s left. Every helper was bounded on its own; nothing was reserved for the answer.
+ */
+export const USER_ANSWER_WINDOW_MS = 120_000
+
+type TurnDeadlineScope = {
+  deadlineAt: number
+  /** Shared by every nested scope of one turn so a nested stage marking the answer as started is seen by all. */
+  answer: { reserveMs: number; started: boolean }
+}
+
+const turnDeadlineScope = new AsyncLocalStorage<TurnDeadlineScope>()
 
 /**
  * Run one whole COS turn under a single wall-clock deadline. Nested scopes can only tighten it.
  * Everything awaited inside fn (reasoner phases, rescues, model HTTP calls) sees the same deadline.
  */
-export function runWithTurnDeadline<T>(deadlineAt: number, fn: () => Promise<T>): Promise<T> {
+export function runWithTurnDeadline<T>(
+  deadlineAt: number,
+  fn: () => Promise<T>,
+  options: Readonly<{ answerReserveMs?: number }> = {},
+): Promise<T> {
   const outer = turnDeadlineScope.getStore()
   const effective = outer ? Math.min(outer.deadlineAt, deadlineAt) : deadlineAt
-  return turnDeadlineScope.run({ deadlineAt: effective }, fn)
+  const reserveMs = Math.max(0, Math.floor(Number(options.answerReserveMs) || 0))
+  // A nested scope keeps the turn's answer record; only the outermost scope opens one.
+  const answer = outer ? outer.answer : { reserveMs, started: false }
+  return turnDeadlineScope.run({ deadlineAt: effective, answer }, fn)
+}
+
+/**
+ * ANSWER WINDOW RESERVE. Until the call that writes the user's answer has started, a helper (planner, classifier,
+ * router, judge) may use only the time the answer does not need: the turn's remaining time minus the reserve. Once
+ * the answer has started, helpers that follow it (release repairs) see the plain remaining time. A turn opened with
+ * no reserve behaves exactly as before. Null when no turn deadline is open.
+ */
+export function helperDeadlineRemainingMs(now = Date.now()): number | null {
+  const scope = turnDeadlineScope.getStore()
+  if (!scope) return null
+  const remaining = Math.max(0, scope.deadlineAt - now)
+  if (scope.answer.started) return remaining
+  return Math.max(0, remaining - scope.answer.reserveMs)
+}
+
+/** The call that writes the user's answer has started: from now on helpers are bounded by the plain remaining time. */
+export function markUserAnswerStarted(): void {
+  const scope = turnDeadlineScope.getStore()
+  if (scope) scope.answer.started = true
 }
 
 /**

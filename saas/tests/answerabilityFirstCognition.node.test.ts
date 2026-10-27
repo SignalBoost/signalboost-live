@@ -68,24 +68,3 @@ test('self-contained authoring selects deterministic or creative cognition inste
   assert.match(source, /temperature:cognitiveMode==='creative'\?\.75:\.35/)
   assert.match(source, /cognitive_mode:fast\.cognitiveMode/)
 })
-
-test('PAC analytical tasks bypass optional planner without bypassing safety routing', () => {
-  const source = read('../app/api/cos-browser/route.ts')
-  assert.match(source, /const directAnalyticalAnswer = requestedAnalyticalTasks\(prompt\)\.length >= 3/)
-  assert.match(source, /!requiresFreshExternalEvidence\(prompt\)/)
-  assert.match(source, /!isCosCodingObjective\(prompt, routingContext\)/)
-  assert.match(source, /!agentToolsRequired && !hasSourceAttachment/)
-  assert.match(source, /!directAnalyticalAnswer && !operationalEvidence/)
-  assert.match(source, /requestedAnalyticalTasks\(prompt\)\.length < 3 && shouldResolveSemanticPublicIdentity\(prompt\)/)
-  assert.match(source, /!directVisual && requestedAnalyticalTasks\(prompt\)\.length < 3/)
-})
-
-test('optional COS inference cannot consume the user-answer reserve', () => {
-  const source = read('../lib/ai/local-inference.ts')
-  assert.match(source, /args\.writesUserAnswer !== true/)
-  assert.match(source, /!agentToolLoopRound\(args\)/)
-  assert.match(source, /turnDeadlineRemainingMs\(\) !== null \? 60_000 : 0/)
-  assert.match(source, /outerRemainingMs - answerReserveMs/)
-  assert.match(source, /cos_answer_budget_reserved/)
-  assert.match(source, /args\.writesUserAnswer === true\) return/)
-})

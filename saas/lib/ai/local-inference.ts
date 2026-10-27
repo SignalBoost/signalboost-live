@@ -3,7 +3,7 @@ import { BuilderBudgetError, builderBudgetedModelFetch, currentBuilderInferenceB
 import { randomUUID } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
-import { turnDeadlineRemainingMs } from './cos/cosTurnBudget.ts'
+import { turnDeadlineRemainingMs, helperDeadlineRemainingMs, markUserAnswerStarted, USER_ANSWER_WINDOW_MS } from './cos/cosTurnBudget.ts'
 import { estimateQwenContextTokens, planContextWindow } from './context-window-manager.ts'
 import { modelCapabilityProfileForId, requireModelCapability, type ModelTransportProtocol } from './modelCapabilityRegistry.ts'
 import { tryAssignedPlatformModelTurn } from './modelRuntimeAssignment.ts'
@@ -242,9 +242,27 @@ function agentToolLoopRound(args: LocalModelCallArgs): boolean {
 }
 
 /** Time for the answer the user reads, inside the 150 s browser-turn model deadline (app/api/cos-browser). */
-export const USER_ANSWER_TIMEOUT_MS = 120_000
+export const USER_ANSWER_TIMEOUT_MS = USER_ANSWER_WINDOW_MS
 /** Output room for the answer the user reads; the configured global reasoner ceiling still applies. */
 export const USER_ANSWER_MAX_TOKENS = 4_000
+
+/**
+ * Calls that decide how a turn is handled rather than writing its answer: the routing classifiers and, under the
+ * interactive answer feature, the first-turn planner, the task-intent judge and the self-disclosure judge. Inside a
+ * turn that reserves the answer window (cosTurnBudget), these may only spend the surplus; a helper with no surplus
+ * is refused before any transport or RunPod slot work, and its caller's no-verdict fallback decides.
+ */
+const ANSWER_WINDOW_HELPER_PURPOSES = new Set(['agent_native_tool_choice', 'agent_answer_or_capability_plan_compat', 'semantic_task_intent', 'public_self_disclosure'])
+export function answerWindowHelper(args: LocalModelCallArgs): boolean {
+  const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
+  if (feature === 'cos_routing_classifier') return true
+  return feature === 'cos_interactive_answer' && ANSWER_WINDOW_HELPER_PURPOSES.has(String(args.usageContext?.purpose || '').trim().toLowerCase())
+}
+
+/** The turn-level bound for this call: the helper surplus for a helper, the plain remaining time for everything else. */
+function turnBoundRemainingMs(args: LocalModelCallArgs): number | null {
+  return answerWindowHelper(args) ? helperDeadlineRemainingMs() : turnDeadlineRemainingMs()
+}
 
 function interactiveModelTimeoutMs(args: LocalModelCallArgs, configTimeoutMs: number): number {
   // An agent-loop round may write a whole analysis program; the loop owns its per-round bound
@@ -492,25 +510,16 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   // COS's whole-turn budget and the outer Platform Harness are independent ceilings. A model call
   // receives the strictest remaining bound and the Harness AbortSignal, so RunPod/DeepInfra/fallback
   // transport cannot continue on a fresh provider clock after its owning HarnessRun expires.
-  const remainingBounds = [turnDeadlineRemainingMs(), harnessDeadlineRemainingMs()]
+  const remainingBounds = [turnBoundRemainingMs(args), harnessDeadlineRemainingMs()]
     .filter((value): value is number => value !== null)
   const outerRemainingMs = remainingBounds.length ? Math.min(...remainingBounds) : null
-  // Reserve a real inference window for the eventual user answer. Optional semantic
-  // classifiers and planning calls must not consume the entire shared browser-turn clock.
-  // The explicit user-facing answer, tool execution, and isolated noninteractive jobs
-  // retain their existing independent budgets.
-  const answerReserveMs = interactiveUserResponse(args) && args.writesUserAnswer !== true
-    && !agentToolLoopRound(args) && turnDeadlineRemainingMs() !== null ? 60_000 : 0
-  const optionalRemainingMs = outerRemainingMs === null ? null : outerRemainingMs - answerReserveMs
-  if (optionalRemainingMs !== null && optionalRemainingMs <= 0)
-    throw new Error('cos_answer_budget_reserved')
-  const timeoutMs = optionalRemainingMs === null
+  const timeoutMs = outerRemainingMs === null
     ? callerBoundTimeoutMs
-    : Math.max(1, Math.min(callerBoundTimeoutMs, optionalRemainingMs))
+    : Math.max(1, Math.min(callerBoundTimeoutMs, outerRemainingMs))
   const timeout = setTimeout(() => controller.abort(new DOMException('Inference transport deadline exceeded', 'TimeoutError')), timeoutMs)
   try {
     controller.signal.throwIfAborted()
-    if (outerRemainingMs !== null && outerRemainingMs <= 0) throw new Error('inference_deadline_expired')
+    if (outerRemainingMs !== null && outerRemainingMs <= 0) throw new Error(answerWindowHelper(args) && turnDeadlineRemainingMs() ? 'inference_answer_window_reserved' : 'inference_deadline_expired')
     if (provider === 'deepinfra' && harnessContext?.providerCostLedger) {
       const reservation = Number(args.maxEstimatedCostUsd)
       if (!Number.isFinite(reservation) || reservation <= 0) {
@@ -947,8 +956,9 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
 export async function callLocalModelTurn(args: LocalModelCallArgs, config?: LocalInferenceConfig): Promise<LocalModelTurnResult | null> {
   throwIfInferenceAborted(args.signal)
   currentHarnessExecutionContext()?.signal.throwIfAborted()
-  const remaining = [turnDeadlineRemainingMs(), harnessDeadlineRemainingMs()].filter((value): value is number => value !== null)
-  if (remaining.some(value => value <= 0)) throw new Error('inference_deadline_expired')
+  const remaining = [turnBoundRemainingMs(args), harnessDeadlineRemainingMs()].filter((value): value is number => value !== null)
+  if (remaining.some(value => value <= 0)) throw new Error(answerWindowHelper(args) && turnDeadlineRemainingMs() ? 'inference_answer_window_reserved' : 'inference_deadline_expired')
+  if (args.writesUserAnswer === true) markUserAnswerStarted()
   const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
   if (config === undefined && !protectedIndependentEvaluation(args) && !feature.startsWith('university_')) {
     const assigned = await tryAssignedPlatformModelTurn(args)

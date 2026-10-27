@@ -27,7 +27,7 @@ test('a reply cut off at the output limit is preserved, executes only complete a
       load(url, context, next) {
         const modules = {
           'mock:localInferenceUsage.ts': 'export async function recordLocalInferenceUsage(){}',
-          'mock:cosTurnBudget.ts': 'export function turnDeadlineRemainingMs(){return null}',
+          'mock:cosTurnBudget.ts':'export function turnDeadlineRemainingMs(){return null};export function helperDeadlineRemainingMs(){return null};export function markUserAnswerStarted(){};export const USER_ANSWER_WINDOW_MS=120000',
           'mock:modelRuntimeAssignment.ts': 'export async function tryAssignedPlatformModelTurn(){throw Error("unexpected")}',
           'mock:execution-context.ts': 'export function currentHarnessExecutionContext(){return null};export function harnessDeadlineRemainingMs(){return null};export function reserveHarnessProviderCostUsd(){};export function settleHarnessProviderCostUsd(){}',
         };

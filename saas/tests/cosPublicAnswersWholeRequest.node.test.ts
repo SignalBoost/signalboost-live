@@ -88,12 +88,28 @@ test('without a verdict, both detectors the old public intercept used still deci
   assert.equal(settlePublicSelfDisclosure('only', true, 'What model powers you?'), 'only')
 })
 
-test('a long or multi-line request is never replaced by the fixed boundary reply, whatever the verdict', () => {
+test('the judge reads the whole of a long request, not only its first window', async () => {
   const brief = readFileSync(new URL('./fixtures/builderAcceptanceBrief.txt', import.meta.url), 'utf8')
-  assert.ok(brief.length > PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS && /[\r\n]/.test(brief))
-  for (const judged of [null, 'only', 'none', 'part'] as const) {
-    assert.notEqual(settlePublicSelfDisclosure(judged, true, brief), 'only', String(judged))
+  assert.ok(brief.length > PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS * 2 && /[\r\n]/.test(brief))
+  const windows = Math.ceil(brief.trim().length / PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS)
+  let calls = 0
+  const verdictFor = (answers: (string | null)[]) => async () => {
+    const text = answers[calls++]
+    return text === null ? null : { text: JSON.stringify({ self_disclosure: text }) }
   }
+  const run = async (answers: (string | null)[]) => { calls = 0; return classifyPublicSelfDisclosure(brief, verdictFor(answers)) }
+  const none = Array(windows).fill('none')
+  assert.equal(await run(none), 'none')
+  assert.equal(calls, windows)
+  assert.equal(await run(none.map((v, i) => (i === windows - 1 ? 'part' : v))), 'part')
+  assert.equal(await run(none.map(() => 'only')), 'part')
+  assert.equal(await run(none.map((v, i) => (i === 1 ? null : v))), null)
+  assert.equal(await classifyPublicSelfDisclosure('x'.repeat(PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS * 9), verdictFor([])), null)
+})
+
+test('without any verdict, a long or multi-line request is never replaced by the fixed boundary reply', () => {
+  const brief = readFileSync(new URL('./fixtures/builderAcceptanceBrief.txt', import.meta.url), 'utf8')
+  assert.equal(settlePublicSelfDisclosure(null, true, brief), 'part')
   assert.equal(settlePublicSelfDisclosure(null, true, 'What model\npowers you?'), 'part')
-  assert.equal(settlePublicSelfDisclosure('none', true, brief), 'part')
+  assert.equal(settlePublicSelfDisclosure('none', true, brief), 'none')
 })

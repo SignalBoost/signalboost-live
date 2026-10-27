@@ -217,3 +217,39 @@ test('COS reasoner retains complete draft only on optional budget exhaustion, ne
   assert.match(source, /releasableAnalyticalAnswer\(effectiveArgs\.prompt, candidate\)/)
   assert.match(source, /if \(!safeToRelease\) return null/)
 })
+
+test('unavailable model checker releases only after independently passed and persisted host verification', async () => {
+  const receipts: {passed:boolean;failures:readonly string[]}[] = []
+  const result = await runAnswerCompletionLoop({
+    request: 'forensic analysis', answer: 'complete forensic answer',
+    ports: {
+      remainingMs: () => 10000,
+      check: async () => null,
+      complete: async () => { throw new Error('no model repair allowed') },
+      verify: async () => ({ passed: true, failures: [] }),
+      persistVerification: async receipt => { receipts.push(receipt) },
+    },
+  })
+  assert.equal(result.stopped, 'complete')
+  assert.equal(result.answer, 'complete forensic answer')
+  assert.equal(receipts.length, 1)
+  assert.equal(receipts[0]?.passed, true)
+})
+
+test('unavailable checker never bypasses failed host verdict or failed audit persistence', async () => {
+  const base = { remainingMs: () => 10000, check: async () => null, complete: async () => 'ignored' }
+  const rejected = await runAnswerCompletionLoop({
+    request: 'incident', answer: 'incomplete',
+    ports: { ...base, verify: async () => ({ passed: false, failures: ['missing experiments'] }),
+      persistVerification: async () => {} },
+  })
+  assert.equal(rejected.stopped, 'checker_unavailable')
+  assert.deepEqual(rejected.missing, ['missing experiments'])
+  const failedAudit = await runAnswerCompletionLoop({
+    request: 'incident', answer: 'complete',
+    ports: { ...base, verify: async () => ({ passed: true, failures: [] }),
+      persistVerification: async () => { throw new Error('db failed') } },
+  })
+  assert.equal(failedAudit.stopped, 'checker_unavailable')
+  assert.deepEqual(failedAudit.missing, ['verification_receipt_persistence_failed'])
+})

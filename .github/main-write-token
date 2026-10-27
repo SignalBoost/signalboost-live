@@ -1,2 +1,2 @@
-base_sha=45dd5eb2e5b05ca6ac4a86f1b267a662fe6442b9
-branch=fix/answer-loop-never-discards-draft-20261027
+base_sha=30c29d23c9a40f77e8efa93cd1d531f5f0b20084
+branch=fix/runpod-wake-wait-bounded-20261027

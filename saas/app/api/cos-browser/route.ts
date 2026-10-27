@@ -270,7 +270,7 @@ async function executeBrowserTurn(req: NextRequest) {
 
   if (browserSurface === 'concierge' && !softwareRepairRequest && !isConciergeBuilderObjective(prompt, routingContext)) {
     const deterministicIdentity = publicConciergeIdentityReply(prompt)
-    const semanticIdentityEligible = !deterministicIdentity && shouldResolveSemanticPublicIdentity(prompt)
+    const semanticIdentityEligible = !deterministicIdentity && requestedAnalyticalTasks(prompt).length < 3 && shouldResolveSemanticPublicIdentity(prompt)
     semanticIdentityInvoked = semanticIdentityEligible
     const semanticIdentity = semanticIdentityEligible ? await resolveSemanticPublicIdentity(prompt) : null
     const identity = deterministicIdentity || (semanticIdentity
@@ -431,7 +431,7 @@ async function executeBrowserTurn(req: NextRequest) {
     // preserves the user's exact words; it does not infer the continuation itself.
     const softwareExecutionObjective = isCosCodingObjective(prompt, routingContext)
     const directVisual = !softwareExecutionObjective && isConciergeVisualObjective(prompt)
-    const semanticVisualEligible = !softwareExecutionObjective && !directVisual
+    const semanticVisualEligible = !softwareExecutionObjective && !directVisual && requestedAnalyticalTasks(prompt).length < 3
       && browserSurface === 'concierge'
       && shouldResolveSemanticVisualRequest(messages, prompt)
     semanticVisualInvoked = semanticVisualEligible

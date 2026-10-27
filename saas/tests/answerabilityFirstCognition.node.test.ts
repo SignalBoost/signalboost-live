@@ -79,3 +79,13 @@ test('PAC analytical tasks bypass optional planner without bypassing safety rout
   assert.match(source, /requestedAnalyticalTasks\(prompt\)\.length < 3 && shouldResolveSemanticPublicIdentity\(prompt\)/)
   assert.match(source, /!directVisual && requestedAnalyticalTasks\(prompt\)\.length < 3/)
 })
+
+test('optional COS inference cannot consume the user-answer reserve', () => {
+  const source = read('../lib/ai/local-inference.ts')
+  assert.match(source, /args\.writesUserAnswer !== true/)
+  assert.match(source, /!agentToolLoopRound\(args\)/)
+  assert.match(source, /turnDeadlineRemainingMs\(\) !== null \? 60_000 : 0/)
+  assert.match(source, /outerRemainingMs - answerReserveMs/)
+  assert.match(source, /cos_answer_budget_reserved/)
+  assert.match(source, /args\.writesUserAnswer === true\) return/)
+})

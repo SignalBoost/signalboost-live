@@ -870,6 +870,8 @@ const tests = [
   'tests/cosInstructionNarration.node.test.ts',
   'tests/crossLanguageLiveIntent.node.test.ts',
   'tests/crossLanguageLiveParity.node.test.ts',
+  'tests/cosAnswerWindowReserve.node.test.ts',
+  'tests/runpodReadinessWaitBounded.node.test.ts',
 
 
 

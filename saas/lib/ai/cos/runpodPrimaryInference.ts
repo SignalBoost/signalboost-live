@@ -1,3 +1,5 @@
+// saas/lib/ai/cos/runpodPrimaryInference.ts
+import { readinessWaitMs } from './runpodReadinessWait.ts'
 import { throwIfInferenceAborted } from '../inferenceCancellation.ts'
 import {
   callLocalModel,
@@ -24,7 +26,6 @@ export type RunpodPrimaryAttempt = Readonly<{
 
 const DEFAULT_REASONER_MODEL = 'qwen3:30b'
 const READY_TTL_MS = 60_000
-const MAX_READY_WAIT_MS = 120_000
 const HEALTH_INTERVAL_MS = 2_000
 
 let readyUntil = 0
@@ -63,18 +64,30 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-async function proveReady(workload: RunpodPrimaryWorkload, podId: string): Promise<boolean> {
+async function proveReady(workload: RunpodPrimaryWorkload, podId: string, maxWaitMs?: number): Promise<boolean> {
   const config = runpodPrimaryConfig(workload, podId)
   if (readyPodId === podId && readyModel === config.model && readyUntil > Date.now()) return true
-  if (readinessPromise) return readinessPromise
+  const waitMs = readinessWaitMs(config.timeoutMs, maxWaitMs)
+  if (!readinessPromise) readinessPromise = startReadinessProof(workload, podId, config).finally(() => { readinessPromise = null })
+  if (waitMs <= 0) return false
+  // The shared proof keeps running for the next caller; this caller stops waiting at its own bound.
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const expired = new Promise<false>(resolve => { timer = setTimeout(() => resolve(false), waitMs) })
+  try {
+    return await Promise.race([readinessPromise, expired])
+  } finally {
+    clearTimeout(timer)
+  }
+}
 
-  readinessPromise = (async () => {
+async function startReadinessProof(workload: RunpodPrimaryWorkload, podId: string, config: LocalInferenceConfig): Promise<boolean> {
+  try {
     await ensureRunpodReasonerStarted({
       reasonerModel: config.model,
       embeddingModel: process.env.RUNPOD_PRIMARY_EMBEDDING_MODEL?.trim() || 'nomic-embed-text',
     })
 
-    const deadline = Date.now() + Math.min(MAX_READY_WAIT_MS, Math.max(10_000, config.timeoutMs))
+    const deadline = Date.now() + readinessWaitMs(config.timeoutMs)
     let lastHealthError = 'not_checked'
     while (Date.now() < deadline) {
       const health = await checkLocalInferenceHealth(config)
@@ -96,12 +109,10 @@ async function proveReady(workload: RunpodPrimaryWorkload, podId: string): Promi
       reason: lastHealthError,
     }))
     return false
-  })()
-
-  try {
-    return await readinessPromise
-  } finally {
-    readinessPromise = null
+  } catch (error) {
+    // The proof is shared and awaited by racing callers: a thrown wake error is a "not ready", never an unhandled rejection.
+    console.warn('[runpod-primary-readiness]', JSON.stringify({ workload, podId, model: config.model, ready: false, reason: error instanceof Error ? error.message : String(error) }))
+    return false
   }
 }
 
@@ -167,6 +178,7 @@ export async function invalidateRunpodPrimaryReadiness(): Promise<void> {
 
 export async function resolveRunpodPrimaryConfigForChat(
   workload: RunpodPrimaryWorkload,
+  options: Readonly<{ maxWaitMs?: number }> = {},
 ): Promise<LocalInferenceConfig | null> {
   if (!runpodPrimaryEnabled()) return null
   const model = runpodPrimaryModel(workload)
@@ -179,10 +191,10 @@ export async function resolveRunpodPrimaryConfigForChat(
       readyUntil = Date.now() + READY_TTL_MS
       return runpodPrimaryConfig(workload, sharedPodId)
     }
-    return resolveReadyRunpodPrimaryConfig(workload)
+    return resolveReadyRunpodPrimaryConfig(workload, options)
   } catch (error) {
     console.warn('[runpod-primary-chat-resolution]', error instanceof Error ? error.message : String(error))
-    return resolveReadyRunpodPrimaryConfig(workload)
+    return resolveReadyRunpodPrimaryConfig(workload, options)
   }
 }
 
@@ -192,11 +204,12 @@ export async function resolveRunpodPrimaryConfigForChat(
  */
 export async function resolveReadyRunpodPrimaryConfig(
   workload: RunpodPrimaryWorkload,
+  options: Readonly<{ maxWaitMs?: number }> = {},
 ): Promise<LocalInferenceConfig | null> {
   if (!runpodPrimaryEnabled()) return null
   try {
     const podId = await resolveRunpodPrimaryPodId()
-    const ready = await proveReady(workload, podId)
+    const ready = await proveReady(workload, podId, options.maxWaitMs)
     return ready ? runpodPrimaryConfig(workload, podId) : null
   } catch (error) {
     console.warn('[runpod-primary-resolution]', JSON.stringify({

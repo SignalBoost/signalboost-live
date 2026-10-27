@@ -264,6 +264,23 @@ function turnBoundRemainingMs(args: LocalModelCallArgs): number | null {
   return answerWindowHelper(args) ? helperDeadlineRemainingMs() : turnDeadlineRemainingMs()
 }
 
+/**
+ * The time this one call is allowed to run: its own bound (interactive window or configured timeout, tightened by
+ * the caller's timeoutMs) and the turn and Harness deadlines, whichever is strictest. Also the most it may wait for
+ * the owned pod to wake (runpodPrimaryInference.readinessWaitMs): a call never waits for a provider longer than it
+ * may run. Production 2026-10-27: background-labelled routers waited up to 120 s for a cold pod before sending anything.
+ */
+export function callTimeBoundMs(args: LocalModelCallArgs, config: LocalInferenceConfig): number {
+  const baseTimeoutMs = interactiveUserResponse(args) ? interactiveModelTimeoutMs(args, config.timeoutMs) : config.timeoutMs
+  const callerTimeoutMs = Number(args.timeoutMs)
+  const callerBoundTimeoutMs = Number.isFinite(callerTimeoutMs) && callerTimeoutMs > 0
+    ? Math.max(250, Math.min(baseTimeoutMs, callerTimeoutMs))
+    : baseTimeoutMs
+  const remainingBounds = [turnBoundRemainingMs(args), harnessDeadlineRemainingMs()]
+    .filter((value): value is number => value !== null)
+  return remainingBounds.length ? Math.max(0, Math.min(callerBoundTimeoutMs, ...remainingBounds)) : callerBoundTimeoutMs
+}
+
 function interactiveModelTimeoutMs(args: LocalModelCallArgs, configTimeoutMs: number): number {
   // An agent-loop round may write a whole analysis program; the loop owns its per-round bound
   // (cosAgentLoop ROUND_TIMEOUT_MS) inside the turn deadline. Production 2026-10-16: the 20 s
@@ -879,7 +896,7 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
       if (!runpod.runpodPrimaryEnabled()) return null
       const { recordCosLatencyStage } = await import('./cos/cosLatencyStages.ts')
       const readyStartedAt = Date.now()
-      const runpodConfig = await runpod.resolveRunpodPrimaryConfigForChat('reasoner')
+      const runpodConfig = await runpod.resolveRunpodPrimaryConfigForChat('reasoner', { maxWaitMs: callTimeBoundMs(args, config) })
       recordCosLatencyStage('runpod:ready_check', Date.now() - readyStartedAt)
       if (!runpodConfig) return null
       // A truncated owned answer throws (-> null) so the managed backup still gets its chance. A request that
@@ -978,7 +995,10 @@ export async function callLocalModelTurn(args: LocalModelCallArgs, config?: Loca
     const primary = await import('./cos/runpodPrimaryInference.ts')
     if (primary.runpodPrimaryEnabled()) {
       ownedAttempted = true
-      const runpodConfig = await primary.resolveReadyRunpodPrimaryConfig('reasoner')
+      const { recordCosLatencyStage } = await import('./cos/cosLatencyStages.ts')
+      const readyWaitStartedAt = Date.now()
+      const runpodConfig = await primary.resolveReadyRunpodPrimaryConfig('reasoner', { maxWaitMs: callTimeBoundMs(args, effectiveConfig) })
+      recordCosLatencyStage('runpod:ready_wait', Date.now() - readyWaitStartedAt)
       if (runpodConfig) {
         try {
           const runpodArgs = freshGroundedTask(args)

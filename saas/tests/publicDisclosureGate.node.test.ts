@@ -213,11 +213,3 @@ test('length alone never suppresses a direct service identity question', () => {
   assert.equal(asksAboutServiceIdentity('What model powers COS' + ' '.repeat(260) + '?'), true)
   assert.equal(asksAboutServiceIdentity('Who trained you?'), true)
 })
-
-test('PAC analysis remains distinct from direct identity questions', async () => {
-  const { isSubstantiveInvestigationRequest } = await import('../lib/ai/cos/publicSelfDisclosureIntent.ts')
-  assert.equal(isSubstantiveInvestigationRequest('Investigate a database incident and rank causal hypotheses'), true)
-  assert.equal(isSubstantiveInvestigationRequest('Engineering uncertainty: analyze contention and propose experiments'), true)
-  assert.equal(isSubstantiveInvestigationRequest('What model powers COS?'), false)
-  assert.equal(isSubstantiveInvestigationRequest('Who trained you?'), false)
-})

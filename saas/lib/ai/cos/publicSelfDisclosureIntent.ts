@@ -94,14 +94,24 @@ export async function classifyPublicSelfDisclosure(
 }
 
 /**
- * A quoted service-identity question inside an investigation is evidence, not a
- * request to disclose the service's own implementation. If an intent judge says
- * "only" anyway, preserve the substantive task while retaining the stricter
- * disclosure gate ("part") for the eventual answer.
+ * Settles the final verdict from the judge's verdict and the word rules (the safety net). A fixed boundary reply
+ * replaces the WHOLE answer, so "only" is granted just when the request is plainly nothing but the identity question:
+ * the judge must have seen all of it, and without a judge verdict the request must also be a single line. Anything
+ * else that the word rules flag is answered whole and released under the strict self-disclosure gate ("part"), which
+ * keeps the boundary without discarding the user's work. Production 2026-10-27: an 11,600-character Builder
+ * acceptance brief that merely said "provider stub. COS must respect..." received the fixed reply and was never built.
  */
-export function isSubstantiveInvestigationRequest(request: string): boolean {
-  const value = String(request ?? '')
-  const asksForAnalysis = /\b(?:investigat(?:e|ion)|analy[sz](?:e|is)|diagnos(?:e|is)|forensic|root[ -]?cause|causal|hypothes(?:is|es)|rank(?:ed)?\s+(?:causes|hypotheses)|propose\s+experiments|design\s+experiments|engineering\s+uncertainty|database\s+incident|incident\s+report)\b/i.test(value)
-  const requestsDeliverables = /\b(?:distinguish|compare|explain|identify|propose|design|rank|evaluate)\b[\s\S]{0,140}\b(?:causes|hypotheses|evidence|experiments|correlation|causation|measurements)\b/i.test(value)
-  return asksForAnalysis || requestsDeliverables
+export function settlePublicSelfDisclosure(
+  judged: PublicSelfDisclosureIntent | null,
+  wordRule: boolean,
+  request: string,
+): PublicSelfDisclosureIntent {
+  const seenWhole = request.length <= PUBLIC_SELF_DISCLOSURE_JUDGED_CHARS
+  if (judged === null) {
+    if (!wordRule) return 'none'
+    return seenWhole && !/[\r\n]/.test(request) ? 'only' : 'part'
+  }
+  if (judged === 'only') return seenWhole ? 'only' : 'part'
+  if (judged === 'none' && wordRule && !seenWhole) return 'part'
+  return judged
 }

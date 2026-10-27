@@ -47,6 +47,7 @@ import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isSoftwareRepairRequest } from '@/lib/ai/cos/softwareRepairIntent'
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { runWithTurnDeadline, turnDeadlineRemainingMs } from '@/lib/ai/cos/cosTurnBudget'
+import { requestedAnalyticalTasks } from '@/lib/ai/cos/answerTaskContract'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -269,7 +270,7 @@ async function executeBrowserTurn(req: NextRequest) {
 
   if (browserSurface === 'concierge' && !softwareRepairRequest && !isConciergeBuilderObjective(prompt, routingContext)) {
     const deterministicIdentity = publicConciergeIdentityReply(prompt)
-    const semanticIdentityEligible = !deterministicIdentity && shouldResolveSemanticPublicIdentity(prompt)
+    const semanticIdentityEligible = !deterministicIdentity && requestedAnalyticalTasks(prompt).length < 3 && shouldResolveSemanticPublicIdentity(prompt)
     semanticIdentityInvoked = semanticIdentityEligible
     const semanticIdentity = semanticIdentityEligible ? await resolveSemanticPublicIdentity(prompt) : null
     const identity = deterministicIdentity || (semanticIdentity
@@ -397,6 +398,13 @@ async function executeBrowserTurn(req: NextRequest) {
     return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
   }
 
+  // PAC incident analysis has a fully specified, non-executable task contract.
+  // Do not spend the interactive answer budget on a model-based capability planner.
+  // Live evidence, software execution, attachments, and host-required tools still use routing.
+  const directAnalyticalAnswer = requestedAnalyticalTasks(prompt).length >= 3
+    && !requiresFreshExternalEvidence(prompt) && !requiresLiveTravelPlanningEvidence(prompt)
+    && !isCosCodingObjective(prompt, routingContext) && !agentToolsRequired && !hasSourceAttachment
+
   const routedHeaders = new Headers(req.headers)
   routedHeaders.set('content-type', 'application/json')
   routedHeaders.delete('content-length')
@@ -423,7 +431,7 @@ async function executeBrowserTurn(req: NextRequest) {
     // preserves the user's exact words; it does not infer the continuation itself.
     const softwareExecutionObjective = isCosCodingObjective(prompt, routingContext)
     const directVisual = !softwareExecutionObjective && isConciergeVisualObjective(prompt)
-    const semanticVisualEligible = !softwareExecutionObjective && !directVisual
+    const semanticVisualEligible = !softwareExecutionObjective && !directVisual && requestedAnalyticalTasks(prompt).length < 3
       && browserSurface === 'concierge'
       && shouldResolveSemanticVisualRequest(messages, prompt)
     semanticVisualInvoked = semanticVisualEligible
@@ -469,7 +477,7 @@ async function executeBrowserTurn(req: NextRequest) {
     || (browserSurface !== 'concierge' && authenticatedOwner && mentionsPlatformConcept(prompt))
   if (agentToolsRequired && !operationalEvidence) {
     agentDecision = { mode: 'orchestrate', answer: '', confidence: 1, capabilities: ['compute'], searchQueries: [], reason: 'host_compute_guard', reasonerLabel: 'host' }
-  } else if (!operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !stableKnowledgeQuestionNeedsNoPlanner(prompt, priorAnswer)) {
+  } else if (!directAnalyticalAnswer && !operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !stableKnowledgeQuestionNeedsNoPlanner(prompt, priorAnswer)) {
     const plannerStartedAt = Date.now()
     agentDecision = await decideCosAgentTurn({
       prompt,

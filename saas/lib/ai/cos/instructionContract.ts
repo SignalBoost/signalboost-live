@@ -48,4 +48,4 @@ export const USER_OUTCOME_AUTHORITY = [
   'You may suggest a helpful next action in one brief sentence, but do not perform that different task without a request.',
   'Retain the original objective, explicit prohibitions, and agreed constraints through every tool call and retry.',
   'Compare final output with the actual requested outcome; a tool receipt or fluent prose alone is not task completion.',
-].join('\\n')
+].join('\n')

@@ -43,7 +43,8 @@ export function isRepositoryRepairCheckpoint(value: unknown): value is Repositor
  */
 export function repositoryRepairV2Objective(baseObjective: string, proofCommand: string | null): string {
   const base = String(baseObjective || '').trim()
-  return proofCommand ? `${base}\n\nRequired execution:\n${proofCommand}` : base
+  if (proofCommand) return `${base}\n\nRequired execution:\n${proofCommand}`
+  return `${base}\n\nREPAIR REPRODUCTION CONTRACT: No failing proof was supplied or selected. Do not treat a passing existing test as proof that the reported defect is repaired. First identify the reported behavioral failure, its implicated source and a targeted regression assertion. Inspect the relevant source and test, write a regression test under tests/ if necessary, then RUN that test and record its actual nonzero exit before changing implementation. If an existing test passes, it is merely a diagnostic; continue investigating or add a targeted failing regression instead of terminating. After reproducing the failure, make the smallest source correction and rerun the same regression followed by relevant existing tests. If evidence cannot reproduce the reported behavior within the bounded task, terminate explicitly as unreproduced with the exact blocker and attempted commands; never claim success or invent a mutation.`
 }
 
 /** The workspace copy of a repository file the agent edited, written at edit time by the lane. */

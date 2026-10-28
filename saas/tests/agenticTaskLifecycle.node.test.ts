@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { beginAgenticTask, advanceAgenticTask, outstandingAgenticRequirements, validateDynamicWorkflow, executeDynamicWorkflow } from '../lib/agentic/taskLifecycle.ts'
+import { beginAgenticTask, advanceAgenticTask, outstandingAgenticRequirements, validateDynamicWorkflow, executeDynamicWorkflow, beginWorkflowCheckpoint, inspectWorkflowRecovery } from '../lib/agentic/taskLifecycle.ts'
 
 test('unverified claims cannot complete an agentic task', () => {
  const state=beginAgenticTask('Repair the source and prove the change', ['source','tests'])
@@ -77,4 +77,21 @@ test('dynamic execution blocks unapproved Builder side effects and missing evide
  const missing=await executeDynamicWorkflow(def,{builder:async()=>''},{...grant,approvedStepIds:['edit']})
  assert.equal(missing.reason,'missing_host_receipt')
  assert.equal(missing.status,'blocked')
+})
+
+test('checkpoint recovery rejects replay of potentially committed side effects',()=>{
+ const def={id:'builder-repair',version:2,objective:'Verify repair',steps:[
+  {id:'write',capability:'builder',dependsOn:[]},
+  {id:'test',capability:'verify',dependsOn:['write']},
+ ]}
+ const start=beginWorkflowCheckpoint(def)
+ assert.deepEqual(inspectWorkflowRecovery(def,start).pending,['write','test'])
+ const ambiguous={...start,inFlightStep:'write'}
+ assert.equal(inspectWorkflowRecovery(def,ambiguous).reason,'in_flight_requires_reconciliation')
+ const afterWrite={...start,completed:[{id:'write',capability:'builder',evidenceId:'authoritative:1'}]}
+ const restored=JSON.parse(JSON.stringify(afterWrite))
+ assert.deepEqual(inspectWorkflowRecovery(def,restored).pending,['test'])
+ assert.equal(inspectWorkflowRecovery({...def,version:3},restored).reason,'checkpoint_version_mismatch')
+ const fake={...start,completed:[{id:'test',capability:'verify',evidenceId:'fake'}]}
+ assert.equal(inspectWorkflowRecovery(def,fake).reason,'invalid_checkpoint_receipts')
 })

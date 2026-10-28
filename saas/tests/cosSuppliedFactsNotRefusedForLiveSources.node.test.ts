@@ -25,3 +25,12 @@ test('without authoritative live evidence, only a confident self-contained readi
   // The judge reads the request when it has not already; its verdict, not the word rules, decides.
   assert.match(route, /const liveFactsIntent=!authoritySatisfied&&freshSources\.length\n\s*\? semanticTaskIntent\?\?await classifyCosSemanticTaskIntent\(/)
 })
+
+
+test('document-grounded advice can continue under an evidence-limited contract', () => {
+  assert.match(route, /const documentAdvisoryRequest = input\.length > 1200/)
+  assert.match(route, /documentAdvisoryRequest && !directCategory/)
+  assert.match(route, /if\(documentAdvisoryRequest && freshMissUseLocal\)/)
+  assert.match(route, /Do not assert any external current law/)
+  assert.match(route, /do not draft an unsolicited email or letter/)
+})

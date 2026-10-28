@@ -49,3 +49,14 @@ test('a completed-looking answer cannot mint its own verified receipt', () => {
  assert.equal(result.complete, false)
  assert.deepEqual(result.outstanding, ['requested_analytical_outcome'])
 })
+
+
+test('COS customer service contract requires meaningful advice and relevant follow-through', () => {
+ const prompt='I will reach retirement age next year. The attached memo is about another type of retirement. What options do I have?'
+ const envelope=cosExecutionEnvelope(prompt)
+ assert.match(envelope.instructionBlock,/Answer the customer underlying question/)
+ assert.match(envelope.instructionBlock,/directly relevant alternative authority/)
+ assert.match(envelope.instructionBlock,/citation substantiates the specific claim/)
+ assert.match(envelope.instructionBlock,/most useful practical next step/)
+ assert.match(envelope.instructionBlock,/do not perform an unrequested draft/)
+})

@@ -60,3 +60,11 @@ test('COS customer service contract requires meaningful advice and relevant foll
  assert.match(envelope.instructionBlock,/most useful practical next step/)
  assert.match(envelope.instructionBlock,/do not perform an unrequested draft/)
 })
+
+test('ambiguous zero after an HR letter does not authorize another rewrite', () => {
+ const contract=cosExecutionEnvelope('0').instructionBlock
+ assert.match(contract, /digit such as 0/)
+ assert.match(contract, /not permission to rewrite a previous letter/)
+ assert.match(contract, /explicitly offered numbered option/)
+ assert.match(contract, /briefly ask what the customer wants next/)
+})

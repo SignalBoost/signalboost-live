@@ -41,7 +41,7 @@ test('freshness is a post-model release guard, not a pre-model semantic router',
 test('a native capability plan suppresses redundant semantic classification downstream', () => {
   assert.match(primary, /const modelPlannedFreshEvidence=agentCapabilities\.has\('live_web'\)/)
   assert.match(primary, /const semanticTaskIntentNeeded=!requestedAction\s*\n\s*&& !modelPlannedFreshEvidence/)
-  assert.match(primary, /const baselineRequiresFreshEvidence=\(modelPlannedFreshEvidence\|\|heuristicRequiresFreshEvidence\|\|semanticRequiresFreshEvidence\)/)
+  assert.match(primary, /const baselineRequiresFreshEvidence=!suppliedIncidentAnalysis&&\(modelPlannedFreshEvidence\|\|heuristicRequiresFreshEvidence\|\|semanticRequiresFreshEvidence\)/)
 })
 
 test('public Concierge cannot request owner-private capabilities', () => {

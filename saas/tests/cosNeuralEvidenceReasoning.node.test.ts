@@ -130,3 +130,29 @@ test('COS charter treats pragmatic interpretation as reasoning, not a proof hunt
   assert.match(operatingCharter, /answer the human question first/i)
   assert.match(operatingCharter, /do not lead with evidence boilerplate/i)
 })
+
+test('PAC-03 supplied-facts infrastructure incident remains analytical if the intent model times out', async () => {
+  const { isSelfContainedIncidentAnalysis, requiresFreshExternalEvidence } = await import('../lib/ai/cos/cosFreshnessPolicy.ts')
+  const incident = [
+    'Infrastructure incident report (format: bullet facts).',
+    '- 03:40 UTC: 30% of HTTP requests to the api tier return 502 from the edge load balancer.',
+    '- Only requests routed to availability zone C fail; zones A and B are healthy.',
+    '- Zone C instances pass their health checks every 10 s during the whole window.',
+    '- A node-pool upgrade in zone C finished at 03:31; pods were rescheduled with the new CNI plugin version.',
+    '- Internal service-to-service calls inside zone C succeed; calls from the edge to zone C pods fail with connection reset.',
+    '- No change was deployed to the api application itself.',
+    'Deliver:',
+    '1. Identify the plausible root causes consistent with every stated fact.',
+    '2. Explain which facts rule out the common explanations (bad deploy, capacity, DNS).',
+    '3. Rank the remaining hypotheses and state the evidence that would confirm each.',
+    '4. Describe a rollback-versus-investigate decision with its criteria.',
+    '5. State the most likely explanation and what would refute it.',
+    'Stay within the stated facts; mark every inference as such.',
+  ].join('\n')
+  assert.equal(isSelfContainedIncidentAnalysis(incident), true)
+  assert.equal(requiresFreshExternalEvidence(incident), false)
+  assert.equal(isSelfContainedIncidentAnalysis(incident + '\nLook up the current live network incident.'), false)
+  const route = readFileSync('app/api/cos-primary/route.ts','utf8')
+  assert.match(route, /const suppliedIncidentAnalysis=isSelfContainedIncidentAnalysis\(input\)/)
+  assert.match(route, /baselineRequiresFreshEvidence=!suppliedIncidentAnalysis/)
+})

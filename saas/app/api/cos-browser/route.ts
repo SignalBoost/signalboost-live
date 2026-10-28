@@ -285,7 +285,9 @@ async function executeBrowserTurn(req: NextRequest) {
   // execute cosPrimaryPost; public Concierge retains public audit/delivery scope and presentation.
   // The word rules only suggest writing, a file or a picture; the turn's intent judge decides (cosTurnIntent.ts).
   const turnIntent = () => cosTurnIntent({ input: prompt, language, previousUserContext: previousUserPrompt || null, previousAssistant: priorAnswer || null })
-  const fastAuthoringIngress = !directTextHasAttachments
+  // A pasted conversation is evidence, not an automatic writing objective.
+  const pastedConversationEvidence = /(?:^|\n)\s*(?:YOUR REQUEST \d+|COS response \d+|assistant response \d+)\s*(?:\n|$)/im.test(prompt)
+  const fastAuthoringIngress = !pastedConversationEvidence && !directTextHasAttachments
     && isAuthoringObjectiveWithoutLiveLookup(prompt)
     && !softwareRepairRequest
     && !isCosCodingObjective(prompt, routingContext)

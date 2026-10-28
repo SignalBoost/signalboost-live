@@ -454,8 +454,8 @@ async function executeBrowserTurn(req: NextRequest) {
     // bounded recent user-authored conversation context. Deterministic code only validates and
     // preserves the user's exact words; it does not infer the continuation itself.
     const softwareExecutionObjective = isCosCodingObjective(prompt, routingContext)
-    const directVisual = !softwareExecutionObjective && isConciergeVisualObjective(prompt)
-    const semanticVisualEligible = !softwareExecutionObjective && !directVisual
+    const directVisual = !softwareExecutionObjective && prompt.length <= 8_000 && isConciergeVisualObjective(prompt)
+    const semanticVisualEligible = !softwareExecutionObjective && !directVisual && prompt.length <= 8_000
       && browserSurface === 'concierge'
       && shouldResolveSemanticVisualRequest(messages, prompt)
     semanticVisualInvoked = semanticVisualEligible

@@ -7,7 +7,7 @@ test('unselected proof instructs Builder V2 to reproduce the specific failure', 
   const objective = repositoryRepairV2Objective('Repair the actual Builder workflow', null)
   assert.match(objective, /targeted regression assertion/)
   assert.match(objective, /RUN that test/)
-  assert.match(objective, /passing existing test.*diagnostic/)
+  assert.match(objective, /existing test passes, it is merely a diagnostic/)
   assert.match(objective, /same regression/)
 })
 

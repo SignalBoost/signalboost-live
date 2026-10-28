@@ -1,2 +1,2 @@
-base_sha=d618064ffc737018ce1b66e1165c878ba0dfda16
-branch=feat/atomic-workflow-run-checkpoints-20261028
+base_sha=b418dd139584b87bad35e8b5bf0ae209002c9517
+branch=feat/governed-workflow-step-executor-20261028

@@ -300,10 +300,20 @@ export async function executeSignalBoostRepositoryRepair(input: {
         || target.failureEvidence.some(line => /(?:saas\/)?tests?\/[A-Za-z0-9_.\/-]+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)/i.test(line))
       )
       && target.failureEvidence.some(line => /(?:assertionerror|failed|not ok|exit code|error:)/i.test(line))
-    const needsRepairProof = resumeState ? resumeState.proof !== null : !engineeringTask || engineeringRepair
+    // The proof decision is not a wording rule: whenever the host can name the check from the request (a test file
+    // named anywhere in it, the recorded failing command, or an unambiguous source/test pair), the host runs that check
+    // first and its result decides. Production 2026-10-28 (job 5f60d618): an owner request naming a test file was
+    // classed as engineering work, so no host check ran, the model picked its own passing test and the job ended with
+    // nothing to show. A passing host check ends such a request as not reproduced with no model spend.
     let selectedProofCommand: string | null = null
+    if (!resumeState) {
+      const namedTests = [...String(target.rawLog || '').matchAll(/(?:saas\/)?tests?\/[A-Za-z0-9_.\/-]+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)/g)]
+        .map(match => match[0]).filter(path => !path.includes('..'))
+      const proofTarget = { ...target, pathHints: [...new Set([...target.pathHints, ...namedTests])] }
+      selectedProofCommand = discoverRepositoryRepairProofCommand(proofTarget, (await durableSession.listFiles(input.workspaceId)).map(file => file.path))
+    }
+    const needsRepairProof = resumeState ? resumeState.proof !== null : !engineeringTask || engineeringRepair || selectedProofCommand !== null
     if (needsRepairProof && !resumeState) {
-      selectedProofCommand = discoverRepositoryRepairProofCommand(target, (await durableSession.listFiles(input.workspaceId)).map(file => file.path))
       if (!selectedProofCommand && typeof durableSession.searchFiles === 'function') {
         // The reported failure may name a symbol or diagnostic but not its test path.
         // Search actual repository contents; do not pick an arbitrary passing suite.

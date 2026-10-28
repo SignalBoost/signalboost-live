@@ -16,7 +16,7 @@ import { buildFreshVerificationUnavailableReply } from '@/lib/ai/cos/freshVerifi
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { tryDomainAvailabilityLookup } from '@/lib/ai/cos/domainAvailability'
 import { runOwnerDomainBrainstorm } from '@/lib/ai/cos/domainBrainstorm'
-import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
+import { isPlatformSelfKnowledgePrompt, isSelfContainedIncidentAnalysis, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { classifyKnowledgeAccess } from '@/lib/ai/cos/knowledgeAccessPolicy'
 import { decodePlannerSearchQueriesHeader, liveSearchQueriesForTurn, PLANNER_SEARCH_QUERIES_HEADER } from '@/lib/ai/cos/plannerSearchQueries'
 import { classifyCosSemanticTaskIntent, semanticIntentIsSelfContainedContentGeneration, semanticIntentRequiresFreshness, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
@@ -877,6 +877,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const modelPlannedCreativeMemory=agentCapabilities.has('creative_memory')
   // A question about an earlier conversation with this user is answered from their own history, never from the public web.
   const conversationRecallRequested=Boolean(userId)&&(modelPlannedConversationRecall||detectConversationRecallIntent(input))
+  const suppliedIncidentAnalysis=isSelfContainedIncidentAnalysis(input)
   const heuristicRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested
   // A model capability plan is the semantic decision for this turn. Do not charge a second model
   // classifier when the first model already requested live evidence. The semantic classifier remains
@@ -894,7 +895,9 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     : null
   if(semanticTaskIntentNeeded)recordCosLatencyStage('primary:semantic_intent',Date.now()-semanticIntentStartedAt)
   const semanticRequiresFreshEvidence=semanticIntentRequiresFreshness(semanticTaskIntent)
-  const baselineRequiresFreshEvidence=(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested
+  // A bounded, supplied-facts incident exercise must not become a live-world lookup
+  // merely because a planner requested web or the semantic judge timed out.
+  const baselineRequiresFreshEvidence=!suppliedIncidentAnalysis&&(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested
   // HMI semantic rescue: if incidental temporal wording made a human writing request look fresh, the
   // semantic intent below suppresses freshness and COS answers it. (The former second fast-authoring
   // detour here cost another full 18s when it failed; see ONE PIPELINE above.)

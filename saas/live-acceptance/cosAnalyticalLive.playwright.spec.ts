@@ -88,7 +88,7 @@ test('unmocked COS advice: supplied policy memorandum must not turn into an unso
     'The memorandum does not announce a change to age-based mandatory retirement.',
     'USER QUESTION: I am not near my time-in-grade limit, but I expect to reach age 65 next year. Does this memorandum create an opportunity to keep working? What options should I discuss with HR?',
     'Please advise on the significance of the memorandum and explain what needs independent confirmation. I am seeking advice, not a letter or email.',
-  ].join('\\n')
+  ].join('\n')
   const started = Date.now()
   const response = await request.post('/api/cos-browser', {
     headers: { accept: 'application/json', 'content-type': 'application/json', 'x-signalboost-surface': 'cos' },
@@ -103,7 +103,7 @@ test('unmocked COS advice: supplied policy memorandum must not turn into an unso
   const answer = typeof payload.reply === 'string' ? payload.reply
     : typeof payload.answer === 'string' ? payload.answer : ''
   const refusal = /requires live authoritative evidence|No model-memory answer was used|Visual instructions can be up to|historical-list page|could not safely parse/i.test(answer)
-  const unsolicitedDraft = /(?:^|\\n)\\s*(?:subject:\\s*request for|dear (?:hr|team|sir|madam)|respectfully,|sincerely,)/im.test(answer)
+  const unsolicitedDraft = /(?:^|\n)\s*(?:subject:\s*request for|dear (?:hr|team|sir|madam)|respectfully,|sincerely,)/im.test(answer)
   const mentionsMemoLimit = /(?:memorandum|memo|time.in.grade|age.based|retirement)/i.test(answer)
   const receipt = {
     case: 'supplied-policy-advice-not-draft',

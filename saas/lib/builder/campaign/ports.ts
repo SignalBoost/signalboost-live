@@ -37,7 +37,11 @@ export type CampaignPorts = Readonly<{
   analysis?: (prompt: string, signal?: AbortSignal) => Promise<AnalysisOutcome>
   /** One real request whose routing decision is read back (did it enter the Builder?). */
   routing?: (prompt: string, signal?: AbortSignal) => Promise<Readonly<{ outcome: AnalysisOutcome; enteredBuilder: boolean }>>
-  fault?: (fault: 'runpod_busy' | 'model_timeout' | 'output_truncation' | 'malformed_output', signal?: AbortSignal) => Promise<PortResult>
+  /**
+   * One controlled provider fault against the reasoner, in isolation. `productionCommit` is the revision under
+   * test; a host whose own code is another revision must BLOCK, never certify production with code it lacks.
+   */
+  fault?: (fault: 'runpod_busy' | 'model_timeout' | 'output_truncation' | 'malformed_output', productionCommit: string | null, signal?: AbortSignal) => Promise<PortResult>
   browser?: (testId: string, signal?: AbortSignal) => Promise<PortResult>
   observability?: (correlationIds: readonly string[], signal?: AbortSignal) => Promise<PortResult>
   governance?: (signal?: AbortSignal) => Promise<PortResult>

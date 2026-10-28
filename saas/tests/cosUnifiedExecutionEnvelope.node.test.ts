@@ -76,4 +76,7 @@ test('pasted COS transcript is treated as evidence, not a request to rewrite a l
  assert.match(envelope.instructionBlock,/Do not execute a draft or rewrite/)
  const browser=readFileSync(new URL('../app/api/cos-browser/route.ts',import.meta.url),'utf8')
  assert.match(browser,/fastAuthoringIngress = !pastedConversationEvidence && !directTextHasAttachments/)
+ assert.match(browser,/!pastedConversationEvidence && isConciergeArtifactObjective\(prompt\)/)
+ assert.match(browser,/directVisual = !pastedConversationEvidence/)
+ assert.match(browser,/semanticVisualEligible = !pastedConversationEvidence/)
 })

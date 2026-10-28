@@ -38,12 +38,18 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
   // slicing from that match can accidentally include the NEXT heading as content.
   const sections = [...body.matchAll(/(?:^|\n)[ \t]*(?:#{1,6}[ \t]*)?(\d{1,2})[.)][ \t]+/g)]
   return tasks.filter((directive, index) => {
-    const position = sections.findIndex(item => Number(item[1]) === index + 1)
-    if (position >= 0) {
-      const match = sections[position]
-      const end = position + 1 < sections.length
-        ? sections[position + 1].index! : body.length
-      const section = body.slice(match.index! + match[0].length, end).trim()
+    const positions = sections.flatMap((item, position) => Number(item[1]) === index + 1 ? [position] : [])
+    if (positions.length) {
+      // Completion rounds append missing answers. The first occurrence can be the original
+      // incomplete draft, while a later occurrence supplies the actual analysis. Evaluate
+      // every candidate and accept one substantial, distinct body rather than always
+      // choosing the first numbered heading and rejecting a successful completion.
+      const candidates = positions.map(position => {
+        const match = sections[position]
+        const end = position + 1 < sections.length ? sections[position + 1].index! : body.length
+        return body.slice(match.index! + match[0].length, end).trim()
+      })
+      return !candidates.some(section => {
       // A heading or a copy of the user's checklist is not a completed task.
       // Require a meaningful amount of explanation and novel analytical content.
       const requestedWords = new Set(topicWords(directive))
@@ -65,7 +71,8 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
       const normalized = answerBody.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
       const repeatsPriorSection = seenSectionBodies.has(normalized)
       seenSectionBodies.add(normalized)
-      return section.length < 100 || novel.size < 7 || repeatsPriorSection
+      return section.length >= 100 && novel.size >= 7 && !repeatsPriorSection
+      })
     }
     // Some legitimate answers use prose headings instead of numbers. Permit those
     // only when the answer meaningfully mentions the task's subject matter.

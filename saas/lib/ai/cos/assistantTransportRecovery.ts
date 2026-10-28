@@ -111,3 +111,22 @@ export function findDurableCosTurnReply(
   }
   return null
 }
+
+/**
+ * An accepted durable turn is not a failed request just because the foreground
+ * stopped waiting. Keep its identity and direct the customer to the same History
+ * entry; never imply a retry is safe.
+ */
+export const COS_DURABLE_PENDING_COPY = {
+  en: 'COS accepted this request and it was still running when the page stopped waiting. Open History to view its final result. Do not submit it again.',
+  es: 'COS aceptó esta solicitud y seguía en curso cuando la página dejó de esperar. Abre el Historial para ver el resultado final. No la envíes de nuevo.',
+  pt: 'O COS aceitou esta solicitação e ela ainda estava em andamento quando a página parou de aguardar. Abra o Histórico para ver o resultado final. Não a envie novamente.',
+  pl: 'COS przyjął to żądanie i nadal je przetwarzał, gdy strona przestała czekać. Otwórz Historię, aby zobaczyć wynik. Nie wysyłaj go ponownie.',
+  ru: 'COS принял запрос, и он ещё выполнялся, когда страница перестала ждать. Откройте историю, чтобы увидеть результат. Не отправляйте запрос повторно.',
+  de: 'COS hat diese Anfrage angenommen; sie lief noch, als die Seite nicht länger wartete. Öffnen Sie den Verlauf, um das Ergebnis zu sehen. Senden Sie sie nicht erneut.',
+  fr: 'COS a accepté cette demande; elle était encore en cours lorsque la page a cessé d’attendre. Ouvrez l’historique pour voir le résultat. Ne la renvoyez pas.',
+  it: 'COS ha accettato la richiesta, ancora in esecuzione quando la pagina ha smesso di attendere. Apri la cronologia per vedere il risultato. Non inviarla di nuovo.',
+  ja: 'COS はリクエストを受け付けましたが、ページの待機終了時点ではまだ実行中でした。結果は履歴で確認してください。再送信しないでください。',
+  ko: 'COS가 요청을 수락했으며 페이지의 대기가 끝났을 때도 실행 중이었습니다. 결과는 기록에서 확인하세요. 다시 제출하지 마세요.',
+  ar: 'قبل COS الطلب وكان لا يزال قيد التنفيذ عندما توقفت الصفحة عن الانتظار. افتح السجل للاطلاع على النتيجة. لا ترسل الطلب مرة أخرى.',
+} as const

@@ -1,7 +1,7 @@
 import { isConciergeBuilderObjective, structuredApplicationBuild } from './cosReasoningRolePolicy.ts'
 import { assistanceCopy, PROGRESS_DONE, PROGRESS_READY, PROGRESS_RECEIVED, PROGRESS_RECONNECTING, PROGRESS_SLOW, PROGRESS_STILL_RUNNING, PROGRESS_UNCONFIRMED, PROGRESS_WORKING, readPendingApproval } from './assistanceMode.ts'
 import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMessage } from './operator-progress.ts'
-import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findDurableCosTurnReply, findRecoveredAssistantTurn, type RecoveredAssistantTurn } from './assistantTransportRecovery.ts'
+import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, COS_DURABLE_PENDING_COPY, findDurableCosTurnReply, findRecoveredAssistantTurn, type RecoveredAssistantTurn } from './assistantTransportRecovery.ts'
 import { planResearchTask } from './researchBudget.ts'
 import { BUILDER_JOB_FOLLOW_WINDOW_MS, BUILDER_JOB_POLL_DELAY_MS, BUILDER_JOB_SLOW_POLL_DELAY_MS } from '../../builder/job-poll.ts'
 
@@ -162,6 +162,12 @@ function transportFailureReply(body: unknown): string {
   const record = bodyRecord(body)
   const locale = String(record?.context?.language || 'en').toLowerCase() as keyof typeof ASSISTANT_TRANSPORT_TIMEOUT_COPY
   return ASSISTANT_TRANSPORT_TIMEOUT_COPY[locale] || ASSISTANT_TRANSPORT_TIMEOUT_COPY.en
+}
+
+function durablePendingReply(body: unknown): string {
+  const record = bodyRecord(body)
+  const locale = String(record?.context?.language || 'en').toLowerCase() as keyof typeof COS_DURABLE_PENDING_COPY
+  return COS_DURABLE_PENDING_COPY[locale] || COS_DURABLE_PENDING_COPY.en
 }
 
 function deliberateAbort(error: unknown, signal: AbortSignal): boolean {
@@ -540,7 +546,7 @@ export async function postWithAgentProgress(args: {
       ok: false,
       status: 504,
       data: {
-        reply: transportFailureReply(requestBody),
+        reply: durablePendingReply(requestBody),
         source: 'cos-durable-history-deadline',
         turnId,
         status: 'running',

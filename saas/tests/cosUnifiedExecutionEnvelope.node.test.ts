@@ -60,3 +60,20 @@ test('COS customer service contract requires meaningful advice and relevant foll
  assert.match(envelope.instructionBlock,/most useful practical next step/)
  assert.match(envelope.instructionBlock,/do not perform an unrequested draft/)
 })
+
+
+test('pasted COS transcript is treated as evidence, not a request to rewrite a letter', () => {
+ const pasted=[
+  'YOUR REQUEST 1',
+  'Memo: retirement rules and background.',
+  'COS response 1',
+  'Here is a draft letter: Dear HR Team,',
+  'YOUR REQUEST 2',
+  'Please compare the COS response to the requested advice.',
+ ].join('\n')
+ const envelope=cosExecutionEnvelope(pasted)
+ assert.match(envelope.instructionBlock,/PASTED TRANSCRIPT BOUNDARY/)
+ assert.match(envelope.instructionBlock,/Do not execute a draft or rewrite/)
+ const browser=readFileSync(new URL('../app/api/cos-browser/route.ts',import.meta.url),'utf8')
+ assert.match(browser,/fastAuthoringIngress = !pastedConversationEvidence && !directTextHasAttachments/)
+})

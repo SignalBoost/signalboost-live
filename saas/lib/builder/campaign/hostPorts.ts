@@ -7,8 +7,10 @@
 // production records by the turn id the production path returned. The one in-process port is fault injection: the
 // brief requires faults in isolation on the same release artifact, so the job runs the deployed reasoner in its own
 // async scope against a controlled provider stub (faults.ts); no user request and no real provider is touched.
-// Ports this host does not yet provide (a browser runner with a test account, governance read-back, the Builder
-// fixture) are left undefined so their items are BLOCKED with that cause.
+// The browser checks (PAC-13..15) drive the live site through the Builder's own Vercel Sandbox + Playwright CLI port
+// (browserChecks.ts); the sandbox is named and kept across slices so a two-minute answer can be waited for. Ports
+// this host does not yet provide (governance read-back, the Builder fixture) are left undefined so their items are
+// BLOCKED with that cause.
 //
 // Credentials are read from the environment inside the job; nothing here logs or returns them.
 
@@ -18,6 +20,8 @@ import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
 import { withInferenceTransport } from '../../ai/inferenceTransport.ts'
 import { runWithTurnDeadline } from '../../ai/cos/cosTurnBudget.ts'
 import { createFaultStub, judgeFault, FAULT_PROMPT, FAULT_TURN_DEADLINE_MS, type CampaignFault } from './faults.ts'
+import { campaignBrowserOrigins, newBrowserSession, runBrowserCheck, BROWSER_SLICE_RESERVE_MS, type BrowserDriver, type BrowserSession, type DriverStep } from './browserChecks.ts'
+import { createBuilderPlaywrightCliPort, type VercelSandboxPlaywrightCliPort } from '../playwright-cli-port.ts'
 
 const GITHUB_API = 'https://api.github.com/repos/SignalBoost/signalboost-live'
 /** The live site reports the revision serving each response in this header (app/api/cos-browser/route.ts). */
@@ -207,12 +211,98 @@ export async function isolatedFault(fault: CampaignFault, productionCommit: stri
   return judgeFault({ fault, calls: stub.calls(), released, escaped, elapsedMs: Date.now() - startedAt })
 }
 
+/** The browser sandbox lives long enough for the three checks in sequence, each waited for across slices. */
+export const BROWSER_SANDBOX_LIFETIME_MS = 30 * 60_000
+
+function driverStep(observed: Awaited<ReturnType<VercelSandboxPlaywrightCliPort['invoke']>>): DriverStep {
+  return { ok: observed.ok, stdout: observed.stdout, detail: `exit=${observed.exitCode}${observed.timedOut ? ' timeout' : ''}${observed.failureCode ? ` ${observed.failureCode}` : ''}` }
+}
+
+function cliDriver(port: VercelSandboxPlaywrightCliPort): BrowserDriver {
+  return {
+    open: async url => driverStep(await port.invoke({ action: 'open', url })),
+    goto: async url => driverStep(await port.invoke({ action: 'goto', url })),
+    fill: async (target, text) => driverStep(await port.invoke({ action: 'fill', target, text })),
+    click: async target => driverStep(await port.invoke({ action: 'click', target })),
+    find: async query => driverStep(await port.invoke({ action: 'find', query })),
+    snapshot: async () => driverStep(await port.invoke({ action: 'snapshot' })),
+    reload: async () => driverStep(await port.invoke({ action: 'reload' })),
+    requests: async () => driverStep(await port.invoke({ action: 'requests' })),
+    close: async () => driverStep(await port.invoke({ action: 'close' })),
+  }
+}
+
+/** The test account the browser signs in with, from the job's environment; never logged or returned. */
+function browserCredentials(): Readonly<{ email: string; password: string }> | null {
+  const email = String(process.env.CAMPAIGN_BROWSER_LOGIN_EMAIL || '').trim()
+  const password = String(process.env.CAMPAIGN_BROWSER_LOGIN_PASSWORD || '')
+  return email && password ? { email, password } : null
+}
+
+/**
+ * How many user messages carry a request token, and how many assistant messages follow them in their conversations.
+ * An answer does not repeat the token (Codex on #4980), so answers are counted by position after the request.
+ */
+export async function requestRecords(token: string): Promise<Readonly<{ user: number; assistant: number }> | null> {
+  const db = cosServiceDb()
+  if (!db) return null
+  const requests = await db.from('assistant_messages').select('conversation_id, message_order').eq('role', 'user').ilike('content', `%${token}%`)
+  if (requests.error || !Array.isArray(requests.data)) return null
+  const rows = requests.data as Array<{ conversation_id: string; message_order: number }>
+  if (!rows.length) return { user: 0, assistant: 0 }
+  const answers = await db.from('assistant_messages').select('conversation_id, message_order').eq('role', 'assistant').in('conversation_id', [...new Set(rows.map(row => row.conversation_id))])
+  if (answers.error || !Array.isArray(answers.data)) return null
+  const assistant = (answers.data as Array<{ conversation_id: string; message_order: number }>)
+    .filter(answer => rows.some(request => request.conversation_id === answer.conversation_id && answer.message_order > request.message_order)).length
+  return { user: rows.length, assistant }
+}
+
+
+/**
+ * One browser check, continued across slices. The sandbox is created on the first call and named in the session so
+ * the next slice attaches to it; it is stopped after the last browser item (or when a check cannot continue).
+ */
+export async function browserCheck(
+  testId: string,
+  session: BrowserSession | null,
+  slice: Readonly<{ remainingMs: () => number; last: boolean }>,
+  signal?: AbortSignal,
+): Promise<Readonly<{ status: 'done'; result: PortResult; session: BrowserSession }> | Readonly<{ status: 'pending'; session: BrowserSession }>> {
+  let current = session ?? newBrowserSession(testId, Date.now())
+  const port = createBuilderPlaywrightCliPort({
+    ownerAuthorized: true, interactive: true, sandboxName: current.sandboxName, sandboxLifetimeMs: BROWSER_SANDBOX_LIFETIME_MS,
+    env: { ...process.env, BUILDER_PLAYWRIGHT_CLI_ALLOWED_ORIGINS: campaignBrowserOrigins() },
+  })
+  const stop = async () => { await port.close().catch(() => undefined) }
+  try {
+    if (!current.sandboxName) {
+      const name = await port.warm()
+      current = { ...current, sandboxName: name, log: [...current.log, 'browser sandbox ready'] }
+      // Bootstrapping took most of the slice: checkpoint the sandbox and start the actions in the next slice.
+      if (slice.remainingMs() < 2 * BROWSER_SLICE_RESERVE_MS) { port.detach(); return { status: 'pending', session: current } }
+    }
+    const outcome = await runBrowserCheck({
+      testId, session: current, driver: cliDriver(port), credentials: browserCredentials(), records: requestRecords,
+      now: Date.now, remainingMs: slice.remainingMs,
+      sleep: ms => new Promise<void>(resolve => { const timer = setTimeout(resolve, ms); signal?.addEventListener('abort', () => { clearTimeout(timer); resolve() }, { once: true }) }),
+    })
+    if (outcome.status === 'pending' || !slice.last) port.detach()
+    else await stop()
+    return outcome
+  } catch (error) {
+    await stop()
+    const cause = error instanceof Error ? error.message : String(error)
+    return { status: 'done', session: { ...current, sandboxName: null }, result: { verdict: 'FAIL', actual: `browser runner failed: ${cause.slice(0, 200)}`, evidence: current.log.map((line, index) => ({ kind: 'browser' as const, label: `step ${index + 1}`, detail: line })), failureCause: cause.slice(0, 200) } }
+  }
+}
+
 export function createCampaignHostPorts(): CampaignPorts {
   return {
     deployment: () => deploymentFacts(),
     analysis: (prompt, signal) => productionAnalysis(prompt, signal),
     routing: (prompt, signal) => productionRouting(prompt, signal),
     fault: (fault, productionCommit, signal) => isolatedFault(fault, productionCommit, signal),
+    browser: (testId, session, slice, signal) => browserCheck(testId, session, slice, signal),
     release: (commit, signal) => releaseChecks(commit, signal),
     observability: ids => productionTrace(ids),
   }

@@ -13,6 +13,7 @@ import type { CampaignItem } from './catalog.ts'
 import type { CampaignEvidence, CampaignLedger, CampaignLedgerRow, CampaignVerdict } from './ledger.ts'
 import { pendingItems } from './ledger.ts'
 import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
+import { newBrowserSession, type BrowserSession } from './browserChecks.ts'
 import { missingAnalyticalTasks } from '../../ai/cos/answerTaskContract.ts'
 
 /**
@@ -50,6 +51,8 @@ export type CampaignState = Readonly<{
   longestRequestMs?: number
   /** The item the previous slice interrupted, if any: it is started again only when the longest request fits. */
   interruptedItem?: string | null
+  /** The browser session of a check still in progress, or the sandbox kept for the next browser item. */
+  browser?: BrowserSession | null
 }>
 
 /** Production-path sources that mean the request did not get a released answer. Read from the response, not the reply text. */
@@ -113,9 +116,9 @@ function blocked(cause: string): PortResult {
   return { verdict: 'BLOCKED', actual: `Not executed: ${cause}.`, evidence: [{ kind: 'note', label: 'Capability', detail: cause }], failureCause: cause }
 }
 
-type Executed = Readonly<{ result: PortResult; scenario: string; servedCommit?: string | null; requestMs?: number; interrupted?: boolean }>
+type Executed = Readonly<{ result: PortResult; scenario: string; servedCommit?: string | null; requestMs?: number; interrupted?: boolean; browser?: BrowserSession | null; pending?: boolean }>
 
-async function executeItem(item: CampaignItem, ports: CampaignPorts, ledger: CampaignLedger, signal: AbortSignal | undefined): Promise<Executed> {
+async function executeItem(item: CampaignItem, ports: CampaignPorts, ledger: CampaignLedger, signal: AbortSignal | undefined, context: Readonly<{ browser: BrowserSession | null; remainingMs: () => number; lastBrowserItem: boolean; now: () => number }>): Promise<Executed> {
   switch (item.port) {
     case 'analysis': {
       if (!ports.analysis) return { result: blocked('no production-path analysis port on this host'), scenario: item.prompt || '' }
@@ -138,8 +141,14 @@ async function executeItem(item: CampaignItem, ports: CampaignPorts, ledger: Cam
       return { scenario: `fault: ${item.fault}`, result, interrupted: Boolean(ports.fault && signal?.aborted) }
     }
     case 'browser': {
-      const result = ports.browser ? await ports.browser(item.id, signal) : blocked('no browser runner with network and a test account on this host')
-      return { scenario: `browser workflow ${item.id}`, result, interrupted: Boolean(ports.browser && signal?.aborted) }
+      if (!ports.browser) return { result: blocked('no browser runner on this host'), scenario: `browser workflow ${item.id}` }
+      // A session from an earlier slice continues only when it is this item's; a finished item's session keeps the
+      // sandbox, and the next item gets its own request token (Codex on #4980: a shared token made PAC-15 count PAC-14's request).
+      const session = context.browser?.testId === item.id ? context.browser : context.browser ? newBrowserSession(item.id, context.now(), context.browser.sandboxName) : null
+      const outcome = await ports.browser(item.id, session, { remainingMs: context.remainingMs, last: context.lastBrowserItem }, signal)
+      if (signal?.aborted) return { result: blocked('interrupted'), scenario: `browser workflow ${item.id}`, interrupted: true, browser: outcome.session }
+      if (outcome.status === 'pending') return { result: blocked('pending'), scenario: `browser workflow ${item.id}`, pending: true, browser: outcome.session }
+      return { scenario: `browser workflow ${item.id}`, result: outcome.result, browser: outcome.session }
     }
     case 'observability': {
       const ids = ledger.rows.map(r => r.correlationId).filter((id): id is string => Boolean(id))
@@ -183,6 +192,8 @@ export async function runCampaignSlice(input: Readonly<{
   let longestRequestMs = input.state.longestRequestMs ?? 0
   let shortestRequestMs = input.state.shortestRequestMs ?? 0
   let interruptedItem: string | null = input.state.interruptedItem ?? null
+  let browser: BrowserSession | null = input.state.browser ?? null
+  const browserItems = input.catalog.filter(item => item.port === 'browser').map(item => item.id)
   const noteRequest = (ms: number | undefined) => {
     if (typeof ms !== 'number' || ms <= 0) return
     if (ms > longestRequestMs) longestRequestMs = ms
@@ -190,7 +201,7 @@ export async function runCampaignSlice(input: Readonly<{
   }
   const reserveFor = (testId: string) => itemReserveMs({ shortestRequestMs, longestRequestMs }, interruptedItem === testId)
   const state = (stopped: 'complete' | 'budget' | 'aborted', progress: ReliabilityProgress | null = reliability, interrupted: string | null = null) =>
-    ({ ledger, reliability: progress, shortestRequestMs, longestRequestMs, interruptedItem: interrupted, stopped })
+    ({ ledger, reliability: progress, shortestRequestMs, longestRequestMs, interruptedItem: interrupted, browser, stopped })
   if (!ledger.mainCommit) {
     const facts = await input.ports.deployment()
     ledger = { ...ledger, mainCommit: facts.mainCommit }
@@ -232,8 +243,11 @@ export async function runCampaignSlice(input: Readonly<{
       reliability = null
       continue
     }
-    const executed = await executeItem(item, input.ports, ledger, input.signal)
+    const executed = await executeItem(item, input.ports, ledger, input.signal, { browser, remainingMs: input.remainingMs, lastBrowserItem: browserItems.at(-1) === item.id, now })
+    if (executed.browser !== undefined) browser = executed.browser
     if (executed.interrupted) return state('aborted', reliability, item.id)
+    // A browser check waiting for the page hands the slice back; the next slice continues the same session.
+    if (executed.pending) return state('budget')
     interruptedItem = null
     noteRequest(executed.requestMs)
     ledger = noteServedRevision(ledger, executed.servedCommit ?? null)

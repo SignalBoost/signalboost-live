@@ -5,6 +5,7 @@
 // evidence the ledger records; the runner never invents one.
 
 import type { CampaignEvidence, CampaignVerdict } from './ledger.ts'
+import type { BrowserSession } from './browserChecks.ts'
 
 export type PortResult = Readonly<{
   verdict: CampaignVerdict
@@ -42,7 +43,14 @@ export type CampaignPorts = Readonly<{
    * test; a host whose own code is another revision must BLOCK, never certify production with code it lacks.
    */
   fault?: (fault: 'runpod_busy' | 'model_timeout' | 'output_truncation' | 'malformed_output', productionCommit: string | null, signal?: AbortSignal) => Promise<PortResult>
-  browser?: (testId: string, signal?: AbortSignal) => Promise<PortResult>
+  /**
+   * One real browser check (browserChecks.ts). The session carries the browser across slices: the port continues
+   * a pending session, and `done` ends the sandbox once the last browser item has finished.
+   */
+  browser?: (testId: string, session: BrowserSession | null, slice: Readonly<{ remainingMs: () => number; last: boolean }>, signal?: AbortSignal) => Promise<
+    | Readonly<{ status: 'done'; result: PortResult; session: BrowserSession }>
+    | Readonly<{ status: 'pending'; session: BrowserSession }>
+  >
   observability?: (correlationIds: readonly string[], signal?: AbortSignal) => Promise<PortResult>
   governance?: (signal?: AbortSignal) => Promise<PortResult>
   builderFixture?: (signal?: AbortSignal) => Promise<PortResult>

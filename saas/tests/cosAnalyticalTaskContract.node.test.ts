@@ -151,3 +151,13 @@ test('task outcome requires verified execution evidence, not provider success te
   })
   assert.equal(verified.status, 'verified')
 })
+
+
+test('COS answer release projects original request outcome before policy release gates', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
+  const outcome = source.indexOf('const outcome = evaluateTaskOutcome({ originalRequest: effectiveArgs.prompt')
+  const policy = source.indexOf('if (remainingTaskGaps.length && !(')
+  assert.ok(outcome > 0 && policy > outcome)
+  assert.match(source, /\[cos-original-request-outcome\]/)
+  assert.match(source, /remainingDeliverables: outcome.remainingDeliverables.length/)
+})

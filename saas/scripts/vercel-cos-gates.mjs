@@ -873,6 +873,7 @@ const tests = [
   'tests/cosAnswerWindowReserve.node.test.ts',
   'tests/runpodReadinessWaitBounded.node.test.ts',
   'tests/builderVerificationCampaign.node.test.ts',
+  'tests/builderCampaignFaults.node.test.ts',
 
 
 

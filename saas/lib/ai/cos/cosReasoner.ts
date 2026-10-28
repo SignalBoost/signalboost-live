@@ -18,6 +18,7 @@ import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairD
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { ANSWER_COMPLETION_CHECK_SYSTEM_PROMPT, ANSWER_COMPLETION_SYSTEM_PROMPT, parseAnswerCompletionCheck, runAnswerCompletionLoop } from './answerCompletionLoop.ts'
 import { callLocalModel, captureServedInference, localInferenceConfigFromEnv, type LocalModelCallArgs, type ServedInference } from '@/lib/ai/local-inference'
+import { currentInferenceTransport } from '@/lib/ai/inferenceTransport'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRepair, recordQualityRepairDecision, assessReasonerDraft } from '@/lib/ai/cos/reasonerQuality'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
@@ -163,9 +164,13 @@ export async function callRawCosReasoner(
   let answered = false
   let finalConfidence: number | null = null
   let publishedDiagnosticResearch: PublishedDiagnosticLookupResult | null = null
+  // A turn under a controlled provider transport (verification campaign fault injection) is synthetic: it runs the
+  // same code but writes nothing durable — no turn experience row, no verification audit row, no pod activity —
+  // so production statistics hold only real turns (Codex on #4977). Its evidence is the campaign's own record.
+  const syntheticTurn = currentInferenceTransport() !== null
 
   try {
-    await touchRunpodActivityLease('qwen_reasoning')
+    if (!syntheticTurn) await touchRunpodActivityLease('qwen_reasoning')
 
     // Preserve the same user objective, prohibitions and deliverables across
     // prompt compilation, model inference, critic repair, and the completion loop.
@@ -294,9 +299,16 @@ export async function callRawCosReasoner(
     // investigation is impossible. Give analytical tasks one bounded fresh
     // synthesis attempt while the turn budget permits; never invent a result.
     const analyticalTasks = requestedAnalyticalTasks(args.prompt)
-    let initialDraft = first
+    // THE ANSWER THE PERSON READS MUST PARSE. For a user-answer turn the provider's text is a draft only when it
+    // parses as {answer, confidence}; broken JSON or an object without those keys is no draft, so the recovery call
+    // below still runs and nothing unparseable is ever this turn's text. Fault check PAC-10 (2026-10-28): the
+    // provider returned `{"answer": "The parser upgrade` and the turn released it verbatim.
+    const parseableDraft = (draft: string | null): string | null =>
+      draft && (args.writesUserAnswer !== true || parseLocalResult(draft)) ? draft : null
+    if (first && !parseableDraft(first)) console.warn('[cos-reasoner-draft-unparseable]', JSON.stringify({ turnId, phase: 'draft', length: first.length }))
+    let initialDraft = parseableDraft(first)
     if (!initialDraft && analyticalTasks.length > 0 && remainingMs(budget) >= 8_000) {
-      initialDraft = await recorder.time('analytical_no_draft_recovery', () => callLocalModel({
+      initialDraft = parseableDraft(await recorder.time('analytical_no_draft_recovery', () => callLocalModel({
         ...effectiveArgs,
         temperature: 0,
         prompt: [
@@ -309,7 +321,7 @@ export async function callRawCosReasoner(
       }, boundedInference()), 'model').catch(error => {
         console.warn('[cos-analytical-no-draft-recovery-failed]', error instanceof Error ? error.message : String(error))
         return null
-      })
+      }))
     }
     if (!initialDraft) {
       recorder.skip('quality_repair', 'no_draft')
@@ -425,6 +437,7 @@ export async function callRawCosReasoner(
             return { passed: failures.length === 0, failures }
           },
           persistVerification: async receipt => {
+            if (syntheticTurn) return
             const db = cosServiceDb()
             if (!db) throw new Error('cos_verification_audit_database_unavailable')
             const eventId = randomUUID()
@@ -579,7 +592,7 @@ export async function callRawCosReasoner(
       phases: experience.phases,
       skipped: experience.skipped,
     }))
-    recordTurnExperience(experience)
+    if (!syntheticTurn) recordTurnExperience(experience)
     // TURN TIMING (2026-09-30): the reasoner's own phases (draft, quality repair, council…) join the per-stage
     // timings shown in the provenance reply, so time spent around the model call is visible, not only the call.
     for (const phase of experience.phases) recordCosLatencyStage(`reasoner:${phase.phase}`, phase.ms)

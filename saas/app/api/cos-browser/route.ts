@@ -30,6 +30,7 @@ import { isOperationalLogRepairOffer } from '@/lib/ai/cos/pastedOperationalLog'
 import { isRepairConfirmation } from '@/lib/ai/cos/repairConfirmationIntent'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
+import { MAX_VISUAL_OBJECTIVE_CHARS } from '@/lib/visuals/request-contract'
 import { requiresAgentTools } from '@/lib/ai/cos/agentLoop/agentToolIntent'
 import { resolveSemanticVisualRequest, shouldResolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
 import { publicConciergeIdentityReply, publicConciergeIdentityReplyForIntent } from '@/lib/ai/cos/publicConciergeIdentity'
@@ -457,7 +458,9 @@ async function executeBrowserTurn(req: NextRequest) {
     // reasoner using bounded recent user-authored conversation context; deterministic code only validates and
     // preserves the user's exact words.
     const softwareExecutionObjective = isCosCodingObjective(prompt, routingContext)
+    // The image endpoint accepts at most MAX_VISUAL_OBJECTIVE_CHARS; a longer request continues through COS.
     const directVisual = browserSurface === 'concierge' && !softwareExecutionObjective
+      && prompt.length <= MAX_VISUAL_OBJECTIVE_CHARS
       && isConciergeVisualObjective(prompt) && semanticIntentConfirmsPicture(await turnIntent())
     const semanticVisualEligible = !softwareExecutionObjective && !directVisual
       && browserSurface === 'concierge'

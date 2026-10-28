@@ -1026,12 +1026,14 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     const deterministicFresh=resolveDeterministicDirectFlight(lookupInput,freshSources)
     const deterministicOfficeHolder=resolveDeterministicFreshOfficeHolder(lookupInput,freshSources)
     const deterministicOfficeHolderHasRequestedRoster=Boolean(deterministicOfficeHolder&&/\n\nPast[\s\S]+s for the requested period:\n- .+\n- /.test(deterministicOfficeHolder.reply))
-    // The list word rule only suggests a historical-list request; the turn's intent judge must confirm the user wants
-    // outside-world facts. Production 2026-10-28: a pasted cable with a question about the user's own options got
+    // The list word rule only suggests a historical-list request. Holding back an incumbent-only answer is safe on the
+    // suggestion alone (COS continues to synthesis), but refusing the turn needs the intent judge to confirm the user
+    // wants outside-world facts. Production 2026-10-28: a pasted cable with a question about the user's own options got
     // "COS read the authoritative historical-list page but could not safely parse its dated rows".
-    const rosterRequested=asksForHistoricalRoster(lookupInput)&&semanticIntentRequiresFreshness(await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null}))
-    const deterministicAnswer=deterministicFresh??(!rosterRequested||deterministicOfficeHolderHasRequestedRoster?deterministicOfficeHolder:null)
-    if (deterministicOfficeHolder && rosterRequested && !deterministicOfficeHolderHasRequestedRoster) {
+    const rosterSuggested=asksForHistoricalRoster(lookupInput)
+    const rosterRequested=rosterSuggested&&semanticIntentRequiresFreshness(await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null}))
+    const deterministicAnswer=deterministicFresh??(!rosterSuggested||deterministicOfficeHolderHasRequestedRoster?deterministicOfficeHolder:null)
+    if (deterministicOfficeHolder && rosterSuggested && !deterministicOfficeHolderHasRequestedRoster) {
       partialFreshOfficeHolderReply=partialOfficeHolderReply(deterministicOfficeHolder.reply,language)
     }
     if(deterministicAnswer){

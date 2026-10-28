@@ -53,8 +53,12 @@ test('fresh/current facts use evidence-only local COS synthesis before external 
 test('a complete deterministic historical roster is returned before model synthesis', () => {
   const source = route()
   assert.match(source, /deterministicOfficeHolderHasRequestedRoster/)
-  assert.match(source, /const rosterRequested=asksForHistoricalRoster\(lookupInput\)&&semanticIntentRequiresFreshness\(await cosTurnIntent\(/)
-  assert.match(source, /!rosterRequested\|\|deterministicOfficeHolderHasRequestedRoster/)
+  // Withholding an incumbent-only answer needs only the word rule's suggestion, so an unavailable judge never releases
+  // an incomplete list; refusing the turn needs the judge's confirmation.
+  assert.match(source, /const rosterSuggested=asksForHistoricalRoster\(lookupInput\)/)
+  assert.match(source, /const rosterRequested=rosterSuggested&&semanticIntentRequiresFreshness\(await cosTurnIntent\(/)
+  assert.match(source, /!rosterSuggested\|\|deterministicOfficeHolderHasRequestedRoster/)
+  assert.match(source, /if\(rosterRequested&&claimResearch\.pagesRead>0\)\{/)
   assert.match(source, /&& !deterministicOfficeHolderHasRequestedRoster/)
 })
 

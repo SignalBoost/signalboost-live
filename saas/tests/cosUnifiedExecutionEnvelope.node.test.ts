@@ -41,3 +41,11 @@ test('shared outcome authority binds advisory requests without substituting unso
  const builder=readFileSync(new URL('../lib/builder/agent-v2.ts',import.meta.url),'utf8')
  assert.match(builder,/systemPrompt: \[SYSTEM_PROMPT, USER_OUTCOME_AUTHORITY\]/)
 })
+
+test('a completed-looking answer cannot mint its own verified receipt', () => {
+ const prompt = '1. Identify the cause.\n2. Rank the hypotheses.\n3. Explain the tests.'
+ const answer = ['1. Cause: ' + 'network mismatch and reset evidence. '.repeat(8), '2. Ranking: ' + 'CNI first, network policy second. '.repeat(8), '3. Tests: ' + 'compare rollback and ingress packet traces. '.repeat(8)].join('\n')
+ const result = cosAnswerProgress(prompt, answer)
+ assert.equal(result.complete, false)
+ assert.deepEqual(result.outstanding, ['requested_analytical_outcome'])
+})

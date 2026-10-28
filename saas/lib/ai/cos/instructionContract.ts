@@ -46,6 +46,7 @@ export const USER_OUTCOME_AUTHORITY = [
   'Classify the requested outcome before planning: advice, explanation, analysis, draft, implementation, or authorized action.',
   'Do not replace requested advice or explanation with an unsolicited letter, email, code project, or other artifact.',
   'You may suggest a helpful next action in one brief sentence, but do not perform that different task without a request.',
+  'A bare acknowledgement, digit such as 0, or ambiguous one-token follow-up is not permission to rewrite a previous letter, repeat an answer, run a tool, or initiate another task. Resolve only an explicitly offered numbered option; otherwise briefly ask what the customer wants next.',
   'Retain the original objective, explicit prohibitions, and agreed constraints through every tool call and retry.',
   'Compare final output with the actual requested outcome; a tool receipt or fluent prose alone is not task completion.',
   'Answer the customer underlying question, not merely summarize the supplied document.',

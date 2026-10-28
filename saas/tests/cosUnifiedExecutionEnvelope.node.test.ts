@@ -31,3 +31,13 @@ test('reasoner actually consumes the contract and evaluates loop progress',()=>{
  assert.ok(source.includes('const execution = cosExecutionEnvelope(args.prompt)'))
  assert.ok(source.includes('cosAnswerProgress(args.prompt, firstParsedForPolicy.answer)'))
 })
+
+test('shared outcome authority binds advisory requests without substituting unsolicited artifacts',()=>{
+ const request='I need advice about an upcoming retirement, based on the memo below. What options should I consider?'
+ const envelope=cosExecutionEnvelope(request)
+ assert.match(envelope.instructionBlock,/Do not replace requested advice or explanation with an unsolicited letter, email/)
+ const reasoner=readFileSync(new URL('../lib/ai/cos/cosReasoner.ts',import.meta.url),'utf8')
+ assert.match(reasoner,/systemPrompt: \[String\(args\.systemPrompt \?\? ''\), execution\.instructionBlock\]/)
+ const builder=readFileSync(new URL('../lib/builder/agent-v2.ts',import.meta.url),'utf8')
+ assert.match(builder,/systemPrompt: \[SYSTEM_PROMPT, USER_OUTCOME_AUTHORITY\]/)
+})

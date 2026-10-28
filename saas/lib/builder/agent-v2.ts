@@ -3,6 +3,7 @@ import { checkpointDigest, workspaceDigest } from './checkpoint.ts'
 import { BuilderV2Dispatcher, type BuilderV2Action, type BuilderV2Receipt } from './agent-v2-dispatcher.ts'
 import { BuilderBudgetError, checkBuilderInferenceDeadline } from './inference-budget.ts'
 import { builderTaskContract } from './task-contract.ts'
+import { USER_OUTCOME_AUTHORITY } from '../ai/cos/instructionContract.ts'
 import { builderWorkspaceInterfaceRepairs, builderWorkspaceModuleInterfaces, type BuilderInterfaceRepair } from './interface-mismatches.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
 import { BUILDER_JOB_MODEL_CALL_BUDGET } from './work-budget.ts'
@@ -799,7 +800,7 @@ export class BuilderV2Agent {
       let raw: string | null
       try {
         raw = await this.generateWithRetry({
-          systemPrompt: SYSTEM_PROMPT,
+          systemPrompt: [SYSTEM_PROMPT, USER_OUTCOME_AUTHORITY].join('\n\n'),
           prompt: JSON.stringify({
             objective: options.objective,
             ...(checklist.files.length || checklist.commands.length || checklist.minimumTests

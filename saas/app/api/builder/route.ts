@@ -13,7 +13,7 @@ import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isOperationalLogEvidence, isPastedOperationalLog } from '@/lib/ai/cos/pastedOperationalLog'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
-import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
+import type { BuilderSourceFile } from '@/lib/builder/source-files'
 import { builderPollMayResume, builderSoleResumableJob, stopBuilderJobForUser, enqueueBuilderJob, getBuilderJobForUser, readBuilderEvidenceJob, readLatestBuilderWorkspaceJob, type BuilderJobRecord } from '@/lib/builder/job-store'
 import { runBuilderJob, selfHealingCapacityJob } from '@/lib/builder/job-runner'
 import { hasWorkspaceSource, isOwnerRepairWithoutSource, parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
@@ -36,7 +36,6 @@ export const maxDuration = 300
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_JOB_FILES = 100
-const DEBUG_OBJECTIVE = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:does not work|doesn't work|broken|failing|throws?)\b/i
 const SIGNALBOOST_OPERATIONAL_TARGET = /\b(?:signalboost-live|(?:saas\.)?signalboostapp\.com)\b/i
 
 function noStore(payload: unknown, init?: ResponseInit): NextResponse {
@@ -61,7 +60,7 @@ async function requestedJobOrThrow(requestedJobId: string, userId: string, error
   throw error
 }
 
-function cleanFiles(value: unknown): DebugFileInput[] {
+function cleanFiles(value: unknown): BuilderSourceFile[] {
   if (!Array.isArray(value)) return []
   if (value.length > MAX_JOB_FILES) throw new Error('builder_file_limit')
   return value.map(file => ({
@@ -301,8 +300,6 @@ export async function POST(request: Request) {
 
     let files = cleanFiles(body?.files)
     const repositoryTarget = builderRepositoryTarget(objective, body?.repositoryUrl)
-    const debugPlan = planDebugFileJob(objective, files)
-    if (debugPlan) return noStore({ error: 'builder_v1_debug_mode_retired_use_v2', execution_allowed: false }, { status: 409 })
     const ownerDeveloperLogSubmission = access.isOwner
       && isOperationalLogEvidence(objective)
       && SIGNALBOOST_OPERATIONAL_TARGET.test(objective)
@@ -432,7 +429,7 @@ export async function POST(request: Request) {
       }
     }
     const routingContext = { attachmentNames: files.map(file => file.path) }
-    if (!project.context && !repositoryTarget && !debugPlan && !logEvidence && !newProjectRequested && !isConciergeBuilderObjective(objective, routingContext)
+    if (!project.context && !repositoryTarget && !logEvidence && !newProjectRequested && !isConciergeBuilderObjective(objective, routingContext)
       && !(isExplicitIsolatedProjectBuild(objective) && wantsIsolatedPublication(objective))) {
       const reply = 'This request does not contain an executable coding or design objective with concrete source evidence. No Builder job was created and no code was run.'
       await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
@@ -514,15 +511,8 @@ export async function POST(request: Request) {
         userId: access.userId,
         conversationId,
         objective,
-        jobKind: debugPlan ? 'debug_file' : 'standard',
-        metadata: debugPlan
-          ? {
-              debugPath: debugPlan.path,
-              debugCommand: debugPlan.command,
-              debugRuntime: debugPlan.runtime,
-              debugPaths: debugPlan.files,
-            }
-          : logEvidence
+        jobKind: 'standard',
+        metadata: logEvidence
             ? {
                 ...(project.context ? { projectContext: project.context } : {}),
                 logEvidence: true,

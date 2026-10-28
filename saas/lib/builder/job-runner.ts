@@ -6,7 +6,6 @@ import { builderAcceptanceLedger } from './acceptance-ledger.ts'
 import type { BuilderLoopCheckpoint } from './checkpoint.ts'
 import { publishVerifiedIsolatedProject, mergeVerifiedIsolatedPullRequest, verifyIsolatedPreview, isolatedDeploymentFiles, wantsIsolatedPublication } from './isolated-publication.ts'
 import { withHostProductionHarnessIngress } from '../../platform-harness/runtime/host-ingress.ts'
-import { classifyBuilderDocumentationIntent } from './documentation-intent.ts'
 import { builderRunSourceEvidence } from './source-evidence.ts'
 import { builderPendingWriteEvidence } from './evidence-events.ts'
 // lib/builder/job-runner.ts
@@ -15,42 +14,30 @@ import { readBuilderRunLimits, withBuilderInferenceBudget, withBuilderInferenceJ
 import { builderInferenceBudgetSummary, createBuilderInferenceBudgetStore, readBuilderInferenceBudgetReceipt } from './inference-budget-store.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import type { BuilderToolTrace } from './contracts.ts'
-import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
-import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, requeueBuilderContinuationCycle, readBuilderWorkspaceFingerprint, getBuilderJobForUser, peekBuilderJob, type BuilderJobRecord } from './job-store.ts'
-import { MAX_WORK_SLICES, builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport, builderJobOverTotalDeadline, BUILDER_JOB_TOTAL_DEADLINE_MS, BUILDER_SLICE_MAX_STEPS } from './work-budget.ts'
-import { builderContractObjective, builderTaskContract, builderTaskProgress } from './task-contract.ts'
+import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, readBuilderWorkspaceFingerprint, getBuilderJobForUser, peekBuilderJob, type BuilderJobRecord } from './job-store.ts'
+import { MAX_WORK_SLICES, builderJobOverTotalDeadline, BUILDER_JOB_TOTAL_DEADLINE_MS, BUILDER_SLICE_MAX_STEPS } from './work-budget.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { builderNextAction } from './user-guidance.ts'
 import { isRepairObjective } from './regression-gate.ts'
 import { formatBuilderExecutionEvidence } from './execution-evidence.ts'
-import { explainInitialBuilderRepair } from './explain-evidence.ts'
-import { BuilderToolLoop } from './tool-loop.ts'
 import { BuilderV2Agent, builderV2ProgressReport, builderV2IdleSliceCount, type BuilderV2Checkpoint } from './agent-v2.ts'
 import { BuilderV2Dispatcher } from './agent-v2-dispatcher.ts'
 import { runBuilderV2JobCycle } from './agent-v2-job-cycle.ts'
 import { createBuilderV2SupabaseLeaseStore } from './agent-v2-supabase-store.ts'
-import { createBuilderMcpReadPort } from './mcp-read-port.ts'
 import { createBuilderPlaywrightCliPort } from './playwright-cli-port.ts'
 import { VercelSandboxBuilderRunner } from './vercel-sandbox-runner.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { executeSignalBoostRepositoryRepair } from './repository-repair.ts'
+import { isRepositoryRepairCheckpoint } from './repository-repair-v2.ts'
 import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from './repository-repair-target.ts'
-import { inspectBuilderContinuationSource } from './continuation-source.ts'
 import { builderAutoMergeSnapshotPort } from './repository-repair-snapshot-host.ts'
-import { retrieveValidatedCognitiveSkills, type CognitiveSkillContextResult } from '@/lib/ai/cos/cognitiveSkillContext'
-import { recordVerifiedCognitiveProductionOutcome } from '@/lib/ai/cos/cognitiveProductionOutcome'
-import { verifiedBuilderCognitiveApplication } from './cognitive-application.ts'
 import { deepInfraMaxRunUsd } from '../ai/cos/deepInfraSpendPolicy.ts'
 import { runWithoutTurnDeadline } from '../ai/cos/cosTurnBudget.ts'
-import { workingAgentKnowledgeBlock } from '@/lib/ai/cos/workingAgentKnowledge'
-import { formatBuilderEpisodesForPrompt, recordBuilderEpisode, retrieveBuilderEpisodes } from './episodic-memory.ts'
 import { recordBuilderCompetencyGap } from './competency-gap.ts'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { assistanceCopy, BUILDER_RESULT_CONTINUING, BUILDER_RESULT_DONE, BUILDER_RESULT_NOT_FINISHED, BUILDER_RESULT_STALLED, BUILDER_RESULT_SYNTAX_ONLY, COLLABORATE_PUBLICATION_PAUSED, COLLABORATE_SOURCE_CHANGED } from '../ai/cos/assistanceMode.ts'
 import { markActiveSpanFailed, withSpan, withTraceparent } from '../observability/tracing.ts'
 
-const BUILDER_JOB_BUDGET_MS = 260_000
-const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
 const BUILDER_SLICE_HARD_DEADLINE_MS = 240_000
 const SELF_HEALING_REPOSITORY_BUDGET_MS = 285_000
 const MAX_SELF_HEALING_EXECUTION_TIMEOUT_DEFERRALS = 3
@@ -96,25 +83,6 @@ async function deferSelfHealingCapacity(job: BuilderJobRecord, error: string | n
   return deferred
 }
 
-const emptyCognitiveContext = (): CognitiveSkillContextResult => ({ retrieved: 0, relevant: 0, selected: 0, dependencyRejected: 0, items: [] })
-
-async function recordAppliedCognitiveSkills(job: BuilderJobRecord, skillKeys: readonly string[], successfulRuns: number): Promise<void> {
-  await Promise.all(skillKeys.map(skillKey => recordVerifiedCognitiveProductionOutcome({
-    skillKey,
-    success: true,
-    score: 1,
-    evidence: {
-      source: 'cos_software_specialist_builder',
-      builderJobId: job.id,
-      verification: 'workspace_changed_and_host_command_exit_zero',
-      successfulRuns,
-      authorityGranted: false,
-    },
-  }).catch(error => {
-    console.error('[builder_cognitive_application_record_failed]', { skillKey, message: error instanceof Error ? error.message : 'unknown' })
-  })))
-}
-
 function publicTrace(trace: readonly BuilderToolTrace[]) {
   return trace.map(({ round, toolId, ok, input, output, error, failureClass, remediation }) => {
     const base = {
@@ -155,17 +123,6 @@ function publicTrace(trace: readonly BuilderToolTrace[]) {
       ...(typeof result.timedOut === 'boolean' ? { timedOut: result.timedOut } : {}),
     }
   })
-}
-
-function debugPlan(job: BuilderJobRecord): DebugFilePlan | null {
-  if (job.jobKind !== 'debug_file') return null
-  const path = typeof job.metadata.debugPath === 'string' ? job.metadata.debugPath : ''
-  const command = typeof job.metadata.debugCommand === 'string' ? job.metadata.debugCommand : ''
-  const runtime = job.metadata.debugRuntime === 'python3' ? 'python3' : 'node'
-  const rawPaths = Array.isArray(job.metadata.debugPaths) ? job.metadata.debugPaths : []
-  const files = rawPaths.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-  if (!path || !command) return null
-  return Object.freeze({ path, command, runtime, files: files.length ? files : [path] })
 }
 
 function oneLine(value: unknown): string {
@@ -758,9 +715,52 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         snapshotPort: builderAutoMergeSnapshotPort(),
         holdMerge: job.metadata.assistanceMode === 'collaborate',
         responseLanguage: job.metadata.responseLanguage,
+        continuation: {
+          jobId: job.id,
+          claimGeneration: job.claimGeneration,
+          checkpoint: isRepositoryRepairCheckpoint(job.checkpoint) ? job.checkpoint : null,
+          // Each step's checkpoint is written only while this exact claim still runs the job.
+          persist: async checkpoint => {
+            const { data, error } = await db.from('builder_jobs').update({ checkpoint })
+              .eq('id', job!.id).eq('user_id', job!.userId).eq('claim_generation', job!.claimGeneration).eq('status', 'running')
+              .select('id')
+            if (error) throw new Error(`builder_repository_repair_checkpoint_persist_failed: ${error.message}`)
+            return Array.isArray(data) && data.length === 1
+          },
+        },
       })
       if (!execution) {
         await terminalFailure(job, 'builder_repository_repair_target_unavailable')
+        return
+      }
+      if (execution.lostLease) return
+      // The slice ended with the repair unfinished (step budget, slice deadline, spent slice provider budget): pause with
+      // the checkpoint so the next slice resumes it. Three slices in a row without progress end the job instead.
+      if (execution.paused) {
+        const previous = isRepositoryRepairCheckpoint(job.checkpoint) ? job.checkpoint : null
+        const idleSlices = builderV2IdleSliceCount(previous, execution.paused.checkpoint)
+        const files = Array.isArray(execution.payload.files) ? execution.payload.files.map(String) : []
+        const progress = builderV2ProgressReport(job.objective, files, execution.paused.steps, { current: job.claimGeneration, max: MAX_WORK_SLICES })
+        if (idleSlices >= 3) {
+          const reply = historyReply(`${assistanceCopy(BUILDER_RESULT_STALLED, job.metadata.responseLanguage)}\n\n${progress}`, job.workspaceId, files)
+          await finishBuilderJob({
+            jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
+            status: 'failed', reply, error: 'builder_v2_continuation_no_progress',
+            result: { ...execution.payload, jobId: job.id, workspaceId: job.workspaceId, status: 'failed', reply, receipts: execution.paused.steps },
+          })
+          return
+        }
+        const reply = historyReply(`${assistanceCopy(BUILDER_RESULT_CONTINUING, job.metadata.responseLanguage)}\n\n${progress}`, job.workspaceId, files)
+        const { data: paused, error: pauseError } = await db.rpc('pause_builder_job_slice', {
+          p_job_id: job.id, p_user_id: job.userId, p_generation: job.claimGeneration,
+          p_checkpoint: { ...execution.paused.checkpoint, idleSlices }, p_reply: reply,
+          p_result: { ...execution.payload, jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply },
+        })
+        if (pauseError) throw new Error(`builder_repository_repair_pause_failed: ${pauseError.message}`)
+        if (paused === true) return
+        // Not paused: at the slice cap the repair ends unfinished; otherwise another claim owns the job.
+        if (job.claimGeneration < MAX_WORK_SLICES) return
+        await terminalFailure(job, 'builder_continuation_budget_exhausted')
         return
       }
       const payload = execution.payload
@@ -785,275 +785,13 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       })
       // The database may convert a PR-awaiting-merge result to paused. Its terminal evidence is
       // recorded only by repository-repair-job-lifecycle after the fenced reconciliation write.
-      const repositoryMergePending = payload.repository_merge_pending === true
-        || (payload.repository_write_stage === 'pr_created'
-          && payload.merge_allowed === true
-          && payload.merge_taken !== true
-          && Number.isInteger(Number(payload.pull_request_number))
-          && Number(payload.pull_request_number) > 0)
-      if (!repositoryMergePending) {
-        const repositoryCompleted = payload.merge_taken === true && typeof payload.merge_commit_sha === 'string'
-        
-      }
       return
     }
 
-    // V1 has been retired. Never silently route untagged or legacy debug jobs
-    // to the old execution harness (including resumed checkpoint claims).
-    // Terminal failure is intentionally safer than replaying a V1 job as V2.
-    // The fence sits after the Platform Engineer lane: owner self-healing repair jobs
-    // (platformRepair, Vercel-log targets) are repository work with their own harness, not the
-    // retired tool loop. Production 2026-10-17: 46 repair jobs in six hours died here untouched.
-    if (job.jobKind !== 'standard' || job.metadata.builderEngine !== 'v2') {
-      await terminalFailure(job, 'builder_v1_retired_use_v2')
-      return
-    }
-
-    const workspace = createSupabaseBuilderWorkspace(job.userId)
-    if (!workspace) {
-      await terminalFailure(job, 'builder_job_storage_unavailable')
-      return
-    }
-    // Conversation continuations may be admitted when their initial file list
-    // was transiently empty. The claimed worker must read source again before
-    // doing any work: never invent a replacement project from an empty listing.
-    if (job.metadata.requiresExistingSource === true) {
-      const source = await inspectBuilderContinuationSource({
-        hasWorkspace: () => workspace.hasWorkspace(job.workspaceId),
-        listPaths: async () => (await workspace.listFiles(job.workspaceId)).map(file => file.path),
-      })
-      if (source.status !== 'ready') {
-        const reason = source.status === 'workspace_missing' ? 'builder_existing_workspace_missing'
-          : source.status === 'read_unavailable' ? 'builder_existing_source_read_unavailable'
-          : 'builder_existing_source_unavailable'
-        await terminalFailure(job, reason)
-        return
-      }
-    }
-
-    const cognitive = await retrieveValidatedCognitiveSkills(job.objective, { specialistFamily: 'software' }).catch(error => {
-      console.error('[builder_cognitive_skill_retrieval_failed]', { message: error instanceof Error ? error.message : 'unknown' })
-      return emptyCognitiveContext()
-    })
-    // Open/public retained knowledge is shared with the working Builder immediately. This is
-    // reference/RAG context only: it cannot authorize tools, prove current facts, or award University
-    // credit. The helper is bounded and fails open so ordinary work is not blocked by retrieval.
-    const workingKnowledge = await workingAgentKnowledgeBlock(job.objective, 'builder')
-    const priorEpisodes = await retrieveBuilderEpisodes({
-      userId: job.userId,
-      objective: job.objective,
-      excludeConversationId: job.conversationId,
-      limit: 4,
-    }).catch(error => {
-      console.warn('[builder_episode_read_failed]', { jobId, message: error instanceof Error ? error.message : 'unknown' })
-      return []
-    })
-    const episodicKnowledge = formatBuilderEpisodesForPrompt(priorEpisodes)
-    const combinedWorkingKnowledge = [workingKnowledge, episodicKnowledge].filter(Boolean).join('\n\n')
-
-    const sliceStartedAtMs = Date.now()
-    const deadlineAtMs = Date.now() + BUILDER_JOB_BUDGET_MS
-    const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort({ yieldToChat: selfHealingCapacityJob(job) }), {
-      deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
-    })
-    const runner = new VercelSandboxBuilderRunner()
-    const mcp = createBuilderMcpReadPort({
-      tenantId: job.userId,
-      userId: job.userId,
-      environmentId: process.env.VERCEL_ENV || process.env.NODE_ENV || 'production',
-      ownerAuthorized: job.ownerAuthorized === true,
-    })
-    const browserCli = createBuilderPlaywrightCliPort({
-      ownerAuthorized: job.ownerAuthorized === true,
-    })
-    const plan = debugPlan(job)
-    const documentationPaths = !plan && isRepairObjective(job.objective)
-      ? job.checkpoint ? job.checkpoint.documentationPaths ?? null : await classifyBuilderDocumentationIntent(ai, job.objective) : null
-    const priorLessons = plan ? [] : await workspace.fetchProjectRepairSignals(job.workspaceId).catch(() => {
-      console.warn('[builder_project_lesson_read_failed]', { jobId })
-      return []
-    })
-    const result = await withBuilderSliceDeadline(() => plan
-      ? runDebugFileJob({
-          objective: job.objective,
-          workspaceId: job.workspaceId,
-          plan,
-          workspace,
-          runner,
-          ai,
-          cognitiveSkills: cognitive.items,
-          workingKnowledge: combinedWorkingKnowledge,
-        })
-      : new BuilderToolLoop(ai, workspace, runner, mcp, browserCli).run({
-          objective: job.objective,
-          workspaceId: job.workspaceId,
-          priorLessons,
-          cognitiveSkills: cognitive.items,
-          workingKnowledge: combinedWorkingKnowledge,
-          projectContext: job.metadata.projectContext,
-          checkpoint: job.checkpoint,
-          documentationPaths,
-          // Leave room for a slow model round, then a bounded sandbox command and persistence.
-          shouldPause: (beforeTool = false) => {
-            // Each tool boundary refreshes the generation-fenced watchdog timestamp.
-            void heartbeat().catch(() => undefined)
-            return Date.now() - sliceStartedAtMs >= (beforeTool ? 150_000 : 100_000)
-          },
-          maxRounds: 96,
-          deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
-          modelRoundTimeoutMs: 55_000,
-        }), BUILDER_SLICE_HARD_DEADLINE_MS)
-    await browserCli.close().catch(error => {
-      console.warn('[builder_browser_cli_close_failed]', { message: error instanceof Error ? error.message : 'unknown' })
-    })
-
-    lastTrace = result.trace
-    const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
-    const trace = publicTrace(result.trace)
-    // Model capacity is not work: re-queue with this slice's progress before spending a work slice.
-    if (result.ok === false && (result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout' || result.error === BUILDER_TURN_TIMEOUT_ERROR)
-      && await deferSelfHealingCapacity(job, result.error, trace, result.checkpoint ?? null)) return
-    if (result.ok === false && result.checkpoint && builderMayContinue(job, result.checkpoint,
-      result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout' || result.error === BUILDER_TURN_TIMEOUT_ERROR)) {
-      const reply = historyReply(result.checkpoint.verificationPending
-        ? 'Files written — verifying changes. Builder will continue automatically.'
-        : 'Builder saved its progress and will continue automatically. Verification is not complete yet.', job.workspaceId, files)
-      await pauseBuilderJob({ job, checkpoint: result.checkpoint, reply,
-        result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, trace } })
-      return
-    }
-    // A recorded failing full-suite run is an actionable continuation state, not
-    // a completion verdict. Allow a bounded next claim even if this slice only
-    // inspected the two failing assertions; the existing generation-fenced RPC
-    // and MAX_WORK_SLICES cap prevent unbounded replay.
-    const unresolvedSuite = result.ok === false && result.checkpoint &&
-      result.trace.some((item, index, events) => item.toolId === 'run' && !item.ok &&
-        /(?:npm test|node --test|pnpm test|yarn test)/.test(String(item.input.command || '')) &&
-        !events.slice(index + 1).some(next => next.ok &&
-          (next.toolId === 'write_file' || next.toolId === 'edit_file' ||
-            (next.toolId === 'run' && /(?:npm test|node --test|pnpm test|yarn test)/.test(String(next.input.command || ''))))))
-    if (unresolvedSuite && builderMayContinue(job, result.checkpoint!)) {
-      const reply = historyReply('Builder identified failing tests and saved the diagnostic evidence. Automatically continuing focused repair; full-suite verification remains required.', job.workspaceId, files)
-      await pauseBuilderJob({ job, checkpoint: result.checkpoint!, reply,
-        result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, trace } })
-      return
-    }
-    // Reaching a productive-slice ceiling is not a source failure. Atomically reset the
-    // claim generation for a bounded continuation cycle while retaining the same job,
-    // objective, workspace, trace and checkpoint. The database enforces age/cycle caps.
-    if (result.ok === false && result.checkpoint && builderSliceMadeProgress(job.checkpoint, result.checkpoint)
-      && job.claimGeneration >= 24) {
-      const reply = historyReply('Builder saved its work and is automatically continuing verification and remaining files.', job.workspaceId, files)
-      if (await requeueBuilderContinuationCycle({ job, checkpoint: result.checkpoint, reply,
-        result: { jobId: job.id, workspaceId: job.workspaceId, status: 'queued', reply, files, trace } })) return
-    }
-    const shouldExplain = Boolean(plan) || isRepairObjective(job.objective) || typeof job.metadata.proposalSourceJobId === 'string'
-      || trace.some(item => item.toolId === 'run' && !item.ok)
-    const initialReply = async (fallback: string, status: string) => shouldExplain
-      ? explainInitialBuilderRepair({
-          prompt: job.objective,
-          job: { ...job, status, result: { files, trace, ...(result.ok === false ? { error: result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error } : {}) } },
-          workspace: { readFile: (workspaceId, path) => workspace.readExistingFile(workspaceId, path) },
-          ai, fallback, deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
-        })
-      : `${fallback}\n\n${formatBuilderExecutionEvidence(trace)}`
-    if (result.ok === false) {
-      const workLimit = result.checkpoint ? builderWorkLimitReport(job, files) : ''
-      const reply = historyReply(await initialReply(`${repairAwareFailureReply(job, result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error, trace)}${workLimit ? `\n\n${workLimit}` : ''}\n\n${builderNextAction(result.error, result.trace)}`, 'failed'), job.workspaceId, files)
-      await finishBuilderJob({
-        jobId: job.id,
-        userId: job.userId,
-        claimGeneration: job.claimGeneration,
-        status: 'failed',
-        reply,
-        error: result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error,
-        result: {
-          jobId: job.id,
-          workspaceId: job.workspaceId,
-          status: 'failed',
-          error: result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error,
-          reply,
-          files,
-          trace,
-        },
-      })
-      
-      const terminalError = result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error
-      await recordBuilderCompetencyGap({
-        jobId: job.id,
-        objective: job.objective,
-        error: terminalError,
-        ownerAuthorized: job.ownerAuthorized === true,
-      }).catch(gapError => console.error('[builder_competency_gap_record_failed]', {
-        jobId: job.id,
-        message: gapError instanceof Error ? gapError.message : 'unknown',
-      }))
-      await recordBuilderEpisode({
-        job,
-        outcome: 'failed',
-        summary: reply,
-        evidence: { error: terminalError, files, verification: 'generation_fenced_terminal_builder_failure' },
-      }).catch(() => console.warn('[builder_episode_write_failed]', { jobId }))
-      return
-    }
-
-    // A smoke command cannot override an unsuccessful required test suite.
-    // Verify against the last source revision, not an older passing run.
-    const contract = builderTaskContract(builderContractObjective(job.objective, job.metadata.projectContext))
-    const verification = builderTaskProgress(contract, files, result.trace)
-    const latestSourceChange = result.trace.findLastIndex(item => item.ok &&
-      (item.toolId === 'write_file' || item.toolId === 'edit_file'))
-    const latestSuite = result.trace.slice(latestSourceChange + 1).filter(item =>
-      item.toolId === 'run' && /(?:npm test|node --test|pnpm test|yarn test)/.test(String(item.input.command || ''))).at(-1)
-    const suiteUnverified = contract.commands.some(command =>
-      /(?:npm test|node --test|pnpm test|yarn test)/.test(command)) &&
-      (!latestSuite || latestSuite.ok !== true || (latestSuite.output as { exitCode?: number } | undefined)?.exitCode !== 0)
-    if (!verification.satisfied || suiteUnverified) {
-      const reply = historyReply('Builder has not passed the required full verification after the latest changes. Saved workspace and diagnostics remain available.', job.workspaceId, files)
-      await finishBuilderJob({
-        jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
-        status: 'failed', reply, error: 'builder_verification_incomplete',
-        result: { jobId: job.id, workspaceId: job.workspaceId, status: 'failed',
-          error: 'builder_verification_incomplete', reply, files, trace },
-      })
-      return
-    }
-
-    if (verifiedBuilderCognitiveApplication(result)) {
-      const successfulRuns = result.trace.filter(item => item.toolId === 'run' && item.ok).length
-      await recordAppliedCognitiveSkills(job, cognitive.items.map(item => item.skillKey), successfulRuns)
-    }
-
-    const baseReply = !documentationPaths && isRepairObjective(job.objective)
-      ? formatBuilderOperatorRepairReply({ ok: true, answer: result.answer, trace })
-      : shouldExplain ? 'The job completed. See the recorded verification below.' : result.answer
-    const reply = historyReply(await initialReply(baseReply, 'succeeded'), job.workspaceId, files)
-    await finishBuilderJob({
-      jobId: job.id,
-      userId: job.userId,
-      claimGeneration: job.claimGeneration,
-      status: 'succeeded',
-      reply,
-      result: {
-        jobId: job.id,
-        workspaceId: job.workspaceId,
-        status: 'succeeded',
-        reply,
-        files,
-        trace,
-      },
-    })
-    
-    await recordBuilderEpisode({
-      job,
-      outcome: 'succeeded',
-      summary: reply,
-      evidence: { files, successfulRuns: result.trace.filter(item => item.toolId === 'run' && item.ok).length, verification: 'workspace_changed_and_host_command_exit_zero' },
-    }).catch(() => console.warn('[builder_episode_write_failed]', { jobId }))
-    // Only after the generation-fenced terminal write; learning failure cannot undo task success.
-    if (!plan) await workspace.recordJobRepairLesson(job.workspaceId, job.id, job.claimGeneration, result)
-      .then(recorded => console.info('[builder_project_lesson_outcome]', { jobId, recorded, retrievedSignals: priorLessons.length }))
-      .catch(() => console.warn('[builder_project_lesson_write_failed]', { jobId }))
+    // V1 has been retired. Every Builder lane above returned: campaign, V2, production acceptance and repository
+    // repair (which runs on V2). Anything else is a retired V1 job, including a resumed V1 checkpoint claim; it is
+    // never replayed as V2, it ends with that reason.
+    await terminalFailure(job, 'builder_v1_retired_use_v2')
   } catch (error) {
     const message = error instanceof Error ? error.message : 'builder_job_failed'
     console.error('[builder_job_execution_failed]', { jobId, message })

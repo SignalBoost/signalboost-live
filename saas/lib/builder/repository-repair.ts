@@ -4,7 +4,6 @@ import { builderPendingWriteEvidence } from './evidence-events.ts'
 // lib/builder/repository-repair.ts
 import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
-import { BuilderToolLoop } from './tool-loop.ts'
 import { createBuilderPlaywrightCliPort } from './playwright-cli-port.ts'
 import { createRepositoryRepairProofController, discoverRepositoryRepairProofCommand } from './repository-repair-proof-controller.ts'
 import { normalizeBuilderSandboxCommand } from './project-context.ts'
@@ -17,16 +16,30 @@ import { attemptSignalBoostRepositoryAutoMerge, type AutoMergeResult } from './r
 import { watchMergedDeployment, type MergeWatchResult } from './repository-merge-watch.ts'
 import { createSupabaseMergeWatchStore } from './merge-watch-store.ts'
 import { VercelRepositoryRepairSession } from './vercel-repository-repair-session.ts'
-import type { BuilderRunnerPort, BuilderToolTrace } from './contracts.ts'
+import type { BuilderRunResult, BuilderRunnerPort, BuilderToolTrace } from './contracts.ts'
+import { BuilderV2Agent } from './agent-v2.ts'
+import { BuilderV2Dispatcher, type BuilderV2Receipt } from './agent-v2-dispatcher.ts'
+import { runBuilderV2JobCycle } from './agent-v2-job-cycle.ts'
+import { BUILDER_SLICE_MAX_STEPS } from './work-budget.ts'
+import { isRepositoryRepairCheckpoint, repositoryEditCopyPath, repositoryRepairLeaseStore, repositoryRepairTraceFromReceipts, repositoryRepairV2Objective, restoreRepositoryRepairCheckout, type RepositoryRepairCheckpoint } from './repository-repair-v2.ts'
 import type { StateSnapshotPort } from '@/lib/portable/state-snapshot-port'
-import { retrieveValidatedCognitiveSkills } from '@/lib/ai/cos/cognitiveSkillContext'
-import { recordVerifiedCognitiveProductionOutcome } from '@/lib/ai/cos/cognitiveProductionOutcome'
-import { verifiedBuilderCognitiveApplication } from './cognitive-application.ts'
 import { builderNodeTestCommand } from './node-test-command.ts'
 
 export type SignalBoostRepositoryRepairExecution = Readonly<{
   status: number
   payload: Record<string, unknown>
+  /** The slice ended with the repair unfinished; the job pauses with this checkpoint and a later slice resumes it. */
+  paused?: Readonly<{ checkpoint: RepositoryRepairCheckpoint; reason: string; steps: readonly BuilderV2Receipt[] }>
+  /** Another claim owns the job; this slice must write nothing. */
+  lostLease?: true
+}>
+
+/** The durable job this slice runs for: its fenced checkpoint write and the checkpoint a previous slice saved. */
+export type RepositoryRepairContinuation = Readonly<{
+  jobId: string
+  claimGeneration: number
+  checkpoint: RepositoryRepairCheckpoint | null
+  persist: (checkpoint: RepositoryRepairCheckpoint) => Promise<boolean>
 }>
 
 const DEFAULT_REPOSITORY_REQUEST_BUDGET_MS = 250_000
@@ -65,6 +78,16 @@ function publicTrace(trace: readonly BuilderToolTrace[]) {
       ...(typeof result.stderr === 'string' ? { stderr: result.stderr.slice(0, 16_000) } : {}),
       ...(typeof result.timedOut === 'boolean' ? { timedOut: result.timedOut } : {}),
     }
+  })
+}
+
+/** A host-run proof, in the trace shape the evidence consumers read. */
+function proofTrace(round: number, command: string | null, result: BuilderRunResult): BuilderToolTrace {
+  const ok = result.exitCode === 0 && !result.timedOut
+  return Object.freeze({
+    round, toolId: 'run', input: { command: command || '' }, ok, output: result,
+    ...(ok ? {} : { error: result.timedOut ? 'builder_test_timeout' : 'builder_tests_failed' }),
+    ...(!ok && !result.timedOut ? { failureClass: 'test' as const } : {}),
   })
 }
 
@@ -157,7 +180,10 @@ export async function executeSignalBoostRepositoryRepair(input: {
   /** Work with me: create the pull request but never merge it; the owner reviews and merges. */
   holdMerge?: boolean
   responseLanguage?: unknown
+  continuation: RepositoryRepairContinuation
 }): Promise<SignalBoostRepositoryRepairExecution | null> {
+  const resumeState = input.continuation.checkpoint && isRepositoryRepairCheckpoint(input.continuation.checkpoint)
+    ? input.continuation.checkpoint.repositoryRepair : null
   if (input.ownerAuthorized !== true) {
     return Object.freeze({
       status: 403,
@@ -183,14 +209,6 @@ export async function executeSignalBoostRepositoryRepair(input: {
   const objective = signalBoostRepositoryRepairObjective(target)
   await workspace.ensureWorkspace(input.workspaceId)
   await workspace.setObjective(input.workspaceId, objective)
-  const priorLessons = await workspace.fetchVerifiedRepairLessons().catch(error => {
-    console.error('[builder_repository_lesson_read_failed]', { message: error instanceof Error ? error.message : 'unknown' })
-    return []
-  })
-  const cognitive = await retrieveValidatedCognitiveSkills(objective, { specialistFamily: 'software' }).catch(error => {
-    console.error('[builder_repository_cognitive_skill_retrieval_failed]', { message: error instanceof Error ? error.message : 'unknown' })
-    return { items: [] }
-  })
 
   if (Date.now() >= deadlineAtMs - REPOSITORY_RESULT_RESERVE_MS) {
     return failedPayload({
@@ -227,6 +245,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
     // sandbox runner. Apply the same command normalization here and force exact failed-test targets
     // when available so a broad npm test cannot OOM the repository sandbox.
     const repositoryRunner: BuilderRunnerPort = {
+      stagesWorkspaceFiles: false,
       run: runInput => {
         const command = targetedRepositoryCommand(runInput.command, target)
         if (isBroadRepositoryTestCommand(command)) {
@@ -243,8 +262,9 @@ export async function executeSignalBoostRepositoryRepair(input: {
     }
 
     // The repository sandbox is ephemeral. Persist every successful model-issued edit before
-    // returning the tool receipt; timeout paths intentionally cannot collect a full git diff.
+    // returning the tool receipt; a continuation replays these copies into its fresh checkout.
     // Keep the underlying session's methods bound to preserve its private state.
+    const editedPaths = new Set<string>(resumeState?.editedPaths ?? [])
     const durableSession = new Proxy(session, {
       get(target, key, receiver) {
         if (key === 'writeFile' || key === 'editFile') {
@@ -252,7 +272,8 @@ export async function executeSignalBoostRepositoryRepair(input: {
             const result = key === 'writeFile'
               ? await target.writeFile(args[0], args[1], args[2])
               : await target.editFile(args[0], args[1], args[2], args[3])
-            await workspace.writeFile(input.workspaceId, `repository/${result.path}`, result.content)
+            await workspace.writeFile(input.workspaceId, repositoryEditCopyPath(result.path), result.content)
+            editedPaths.add(result.path)
             return result
           }
         }
@@ -260,95 +281,137 @@ export async function executeSignalBoostRepositoryRepair(input: {
         return typeof value === 'function' ? value.bind(target) : value
       },
     })
+    // A continuation rebuilds the paused checkout: same pinned commit, same visible files, every edit replayed.
+    if (resumeState) {
+      await restoreRepositoryRepairCheckout({ checkout: session, copies: workspace, workspaceId: input.workspaceId, state: resumeState })
+    }
 
     const governedAi = createGovernedBuilderAiPort(createBuilderCodingAiPort(), { deadlineAtMs: aiDeadlineAtMs })
     const engineeringTask = target.trigger === 'deployed_platform_engineering'
-    // Repairs retain the controller-owned fail-before/change/pass-after proof. With no host-selected
-    // proof the controller pins the first failing test/typecheck/build Builder runs, so a plain-language
-    // report is investigated and reproduced instead of being refused before any command. Owner-authorized
-    // feature/implementation work has no legitimate failing baseline to manufacture, so it runs
-    // through the same repository workspace/runner but must still mutate source and pass fresh
-    // task-specific verification before BuilderToolLoop can return success.
-    // A deployed-platform task with explicit failing-test evidence is a repair, not a
-    // greenfield feature. It must use the same host-owned fail/edit/pass controller.
+    // Repairs keep the host-owned fail-before/change/pass-after proof. With no host-selected proof the
+    // controller pins the first failing test/typecheck/build the agent runs, so a plain-language report
+    // is investigated and reproduced instead of being refused before any command. Owner-authorized
+    // feature/implementation work has no legitimate failing baseline to manufacture, so it runs on the
+    // same repository checkout and runner but must still change source and pass fresh verification.
+    // A deployed-platform task with explicit failing-test evidence is a repair, not a greenfield feature.
     const engineeringRepair = engineeringTask
       && (
         target.pathHints.some(path => /^(?:saas\/)?tests?\/.+\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(path))
         || target.failureEvidence.some(line => /(?:saas\/)?tests?\/[A-Za-z0-9_.\/-]+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)/i.test(line))
       )
       && target.failureEvidence.some(line => /(?:assertionerror|failed|not ok|exit code|error:)/i.test(line))
-    const needsRepairProof = !engineeringTask || engineeringRepair
-    let selectedProofCommand = needsRepairProof ? discoverRepositoryRepairProofCommand(target, (await durableSession.listFiles(input.workspaceId)).map(file => file.path)) : null
-    if (needsRepairProof && !selectedProofCommand && typeof durableSession.searchFiles === 'function') {
-      // The reported failure may name a symbol or diagnostic but not its test path.
-      // Search actual repository contents; do not pick an arbitrary passing suite.
-      const terms = [...target.symbolHints, ...target.failureEvidence.flatMap(line =>
-        [...line.matchAll(/\b(?:builder|cos|workspace|repository)_[a-z][a-z0-9_]{5,100}\b/g)].map(match => match[0]))]
-        .filter(term => term.length >= 8).slice(0, 4)
-      const matches = new Set<string>()
-      for (const term of terms) {
-        const found = await durableSession.searchFiles(input.workspaceId, term)
-        for (const path of found) {
-          const candidate = path.replace(/^saas\//, '')
-          if (/^(?:tests|test)\/.+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(candidate)) matches.add(candidate)
+    const needsRepairProof = resumeState ? resumeState.proof !== null : !engineeringTask || engineeringRepair
+    let selectedProofCommand: string | null = null
+    if (needsRepairProof && !resumeState) {
+      selectedProofCommand = discoverRepositoryRepairProofCommand(target, (await durableSession.listFiles(input.workspaceId)).map(file => file.path))
+      if (!selectedProofCommand && typeof durableSession.searchFiles === 'function') {
+        // The reported failure may name a symbol or diagnostic but not its test path.
+        // Search actual repository contents; do not pick an arbitrary passing suite.
+        const terms = [...target.symbolHints, ...target.failureEvidence.flatMap(line =>
+          [...line.matchAll(/\b(?:builder|cos|workspace|repository)_[a-z][a-z0-9_]{5,100}\b/g)].map(match => match[0]))]
+          .filter(term => term.length >= 8).slice(0, 4)
+        const matches = new Set<string>()
+        for (const term of terms) {
+          const found = await durableSession.searchFiles(input.workspaceId, term)
+          for (const path of found) {
+            const candidate = path.replace(/^saas\//, '')
+            if (/^(?:tests|test)\/.+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(candidate)) matches.add(candidate)
+          }
         }
+        if (matches.size === 1) selectedProofCommand = builderNodeTestCommand([...matches][0])
       }
-      if (matches.size === 1) selectedProofCommand = builderNodeTestCommand([...matches][0])
     }
     const proofController = needsRepairProof ? createRepositoryRepairProofController({
-      ai: governedAi,
       workspace: durableSession,
       runner: repositoryRunner,
       proofCommand: selectedProofCommand,
+      state: resumeState?.proof ?? null,
     }) : null
 
-    const result = await new BuilderToolLoop(
-      proofController?.ai ?? governedAi,
-      proofController?.workspace ?? durableSession,
-      proofController?.runner ?? repositoryRunner,
-      undefined,
-      browserCli,
-    ).run({
-      objective,
-      workspaceId: input.workspaceId,
-      priorLessons,
-      cognitiveSkills: cognitive.items,
-      maxRounds: 20,
-      // Repository-control prompts are larger than ordinary chat prompts. Production telemetry
-      // has shown valid responses slightly above 35s, so retain a bounded 55s round budget.
-      modelRoundTimeoutMs: 55_000,
-    })
+    // The host runs the selected proof on the untouched revision before any model call: a defect that does not
+    // reproduce is not repaired, and nothing is spent on it.
+    if (proofController && !resumeState) {
+      const baseline = await proofController.baseline(input.workspaceId)
+      if (baseline.state === 'passed' || baseline.state === 'invalid') {
+        return failedPayload({
+          error: baseline.state === 'passed' ? 'builder_regression_not_reproduced' : 'builder_regression_evidence_required',
+          workspaceId: input.workspaceId,
+          files: (await workspace.listFiles(input.workspaceId)).map(file => file.path),
+          trace: baseline.result ? [proofTrace(1, proofController.proofCommand, baseline.result)] : [],
+          baseCommitSha: target.fullCommitSha,
+        })
+      }
+    }
 
-    // A deadline failure must return immediately. Collecting an unverified repository diff can run
-    // several more sandbox commands and recreate the exact Vercel/browser timeout this guard closes.
-    if (result.ok === false && result.error === BUILDER_TURN_TIMEOUT_ERROR) {
-      const files = (await workspace.listFiles(input.workspaceId)).map(file => file.path)
-      return failedPayload({
-        error: result.error,
-        workspaceId: input.workspaceId,
-        files,
-        trace: result.trace,
-        baseCommitSha: target.fullCommitSha,
+    const agentObjective = resumeState?.objective ?? repositoryRepairV2Objective(objective, proofController?.proofCommand ?? null)
+    const agentWorkspace = proofController?.workspace ?? durableSession
+    const agent = new BuilderV2Agent(governedAi, new BuilderV2Dispatcher(agentWorkspace, proofController?.runner ?? repositoryRunner, undefined, browserCli), agentWorkspace)
+    const store = repositoryRepairLeaseStore({
+      jobId: input.continuation.jobId,
+      claimGeneration: input.continuation.claimGeneration,
+      workspaceId: input.workspaceId,
+      objective: agentObjective,
+      checkpoint: input.continuation.checkpoint,
+      repositoryState: () => ({
+        objective: agentObjective,
+        visiblePaths: session!.visibleFiles(),
+        editedPaths: [...editedPaths],
+        proof: proofController?.state() ?? null,
+      }),
+      persist: input.continuation.persist,
+    })
+    // The slice ends before the result reserve, so a paused repair still has time to save its checkpoint.
+    const sliceController = new AbortController()
+    const sliceTimer = setTimeout(() => sliceController.abort(new Error('builder_repository_repair_slice_deadline')),
+      Math.max(0, aiDeadlineAtMs - Date.now()))
+    sliceTimer.unref?.()
+    const cycle = await runBuilderV2JobCycle({
+      jobId: input.continuation.jobId,
+      claimGeneration: input.continuation.claimGeneration,
+      store,
+      agent,
+      maxSteps: BUILDER_SLICE_MAX_STEPS,
+      signal: sliceController.signal,
+    }).finally(() => clearTimeout(sliceTimer))
+    const steps = cycle.result?.steps ?? []
+    const trace = repositoryRepairTraceFromReceipts(steps)
+    const filesNow = async () => (await workspace.listFiles(input.workspaceId)).map(file => file.path)
+
+    if (cycle.status === 'lost_lease') return Object.freeze({ status: 409, payload: { error: 'builder_v2_claim_stale', source: 'cos-platform-engineer' }, lostLease: true })
+    if (cycle.status === 'paused') {
+      const checkpoint = store.lastSaved()
+      if (!checkpoint) {
+        return failedPayload({ error: 'builder_repository_repair_checkpoint_unsaved', workspaceId: input.workspaceId, files: await filesNow(), trace, baseCommitSha: target.fullCommitSha })
+      }
+      return Object.freeze({
+        status: 202,
+        payload: { source: 'cos-platform-engineer', workspaceId: input.workspaceId, files: await filesNow(), trace: publicTrace(trace), base_commit_sha: target.fullCommitSha },
+        paused: { checkpoint, reason: cycle.reason, steps },
       })
     }
+    if (cycle.status === 'failed') {
+      return failedPayload({ error: cycle.reason, workspaceId: input.workspaceId, files: await filesNow(), trace, baseCommitSha: target.fullCommitSha })
+    }
+
+    // Verified by the agent. The repair counts only when the host's own proof run passes on the final source.
+    if (proofController) {
+      const final = await proofController.finalProof(input.workspaceId)
+      if (final.result) trace.push(proofTrace(trace.length + 1, proofController.proofCommand, final.result))
+      if (!final.passed) {
+        return failedPayload({
+          error: proofController.proofCommand ? 'builder_regression_proof_failed_after_change' : 'builder_regression_not_reproduced',
+          workspaceId: input.workspaceId, files: await filesNow(), trace, baseCommitSha: target.fullCommitSha,
+        })
+      }
+    }
+    const result = { ok: true as const, answer: String(cycle.result?.summary || 'Repository repair verified.'), trace }
 
     const acceptanceContract = productionAcceptanceContract(target, result)
     const changes = await session.collectChanges()
     const patchPresent = Boolean(changes.patch.trim())
-    const patchPath = result.ok && patchPresent ? 'repository-repair.patch' : 'repository-repair-unverified.patch'
-    if (patchPresent) await workspace.writeFile(input.workspaceId, patchPath, changes.patch)
-    for (const file of changes.files) await workspace.writeFile(input.workspaceId, `repository/${file.path}`, file.content)
-    let files = (await workspace.listFiles(input.workspaceId)).map(file => file.path)
-
-    if (result.ok === false) {
-      return failedPayload({
-        error: result.error,
-        workspaceId: input.workspaceId,
-        files,
-        trace: result.trace,
-        baseCommitSha: target.fullCommitSha,
-      })
-    }
+    if (patchPresent) await workspace.writeFile(input.workspaceId, 'repository-repair.patch', changes.patch)
+    for (const file of changes.files) await workspace.writeFile(input.workspaceId, repositoryEditCopyPath(file.path), file.content)
+    let files = await filesNow()
     if (!patchPresent) {
       return failedPayload({
         error: 'builder_repository_repair_produced_no_patch',
@@ -373,23 +436,6 @@ export async function executeSignalBoostRepositoryRepair(input: {
     if (certification) await workspace.recordCertificationAttempt(input.workspaceId, certification).catch(error => {
       console.error('[builder_repository_certification_write_failed]', { message: error instanceof Error ? error.message : 'unknown' })
     })
-    if (verifiedBuilderCognitiveApplication(result)) {
-      const successfulRuns = result.trace.filter(item => item.toolId === 'run' && item.ok).length
-      await Promise.all(cognitive.items.map(item => recordVerifiedCognitiveProductionOutcome({
-        skillKey: item.skillKey,
-        success: true,
-        score: 1,
-        evidence: {
-          source: 'cos_software_specialist_platform_engineer',
-          verification: 'repository_changed_and_host_command_exit_zero',
-          successfulRuns,
-          authorityGranted: false,
-        },
-      }).catch(error => {
-        console.error('[builder_repository_cognitive_application_record_failed]', { skillKey: item.skillKey, message: error instanceof Error ? error.message : 'unknown' })
-      })))
-    }
-
     const writeback = await publishSignalBoostRepositoryRepair({
       target,
       workspaceId: input.workspaceId,

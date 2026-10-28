@@ -1718,6 +1718,8 @@ Authority remains bounded:
 - repair must produce fresh proof;
 - repository integration still follows main-write/PR/merge governance.
 
+Execution engine (2026-10-28): Platform Engineer runs on Builder V2, not the retired V1 tool loop (removed from every Builder lane; only COS University protocol practice still drives `BuilderToolLoop`). The host runs the selected proof on the pinned revision before any model call (a passing baseline ends the job `builder_regression_not_reproduced` with nothing spent), source edits wait for a failing proof, and the repair counts only when the host's own proof run passes on the final source. A repair that ends its slice unfinished pauses with a V2 checkpoint plus `repositoryRepair` state (visible files, edited paths, proof state); the next slice rebuilds the sandbox at the same pinned commit, replays the saved edit copies (`repository/<path>` in the workspace) and resumes. Migration `20261028130000_builder_repository_repair_v2_continuation.sql` admits those checkpoints in `pause_builder_job_slice` / `claim_builder_job_slice`; a merge-pending repair (checkpoint null) is untouched. Code: `lib/builder/repository-repair.ts`, `lib/builder/repository-repair-v2.ts`, `lib/builder/repository-repair-proof-controller.ts`; tests `tests/builderRepositoryRepairV2.node.test.ts`, `tests/builderRepositoryRepairProofController.node.test.ts`.
+
 ---
 
 # Concierge visual-continuity repair — 2026-09-09

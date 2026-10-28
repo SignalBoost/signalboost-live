@@ -190,7 +190,7 @@ test('Platform Engineer receives governed Playwright diagnostics without minting
   assert.match(repair, /ownerAuthorized: boolean/)
   assert.match(repair, /if \(input\.ownerAuthorized !== true\)/)
   assert.match(repair, /createBuilderPlaywrightCliPort\(\{ ownerAuthorized: input\.ownerAuthorized \}\)/)
-  assert.match(repair, /new BuilderToolLoop\([\s\S]*undefined,[\s\S]*browserCli,[\s\S]*\)\.run\(/)
+  assert.match(repair, /new BuilderV2Dispatcher\([^)]*undefined, browserCli\)/)
   assert.match(repair, /builder_repository_browser_cli_close_failed/)
   assert.match(runner, /ownerAuthorized: job\.ownerAuthorized === true/)
 })

@@ -35,8 +35,12 @@ export class BuilderV2Dispatcher {
     runner: BuilderRunnerPort,
     executionHooks?: BuilderExecutionHook,
     private readonly browserCli?: BuilderBrowserCliPort,
-  ) { this.runner = executionHooks ? withBuilderExecutionHooks(runner, executionHooks) : runner }
+  ) {
+    this.runner = executionHooks ? withBuilderExecutionHooks(runner, executionHooks) : runner
+    this.stagesFiles = runner.stagesWorkspaceFiles !== false
+  }
   private readonly runner: BuilderRunnerPort
+  private readonly stagesFiles: boolean
 
   // Serialize every tool operation per workspace, so two overlapping jobs cannot
   // compare and write the same file against different uncommitted versions.
@@ -161,9 +165,11 @@ export class BuilderV2Dispatcher {
               stderr: observed.stderr, timedOut: observed.timedOut, failureCode: observed.failureCode },
             ...(observed.ok ? {} : { error: 'builder_browser_verification_failed', next: ['read_file', 'edit_file', 'run_tests'] as const }) }
         }
-        const listed = await this.workspace.listFiles(workspaceId)
-        const files = (await Promise.all(listed.map(item => this.workspace.readFile(workspaceId, item.path))))
-          .filter((file): file is BuilderFile => file !== null)
+        // A runner that executes its own live checkout ignores staged files: reading each one first only spends time.
+        const files = this.stagesFiles
+          ? (await Promise.all((await this.workspace.listFiles(workspaceId)).map(item => this.workspace.readFile(workspaceId, item.path))))
+            .filter((file): file is BuilderFile => file !== null)
+          : []
         // Gathering workspace files can consume the remaining budget; never start tests late.
         checkBuilderInferenceDeadline()
         const result = await this.runner.run({ workspaceId, command: action.command, files })

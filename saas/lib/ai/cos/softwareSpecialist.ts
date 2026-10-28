@@ -18,7 +18,7 @@ import { trimObjectiveForHarness, runSoftwareDelegationWithSafeRetry } from '@/l
 export { extractFailureEvidence } from '@/lib/ai/cos/softwareSpecialistRecovery'
 import { isOperationalLogEvidence } from '@/lib/ai/cos/pastedOperationalLog'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
-import { extractBuilderSourceFiles, planDebugFileJob } from '@/lib/builder/debug-file-job'
+import { extractBuilderSourceFiles } from '@/lib/builder/source-files'
 import { enqueueBuilderJob } from '@/lib/builder/job-store'
 import { readBuilderEvidenceJob } from '@/lib/builder/job-store'
 import { assistanceCopy, BUILDER_RUNNING, DEFAULT_ASSISTANCE_MODE, normalizeAssistanceMode, type AssistanceMode } from '@/lib/ai/cos/assistanceMode'
@@ -398,10 +398,8 @@ async function tryCosSoftwareSpecialistLegacy(
 
   const conversationId = conversationIdFrom(input.body) || crypto.randomUUID()
   const jobId = crypto.randomUUID()
-  const debugPlan = repositoryTarget ? null : planDebugFileJob(objective, stagedFiles)
-  if (debugPlan) return NextResponse.json({ reply: 'Legacy Builder debug mode is retired. Use a fresh Builder V2 request.', execution_allowed: false, source: 'builder-v2-only' }, { status: 409 })
   const reply = runningReply(resolveResponseLanguage(rawObjective, input.body?.context?.language))
-  const specialistSkill = debugPlan ? 'software.repair' : 'software.build'
+  const specialistSkill = 'software.build'
 
   try {
     if (signal?.aborted) throw new Error('harness_software_specialist_delegation_aborted')
@@ -411,16 +409,8 @@ async function tryCosSoftwareSpecialistLegacy(
       userId: builderUserId,
       conversationId,
       objective,
-      jobKind: debugPlan ? 'debug_file' : 'standard',
-      metadata: debugPlan
-        ? {
-            productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null,
-            debugPath: debugPlan.path,
-            debugCommand: debugPlan.command,
-            debugRuntime: debugPlan.runtime,
-            debugPaths: debugPlan.files,
-          }
-        : { productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null, ...(project.context ? { projectContext: project.context } : {}),
+      jobKind: 'standard',
+      metadata: { productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null, ...(project.context ? { projectContext: project.context } : {}),
             // The claimed worker re-reads the existing workspace before any edit (same rule as /api/builder).
             ...(project.context && !stagedFiles.length ? { requiresExistingSource: true } : {}),
             ...builderModeMetadata(input.body, rawObjective),

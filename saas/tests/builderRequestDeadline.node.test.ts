@@ -20,17 +20,6 @@ test('the page no longer waits for the whole Builder execution', () => {
   assert.doesNotMatch(route, /await new BuilderToolLoop/)
 })
 
-test('background Builder work owns a deadline below Vercel maxDuration', () => {
-  const budget = numericConstant(runner, 'BUILDER_JOB_BUDGET_MS')
-  const reserve = numericConstant(runner, 'BUILDER_JOB_RESULT_RESERVE_MS')
-  assert.ok(budget > 0)
-  assert.ok(reserve >= 10_000)
-  assert.ok(budget + reserve <= 280_000)
-  assert.match(runner, /deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS/)
-  assert.match(runner, /BUILDER_TURN_TIMEOUT_ERROR/)
-  assert.match(runner, /finishBuilderJob/)
-})
-
 test('browser watches an accepted durable Builder job for eight minutes without controlling execution', () => {
   const attempts = numericConstant(boundary, 'BUILDER_JOB_POLL_ATTEMPTS')
   const delay = numericConstant(boundary, 'BUILDER_JOB_POLL_DELAY_MS')

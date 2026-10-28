@@ -74,7 +74,6 @@ test('accepted requests expose verifying status without a second POST', () => {
   const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
   assert.match(source, /job\.checkpoint\?\.verificationPending === true/)
   assert.match(source, /Files written — verifying changes/)
-  assert.match(runner, /result\.checkpoint\.verificationPending/)
   assert.match(source, /\}, \{ status: 202 \}\)/)
 })
 

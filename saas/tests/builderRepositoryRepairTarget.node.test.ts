@@ -249,9 +249,9 @@ test('owner COS repair forces the recorded build command instead of an unrelated
 test('owner repository engineering skips synthetic fail-before proof but keeps governed repository verification and publication', () => {
   const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
   assert.match(repair, /target\.trigger === 'deployed_platform_engineering'/)
-  assert.match(repair, /const needsRepairProof = !engineeringTask \|\| engineeringRepair/)
+  assert.match(repair, /const needsRepairProof = resumeState \? resumeState\.proof !== null : !engineeringTask \|\| engineeringRepair/)
   assert.match(repair, /const proofController = needsRepairProof \? createRepositoryRepairProofController/)
-  assert.match(repair, /proofController\?\.ai \?\? governedAi/)
+  assert.match(repair, /proofController\?\.runner \?\? repositoryRunner/)
   assert.match(repair, /publishSignalBoostRepositoryRepair/)
   assert.match(repair, /attemptSignalBoostRepositoryAutoMerge/)
   assert.match(repair, /watchMergedDeployment/)

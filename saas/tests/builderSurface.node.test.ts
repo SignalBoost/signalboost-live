@@ -16,7 +16,7 @@ test('Builder is authenticated, asynchronous, and exposes only a bounded public 
   assert.match(route, /workspace\.certificationSummary\(\)/)
   assert.match(route, /await enqueueBuilderJob/)
   assert.match(route, /after\(async \(\) =>/)
-  assert.match(jobRunner, /publicTrace\(result\.trace\)/)
+  assert.match(jobRunner, /function publicTrace\(trace: readonly BuilderToolTrace\[\]\)/)
   assert.match(jobRunner, /command: typeof input\.command/)
   assert.match(jobRunner, /result\.stdout\.slice/)
   assert.doesNotMatch(jobRunner, /trace: result\.trace/)

@@ -103,22 +103,6 @@ test('only a Builder job a person started claims GPU priority; Self-Healing and 
   assert.match(repairSource, /createBuilderCodingAiPort\(\)/)
 })
 
-test('capacity is re-queued with the current progress before a work slice is spent', () => {
-  const runnerSource = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
-  const requeue = runnerSource.indexOf("await deferSelfHealingCapacity(job, result.error, trace, result.checkpoint ?? null)) return")
-  const pause = runnerSource.indexOf('if (result.ok === false && result.checkpoint && builderMayContinue(job, result.checkpoint,')
-  assert.ok(requeue > 0 && pause > requeue, 're-queue for capacity comes before the ordinary pause')
-  assert.equal(runnerSource.split('await deferSelfHealingCapacity(job, result.error, trace').length - 1, 1, 'one capacity re-queue on the tool-loop result path')
-  // No migration: the slice's checkpoint is stored on this exact running claim, then the existing
-  // four-argument deferral function re-queues the job (Production still runs that function).
-  const store = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
-  const defer = store.slice(store.indexOf('export async function deferBuilderJobForCapacity('), store.indexOf('export async function reconcileStaleBuilderJobs('))
-  assert.match(defer, /\.update\(\{ checkpoint: input\.checkpoint \?\? null \}\)/)
-  assert.match(defer, /\.eq\('status', 'running'\)\.eq\('claim_generation', input\.job\.claimGeneration\)/)
-  assert.ok(defer.indexOf('.update({ checkpoint') < defer.indexOf("db.rpc('defer_builder_job_capacity'"), 'progress is stored before the re-queue')
-  assert.doesNotMatch(defer, /p_checkpoint/, 'the RPC call matches the deployed four-argument function')
-})
-
 test('RunPod busy attempts assigned fallback before durable queueing', () => {
   const source = readFileSync(new URL('../lib/cos/aiPort.ts', import.meta.url), 'utf8')
   const port = source.slice(source.indexOf('export function createBuilderCodingAiPort('), source.indexOf('export function createLocalApplianceAiPort('))
@@ -142,7 +126,6 @@ test('Builder primary timeout is shorter than full model round and preserves con
   assert.doesNotMatch(port, /builderRunpodBlockedUntil|builderRunpodConsecutiveTimeouts/)
   assert.match(port, /tryAssignedPlatformModelTurn/)
   assert.match(port, /callLocalModel\(\{/)
-  assert.match(runner, /modelRoundTimeoutMs: 55_000/)
 })
 
 test('model round timeouts enter durable capacity handling without a same-slice retry', () => {
@@ -167,23 +150,12 @@ test('failed host verification does not spend successful run budget', () => {
   assert.match(src, /if \(!failed\) runCount \+= 1\s+if \(!failed && evaluateRegressionGate/)
 })
 
-test('Builder terminal success requires full verification after the latest source change', () => {
-  const source = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
-  assert.match(source, /builderTaskProgress\(contract, files, result\.trace\)/)
-  assert.match(source, /const latestSourceChange = result\.trace\.findLastIndex/)
-  assert.match(source, /latestSuite\.ok !== true/)
-  assert.match(source, /builder_verification_incomplete/)
-  assert.ok(source.indexOf('builder_verification_incomplete') < source.indexOf('if (verifiedBuilderCognitiveApplication(result))'))
-})
-
 test('unfinished suite retains exact diagnostics and yields a durable continuation', () => {
   const loop = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
   const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
   assert.match(loop, /const targetedFailureGuidance = latestFailedVerification/)
   assert.match(loop, /failingTestNames/)
   assert.match(loop, /targetedFailureGuidance,\s+currentStep/)
-  assert.ok(runner.includes('if (unresolvedSuite && builderMayContinue(job, result.checkpoint!))'))
-  assert.match(runner, /await pauseBuilderJob\(\{ job, checkpoint: result\.checkpoint!, reply/)
 })
 
 test('new multi-file build hides redundant list_files after a successful listing', () => {

@@ -32,6 +32,11 @@ export interface BuilderRunResult {
 /** The host owns code execution. Builder core never evaluates user code itself. */
 export interface BuilderRunnerPort {
   run(input: { workspaceId: string; command: string; files: readonly BuilderFile[] }): Promise<BuilderRunResult>
+  /**
+   * False when the runner executes against its own live checkout and ignores `files` (the repository repair session).
+   * The V2 dispatcher then skips reading every visible file before each test run.
+   */
+  readonly stagesWorkspaceFiles?: boolean
 }
 
 export interface BuilderAiPort {

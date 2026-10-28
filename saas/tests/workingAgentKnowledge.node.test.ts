@@ -32,16 +32,10 @@ test('Production specialist workers consume shared knowledge while strict verifi
   assert.match(workers, /prompt: \[args\.prompt, workingKnowledge\]\.join/)
 })
 
-test('Builder receives shared knowledge once per durable job and both execution loops consume it', () => {
-  const runner = source('lib/builder/job-runner.ts')
+test('the Builder execution loop consumes shared working knowledge', () => {
   const loop = source('lib/builder/tool-loop.ts')
-  const debug = source('lib/builder/debug-file-job.ts')
-  assert.match(runner, /workingAgentKnowledgeBlock\(job\.objective, 'builder'\)/)
-  assert.match(runner, /workingKnowledge,/)
   assert.match(loop, /workingKnowledge\?: string/)
   assert.match(loop, /input\.workingKnowledge \|\| ''/)
-  assert.match(debug, /workingKnowledge\?: string/)
-  assert.match(debug, /input\.workingKnowledge \|\| ''/)
 })
 
 test('University and controlled evaluation contexts cannot receive working-agent retrieval', () => {

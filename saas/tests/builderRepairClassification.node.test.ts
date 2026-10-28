@@ -61,24 +61,15 @@ test('repair classification is never derived from the model own answer prose', (
 })
 
 test('a build objective gets a round budget that can carry a multi-file build', () => {
-  assert.match(jobRunner, /maxRounds: 96/)
   assert.match(gate, /tests\/builderRepairClassification\.node\.test\.ts/)
 })
 
-test('ambiguous documentation intent uses the model but only permits explicitly named document paths', async () => {
-  const { classifyBuilderDocumentationIntent, validBuilderDocumentationScope } = await import('../lib/builder/documentation-intent.ts')
+test('documentation scope only permits explicitly named document paths', async () => {
+  const { validBuilderDocumentationScope } = await import('../lib/builder/documentation-intent.ts')
   const objective = 'Extend README.md with guidance for the existing missing-input-file error. Inspect cli.js and preserve implementation and tests. Run npm test.'
-  const requests: any[] = []
-  const scope = await classifyBuilderDocumentationIntent({ async generate(request) { requests.push(request); return '{"documentationOnly":true,"writePaths":["README.md"]}' } }, objective)
-  assert.deepEqual(scope, ['README.md'])
-  assert.equal(requests.length, 1)
-  assert.equal(JSON.parse(requests[0].prompt).objective, objective)
+  assert.equal(validBuilderDocumentationScope(objective, ['README.md']), true)
   assert.equal(validBuilderDocumentationScope(objective, ['cli.js']), false)
   assert.equal(validBuilderDocumentationScope(objective, ['other.md']), false)
-  for (const response of ['{"documentationOnly":false}', '{}', 'invalid']) {
-    assert.equal(await classifyBuilderDocumentationIntent({ async generate() { return response } }, objective), null)
-  }
-  assert.equal(await classifyBuilderDocumentationIntent({ async generate() { throw new Error('offline') } }, objective), null)
 })
 
 test('documentation extension edits its document and accepts a passing requested check without invented failure', async () => {
@@ -133,13 +124,10 @@ test('documentation scope survives checkpoints and failed checks cannot be accep
 
 
 test('reference and explicitly preserved documents are not writable documentation targets', async () => {
-  const { classifyBuilderDocumentationIntent, validBuilderDocumentationScope } = await import('../lib/builder/documentation-intent.ts')
+  const { validBuilderDocumentationScope } = await import('../lib/builder/documentation-intent.ts')
   const objective = 'Extend README.md with error guidance from docs/guide.md; do not modify docs/guide.md.'
-  const accepted = await classifyBuilderDocumentationIntent({ async generate() { return '{"documentationOnly":true,"writePaths":["README.md"]}' } }, objective)
-  assert.deepEqual(accepted, ['README.md'])
+  assert.equal(validBuilderDocumentationScope(objective, ['README.md']), true)
   assert.equal(validBuilderDocumentationScope(objective, ['README.md', 'docs/guide.md']), false)
-  assert.equal(await classifyBuilderDocumentationIntent({ async generate() { return '{"documentationOnly":true,"writePaths":["README.md","docs/guide.md"]}' } }, objective), null)
-  assert.equal(await classifyBuilderDocumentationIntent({ async generate() { return '{"documentationOnly":true}' } }, objective), null)
 })
 
 test('bare package executable failures are runtime failures, not missing source paths', async () => {

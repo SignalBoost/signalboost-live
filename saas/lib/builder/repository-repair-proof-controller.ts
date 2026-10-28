@@ -1,13 +1,26 @@
-import type { BuilderAiPort, BuilderRunnerPort, BuilderWorkspacePort } from './contracts.ts'
+import type { BuilderRunResult, BuilderRunnerPort, BuilderWorkspacePort } from './contracts.ts'
 import type { SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
 import { isBuilderTestRunnerCommand } from './regression-gate.ts'
 import { builderNodeTestCommand } from './node-test-command.ts'
 
+export type RepositoryRepairProofBaseline = 'pending' | 'failed' | 'passed' | 'invalid'
+
+/** What the controller knows about the proof, carried across work slices in the job checkpoint. */
+export type RepositoryRepairProofState = Readonly<{
+  proofCommand: string | null
+  hostSelected: boolean
+  baseline: RepositoryRepairProofBaseline
+}>
+
 export type RepositoryRepairProofController = Readonly<{
-  ai: BuilderAiPort
   workspace: BuilderWorkspacePort
   runner: BuilderRunnerPort
-  proofCommand: string | null
+  readonly proofCommand: string | null
+  /** Runs the host-selected proof on the untouched revision once; a pinned or already-run proof is not run again. */
+  baseline(workspaceId: string): Promise<Readonly<{ state: RepositoryRepairProofBaseline; result: BuilderRunResult | null }>>
+  /** Runs the proof on the current source. A repair is proven only when this passes after the last change. */
+  finalProof(workspaceId: string): Promise<Readonly<{ passed: boolean; result: BuilderRunResult | null }>>
+  state(): RepositoryRepairProofState
 }>
 
 function normalizedProofCommand(value: unknown): string | null {
@@ -84,40 +97,38 @@ export function discoverRepositoryRepairProofCommand(
 // Before a defect is reproduced only reproduction may be written: a regression test, or the lock file
 // a dependency install generates. Source stays untouched until a proof has failed on it.
 const REPRODUCTION_PATH = /^(?:saas\/)?(?:tests?\/.+|.+\.(?:test|spec)\.[cm]?[jt]sx?|package-lock\.json)$/i
-const ANSWER_CONTROL = /"(?:type|action)"\s*:\s*"answer"/i
+
+function policyDenied(result: BuilderRunResult): boolean {
+  return result.exitCode === 125 && String(result.stderr || '').includes('builder_repository_broad_test_blocked')
+}
 
 /**
- * Repository repair verification is a controller responsibility. This adapter makes
- * the exact host-selected proof the first action on the pinned source and the first
- * action after every successful mutation. The model therefore cannot skip the
- * fail-before/change/pass-after cycle by returning prose, diagnostics, or another
- * command. A passing baseline aborts before the model can edit a non-reproducing bug.
+ * Repository repair proof is a host responsibility, independent of the agent driving the repair. The host runs the
+ * selected proof on the pinned revision before any model call: a passing baseline ends the repair as not reproduced
+ * (nothing to fix, nothing spent), an inconclusive one (timeout, sandbox policy refusal) as missing evidence. Source
+ * may be edited only after the proof has failed, and the repair counts only when the same proof, run by the host on
+ * the final source, passes.
  *
- * When the host has no proof (a plain-language owner report that names no failing test,
- * build, or unambiguous source/test pair), the model must reproduce the defect itself:
- * the first test, typecheck, or build it runs that actually fails becomes the pinned
- * proof, and the same controller cycle applies from then on. Until then source edits
- * are refused and an answer ends as not reproduced, so no unrelated passing test can
- * stand in for a reproduction and no repair can be claimed without one.
+ * When the host has no proof (a plain-language owner report that names no failing test, build, or unambiguous
+ * source/test pair), the agent must reproduce the defect itself: the first test, typecheck, or build it runs that
+ * actually fails becomes the pinned proof. Until then source edits are refused, so no unrelated passing test can stand
+ * in for a reproduction and no repair can be claimed without one.
+ *
+ * The state survives work slices: the job stores `state()` in its checkpoint and passes it back on resume.
  */
 export function createRepositoryRepairProofController(input: {
-  ai: BuilderAiPort
   workspace: BuilderWorkspacePort
   runner: BuilderRunnerPort
   proofCommand: string | null
+  state?: RepositoryRepairProofState | null
 }): RepositoryRepairProofController {
-  let proofCommand = normalizedProofCommand(input.proofCommand)
-  const hostSelected = proofCommand !== null
-
-  let workspaceGeneration = 0
-  let provedGeneration = -1
-  let baselineState: 'pending' | 'failed' | 'passed' | 'invalid' = 'pending'
+  let proofCommand = input.state ? input.state.proofCommand : normalizedProofCommand(input.proofCommand)
+  const hostSelected = input.state ? input.state.hostSelected : proofCommand !== null
+  let baselineState: RepositoryRepairProofBaseline = input.state?.baseline ?? 'pending'
 
   function assertReproductionWrite(path: string) {
-    // A selected command is not proof of a defect. Never mutate implementation
-    // before the original revision has actually failed the host-run proof.
     if (REPRODUCTION_PATH.test(String(path || ''))) return
-    if (proofCommand && baselineState === 'failed' && provedGeneration === workspaceGeneration) return
+    if (proofCommand && baselineState === 'failed') return
     throw new Error('builder_regression_proof_required_before_source_edit: run the narrowest test, typecheck, or build that fails on the reported defect first (a new regression test under tests/ may be written to reproduce it); source is edited only after that proof fails')
   }
 
@@ -129,68 +140,47 @@ export function createRepositoryRepairProofController(input: {
       : {}),
     async writeFile(workspaceId, path, content) {
       assertReproductionWrite(path)
-      const file = await input.workspace.writeFile(workspaceId, path, content)
-      workspaceGeneration += 1
-      return file
+      return input.workspace.writeFile(workspaceId, path, content)
     },
     async editFile(workspaceId, path, search, replace) {
       assertReproductionWrite(path)
-      const file = await input.workspace.editFile(workspaceId, path, search, replace)
-      workspaceGeneration += 1
-      return file
+      return input.workspace.editFile(workspaceId, path, search, replace)
     },
   }
 
   const runner: BuilderRunnerPort = {
+    stagesWorkspaceFiles: input.runner.stagesWorkspaceFiles,
     async run(runInput) {
+      const result = await input.runner.run(runInput)
       if (!proofCommand) {
-        const result = await input.runner.run(runInput)
         const command = String(result.executedCommand || runInput.command || '').trim()
-        const policyDenied = result.exitCode === 125
-          && String(result.stderr || '').includes('builder_repository_broad_test_blocked')
         // Only an executed test runner, typecheck, or build that fails pins the proof.
         // Diagnostics (git log, ls, node --version) and passing tests are inspection.
-        if (result.exitCode !== 0 && !result.timedOut && !policyDenied && isBuilderTestRunnerCommand(command)) {
+        if (result.exitCode !== 0 && !result.timedOut && !policyDenied(result) && isBuilderTestRunnerCommand(command)) {
           proofCommand = command
-          provedGeneration = workspaceGeneration
           baselineState = 'failed'
         }
-        return result
       }
-      const proofRequired = provedGeneration !== workspaceGeneration
-      const command = proofRequired ? proofCommand : runInput.command
-      const result = await input.runner.run({ ...runInput, command })
-      if (proofRequired) {
-        provedGeneration = workspaceGeneration
-        if (hostSelected && workspaceGeneration === 0) {
-          // A host policy refusal (exit 125) never executed the requested proof.
-          // It must not authorize a source mutation as though tests failed.
-          const policyDenied = result.exitCode === 125
-            && String(result.stderr || '').includes('builder_repository_broad_test_blocked')
-          baselineState = result.timedOut || policyDenied ? 'invalid' : result.exitCode === 0 ? 'passed' : 'failed'
-        }
-      }
-      return Object.freeze({ ...result, executedCommand: result.executedCommand || command })
-    },
-  }
-
-  const ai: BuilderAiPort = {
-    async generate(request) {
-      if (baselineState === 'passed' && workspaceGeneration === 0) throw new Error('builder_regression_not_reproduced')
-      if (baselineState === 'invalid' && workspaceGeneration === 0) throw new Error('builder_regression_evidence_required')
-      if (proofCommand && provedGeneration !== workspaceGeneration) {
-        return JSON.stringify({ type: 'tool', toolId: 'run', input: { command: proofCommand } })
-      }
-      const response = await input.ai.generate(request)
-      if (!proofCommand && ANSWER_CONTROL.test(String(response || ''))) throw new Error('builder_regression_not_reproduced')
-      return response
+      return result
     },
   }
 
   return Object.freeze({
-    ai,
     workspace,
     runner,
     get proofCommand() { return proofCommand },
+    async baseline(workspaceId: string) {
+      if (!proofCommand || baselineState !== 'pending') return { state: baselineState, result: null }
+      const result = await input.runner.run({ workspaceId, command: proofCommand, files: [] })
+      // A host policy refusal (exit 125) or a timeout never executed the proof: it is not evidence either way.
+      baselineState = result.timedOut || policyDenied(result) ? 'invalid' : result.exitCode === 0 ? 'passed' : 'failed'
+      return { state: baselineState, result }
+    },
+    async finalProof(workspaceId: string) {
+      if (!proofCommand) return { passed: false, result: null }
+      const result = await input.runner.run({ workspaceId, command: proofCommand, files: [] })
+      return { passed: result.exitCode === 0 && !result.timedOut, result }
+    },
+    state: () => Object.freeze({ proofCommand, hostSelected, baseline: baselineState }),
   })
 }

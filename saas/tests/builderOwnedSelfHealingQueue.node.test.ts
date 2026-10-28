@@ -64,9 +64,9 @@ test('owner Playwright CLI canary executes deterministic five-step proof before 
   assert.match(jobRunner, /PLAYWRIGHT_CLI_CANARY_COMPLETE/)
   assert.match(jobRunner, /builder-playwright-cli-production-canary-v1/)
   const guardIndex = jobRunner.indexOf(guard)
-  const workspaceIndex = jobRunner.indexOf('const workspace = createSupabaseBuilderWorkspace', guardIndex)
+  const repairLaneIndex = jobRunner.indexOf('await executeSignalBoostRepositoryRepair(', guardIndex)
   assert.ok(guardIndex >= 0)
-  assert.ok(workspaceIndex > guardIndex)
+  assert.ok(repairLaneIndex > guardIndex, 'the canary runs before the repository repair lane')
 })
 
 test('Playwright CLI canary persists metadata-only browser evidence', () => {

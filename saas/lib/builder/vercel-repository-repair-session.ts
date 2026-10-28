@@ -150,6 +150,8 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
   private readonly deadlineAtMs: number | null
   private readonly visiblePaths = new Set<string>()
   private networkLocked = false
+  /** Commands run in this live checkout; the `files` a caller stages are ignored. */
+  readonly stagesWorkspaceFiles = false
 
   private constructor(sandbox: SandboxInstance, target: SignalBoostRepositoryRepairTarget, deadlineAtMs: number | null) {
     this.sandbox = sandbox
@@ -308,6 +310,11 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
     const resolved = await this.exec('readlink', ['-f', absoluteParent], '/tmp', 10_000)
     const value = resolved.stdout.trim()
     if (resolved.exitCode !== 0 || (value !== PROJECT_ROOT && !value.startsWith(`${PROJECT_ROOT}/`))) throw new Error('builder_invalid_path')
+  }
+
+  /** The files the agent can see, recorded in a repair checkpoint so a continuation sees the same set. */
+  visibleFiles(): readonly string[] {
+    return Object.freeze([...this.visiblePaths].sort())
   }
 
   async listFiles(_workspaceId: string): Promise<readonly Pick<BuilderFile, 'path' | 'updatedAt'>[]> {

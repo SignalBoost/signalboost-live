@@ -9,6 +9,6 @@ test('Builder completion paths do not depend on University outcome recording', (
   for (const [name, code] of [['job runner', runner], ['repository repair lifecycle', source]]) {
     assert.doesNotMatch(code, /recordBuilderUniversityProductionOutcome|university-outcome\.ts|builder_university_outcome_record_failed/, name)
     assert.match(code, /finishBuilderJob|persistHistory/, name)
-    assert.match(code, /recordBuilderEpisode|recordRepositoryRepairEpisode/, name)
   }
+  assert.match(source, /recordBuilderEpisode|recordRepositoryRepairEpisode/)
 })

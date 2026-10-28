@@ -446,7 +446,7 @@ async function executeBrowserTurn(req: NextRequest) {
   let routedRequest = new NextRequest(req.url, { method: 'POST', headers: routedHeaders, body: JSON.stringify(routedBody) })
 
   if (!operationalEvidence && !agentToolsRequired) {
-    if (isConciergeArtifactObjective(prompt) && semanticIntentConfirmsFile(await turnIntent())) {
+    if (!pastedConversationEvidence && isConciergeArtifactObjective(prompt) && semanticIntentConfirmsFile(await turnIntent())) {
       const headers = new Headers(req.headers)
       headers.set('content-type', 'application/json')
       headers.delete('content-length')
@@ -461,10 +461,10 @@ async function executeBrowserTurn(req: NextRequest) {
     // preserves the user's exact words.
     const softwareExecutionObjective = isCosCodingObjective(prompt, routingContext)
     // The image endpoint accepts at most MAX_VISUAL_OBJECTIVE_CHARS; a longer request continues through COS.
-    const directVisual = browserSurface === 'concierge' && !softwareExecutionObjective
+    const directVisual = !pastedConversationEvidence && browserSurface === 'concierge' && !softwareExecutionObjective
       && prompt.length <= MAX_VISUAL_OBJECTIVE_CHARS
       && isConciergeVisualObjective(prompt) && semanticIntentConfirmsPicture(await turnIntent())
-    const semanticVisualEligible = !softwareExecutionObjective && !directVisual
+    const semanticVisualEligible = !pastedConversationEvidence && !softwareExecutionObjective && !directVisual
       && browserSurface === 'concierge'
       && shouldResolveSemanticVisualRequest(messages, prompt)
     semanticVisualInvoked = semanticVisualEligible

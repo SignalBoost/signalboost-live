@@ -20,8 +20,8 @@ test('the exact production prompt routes to the visual generator deterministical
   requireWiring(route, {
     file: 'saas/app/api/cos-browser/route.ts',
     purpose: 'Keep explicit visual requests on the zero-cost fast path while semantic ambiguity uses the deep conversation classifier.',
-    expect: /const directVisual = !softwareExecutionObjective && isConciergeVisualObjective\(prompt\)/,
-    insert: '    const directVisual = !softwareExecutionObjective && isConciergeVisualObjective(prompt)',
+    expect: /const directVisual = !softwareExecutionObjective && prompt\.length <= 8_000 && isConciergeVisualObjective\(prompt\)/,
+    insert: '    const directVisual = !softwareExecutionObjective && prompt.length <= 8_000 && isConciergeVisualObjective(prompt)',
     after: '    // ambiguous — including follow-up language — is decided by the deep semantic reasoner',
     requiresImport: "import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
   })
@@ -163,4 +163,11 @@ test('the public Concierge uses the deep semantic visual gate while owner Assist
 test('long nonvisual acceptance campaign never invokes optional semantic visual classifier', () => {
   const campaign = 'Run production acceptance campaign. Record test status, commit SHA, and Playwright evidence. '.repeat(12)
   assert.equal(shouldResolveSemanticVisualRequest([{ role: 'user', content: campaign }], campaign), false)
+})
+
+
+test('oversized user context is not blindly sent to 8000-character image endpoint', async () => {
+  const route = await readRepoFile('app/api/cos-browser/route.ts')
+  assert.match(route, /prompt\.length <= 8_000 && isConciergeVisualObjective\(prompt\)/)
+  assert.match(route, /!directVisual && prompt\.length <= 8_000/)
 })

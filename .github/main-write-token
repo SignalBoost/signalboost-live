@@ -1,2 +1,2 @@
-base_sha=b6f9668eb52bc8b0665cd9743df7e7d83d14aa26
-branch=fix/cos-freshness-regression-gate-20261028
+base_sha=679557390ddc2efcb606330b9239e5f788de1d4c
+branch=fix/cos-oversized-context-visual-misroute-20261028

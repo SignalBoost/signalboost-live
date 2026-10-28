@@ -1,6 +1,6 @@
 import { compileCosInstructionContract, decideCosLoopContinuation, USER_OUTCOME_AUTHORITY } from './instructionContract.ts'
-import { missingAnalyticalTasks } from './answerTaskContract.ts'
-import { beginAgenticTask, advanceAgenticTask, outstandingAgenticRequirements } from '../../agentic/taskLifecycle.ts'
+import { missingAnalyticalTasks, requestedAnalyticalTasks } from './answerTaskContract.ts'
+import { beginAgenticTask, outstandingAgenticRequirements } from '../../agentic/taskLifecycle.ts'
 
 /** Shared across the reasoning, prompt, context and continuation boundaries. */
 export function cosExecutionEnvelope(prompt: string) {
@@ -33,8 +33,8 @@ export function cosAnswerProgress(prompt: string, answer: string, previousMissin
     budgetRemaining: true,
   })
   const task = beginAgenticTask(prompt, ['requested_analytical_outcome'])
-  const verified = missing.length === 0 && answer.trim()
-    ? advanceAgenticTask(task, { type: 'receipt', id: 'answer-verified', satisfies: ['requested_analytical_outcome'] })
-    : task
-  return { missing, decision, complete: outstandingAgenticRequirements(verified).length === 0 }
+  // Draft content is not an independently verified outcome receipt.
+  // A host verifier must advance the task lifecycle before it becomes complete.
+  const readyForVerification = requestedAnalyticalTasks(prompt).length > 0 && missing.length === 0 && answer.trim().length > 0
+  return { missing, decision, complete: false, readyForVerification, outstanding: outstandingAgenticRequirements(task) }
 }

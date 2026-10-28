@@ -1,2 +1,2 @@
-base_sha=406842667b0733f1043682ac6ec2b1a8b4f094e3
-branch=feat/dynamic-workflow-run-state-20261028
+base_sha=d618064ffc737018ce1b66e1165c878ba0dfda16
+branch=feat/atomic-workflow-run-checkpoints-20261028

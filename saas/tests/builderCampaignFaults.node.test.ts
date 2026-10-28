@@ -14,6 +14,7 @@ import { missingAnalyticalTasks, requestedAnalyticalTasks } from '../lib/ai/cos/
 import { parseLocalResult } from '../lib/ai/cos/reasonerOutput.ts'
 import { withInferenceTransport, currentInferenceTransport } from '../lib/ai/inferenceTransport.ts'
 import { callLocalModelTurn, LOCAL_MODEL_OUTPUT_TRUNCATED } from '../lib/ai/local-inference.ts'
+import { withHostProductionHarnessIngress } from '../platform-harness/runtime/host-ingress.ts'
 
 const init = (signal: AbortSignal = new AbortController().signal) => ({ method: 'POST', headers: {}, body: '{}', signal })
 const completeText = JSON.stringify({ answer: FAULT_COMPLETE_ANSWER, confidence: 0.7 })
@@ -137,4 +138,36 @@ test('seam: a cut-off generation is refused as truncated, never returned as cont
     withInferenceTransport(stub.transport, () => callLocalModelTurn(args, config)),
     (error: Error) => error.message === LOCAL_MODEL_OUTPUT_TRUNCATED,
   )
+})
+
+// Production 2026-10-28: the campaign runs inside the durable Builder job harness, whose DeepInfra spend ceiling
+// refused every fault turn before it reached the stub ("the reasoner made no provider call" on PAC-07..10).
+const builderJobHarness = <T>(operation: () => Promise<T>) => withHostProductionHarnessIngress({
+  objective: 'Execute durable Builder job campaign-fault-test', portableId: 'cos-builder', agentId: 'cos-builder-worker',
+  role: 'software_specialist', capabilityId: 'builder.job.execute', risk: 'write', deadlineMs: 300_000, maxConcurrency: 1,
+  maxToolCalls: 200, maxCostUsd: 0.24, runId: 'builder-job-campaign-fault-test',
+}, operation)
+const deepinfraConfig = { baseUrl: 'https://api.deepinfra.com/v1/openai', model: 'stub-model', timeoutMs: 5_000, provider: 'deepinfra' }
+
+test('seam: inside the Builder job harness a controlled-transport call reaches its stub without a spend reservation', async () => {
+  const stub = createFaultStub('runpod_busy')
+  const turns = await builderJobHarness(() => withInferenceTransport(stub.transport, async () => [
+    await callLocalModelTurn(args, deepinfraConfig),
+    await callLocalModelTurn(args, deepinfraConfig),
+  ]))
+  assert.deepEqual(stub.calls().map(item => item.outcome), ['503', '200'])
+  assert.equal(turns[1]?.content, completeText)
+})
+
+test('seam: inside the Builder job harness a real DeepInfra call without a reservation is still refused before the network', async () => {
+  const realFetch = globalThis.fetch
+  let networkCalls = 0
+  globalThis.fetch = (async () => { networkCalls++; throw new Error('network must not be reached') }) as typeof fetch
+  try {
+    const turn = await builderJobHarness(() => callLocalModelTurn(args, deepinfraConfig)).catch((error: Error) => error)
+    assert.ok(turn === null || (turn instanceof Error && turn.message === 'deepinfra_harness_cost_reservation_required'), String(turn))
+    assert.equal(networkCalls, 0)
+  } finally {
+    globalThis.fetch = realFetch
+  }
 })

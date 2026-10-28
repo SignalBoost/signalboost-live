@@ -539,7 +539,11 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   try {
     controller.signal.throwIfAborted()
     if (outerRemainingMs !== null && outerRemainingMs <= 0) throw new Error(answerWindowHelper(args) && turnDeadlineRemainingMs() ? 'inference_answer_window_reserved' : 'inference_deadline_expired')
-    if (provider === 'deepinfra' && harnessContext?.providerCostLedger) {
+    // A controlled transport is an in-process stub, not a paid provider: it reaches no network and spends nothing,
+    // so it holds no reservation against the run's spend ceiling (it already bypasses the Builder budgeted fetch).
+    // Production 2026-10-28: inside a Builder job harness every verification-campaign fault turn was refused here
+    // before reaching its stub, so PAC-07..10 recorded "the reasoner made no provider call".
+    if (provider === 'deepinfra' && harnessContext?.providerCostLedger && controlledTransport === null) {
       const reservation = Number(args.maxEstimatedCostUsd)
       if (!Number.isFinite(reservation) || reservation <= 0) {
         throw new Error('deepinfra_harness_cost_reservation_required')

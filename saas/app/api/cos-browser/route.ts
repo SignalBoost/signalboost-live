@@ -46,6 +46,7 @@ import { mentionsPlatformConcept } from '@/lib/ai/cos/cosPlatformGlossary'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isSoftwareRepairRequest } from '@/lib/ai/cos/softwareRepairIntent'
 import { startVerificationCampaign } from '@/lib/builder/campaign/start'
+import { requestsProductionAcceptanceExecution } from '@/lib/builder/campaign/intent'
 import { recordCosLatencyStage, timeCosStage } from '@/lib/ai/cos/cosLatencyStages'
 import { runWithTurnDeadline, turnDeadlineRemainingMs, USER_ANSWER_WINDOW_MS } from '@/lib/ai/cos/cosTurnBudget'
 
@@ -486,6 +487,18 @@ async function executeBrowserTurn(req: NextRequest) {
     if ((isPlatformSelfKnowledgePrompt(prompt) || asksAboutThisService) && agentDecision?.mode === 'orchestrate'
       && !agentDecision.capabilities.includes('software_specialist') && !agentDecision.capabilities.includes('repository_read')) {
       agentDecision = null
+    }
+  }
+
+  // Explicit PAC execution is host-enforced for the authenticated owner. The planner
+  // may overlook the capability or the platform-self-knowledge filter may clear it;
+  // neither may silently replace an execution request with a written review.
+  if (authenticatedOwner && browserSurface === 'assistant' && requestsProductionAcceptanceExecution(prompt)
+    && !agentDecision?.capabilities.includes('verification_campaign')) {
+    agentDecision = {
+      mode: 'orchestrate', answer: '', confidence: 1,
+      capabilities: ['verification_campaign'], searchQueries: [],
+      reason: 'host_pac_execution_guard', reasonerLabel: 'host',
     }
   }
 

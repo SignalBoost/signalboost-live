@@ -874,6 +874,7 @@ const tests = [
   'tests/runpodReadinessWaitBounded.node.test.ts',
   'tests/builderVerificationCampaign.node.test.ts',
   'tests/builderCampaignFaults.node.test.ts',
+  'tests/builderCampaignBrowser.node.test.ts',
 
 
 

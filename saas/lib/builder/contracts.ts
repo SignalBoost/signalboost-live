@@ -62,7 +62,7 @@ export interface BuilderMcpReadPort {
   }>>
 }
 
-export type BuilderBrowserCliAction = 'open' | 'goto' | 'snapshot' | 'find' | 'console' | 'requests' | 'close'
+export type BuilderBrowserCliAction = 'open' | 'goto' | 'snapshot' | 'find' | 'click' | 'fill' | 'reload' | 'console' | 'requests' | 'close'
 
 export type BuilderBrowserCliCapability = Readonly<{
   actions: readonly BuilderBrowserCliAction[]
@@ -86,6 +86,8 @@ export interface BuilderBrowserCliPort {
     url?: string
     query?: string
     target?: string
+    /** For `fill`: the text typed into the target. */
+    text?: string
     level?: 'error' | 'warning' | 'info' | 'debug'
   }): Promise<Readonly<{
     ok: boolean

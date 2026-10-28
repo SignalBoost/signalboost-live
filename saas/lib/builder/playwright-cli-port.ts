@@ -16,6 +16,7 @@ const BOOTSTRAP_TIMEOUT_MS = 180_000
 const SANDBOX_TIMEOUT_MS = 220_000
 const OUTPUT_LIMIT = 16_000
 const DEFAULT_ORIGINS = Object.freeze(['https://itmounts.com', 'https://www.itmounts.com'])
+/** What a model-driven Builder round may do: read-only navigation and inspection. */
 const ACTIONS: readonly BuilderBrowserCliAction[] = Object.freeze([
   'open',
   'goto',
@@ -25,9 +26,14 @@ const ACTIONS: readonly BuilderBrowserCliAction[] = Object.freeze([
   'requests',
   'close',
 ])
+/**
+ * The interactive actions exist only for fixed, owner-authorized scripts (the verification campaign's browser
+ * checks); a model-driven Builder round never receives them.
+ */
+const INTERACTIVE_ACTIONS: readonly BuilderBrowserCliAction[] = Object.freeze([...ACTIONS, 'click', 'fill', 'reload'])
 
 type Environment = Readonly<Record<string, string | undefined>>
-type SandboxInstance = Awaited<ReturnType<typeof Sandbox.create>>
+type SandboxInstance = Awaited<ReturnType<typeof Sandbox.get>>
 
 function bounded(value: unknown): string {
   return String(value ?? '').slice(0, OUTPUT_LIMIT)
@@ -87,7 +93,7 @@ function shortText(value: unknown, max: number, code: string): string {
 }
 
 function commandArgs(
-  input: { action: BuilderBrowserCliAction; url?: string; query?: string; target?: string; level?: 'error' | 'warning' | 'info' | 'debug' },
+  input: { action: BuilderBrowserCliAction; url?: string; query?: string; target?: string; text?: string; level?: 'error' | 'warning' | 'info' | 'debug' },
   origins: readonly string[],
 ): readonly string[] {
   switch (input.action) {
@@ -97,6 +103,13 @@ function commandArgs(
       return ['goto', exactAllowedUrl(input.url, origins)]
     case 'snapshot':
       return input.target ? ['snapshot', shortText(input.target, 120, 'builder_browser_cli_invalid_target')] : ['snapshot']
+    // A target is a snapshot ref or a Playwright locator such as getByRole('button', { name: 'Send' }).
+    case 'click':
+      return ['click', shortText(input.target, 120, 'builder_browser_cli_invalid_target')]
+    case 'fill':
+      return ['fill', shortText(input.target, 120, 'builder_browser_cli_invalid_target'), shortText(input.text, 4_000, 'builder_browser_cli_invalid_text')]
+    case 'reload':
+      return ['reload']
     case 'find':
       return ['find', shortText(input.query, 500, 'builder_browser_cli_invalid_query')]
     case 'console': {
@@ -116,31 +129,75 @@ function commandArgs(
 export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
   private sandbox: SandboxInstance | null = null
   private readonly createSandbox: typeof Sandbox.create
+  private readonly getSandbox: typeof Sandbox.get
   private readonly origins: readonly string[]
   private readonly enabled: boolean
+  private readonly lifetimeMs: number
+  private readonly actions: readonly BuilderBrowserCliAction[]
+  private attachTo: string | null
 
   constructor(options: {
     ownerAuthorized: boolean
     env?: Environment
     createSandbox?: typeof Sandbox.create
+    getSandbox?: typeof Sandbox.get
+    /** The name of a bootstrapped sandbox from an earlier slice to attach to instead of creating one (verification campaign). */
+    sandboxName?: string | null
+    /** The sandbox's lifetime; the Builder's single-round default unless a caller needs the browser across slices. */
+    sandboxLifetimeMs?: number
+    /** Allow click, fill and reload: only for a fixed owner-authorized script, never a model-driven round. */
+    interactive?: boolean
   }) {
     this.enabled = options.ownerAuthorized === true
     this.origins = configuredOrigins(options.env ?? process.env)
     this.createSandbox = options.createSandbox ?? Sandbox.create
+    this.getSandbox = options.getSandbox ?? Sandbox.get
+    this.attachTo = options.sandboxName ?? null
+    this.lifetimeMs = options.sandboxLifetimeMs ?? SANDBOX_TIMEOUT_MS
+    this.actions = options.interactive === true ? INTERACTIVE_ACTIONS : ACTIONS
   }
 
   async capabilities(): Promise<BuilderBrowserCliCapability | null> {
     if (!this.enabled) return null
-    return Object.freeze({ actions: ACTIONS, allowedOrigins: this.origins })
+    return Object.freeze({ actions: this.actions, allowedOrigins: this.origins })
+  }
+
+  /** The name of the sandbox this port drives once it is ready, for a later slice to attach to. */
+  sandboxName(): string | null {
+    return this.sandbox?.name ?? null
+  }
+
+  /** Bootstrap (or attach) now and return the sandbox name, so a caller can checkpoint it before the first action. */
+  async warm(): Promise<string> {
+    return (await this.ready()).name
+  }
+
+  /** Forget the sandbox without stopping it: a later slice attaches to it by name. */
+  detach(): void {
+    this.sandbox = null
   }
 
   private async ready(): Promise<SandboxInstance> {
     if (!this.enabled) throw new Error('builder_browser_cli_not_authorized')
     if (this.sandbox) return this.sandbox
+    if (this.attachTo) {
+      const name = this.attachTo
+      this.attachTo = null
+      try {
+        const attached = await this.getSandbox({ name })
+        if (attached.status === 'running') {
+          this.sandbox = attached
+          return attached
+        }
+      } catch (error) {
+        console.warn('[builder_browser_cli_attach_failed]', { sandboxName: name, error: error instanceof Error ? error.message : String(error) })
+      }
+      // The earlier sandbox is gone (expired or stopped): bootstrap a fresh one below.
+    }
 
     const sandbox = await this.createSandbox({
       image: 'vercel/sandbox/node:24',
-      timeout: SANDBOX_TIMEOUT_MS,
+      timeout: this.lifetimeMs,
       resources: { vcpus: 1 },
       networkPolicy: 'deny-all',
       persistent: false,
@@ -251,9 +308,10 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
     url?: string
     query?: string
     target?: string
+    text?: string
     level?: 'error' | 'warning' | 'info' | 'debug'
   }) {
-    if (!ACTIONS.includes(input.action)) throw new Error('builder_browser_cli_action_rejected')
+    if (!this.actions.includes(input.action)) throw new Error('builder_browser_cli_action_rejected')
     const args = commandArgs(input, this.origins)
     try {
       const sandbox = await this.ready()
@@ -323,6 +381,10 @@ export function createBuilderPlaywrightCliPort(options: {
   ownerAuthorized: boolean
   env?: Environment
   createSandbox?: typeof Sandbox.create
-}): BuilderBrowserCliPort {
+  getSandbox?: typeof Sandbox.get
+  sandboxName?: string | null
+  sandboxLifetimeMs?: number
+  interactive?: boolean
+}): VercelSandboxPlaywrightCliPort {
   return new VercelSandboxPlaywrightCliPort(options)
 }

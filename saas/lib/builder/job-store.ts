@@ -153,6 +153,12 @@ export async function enqueueBuilderJob(input: {
   }
   const db = serviceClient()
   if (!db) throw new Error('builder_job_storage_unavailable')
+  // V1 retirement: no newly enqueued generic Builder job may omit the V2 engine tag.
+  // The owner-only Platform Engineer repair lane has a separate repository harness;
+  // campaign jobs have their own engine. Existing persisted legacy jobs remain readable.
+  if (input.jobKind !== 'standard' || (input.metadata?.builderEngine !== 'v2' && input.metadata?.builderEngine !== 'campaign' && input.metadata?.platformRepair !== true)) {
+    throw new Error('builder_v1_retired_use_v2')
+  }
   const runLimits = readBuilderRunLimits(input.objective)
   if (runLimits && (input.jobKind !== 'standard' || input.metadata?.builderEngine !== 'v2' || input.metadata?.platformRepair === true)) {
     throw new Error('builder_budget_v2_required')

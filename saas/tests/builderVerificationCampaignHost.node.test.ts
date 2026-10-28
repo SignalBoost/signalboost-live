@@ -140,5 +140,11 @@ test('the host ports execute against the live production path and read facts bac
   assert.equal(ports.builderFixture, undefined)
   assert.ok(ports.analysis && ports.routing && ports.release && ports.observability && ports.fault)
   assert.equal(PAC_CATALOG.filter(item => ['browser', 'governance', 'builder_fixture'].includes(item.port)).length, 5, 'five items stay BLOCKED until their host ports exist')
+  // A worker on another revision than the one under test never certifies production with code it lacks.
+  const preview = await host.isolatedFault('runpod_busy', 'deadbeef', undefined, 'preview-worker-sha')
+  assert.equal(preview.verdict, 'BLOCKED')
+  assert.equal(preview.failureCause, 'worker_revision_differs')
+  assert.equal((await host.isolatedFault('runpod_busy', null, undefined, 'deadbeef')).verdict, 'BLOCKED', 'unknown production revision blocks')
+  assert.equal((await host.isolatedFault('runpod_busy', 'deadbeef', undefined, null)).verdict, 'BLOCKED', 'unknown worker revision blocks')
 })
 

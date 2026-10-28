@@ -169,9 +169,19 @@ export async function productionTrace(correlationIds: readonly string[]): Promis
 
 /**
  * One fault, in isolation: the deployed reasoner runs in this job's async scope with a controlled provider stub as
- * its only provider and a fixed turn deadline. The stub records every call; the judge (faults.ts) decides.
+ * its only provider and a fixed turn deadline. The stub records every call; the judge (faults.ts) decides. The code
+ * that runs is this worker's own revision, so the check certifies production only when that revision IS the
+ * production revision under test (Codex on #4977: a preview worker must not certify production with code it lacks).
  */
-export async function isolatedFault(fault: CampaignFault, signal?: AbortSignal): Promise<PortResult> {
+export async function isolatedFault(fault: CampaignFault, productionCommit: string | null, signal?: AbortSignal, workerRevision: string | null = String(process.env.VERCEL_GIT_COMMIT_SHA || '').trim() || null): Promise<PortResult> {
+  if (!productionCommit || !workerRevision || workerRevision !== productionCommit) {
+    return {
+      verdict: 'BLOCKED',
+      actual: `this worker runs revision ${workerRevision || 'unknown'}, the production revision under test is ${productionCommit || 'unknown'}; the fault check only certifies the revision it runs`,
+      evidence: [{ kind: 'note', label: 'revision', detail: `worker=${workerRevision || 'unknown'} production=${productionCommit || 'unknown'}` }],
+      failureCause: 'worker_revision_differs',
+    }
+  }
   // The reasoner module needs the Next runtime; load it only when a fault actually runs so the host's other ports
   // stay loadable outside it.
   const { callRawCosReasoner, resolveCosReasoner } = await import('../../ai/cos/cosReasoner.ts')
@@ -202,7 +212,7 @@ export function createCampaignHostPorts(): CampaignPorts {
     deployment: () => deploymentFacts(),
     analysis: (prompt, signal) => productionAnalysis(prompt, signal),
     routing: (prompt, signal) => productionRouting(prompt, signal),
-    fault: (fault, signal) => isolatedFault(fault, signal),
+    fault: (fault, productionCommit, signal) => isolatedFault(fault, productionCommit, signal),
     release: (commit, signal) => releaseChecks(commit, signal),
     observability: ids => productionTrace(ids),
   }

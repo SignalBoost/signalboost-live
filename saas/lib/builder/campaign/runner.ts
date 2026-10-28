@@ -134,7 +134,7 @@ async function executeItem(item: CampaignItem, ports: CampaignPorts, ledger: Cam
       return { scenario: item.prompt || '', servedCommit: outcome.servedCommit, requestMs: outcome.latencyMs, result: { ...judged, correlationId: outcome.correlationId, evidence } }
     }
     case 'fault': {
-      const result = ports.fault ? await ports.fault(item.fault!, signal) : blocked('no isolated fault-injection port on this host')
+      const result = ports.fault ? await ports.fault(item.fault!, ledger.productionCommit, signal) : blocked('no isolated fault-injection port on this host')
       return { scenario: `fault: ${item.fault}`, result, interrupted: Boolean(ports.fault && signal?.aborted) }
     }
     case 'browser': {

@@ -86,3 +86,16 @@ test('History terminalizes abandoned durable COS workers rather than leaving run
   assert.match(store, /provenance->>status', 'running'/)
   assert.match(history, /expireStaleDurableCosTurns/)
 })
+
+
+test('failed durable turn is never recovered as successful History answer', () => {
+  const sentAt = Date.now()
+  const failed = [
+    { role: 'user', content: 'send invoice', created_at: new Date(sentAt).toISOString() },
+    { role: 'assistant', content: 'COS failed to send invoice', created_at: new Date(sentAt).toISOString(),
+      provenance: { schema: 'signalboost-cos-turn-v1', turnId: '11111111-1111-4111-8111-111111111111', status: 'failed' } },
+  ]
+  assert.equal(findRecoveredAssistantReply(failed, 'send invoice', sentAt), null)
+  assert.deepEqual(findDurableCosTurnReply(failed, '11111111-1111-4111-8111-111111111111'),
+    { content: 'COS failed to send invoice', status: 'failed' })
+})

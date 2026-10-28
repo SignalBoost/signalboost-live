@@ -1017,6 +1017,12 @@ export class BuilderToolLoop {
             continue
           }
         }
+        // A duplicate passing proof without a reproduced regression cannot repair anything.
+        // Finish with the actual diagnostic classification rather than spending more model
+        // rounds requesting an unchanged command or forcing an unjustified source edit.
+        if (passingProofBeforeChange && blockedAction.toolId === 'run') {
+          return { ok: false, error: 'builder_regression_not_reproduced', trace }
+        }
         const repeatedWrite = await reconcileRepeatedWrite(blockedAction, round)
         if (repeatedWrite === 'already_present' || repeatedWrite === 'different') continue
         if (repeatedWrite) return { ok: false, error: repeatedWrite, trace }
@@ -1194,6 +1200,10 @@ export class BuilderToolLoop {
       }
       // Replaying an unchanged passing command cannot establish missing test coverage.
       // Return a truthful terminal result instead of repeatedly paying for the same rejected run.
+      if (action.toolId === 'run' && completedRunsInCurrentWorkspaceState.has(fingerprint)
+        && passingProofBeforeChange) {
+        return { ok: false, error: 'builder_regression_not_reproduced', trace }
+      }
       if (action.toolId === 'run' && completedRunsInCurrentWorkspaceState.has(fingerprint)
         && task.minimumTests > 0 && !progress.testsSatisfied) {
         trace.push({ round, toolId: 'run', input: action.input, ok: false,

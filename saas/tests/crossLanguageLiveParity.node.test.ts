@@ -78,7 +78,7 @@ test('the chat route sends unflagged non-English questions to the judge and acts
   assert.match(route, /const nonEnglishUnflagged=!heuristicRequiresFreshEvidence&&!conversationRecallRequested&&mayBeNonEnglish\(input,language\)/)
   assert.match(route, /freshConversationContext\.contextUsed \|\| nonEnglishUnflagged\)/)
   assert.match(route, /const semanticRequiresFreshEvidence=semanticIntentRequiresFreshness\(semanticTaskIntent\)/)
-  assert.match(route, /baselineRequiresFreshEvidence=\(modelPlannedFreshEvidence\|\|heuristicRequiresFreshEvidence\|\|semanticRequiresFreshEvidence\)/)
+  assert.match(route, /baselineRequiresFreshEvidence=!suppliedIncidentAnalysis&&\(modelPlannedFreshEvidence\|\|heuristicRequiresFreshEvidence\|\|semanticRequiresFreshEvidence\)/)
 })
 
 test('the shared COS entry point does the same for every other caller', () => {

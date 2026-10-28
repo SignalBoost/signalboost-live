@@ -31,7 +31,7 @@ export async function startVerificationCampaign(input: Readonly<{
   const workspaceId = crypto.randomUUID()
   const conversationId = input.conversationId && UUID.test(input.conversationId) ? input.conversationId : crypto.randomUUID()
   await workspace.ensureWorkspace(workspaceId)
-  const reply = campaignRunningReply()
+  const reply = `${campaignRunningReply()}\n\nJob ID: ${jobId}. Status: queued (execution is not yet verified).`
   await enqueueBuilderJob({
     jobId, workspaceId, userId: input.userId, conversationId,
     objective: String(input.objective || '').trim().slice(0, 4_000) || `Run the production acceptance campaign ${PAC_CAMPAIGN_ID}.`,

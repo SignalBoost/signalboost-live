@@ -135,10 +135,10 @@ test('the host ports execute against the live production path and read facts bac
   assert.equal(failedRequest.status, null)
   assert.equal(failedRequest.ok, false)
   const ports = host.createCampaignHostPorts()
-  assert.equal(ports.fault, undefined)
   assert.equal(ports.browser, undefined)
   assert.equal(ports.governance, undefined)
   assert.equal(ports.builderFixture, undefined)
-  assert.ok(ports.analysis && ports.routing && ports.release && ports.observability)
-  assert.equal(PAC_CATALOG.filter(item => ['fault', 'browser', 'governance', 'builder_fixture'].includes(item.port)).length, 9, 'nine items stay BLOCKED until their host ports exist')
+  assert.ok(ports.analysis && ports.routing && ports.release && ports.observability && ports.fault)
+  assert.equal(PAC_CATALOG.filter(item => ['browser', 'governance', 'builder_fixture'].includes(item.port)).length, 5, 'five items stay BLOCKED until their host ports exist')
 })
+

@@ -294,9 +294,16 @@ export async function callRawCosReasoner(
     // investigation is impossible. Give analytical tasks one bounded fresh
     // synthesis attempt while the turn budget permits; never invent a result.
     const analyticalTasks = requestedAnalyticalTasks(args.prompt)
-    let initialDraft = first
+    // THE ANSWER THE PERSON READS MUST PARSE. For a user-answer turn the provider's text is a draft only when it
+    // parses as {answer, confidence}; broken JSON or an object without those keys is no draft, so the recovery call
+    // below still runs and nothing unparseable is ever this turn's text. Fault check PAC-10 (2026-10-28): the
+    // provider returned `{"answer": "The parser upgrade` and the turn released it verbatim.
+    const parseableDraft = (draft: string | null): string | null =>
+      draft && (args.writesUserAnswer !== true || parseLocalResult(draft)) ? draft : null
+    if (first && !parseableDraft(first)) console.warn('[cos-reasoner-draft-unparseable]', JSON.stringify({ turnId, phase: 'draft', length: first.length }))
+    let initialDraft = parseableDraft(first)
     if (!initialDraft && analyticalTasks.length > 0 && remainingMs(budget) >= 8_000) {
-      initialDraft = await recorder.time('analytical_no_draft_recovery', () => callLocalModel({
+      initialDraft = parseableDraft(await recorder.time('analytical_no_draft_recovery', () => callLocalModel({
         ...effectiveArgs,
         temperature: 0,
         prompt: [
@@ -309,7 +316,7 @@ export async function callRawCosReasoner(
       }, boundedInference()), 'model').catch(error => {
         console.warn('[cos-analytical-no-draft-recovery-failed]', error instanceof Error ? error.message : String(error))
         return null
-      })
+      }))
     }
     if (!initialDraft) {
       recorder.skip('quality_repair', 'no_draft')

@@ -4,15 +4,20 @@
 // in-process shortcuts: an analysis is one HTTP request to the public Concierge ingress of the live site, judged by
 // what the production path returned; the deployed commit is read from the deployment and compared with the
 // repository's main; release checks are read from GitHub for that commit; a request's trace is read back from the
-// production records by the turn id the production path returned. Ports this host does not yet provide (isolated
-// fault injection, a browser runner with a test account, governance read-back, the Builder fixture) are left
-// undefined so their items are BLOCKED with that cause.
+// production records by the turn id the production path returned. The one in-process port is fault injection: the
+// brief requires faults in isolation on the same release artifact, so the job runs the deployed reasoner in its own
+// async scope against a controlled provider stub (faults.ts); no user request and no real provider is touched.
+// Ports this host does not yet provide (a browser runner with a test account, governance read-back, the Builder
+// fixture) are left undefined so their items are BLOCKED with that cause.
 //
 // Credentials are read from the environment inside the job; nothing here logs or returns them.
 
 import { PUBLIC_BRAND } from '../../public-brand.ts'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
+import { withInferenceTransport } from '../../ai/inferenceTransport.ts'
+import { runWithTurnDeadline } from '../../ai/cos/cosTurnBudget.ts'
+import { createFaultStub, judgeFault, FAULT_PROMPT, FAULT_TURN_DEADLINE_MS, type CampaignFault } from './faults.ts'
 
 const GITHUB_API = 'https://api.github.com/repos/SignalBoost/signalboost-live'
 /** The live site reports the revision serving each response in this header (app/api/cos-browser/route.ts). */
@@ -162,11 +167,42 @@ export async function productionTrace(correlationIds: readonly string[]): Promis
   return { verdict: 'PASS', actual: `Every executed request (${correlationIds.length}) has a production trace with model, call count, timing, routing and outcome.`, evidence }
 }
 
+/**
+ * One fault, in isolation: the deployed reasoner runs in this job's async scope with a controlled provider stub as
+ * its only provider and a fixed turn deadline. The stub records every call; the judge (faults.ts) decides.
+ */
+export async function isolatedFault(fault: CampaignFault, signal?: AbortSignal): Promise<PortResult> {
+  // The reasoner module needs the Next runtime; load it only when a fault actually runs so the host's other ports
+  // stay loadable outside it.
+  const { callRawCosReasoner, resolveCosReasoner } = await import('../../ai/cos/cosReasoner.ts')
+  if (!resolveCosReasoner().config) return { verdict: 'BLOCKED', actual: 'no COS reasoner is configured on this host', evidence: [], failureCause: 'reasoner_not_configured' }
+  const stub = createFaultStub(fault)
+  const startedAt = Date.now()
+  let released: string | null = null
+  let escaped: string | null = null
+  try {
+    const reasoned = await withInferenceTransport(stub.transport, () => runWithTurnDeadline(startedAt + FAULT_TURN_DEADLINE_MS, () => callRawCosReasoner({
+      usageContext: { feature: 'cos_interactive_answer', purpose: 'verification_campaign_fault' },
+      writesUserAnswer: true,
+      temperature: 0,
+      maxTokens: 1800,
+      systemPrompt: 'You are COS. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+      prompt: FAULT_PROMPT,
+      signal,
+    })))
+    released = reasoned?.text ?? null
+  } catch (error) {
+    escaped = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+  }
+  return judgeFault({ fault, calls: stub.calls(), released, escaped, elapsedMs: Date.now() - startedAt })
+}
+
 export function createCampaignHostPorts(): CampaignPorts {
   return {
     deployment: () => deploymentFacts(),
     analysis: (prompt, signal) => productionAnalysis(prompt, signal),
     routing: (prompt, signal) => productionRouting(prompt, signal),
+    fault: (fault, signal) => isolatedFault(fault, signal),
     release: (commit, signal) => releaseChecks(commit, signal),
     observability: ids => productionTrace(ids),
   }

@@ -7,6 +7,7 @@ import { turnDeadlineRemainingMs, helperDeadlineRemainingMs, markUserAnswerStart
 import { estimateQwenContextTokens, planContextWindow } from './context-window-manager.ts'
 import { modelCapabilityProfileForId, requireModelCapability, type ModelTransportProtocol } from './modelCapabilityRegistry.ts'
 import { tryAssignedPlatformModelTurn } from './modelRuntimeAssignment.ts'
+import { currentInferenceTransport } from './inferenceTransport.ts'
 import {
   currentHarnessExecutionContext,
   harnessDeadlineRemainingMs,
@@ -508,6 +509,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   let transportFailure: string | null = null
   let toolCalls: readonly LocalModelToolCall[] = Object.freeze([])
   const requestedMaxTokens = args.maxTokens ?? 2048
+  const controlledTransport = currentInferenceTransport()
   const controller = new AbortController()
   const harnessContext = currentHarnessExecutionContext()
   const abortFromHarness = () => controller.abort(harnessContext?.signal.reason)
@@ -609,7 +611,8 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
       }))
     }
     inferenceStartedAt = Date.now()
-    const response = await builderBudgetedModelFetch(fetch)(`${config.baseUrl}/chat/completions`, {
+    // A controlled transport (verification campaign fault injection) replaces the network for this async scope only.
+    const response = await (controlledTransport ?? builderBudgetedModelFetch(fetch))(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
       signal: controller.signal,
@@ -732,7 +735,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
       success, httpStatus, error: errorText, finishReason, requestedMaxTokens,
       promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
     })
-    if (args.persistUsage !== false && !harnessContext?.signal.aborted && shouldPersistUsage(provider, config)) {
+    if (args.persistUsage !== false && controlledTransport === null && !harnessContext?.signal.aborted && shouldPersistUsage(provider, config)) {
       await recordLocalInferenceUsage({
         requestId, provider, model, context: usageContext,
         routeOwner,
@@ -976,6 +979,8 @@ export async function callLocalModelTurn(args: LocalModelCallArgs, config?: Loca
   const remaining = [turnBoundRemainingMs(args), harnessDeadlineRemainingMs()].filter((value): value is number => value !== null)
   if (remaining.some(value => value <= 0)) throw new Error(answerWindowHelper(args) && turnDeadlineRemainingMs() ? 'inference_answer_window_reserved' : 'inference_deadline_expired')
   if (args.writesUserAnswer === true) markUserAnswerStarted()
+  // Under a controlled transport the stub IS the provider: no assigned-model lookup, no RunPod readiness, no hedge.
+  if (currentInferenceTransport()) return callConfiguredModelTurn(args, config ?? localInferenceConfigFromEnv())
   const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
   if (config === undefined && !protectedIndependentEvaluation(args) && !feature.startsWith('university_')) {
     const assigned = await tryAssignedPlatformModelTurn(args)

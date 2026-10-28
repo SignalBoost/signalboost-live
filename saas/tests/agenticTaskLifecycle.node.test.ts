@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { beginAgenticTask, advanceAgenticTask, outstandingAgenticRequirements, validateDynamicWorkflow } from '../lib/agentic/taskLifecycle.ts'
+import { beginAgenticTask, advanceAgenticTask, outstandingAgenticRequirements, validateDynamicWorkflow, executeDynamicWorkflow } from '../lib/agentic/taskLifecycle.ts'
 
 test('unverified claims cannot complete an agentic task', () => {
  const state=beginAgenticTask('Repair the source and prove the change', ['source','tests'])
@@ -46,4 +46,35 @@ test('dynamic workflow refuses unknown tools, injected code, missing dependencie
  assert.ok(injected.errors.includes('unregistered_capability'))
  assert.ok(injected.errors.includes('unexpected_step_field'))
  assert.equal(injected.executionAuthorized,false)
+})
+
+test('dynamic execution requires a version-bound host grant and returns receipts in dependency order',async()=>{
+ const def={id:'retirement-advice',version:1,objective:'Answer the question, not rewrite the cable',steps:[
+  {id:'research',capability:'research',dependsOn:[]},
+  {id:'verify',capability:'verify',dependsOn:['research']},
+  {id:'answer',capability:'answer',dependsOn:['verify']},
+ ]}
+ const called:string[]=[]
+ const handlers=Object.fromEntries(['research','verify','answer'].map(capability=>[capability,async()=>{called.push(capability);return 'host:'+capability}]))
+ const denied=await executeDynamicWorkflow(def,handlers,null)
+ assert.equal(denied.status,'blocked')
+ assert.equal(called.length,0)
+ const stale=await executeDynamicWorkflow(def,handlers,{workflowId:def.id,version:2,allowedCapabilities:['research','verify','answer'],approvedStepIds:[]})
+ assert.equal(stale.reason,'missing_or_stale_grant')
+ const result=await executeDynamicWorkflow(def,handlers,{workflowId:def.id,version:1,allowedCapabilities:['research','verify','answer'],approvedStepIds:[]})
+ assert.equal(result.status,'completed')
+ assert.deepEqual(called,['research','verify','answer'])
+ assert.deepEqual(result.receipts.map(r=>r.evidenceId),['host:research','host:verify','host:answer'])
+})
+test('dynamic execution blocks unapproved Builder side effects and missing evidence',async()=>{
+ const def={id:'builder-repair',version:1,objective:'Repair software',steps:[{id:'edit',capability:'builder',dependsOn:[],requiresApproval:true}]}
+ let runs=0
+ const handler={builder:async()=>{runs++;return 'host:edit'}}
+ const grant={workflowId:def.id,version:1,allowedCapabilities:['builder'],approvedStepIds:[]}
+ const blocked=await executeDynamicWorkflow(def,handler,grant)
+ assert.equal(blocked.reason,'authorization_required')
+ assert.equal(runs,0)
+ const missing=await executeDynamicWorkflow(def,{builder:async()=>''},{...grant,approvedStepIds:['edit']})
+ assert.equal(missing.reason,'missing_host_receipt')
+ assert.equal(missing.status,'blocked')
 })

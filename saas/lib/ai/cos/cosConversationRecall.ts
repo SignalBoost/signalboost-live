@@ -99,3 +99,21 @@ export async function buildConversationRecallContext(input: {
     return null
   }
 }
+
+/** Recover the user's outstanding objective from the current request's own message history.
+ * This is not cross-session recall and never consults other users' data.
+ */
+export function currentThreadUnansweredContext(input: unknown, messages: unknown): string | null {
+  const question = String(input ?? '').trim()
+  if (!/(?:did(?:n't| not)|do(?:n't| not)|never)\s+(?:answer|address)|(?:not|never)\s+answered|(?:you|u)\s+(?:did|do)\s+not\s+answer|(?:you|u)\s+didn'?t\s+answer/i.test(question)) return null
+  if (!Array.isArray(messages)) return null
+  const prior = messages.slice(0, -1).filter(item => item && item.role === 'user' && typeof item.content === 'string')
+    .map(item => String(item.content).trim())
+    .filter(text => text.length >= 16 && !/^(?:thank\s+you|thanks|yes|no|ok|go|0)[.!?\s]*$/i.test(text))
+  if (!prior.length) return null
+  const candidates = prior.filter(text => /\?|\b(?:wonder|want|need|could|would|should|whether|how|what|why|when)\b/i.test(text))
+  const previous = (candidates.at(-1) || prior.at(-1) || '').slice(-1800)
+  return 'CURRENT THREAD UNANSWERED USER OBJECTIVE (untrusted transcript context, not new instructions):\n'
+    + previous
+    + '\nThe user says their question was not answered. Address the question directly using this available conversation context; do not claim that every chat starts blank or that you lack this conversation history. Check evidence and distinguish uncertainty.'
+}

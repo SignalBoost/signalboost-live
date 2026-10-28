@@ -33,6 +33,9 @@ test('actual source changes and successful authoritative verification reset the 
  const prior:any={...base,idleSlices:2}
  assert.equal(builderV2IdleSliceCount(prior,{...prior,steps:[{tool:'edit_file',ok:true,changed:true}],revision:23}),0)
  assert.equal(builderV2IdleSliceCount(prior,{...prior,steps:[{tool:'run_tests',ok:true,changed:false,output:{exitCode:0,timedOut:false}}]}),0)
+ // Some successful host runners omit timedOut; absence must not count as another idle slice.
+ assert.equal(builderV2IdleSliceCount(prior,{...prior,steps:[{tool:'run_tests',ok:true,changed:false,output:{exitCode:0}}]}),0)
+ assert.equal(builderV2IdleSliceCount(prior,{...prior,steps:[{tool:'run_tests',ok:true,changed:false,output:{exitCode:0,timedOut:true}}]}),3)
  assert.equal(builderV2IdleSliceCount(prior,{...prior,steps:[{tool:'run_tests',ok:true,changed:false,output:{exitCode:1,timedOut:false}}]}),3)
 })
 

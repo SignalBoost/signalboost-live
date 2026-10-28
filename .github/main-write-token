@@ -1,2 +1,2 @@
-base_sha=938bb8c863860a828708700905fdd0ce4a92c820
-branch=fix/freshness-honours-supplied-fact-reasoning-20261028
+base_sha=b6f9668eb52bc8b0665cd9743df7e7d83d14aa26
+branch=fix/cos-freshness-regression-gate-20261028

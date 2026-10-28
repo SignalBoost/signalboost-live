@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { PAC_CATALOG, PAC_01_PROMPT, PAC_CAMPAIGN_ID } from '../lib/builder/campaign/catalog.ts'
 import { certifyCampaign, renderCampaignReport, pendingItems } from '../lib/builder/campaign/ledger.ts'
+import { runCampaignJobSlice } from '../lib/builder/campaign/job.ts'
 import { runCampaignSlice, emptyCampaignLedger, judgeAnalysis, CAMPAIGN_ITEM_RESERVE_MS, itemReserveMs } from '../lib/builder/campaign/runner.ts'
 import type { AnalysisOutcome, CampaignPorts } from '../lib/builder/campaign/ports.ts'
 import { requestedAnalyticalTasks } from '../lib/ai/cos/answerTaskContract.ts'
@@ -183,4 +184,12 @@ test('the production commit is what the live site reported serving the first req
   assert.equal(cert.productionChanged, true)
   assert.equal(cert.outcome, 'BLOCKED')
   assert.match(renderCampaignReport(result.ledger, only), /Production changed during the campaign: yes \(rev-b\)/)
+})
+
+
+test('a completed campaign with unavailable host ports terminates failed, never succeeded', async () => {
+  const ports: CampaignPorts = { deployment, analysis: async prompt => released(prompt) }
+  const result = await runCampaignJobSlice({ checkpoint: null, workspaceId: 'fixture', ports, remainingMs: () => 10 * 60_000 })
+  assert.equal(result.status, 'failed')
+  if (result.status !== 'paused') assert.equal(result.outcome, 'BLOCKED')
 })

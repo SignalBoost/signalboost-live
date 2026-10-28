@@ -458,7 +458,14 @@ export async function callRawCosReasoner(
             })
             if (persisted.error) throw new Error('cos_verification_audit_persist_failed')
           },
-          check: async (request, answer) => parseAnswerCompletionCheck(await callLocalModel({
+          // A complete numbered contract already has a trusted host verifier below.
+          // Skip the optional neural checker in this case: it can contend with
+          // background RunPod work or exhaust the fallback model context window.
+          // The host verifier and durable audit receipt are still required.
+          check: async (request, answer) => {
+            if (requestedAnalyticalTasks(request).length > 0 && missingAnalyticalTasks(request, answer).length === 0) return null
+            if (remainingMs(budget) < 30_000) return null
+            return parseAnswerCompletionCheck(await callLocalModel({
             ...effectiveArgs,
             writesUserAnswer: false,
             temperature: 0,
@@ -466,7 +473,8 @@ export async function callRawCosReasoner(
             usageContext: { ...(effectiveArgs.usageContext ?? { feature: 'cos_interactive_answer' }), purpose: 'answer_completion_check' },
             systemPrompt: ANSWER_COMPLETION_CHECK_SYSTEM_PROMPT,
             prompt: `REQUEST:\n${request}\n\nANSWER:\n${answer}`,
-          }, { ...boundedInference(), timeoutMs: Math.min(20_000, boundedInference().timeoutMs) })),
+          }, { ...boundedInference(), timeoutMs: Math.min(8_000, boundedInference().timeoutMs) }))
+          },
           complete: async (request, answer, missing) => {
             const written = await callLocalModel({
               ...effectiveArgs,

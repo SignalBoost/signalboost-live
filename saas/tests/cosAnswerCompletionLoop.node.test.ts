@@ -281,3 +281,13 @@ test('unavailable checker never bypasses failed host verdict or failed audit per
   assert.equal(failedAudit.stopped, 'checker_unavailable')
   assert.deepEqual(failedAudit.missing, ['verification_receipt_persistence_failed'])
 })
+
+
+test('numbered completion checked by host does not consume optional model capacity', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
+  const check = source.slice(source.indexOf('check: async (request, answer) => {'), source.indexOf('complete: async (request, answer, missing)'))
+  assert.match(check, /requestedAnalyticalTasks\(request\)\.length > 0 && missingAnalyticalTasks\(request, answer\)\.length === 0\) return null/)
+  assert.match(check, /remainingMs\(budget\) < 30_000\) return null/)
+  assert.match(check, /timeoutMs: Math\.min\(8_000,/)
+  assert.match(source, /persistVerification: async receipt/)
+})

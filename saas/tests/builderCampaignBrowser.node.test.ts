@@ -7,7 +7,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   runBrowserCheck, newBrowserSession, checkRequest, occurrences, productionRequestStatus,
-  BROWSER_ANSWER_WAIT_MS, BROWSER_SLICE_RESERVE_MS, UI, type BrowserDriver, type BrowserSession, type DriverStep,
+  BROWSER_ANSWER_WAIT_MS, BROWSER_SLICE_RESERVE_MS, UI, campaignBrowserOrigins, type BrowserDriver, type BrowserSession, type DriverStep,
 } from '../lib/builder/campaign/browserChecks.ts'
 import { runCampaignSlice, emptyCampaignLedger } from '../lib/builder/campaign/runner.ts'
 import { PAC_CATALOG } from '../lib/builder/campaign/catalog.ts'
@@ -22,6 +22,8 @@ function fakePage(options: Readonly<{
   signedInAfterSubmit?: boolean
   requestsOutput?: string
   loginWorks?: boolean
+  /** After a reload the Assistant page lists the conversation's title only until its entry is opened. */
+  listedOnly?: boolean
 }> = {}) {
   const actions: string[] = []
   let page = ''
@@ -29,18 +31,21 @@ function fakePage(options: Readonly<{
   let clock = 1_000_000
   let request = ''
   let stopped = false
+  let reloaded = false
+  let reopened = false
   const now = () => clock
   const sleep = async (ms: number) => { clock += ms }
   const render = () => {
     const lines: string[] = []
     if (page === 'login') lines.push('textbox "Email address"', 'textbox "Password"', 'button "Log in"')
     if (page === 'home') lines.push('textbox "Ask COS anything…"')
-    if (page === 'assistant') lines.push('textbox "Ask the concierge…"', 'sidebar: ' + (request ? request.slice(0, 40) : ''))
-    if (request) lines.push(`user: ${request}`)
-    if (request && submittedAt !== null && !stopped) {
+    if (page === 'assistant') lines.push('textbox "Ask the concierge…"', 'button "' + (request ? request.slice(0, 40) : '') + '"')
+    const transcriptHidden = page === 'assistant' && reloaded && options.listedOnly !== false && !reopened
+    if (request && !transcriptHidden) lines.push(`user: ${request}`)
+    if (request && submittedAt !== null && !stopped && !transcriptHidden) {
       const answered = clock - submittedAt >= (options.answerAfterMs ?? 20_000)
       if (options.failureText && answered) lines.push(options.failureText)
-      else if (answered) lines.push('COS', 'answer: consumer lag rises when processing stalls on I/O; Copy response')
+      else if (answered) lines.push('COS', page === 'home' ? 'answer: consumer lag rises when processing stalls on I/O; Copy response' : 'answer: consumer lag rises when processing stalls on I/O; button "👍 Helpful"')
       else lines.push(page === 'home' ? 'COS is thinking…' : 'button "Stop"')
     }
     return lines.join('\n')
@@ -54,11 +59,12 @@ function fakePage(options: Readonly<{
       if (target === UI.homeSend || target === UI.assistantSend) submittedAt = clock
       if (target === UI.loginSubmit && options.loginWorks !== false) page = 'dashboard'
       if (target === UI.assistantStop) stopped = true
+      if (request && target === UI.historyEntry(request.slice(0, 7))) reopened = true
       return ok()
     },
     find: async text => { actions.push(`find ${text}`); const body = render(); return ok(body.split('\n').filter(line => line.includes(text)).join('\n')) },
     snapshot: async () => { actions.push('snapshot'); return ok(render()) },
-    reload: async () => { actions.push('reload'); return ok() },
+    reload: async () => { actions.push('reload'); reloaded = true; return ok() },
     requests: async () => { actions.push('requests'); return ok(options.requestsOutput ?? '1 [POST] https://itmounts.com/api/cos-browser => 200') },
     close: async () => { actions.push('close'); return ok() },
   }
@@ -116,6 +122,7 @@ test('PAC-14 and PAC-15 are BLOCKED without a test account, and sign in with one
   const pass14 = await runBrowserCheck({ testId: 'PAC-14', session: newBrowserSession('PAC-14', persisted.now(), 'sbx'), driver: persisted.driver, credentials, records, now: persisted.now, remainingMs: () => 300_000, sleep: persisted.sleep })
   assert.equal(pass14.status === 'done' && pass14.result.verdict, 'PASS', pass14.status === 'done' ? pass14.result.actual : '')
   assert.ok(persisted.actions.includes(`fill ${UI.loginEmail}`) && persisted.actions.includes(`click ${UI.loginSubmit}`) && persisted.actions.includes('reload'))
+  assert.ok(persisted.actions.some(action => action.startsWith('click getByRole(\'button\', { name: /PAC')), 'the saved conversation is reopened from History after the reload')
   assert.ok(!persisted.actions.some(action => action.includes(credentials.password)), 'the password never enters the action log')
   assert.ok(!JSON.stringify(pass14).includes(credentials.password), 'the password never enters the evidence')
 
@@ -138,6 +145,20 @@ test('PAC-15: Stop while in flight, reload, exactly one recorded request and no 
   const early = await runBrowserCheck({ testId: 'PAC-15', session: newBrowserSession('PAC-15', notInFlight.now(), 'sbx'), driver: notInFlight.driver, credentials, records: async () => ({ user: 1, assistant: 1 }), now: notInFlight.now, remainingMs: () => 300_000, sleep: notInFlight.sleep })
   assert.equal(early.status === 'done' && early.result.verdict, 'FAIL')
   assert.match(early.status === 'done' ? early.result.actual : '', /not in flight/)
+})
+
+test('PAC-14 fails when History lists the conversation but reopening it shows no answer', async () => {
+  const site = fakePage({ answerAfterMs: 10_000 })
+  const original = site.driver.click
+  const driver = { ...site.driver, click: async (target: string) => { if (target.startsWith("getByRole('button', { name: /PAC")) return { ok: false, stdout: '', detail: 'exit=1' }; return original(target) } }
+  const result = await runBrowserCheck({ testId: 'PAC-14', session: newBrowserSession('PAC-14', site.now(), 'sbx'), driver, credentials, records: async () => ({ user: 1, assistant: 1 }), now: site.now, remainingMs: () => 300_000, sleep: site.sleep })
+  assert.equal(result.status === 'done' && result.result.verdict, 'FAIL')
+})
+
+test('the campaign browser may reach the site and the sign-in service the site calls from the browser', () => {
+  assert.equal(campaignBrowserOrigins({}), 'https://itmounts.com,https://www.itmounts.com')
+  assert.equal(campaignBrowserOrigins({ NEXT_PUBLIC_SUPABASE_URL: 'https://abc.supabase.co/rest' }), 'https://itmounts.com,https://www.itmounts.com,https://abc.supabase.co')
+  assert.equal(campaignBrowserOrigins({ NEXT_PUBLIC_SUPABASE_URL: 'not a url' }), 'https://itmounts.com,https://www.itmounts.com')
 })
 
 test('helpers: occurrences and the production request status from the CLI request list', () => {
@@ -171,5 +192,7 @@ test('runner: a pending browser check ends the slice with its session checkpoint
   assert.equal(calls[1].session?.phase, 'submitted', 'the second slice continues the checkpointed session')
   assert.equal(calls[2].session?.sandboxName, 'sbx-run', 'the next browser item reuses the sandbox')
   assert.equal(calls[2].session?.phase, 'start')
+  assert.notEqual(calls[2].session?.token, calls[1].session?.token, 'each browser item gets its own request token')
+  assert.equal(calls[2].session?.testId, 'PAC-14')
   assert.deepEqual(calls.map(call => call.last), [false, false, false, true])
 })

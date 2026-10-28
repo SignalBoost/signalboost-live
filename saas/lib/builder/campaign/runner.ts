@@ -13,7 +13,7 @@ import type { CampaignItem } from './catalog.ts'
 import type { CampaignEvidence, CampaignLedger, CampaignLedgerRow, CampaignVerdict } from './ledger.ts'
 import { pendingItems } from './ledger.ts'
 import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
-import type { BrowserSession } from './browserChecks.ts'
+import { newBrowserSession, type BrowserSession } from './browserChecks.ts'
 import { missingAnalyticalTasks } from '../../ai/cos/answerTaskContract.ts'
 
 /**
@@ -118,7 +118,7 @@ function blocked(cause: string): PortResult {
 
 type Executed = Readonly<{ result: PortResult; scenario: string; servedCommit?: string | null; requestMs?: number; interrupted?: boolean; browser?: BrowserSession | null; pending?: boolean }>
 
-async function executeItem(item: CampaignItem, ports: CampaignPorts, ledger: CampaignLedger, signal: AbortSignal | undefined, context: Readonly<{ browser: BrowserSession | null; remainingMs: () => number; lastBrowserItem: boolean }>): Promise<Executed> {
+async function executeItem(item: CampaignItem, ports: CampaignPorts, ledger: CampaignLedger, signal: AbortSignal | undefined, context: Readonly<{ browser: BrowserSession | null; remainingMs: () => number; lastBrowserItem: boolean; now: () => number }>): Promise<Executed> {
   switch (item.port) {
     case 'analysis': {
       if (!ports.analysis) return { result: blocked('no production-path analysis port on this host'), scenario: item.prompt || '' }
@@ -142,8 +142,9 @@ async function executeItem(item: CampaignItem, ports: CampaignPorts, ledger: Cam
     }
     case 'browser': {
       if (!ports.browser) return { result: blocked('no browser runner on this host'), scenario: `browser workflow ${item.id}` }
-      // A session from an earlier slice continues only when it is this item's; a finished item's session keeps the sandbox.
-      const session = context.browser?.testId === item.id ? context.browser : context.browser ? { ...context.browser, testId: item.id, phase: 'start' as const, submittedAt: null, log: [] } : null
+      // A session from an earlier slice continues only when it is this item's; a finished item's session keeps the
+      // sandbox, and the next item gets its own request token (Codex on #4980: a shared token made PAC-15 count PAC-14's request).
+      const session = context.browser?.testId === item.id ? context.browser : context.browser ? newBrowserSession(item.id, context.now(), context.browser.sandboxName) : null
       const outcome = await ports.browser(item.id, session, { remainingMs: context.remainingMs, last: context.lastBrowserItem }, signal)
       if (signal?.aborted) return { result: blocked('interrupted'), scenario: `browser workflow ${item.id}`, interrupted: true, browser: outcome.session }
       if (outcome.status === 'pending') return { result: blocked('pending'), scenario: `browser workflow ${item.id}`, pending: true, browser: outcome.session }
@@ -242,7 +243,7 @@ export async function runCampaignSlice(input: Readonly<{
       reliability = null
       continue
     }
-    const executed = await executeItem(item, input.ports, ledger, input.signal, { browser, remainingMs: input.remainingMs, lastBrowserItem: browserItems.at(-1) === item.id })
+    const executed = await executeItem(item, input.ports, ledger, input.signal, { browser, remainingMs: input.remainingMs, lastBrowserItem: browserItems.at(-1) === item.id, now })
     if (executed.browser !== undefined) browser = executed.browser
     if (executed.interrupted) return state('aborted', reliability, item.id)
     // A browser check waiting for the page hands the slice back; the next slice continues the same session.

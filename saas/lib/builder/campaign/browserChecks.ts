@@ -44,6 +44,10 @@ export const UI = Object.freeze({
   assistantSend: "getByRole('button', { name: 'Send' })",
   assistantStop: "getByRole('button', { name: 'Stop' })",
   assistantStopText: 'Stop',
+  /** Every answer on the Assistant page carries its feedback row; this label marks a rendered answer. */
+  assistantAnswerText: 'Helpful',
+  /** The History sidebar entry whose title carries the request token (the page lists titles only until one is opened). */
+  historyEntry: (token: string) => `getByRole('button', { name: /${token}/ })`,
 })
 
 /** Failure messages the UI shows when the production path did not answer; any of them on the page is FAIL. */
@@ -53,6 +57,21 @@ export const FAILURE_TEXTS = Object.freeze([
   'I could not create a response',
   'I could not reach COS just now',
 ])
+
+/**
+ * The origins the campaign browser may reach: the live site, and the authentication service the site's sign-in
+ * form calls from the browser (Codex on #4980: with egress limited to the site, PAC-14/15 could never sign in).
+ */
+export function campaignBrowserOrigins(env: Readonly<Record<string, string | undefined>> = process.env): string {
+  const origins = [SITE_URL, 'https://www.itmounts.com']
+  try {
+    const auth = new URL(String(env.NEXT_PUBLIC_SUPABASE_URL || '')).origin
+    if (auth && !origins.includes(auth)) origins.push(auth)
+  } catch {
+    // No authentication origin configured: the site alone.
+  }
+  return origins.join(',')
+}
 
 export type DriverStep = Readonly<{ ok: boolean; stdout: string; detail: string }>
 
@@ -226,7 +245,7 @@ export async function runBrowserCheck(input: BrowserCheckInput): Promise<Browser
         const failure = FAILURE_TEXTS.find(text => snapshot.stdout.includes(text))
         if (failure) return failed(save({}), `the page shows a failure message: "${failure}"`, [`page excerpt: ${snapshot.stdout.slice(0, 400)}`])
         const stillWorking = snapshot.stdout.includes(UI.homeThinking) || occurrences(snapshot.stdout, UI.assistantStopText) > 0
-        const answered = testId === 'PAC-13' ? snapshot.stdout.includes(UI.homeCopyResponse) : !stillWorking && snapshot.stdout.includes(session.token)
+        const answered = testId === 'PAC-13' ? snapshot.stdout.includes(UI.homeCopyResponse) : !stillWorking && snapshot.stdout.includes(UI.assistantAnswerText)
         if (answered && !stillWorking) {
           log.push(`answer on the page ${input.now() - submittedAt} ms after submit`)
           save({ phase: 'answered' })
@@ -250,16 +269,23 @@ export async function runBrowserCheck(input: BrowserCheckInput): Promise<Browser
     log.push(`reload: ${reloaded.detail}`)
     if (!reloaded.ok) return failed(save({}), 'could not reload the page')
     await input.sleep(5_000)
+    // After a reload the Assistant page lists saved conversations by title; the saved result is shown only once its
+    // entry is opened, so that is what "return" means here.
+    const listed = await driver.find(session.token)
+    const reopened = found(listed, session.token) ? await driver.click(UI.historyEntry(session.token)) : null
+    if (reopened) { log.push(`open the saved conversation from History: ${reopened.detail}`); await input.sleep(3_000) }
     const snapshot = await driver.snapshot()
     const requestsOnPage = occurrences(snapshot.stdout, session.token)
+    const answerShown = snapshot.stdout.includes(UI.assistantAnswerText)
     const records = await input.records(session.token)
     const recorded = records ? `records: ${records.user} request(s), ${records.assistant} answer(s)` : 'records: unreadable'
-    log.push(`after reload: request on the page ${requestsOnPage} time(s); ${recorded}`)
+    log.push(`after reload: request on the page ${requestsOnPage} time(s); answer shown: ${answerShown ? 'yes' : 'no'}; ${recorded}`)
     await driver.close()
     if (testId === 'PAC-14') {
-      if (requestsOnPage === 0) return failed(save({}), 'the completed request is not on the page after reload', [`page excerpt: ${snapshot.stdout.slice(0, 400)}`])
+      if (!reopened || !reopened.ok) return failed(save({}), 'the completed request is not listed in History after reload', [`page excerpt: ${snapshot.stdout.slice(0, 400)}`])
+      if (requestsOnPage === 0 || !answerShown) return failed(save({}), 'the saved conversation does not show the request and its answer after reload', [`page excerpt: ${snapshot.stdout.slice(0, 400)}`])
       if (!records || records.user < 1 || records.assistant < 1) return failed(save({}), `the completed request is shown after reload but the production records do not hold it (${recorded})`)
-      return passed(save({}), 'The completed request and its answer are still shown after a reload and are held in the production records.')
+      return passed(save({}), 'After a reload the conversation is listed in History, reopens with the request and its answer, and is held in the production records.')
     }
     // PAC-15: nothing still executing; exactly one request recorded and at most one answer.
     if (occurrences(snapshot.stdout, UI.assistantStopText) > 0) return failed(save({}), 'the request is still executing after Stop and reload')

@@ -20,7 +20,7 @@ import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
 import { withInferenceTransport } from '../../ai/inferenceTransport.ts'
 import { runWithTurnDeadline } from '../../ai/cos/cosTurnBudget.ts'
 import { createFaultStub, judgeFault, FAULT_PROMPT, FAULT_TURN_DEADLINE_MS, type CampaignFault } from './faults.ts'
-import { newBrowserSession, runBrowserCheck, BROWSER_SLICE_RESERVE_MS, type BrowserDriver, type BrowserSession, type DriverStep } from './browserChecks.ts'
+import { campaignBrowserOrigins, newBrowserSession, runBrowserCheck, BROWSER_SLICE_RESERVE_MS, type BrowserDriver, type BrowserSession, type DriverStep } from './browserChecks.ts'
 import { createBuilderPlaywrightCliPort, type VercelSandboxPlaywrightCliPort } from '../playwright-cli-port.ts'
 
 const GITHUB_API = 'https://api.github.com/repos/SignalBoost/signalboost-live'
@@ -239,17 +239,24 @@ function browserCredentials(): Readonly<{ email: string; password: string }> | n
   return email && password ? { email, password } : null
 }
 
-/** How many user and assistant messages the production records hold for a request token. */
+/**
+ * How many user messages carry a request token, and how many assistant messages follow them in their conversations.
+ * An answer does not repeat the token (Codex on #4980), so answers are counted by position after the request.
+ */
 export async function requestRecords(token: string): Promise<Readonly<{ user: number; assistant: number }> | null> {
   const db = cosServiceDb()
   if (!db) return null
-  const { data, error } = await db.from('assistant_messages').select('role').ilike('content', `%${token}%`)
-  if (error || !Array.isArray(data)) return null
-  return {
-    user: data.filter(row => row.role === 'user').length,
-    assistant: data.filter(row => row.role === 'assistant').length,
-  }
+  const requests = await db.from('assistant_messages').select('conversation_id, message_order').eq('role', 'user').ilike('content', `%${token}%`)
+  if (requests.error || !Array.isArray(requests.data)) return null
+  const rows = requests.data as Array<{ conversation_id: string; message_order: number }>
+  if (!rows.length) return { user: 0, assistant: 0 }
+  const answers = await db.from('assistant_messages').select('conversation_id, message_order').eq('role', 'assistant').in('conversation_id', [...new Set(rows.map(row => row.conversation_id))])
+  if (answers.error || !Array.isArray(answers.data)) return null
+  const assistant = (answers.data as Array<{ conversation_id: string; message_order: number }>)
+    .filter(answer => rows.some(request => request.conversation_id === answer.conversation_id && answer.message_order > request.message_order)).length
+  return { user: rows.length, assistant }
 }
+
 
 /**
  * One browser check, continued across slices. The sandbox is created on the first call and named in the session so
@@ -262,7 +269,10 @@ export async function browserCheck(
   signal?: AbortSignal,
 ): Promise<Readonly<{ status: 'done'; result: PortResult; session: BrowserSession }> | Readonly<{ status: 'pending'; session: BrowserSession }>> {
   let current = session ?? newBrowserSession(testId, Date.now())
-  const port = createBuilderPlaywrightCliPort({ ownerAuthorized: true, interactive: true, sandboxName: current.sandboxName, sandboxLifetimeMs: BROWSER_SANDBOX_LIFETIME_MS })
+  const port = createBuilderPlaywrightCliPort({
+    ownerAuthorized: true, interactive: true, sandboxName: current.sandboxName, sandboxLifetimeMs: BROWSER_SANDBOX_LIFETIME_MS,
+    env: { ...process.env, BUILDER_PLAYWRIGHT_CLI_ALLOWED_ORIGINS: campaignBrowserOrigins() },
+  })
   const stop = async () => { await port.close().catch(() => undefined) }
   try {
     if (!current.sandboxName) {

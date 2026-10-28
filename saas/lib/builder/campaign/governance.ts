@@ -68,6 +68,10 @@ export function judgeGovernance(records: GovernanceRecords): PortResult {
     { kind: 'record' as const, label: 'Provider calls', detail: `${calls.length} call(s) of the interactive features since ${records.windowStart}; by provider ${byProvider}; longest ${longestCall} ms; failed without finish reason ${unexplainedCalls}; refused for background work ${refusals}` },
   ]
   if (!turns.length) return { verdict: 'BLOCKED', actual: 'No turn record of this campaign\'s requests was found to judge.', evidence, failureCause: 'no turn records' }
+  // Provider usage is written best-effort; turns that made model calls with no call record cannot certify the call
+  // rules (Codex on #4981): absent evidence is BLOCKED, never PASS.
+  const callsMade = turns.reduce((sum, item) => sum + (item.modelCalls ?? 0), 0)
+  if (callsMade > 0 && !calls.length) return { verdict: 'BLOCKED', actual: `The turns made ${callsMade} model call(s) but no provider call record exists for the window; the call rules cannot be judged.`, evidence, failureCause: 'no provider call records' }
   if (failures.length) return { verdict: 'FAIL', actual: failures.join('; '), evidence, failureCause: failures[0] }
   return { verdict: 'PASS', actual: `Every turn stayed inside the ${GOVERNANCE_TURN_CEILING_MS / 1000} s ceiling with bounded calls, no call outlived it, failures carry their reason, every provider is authorized, and background work refused at most ${GOVERNANCE_MAX_BACKGROUND_REFUSALS} interactive request.`, evidence }
 }

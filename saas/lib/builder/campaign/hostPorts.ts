@@ -24,7 +24,7 @@ import { createFaultStub, judgeFault, FAULT_PROMPT, FAULT_TURN_DEADLINE_MS, type
 import { campaignBrowserOrigins, newBrowserSession, runBrowserCheck, BROWSER_SLICE_RESERVE_MS, type BrowserDriver, type BrowserSession, type DriverStep } from './browserChecks.ts'
 import { createBuilderPlaywrightCliPort, type VercelSandboxPlaywrightCliPort } from '../playwright-cli-port.ts'
 import { judgeGovernance, INTERACTIVE_FEATURES, type CallRecord, type TurnRecord } from './governance.ts'
-import { judgeFixture, newFixtureSession, FIXTURE_OBJECTIVE, FIXTURE_SLICE_MAX_STEPS, FIXTURE_TOTAL_DEADLINE_MS, FIXTURE_WORKSPACE_ID, type FixtureSession } from './fixture.ts'
+import { judgeFixture, newFixtureSession, FIXTURE_OBJECTIVE, FIXTURE_RESUMABLE_REASONS, FIXTURE_SLICE_MAX_STEPS, FIXTURE_TOTAL_DEADLINE_MS, FIXTURE_WORKSPACE_ID, type FixtureSession } from './fixture.ts'
 
 const GITHUB_API = 'https://api.github.com/repos/SignalBoost/signalboost-live'
 /** The live site reports the revision serving each response in this header (app/api/cos-browser/route.ts). */
@@ -342,9 +342,11 @@ export async function fixtureRun(session: FixtureSession | null, slice: Readonly
   const receipts = outcome.checkpoint?.steps ?? [...current.receipts, ...outcome.steps]
   const next: FixtureSession = { ...current, files, checkpoint: outcome.checkpoint ?? null, receipts }
   const elapsedMs = Date.now() - current.startedAt
-  // Not finished, still inside the fixture's own deadline, and able to resume: the next slice continues it.
+  // Not finished, still inside the fixture's own deadline, and paused at a slice boundary (its step budget or a model
+  // call that did not answer in this slice): the next slice continues it. Exhausted whole-job budgets, cancellation
+  // and rejected checkpoints are terminal (Codex on #4981: the per-slice step budget is the normal pause, not a FAIL).
   const resumable = !outcome.ok && Boolean(outcome.checkpoint) && !signal?.aborted && elapsedMs < FIXTURE_TOTAL_DEADLINE_MS
-    && !/budget|deadline|scope_mismatch|workspace_changed|checkpoint_rejected/.test(outcome.reason)
+    && FIXTURE_RESUMABLE_REASONS.includes(outcome.reason)
   if (resumable) return { status: 'pending', session: next }
   const reason = elapsedMs >= FIXTURE_TOTAL_DEADLINE_MS && !outcome.ok ? `fixture deadline of ${FIXTURE_TOTAL_DEADLINE_MS / 60_000} min reached (${outcome.reason})` : outcome.reason
   return { status: 'done', session: next, result: judgeFixture({ ok: outcome.ok, reason, receipts, files, elapsedMs }) }

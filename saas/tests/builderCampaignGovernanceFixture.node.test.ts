@@ -6,7 +6,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { judgeGovernance, GOVERNANCE_TURN_CEILING_MS, GOVERNANCE_MAX_CALLS_PER_TURN, type CallRecord, type TurnRecord } from '../lib/builder/campaign/governance.ts'
-import { judgeFixture, newFixtureSession, FIXTURE_COMMAND, FIXTURE_FILES, FIXTURE_OBJECTIVE, type FixtureSession } from '../lib/builder/campaign/fixture.ts'
+import { judgeFixture, newFixtureSession, FIXTURE_COMMAND, FIXTURE_FILES, FIXTURE_OBJECTIVE, FIXTURE_RESUMABLE_REASONS, type FixtureSession } from '../lib/builder/campaign/fixture.ts'
 import { builderTaskContract } from '../lib/builder/task-contract.ts'
 import { runCampaignSlice, emptyCampaignLedger } from '../lib/builder/campaign/runner.ts'
 import { PAC_CATALOG } from '../lib/builder/campaign/catalog.ts'
@@ -42,6 +42,9 @@ test('governance: each rule of the brief fails on its own evidence', () => {
   check({ turns: [turn('t1')], calls: [call({ success: false, finishReason: null })], windowStart: window }, /no finish reason/)
   check({ turns: [turn('t1')], calls: [call({ provider: 'openai' })], windowStart: window }, /unauthorized route: openai/)
   assert.equal(judgeGovernance({ turns: [], calls: [call()], windowStart: window }).verdict, 'BLOCKED')
+  const noCalls = judgeGovernance({ turns: [turn('t1', { modelCalls: 4 })], calls: [], windowStart: window })
+  assert.equal(noCalls.verdict, 'BLOCKED', 'turns that made calls with no call record cannot certify the call rules')
+  assert.equal(judgeGovernance({ turns: [turn('t1', { modelCalls: 0 })], calls: [], windowStart: window }).verdict, 'PASS', 'a turn that made no call needs no call record')
 })
 
 const receipt = (tool: BuilderV2Receipt['tool'], ok: boolean, output: unknown, changed = false): BuilderV2Receipt => ({ tool, ok, changed, output })
@@ -52,6 +55,14 @@ test('fixture: the objective names the real command and the files carry the plan
   assert.deepEqual(builderTaskContract(FIXTURE_OBJECTIVE).commands, [FIXTURE_COMMAND])
   assert.match(FIXTURE_FILES['app.js'], /sum \+ line\.price,/)
   assert.match(FIXTURE_FILES['app.test.js'], /quantity: 3/)
+})
+
+test('fixture: the per-slice step budget and an unanswered model call resume; exhausted budgets and cancellation are terminal', () => {
+  assert.ok(FIXTURE_RESUMABLE_REASONS.includes('builder_v2_step_budget'))
+  assert.ok(FIXTURE_RESUMABLE_REASONS.includes('builder_v2_model_unavailable'))
+  for (const terminal of ['builder_v2_model_call_budget_exhausted', 'builder_v2_step_budget_exhausted', 'builder_v2_cancelled', 'builder_v2_checkpoint_scope_mismatch', 'builder_v2_invalid_model_action']) {
+    assert.ok(!FIXTURE_RESUMABLE_REASONS.includes(terminal), terminal)
+  }
 })
 
 test('fixture: fail, inspect, minimal change, pass with the same command is PASS', () => {

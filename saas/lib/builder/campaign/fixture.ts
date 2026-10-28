@@ -24,6 +24,12 @@ export const FIXTURE_COMMAND = 'node --test app.test.js'
 export const FIXTURE_TOTAL_DEADLINE_MS = 15 * 60_000
 /** Receipts per slice; a resumed run gets a fresh slice budget on top of its saved receipts. */
 export const FIXTURE_SLICE_MAX_STEPS = 12
+/**
+ * The Builder's outcomes that are a pause at a slice boundary with a resumable checkpoint: its per-slice step budget
+ * (and stall detection) and a model call that did not answer in this slice. Every other unfinished outcome
+ * (whole-job budgets exhausted, cancelled, checkpoint rejected, invalid action) is terminal.
+ */
+export const FIXTURE_RESUMABLE_REASONS = Object.freeze(['builder_v2_step_budget', 'builder_v2_model_unavailable'])
 
 /** The defect: the total ignores each line's quantity. */
 export const FIXTURE_FILES = Object.freeze({

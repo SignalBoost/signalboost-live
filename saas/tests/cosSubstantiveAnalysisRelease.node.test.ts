@@ -67,5 +67,9 @@ test('the reasoner and the primary route release by the same rule', () => {
   const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
   assert.match(reasoner, /remainingTaskGaps\.length && !\(finalParsedForPolicy && releasableAnalyticalAnswer\(effectiveArgs\.prompt, finalParsedForPolicy\.answer\)\)/)
   assert.match(reasoner, /repairedTaskGaps\.length < firstTaskGaps\.length/)
-  assert.doesNotMatch(route, /missingAnalyticalTasks\(/)
+  // The primary route's last-chance rescue now checks missing deliverables before
+  // releasing. This must not weaken the shared substantive release contract.
+  assert.match(route, /firstMissing=analyticalTasks\.length\?missingAnalyticalTasks\(input,reply\):\[\]/)
+  assert.match(route, /missingAnalyticalTasks\(input,candidateReply\)\.length\)return null/)
+  assert.match(route, /releasableAnalyticalAnswer\(/)
 })

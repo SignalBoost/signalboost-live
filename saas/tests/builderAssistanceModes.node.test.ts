@@ -96,7 +96,7 @@ test('the worker pauses Work with me before any publication and publishes after 
   assert.ok(approved.indexOf('readBuilderWorkspaceFingerprint(') < approved.indexOf('await publishIsolatedJobFiles('), 'files re-checked before publishing')
   assert.match(approved, /awaiting\.fingerprint !== job\.metadata\.approvedWorkspaceFingerprint/)
   assert.doesNotMatch(approved, /createBuilderCodingAiPort|BuilderV2Agent/, 'no model call')
-  const dispatch = runner.slice(runner.indexOf("if (job.jobKind === 'standard' && job.metadata.builderEngine === 'v2')"))
+  const dispatch = runner.slice(runner.indexOf("if (job.jobKind === 'standard' && job.metadata.builderEngine === 'v2' && job.metadata.platformRepair !== true)"))
   assert.ok(dispatch.indexOf('await runApprovedIsolatedPublication(job, totalDeadlineMs)') < dispatch.indexOf('new BuilderV2Agent('))
 })
 

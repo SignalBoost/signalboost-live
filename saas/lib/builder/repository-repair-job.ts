@@ -106,6 +106,7 @@ export async function enqueueSignalBoostRepositoryRepairJob(input: {
     objective,
     jobKind: 'standard',
     metadata: {
+      builderEngine: 'v2',
       platformRepair: true,
       productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null,
       commitSha: target.fullCommitSha || target.commitSha,

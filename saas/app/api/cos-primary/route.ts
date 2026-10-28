@@ -877,6 +877,13 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const modelPlannedCreativeMemory=agentCapabilities.has('creative_memory')
   // A question about an earlier conversation with this user is answered from their own history, never from the public web.
   const conversationRecallRequested=Boolean(userId)&&(modelPlannedConversationRecall||detectConversationRecallIntent(input))
+  // Long quoted/reference documents can contain mutable-fact keywords, but a user asking
+  // for advice about the supplied material still deserves a useful, qualified answer.
+  // This is NOT permission to present unverified public law or current state as fact.
+  const documentAdvisoryRequest = input.length > 1200
+    && /(?:\b(?:advice|advise|recommend|options|wonder|should i|could i|can i)\b)/i.test(input.slice(-900))
+    && /(?:\?|\bwonder\b)/i.test(input.slice(-900))
+    && !/(?:\b(?:verify|check|confirm|what is the current law|latest law|current status)\b)/i.test(input.slice(-400))
   const suppliedIncidentAnalysis=isSelfContainedIncidentAnalysis(input)
   const heuristicRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested
   // A model capability plan is the semantic decision for this turn. Do not charge a second model
@@ -985,7 +992,8 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       ? semanticTaskIntent??await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
       : semanticTaskIntent
     if(!authoritySatisfied){
-      if((!freshSources.length && !mustFailClosedWithoutAuthoritativeLiveEvidence(lookupInput))
+      if((documentAdvisoryRequest && !directCategory)
+        ||(!freshSources.length && !mustFailClosedWithoutAuthoritativeLiveEvidence(lookupInput))
         ||(freshSources.length>0&&liveFactsIntent!==null&&liveFactsIntent.suppliedContextPrimary===true
           &&liveFactsIntent.externalFactsRequired===false&&liveFactsIntent.confidence>=0.72)){
         freshMissUseLocal=true
@@ -1097,6 +1105,9 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   }
 
   let reasoningPrompt=input
+  if(documentAdvisoryRequest && freshMissUseLocal){
+    reasoningPrompt = `ADVICE-ONLY EVIDENCE BOUNDARY: Answer the user's actual question using the supplied document as an explicitly unverified premise. Do not assert any external current law, eligibility, enactment, benefit, contact, or legal entitlement unless verified by authoritative sources. Clearly distinguish what the document says from what requires confirmation. Give useful reasoning and practical next verification steps; do not draft an unsolicited email or letter.\\n\\n${reasoningPrompt}`
+  }
   if(semanticTaskIntent?.mode==='contextual_interpretation'&&freshConversationContext.contextUsed&&freshConversationContext.previousUserText){
     reasoningPrompt=`PREVIOUS USER CONTEXT:\n${freshConversationContext.previousUserText}\n\nCURRENT USER REQUEST:\n${input}`
   }

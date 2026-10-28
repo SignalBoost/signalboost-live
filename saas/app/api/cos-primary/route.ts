@@ -470,7 +470,8 @@ async function runCompletionFirstRescue(input:string,language:string,audience:Co
   // Recover missing deliverables once; never mark a partial rescue as completed.
   const firstMissing=analyticalTasks.length?missingAnalyticalTasks(input,reply):[]
   if(firstMissing.length){
-    if(turnDeadlineRemainingMs() < 12_000)return null
+    const timeLeft=turnDeadlineRemainingMs()
+    if(timeLeft!==null && timeLeft<12_000)return releasableAnalyticalAnswer(input,reply)?{reply,reasonerLabel:resolveCosReasoner().config?.label??'cos-reasoner',confidence:Math.max(.01,Math.min(1,parsed?.confidence??.5))}:null
     const repaired=await callCosReasoner({
       temperature:0,writesUserAnswer:true,maxTokens:userAnswerMaxTokens(),disableThinking:true,
       usageContext:{feature:'cos_interactive_answer',purpose:'completion_rescue'},
@@ -481,8 +482,10 @@ async function runCompletionFirstRescue(input:string,language:string,audience:Co
     }).catch(()=>null)
     const candidate=repaired?.text?parseLocalResult(repaired.text):null
     const candidateReply=String(candidate?.answer||'').trim()
-    if(!candidateReply||hasUnsafePublicModelOutput(candidateReply)||missingAnalyticalTasks(input,candidateReply).length)return null
-    reply=candidateReply
+    if(candidateReply&&!hasUnsafePublicModelOutput(candidateReply)&&(
+      missingAnalyticalTasks(input,candidateReply).length===0 || releasableAnalyticalAnswer(input,candidateReply)
+    )) reply=candidateReply
+    else if(!releasableAnalyticalAnswer(input,reply))return null
   }
   const resolved=resolveCosReasoner()
   return{reply,reasonerLabel:resolved.config?.label??'cos-reasoner',confidence:Math.max(.01,Math.min(1,parsed?.confidence??.5))}

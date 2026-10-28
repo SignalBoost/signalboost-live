@@ -49,3 +49,21 @@ test('a completed-looking answer cannot mint its own verified receipt', () => {
  assert.equal(result.complete, false)
  assert.deepEqual(result.outstanding, ['requested_analytical_outcome'])
 })
+
+test('customer-service completion loop remains bound to COS and Builder reasoning', () => {
+ const envelope = cosExecutionEnvelope('I am not TIC limited. Can I extend my age-65 retirement next year? The memo discusses TIC changes.')
+ for (const stage of ['UNDERSTAND', 'INVESTIGATE', 'RESOLVE', 'ANTICIPATE', 'OFFER', 'REMEMBER']) {
+  assert.ok(envelope.instructionBlock.includes(stage), stage)
+ }
+ assert.match(envelope.instructionBlock, /VERIFICATION GATE/)
+ assert.match(envelope.instructionBlock, /answer the personal question first/)
+ assert.match(envelope.instructionBlock, /sources that actually support them/)
+ assert.match(envelope.instructionBlock, /do not send, purchase, deploy, alter accounts/)
+ assert.match(envelope.instructionBlock, /never claim persistence without a storage receipt/)
+})
+
+test('closed-world incident remains an analysis task with no invented live-evidence requirement', () => {
+ const envelope=cosExecutionEnvelope(incident)
+ assert.match(envelope.instructionBlock, /For a supplied-facts incident with enumerated deliverables/)
+ assert.equal(envelope.contract.prohibitsExecution,true)
+})

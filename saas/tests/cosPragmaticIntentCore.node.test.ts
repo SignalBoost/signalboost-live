@@ -10,7 +10,7 @@ test('route-level neural interpretation suppression remains before live freshnes
   const heuristic = route.indexOf('heuristicRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested')
   const semantic = route.indexOf('? await classifyCosSemanticTaskIntent')
   const semanticFresh = route.indexOf('semanticRequiresFreshEvidence=semanticIntentRequiresFreshness(semanticTaskIntent)')
-  const baseline = route.indexOf('baselineRequiresFreshEvidence=(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested')
+  const baseline = route.indexOf('baselineRequiresFreshEvidence=!suppliedIncidentAnalysis&&(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested')
   const finalGate = route.indexOf('requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness')
   const liveSearch = route.indexOf('freshEvidenceSearchQueries(lookupInput)')
 

@@ -174,7 +174,7 @@ test('deep semantic identity routing separates current identity from naming work
 
 test('new semantic-only public visual requests still reach bounded semantic detection without pre-classifying ordinary questions', async () => {
   const source = await readFile(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
-  assert.match(source, /const directVisual = browserSurface === 'concierge' && !softwareExecutionObjective\n\s*&& isConciergeVisualObjective\(prompt\) && semanticIntentConfirmsPicture\(await turnIntent\(\)\)/)
+  assert.match(source, /const directVisual = browserSurface === 'concierge' && !softwareExecutionObjective\n\s*&& prompt\.length <= MAX_VISUAL_OBJECTIVE_CHARS\n\s*&& isConciergeVisualObjective\(prompt\) && semanticIntentConfirmsPicture\(await turnIntent\(\)\)/)
   assert.match(source, /const semanticVisualEligible =[\s\S]*shouldResolveSemanticVisualRequest\(messages, prompt\)/)
   assert.match(source, /const semanticResolution = semanticVisualEligible[\s\S]*await resolveSemanticVisualRequest\(messages, prompt\)/)
   assert.match(source, /const visualObjective = browserSurface === 'assistant'[\s\S]*\? null[\s\S]*: directVisual \? prompt : semanticResolution\?\.objective \?\? null/)

@@ -245,12 +245,16 @@ test('a successful model response is shown without waiting for History or a seco
 test('accepted durable turn deadline retains running identity and does not imply server failure or retry',()=>{
  const recovery=readFileSync(join(process.cwd(),'lib/ai/cos/assistantTransportRecovery.ts'),'utf8')
  const client=readFileSync(join(process.cwd(),'lib/ai/cos/agentProgressClient.ts'),'utf8')
- assert.match(recovery,/COS_DURABLE_PENDING_COPY/)
- assert.match(recovery,/Open History to view its final result/)
- assert.match(recovery,/Do not submit it again/)
- assert.match(client,/source: 'cos-durable-history-deadline',[\\s\\S]*?turnId,[\\s\\S]*?status: 'running'/)
- assert.match(client,/reply: durablePendingReply\\(requestBody\\),\\s*source: 'cos-durable-history-deadline'/)
+ assert.ok(recovery.includes('COS_DURABLE_PENDING_COPY'))
+ assert.ok(recovery.includes('Open History to view its final result'))
+ assert.ok(recovery.includes('Do not submit it again'))
+ const pending=client.indexOf("source: 'cos-durable-history-deadline'")
+ assert.ok(pending>0)
+ const excerpt=client.slice(pending-100,pending+240)
+ assert.ok(excerpt.includes('reply: durablePendingReply(requestBody)'))
+ assert.ok(excerpt.includes('turnId,'))
+ assert.ok(excerpt.includes("status: 'running'"))
  for (const locale of ['en','es','pt','pl','ru','de','fr','it','ja','ko','ar']) {
-   assert.match(recovery,new RegExp('\\\\b'+locale+': '))
+   assert.ok(recovery.includes('  '+locale+': '),locale)
  }
 })

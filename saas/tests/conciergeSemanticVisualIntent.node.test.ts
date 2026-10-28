@@ -164,3 +164,10 @@ test('long nonvisual acceptance campaign never invokes optional semantic visual 
   const campaign = 'Run production acceptance campaign. Record test status, commit SHA, and Playwright evidence. '.repeat(12)
   assert.equal(shouldResolveSemanticVisualRequest([{ role: 'user', content: campaign }], campaign), false)
 })
+
+
+test('oversized user context is not blindly sent to 8000-character image endpoint', () => {
+  const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /prompt\.length <= 8_000 && isConciergeVisualObjective\(prompt\)/)
+  assert.match(route, /!directVisual && prompt\.length <= 8_000/)
+})

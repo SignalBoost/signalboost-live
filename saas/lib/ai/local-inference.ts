@@ -985,6 +985,13 @@ export async function callLocalModelTurn(args: LocalModelCallArgs, config?: Loca
   if (args.writesUserAnswer === true) markUserAnswerStarted()
   // Under a controlled transport the stub IS the provider: no assigned-model lookup, no RunPod readiness, no hedge.
   if (currentInferenceTransport()) return callConfiguredModelTurn(args, config ?? localInferenceConfigFromEnv())
+  // Fail before provider routing/hedging: a missing reservation for an explicitly selected paid DeepInfra
+  // endpoint must not trigger a backup HTTP attempt. The per-call reservation is still charged in
+  // callConfiguredModelTurn; this early check only prevents ungoverned fallback dispatch.
+  if (config && providerFor(config) === 'deepinfra' && currentHarnessExecutionContext()?.providerCostLedger) {
+    const reservation = Number(args.maxEstimatedCostUsd)
+    if (!Number.isFinite(reservation) || reservation <= 0) throw new Error('deepinfra_harness_cost_reservation_required')
+  }
   const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
   if (config === undefined && !protectedIndependentEvaluation(args) && !feature.startsWith('university_')) {
     const assigned = await tryAssignedPlatformModelTurn(args)

@@ -19,7 +19,7 @@ import { PUBLIC_BRAND } from '../../public-brand.ts'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
 import { withInferenceTransport } from '../../ai/inferenceTransport.ts'
-import { runWithTurnDeadline } from '../../ai/cos/cosTurnBudget.ts'
+import { runWithTurnDeadline, runWithoutTurnDeadline } from '../../ai/cos/cosTurnBudget.ts'
 import { createFaultStub, judgeFault, FAULT_PROMPT, FAULT_TURN_DEADLINE_MS, type CampaignFault } from './faults.ts'
 import { campaignBrowserOrigins, newBrowserSession, runBrowserCheck, BROWSER_SLICE_RESERVE_MS, type BrowserDriver, type BrowserSession, type DriverStep } from './browserChecks.ts'
 import { createBuilderPlaywrightCliPort, type VercelSandboxPlaywrightCliPort } from '../playwright-cli-port.ts'
@@ -198,7 +198,7 @@ export async function isolatedFault(fault: CampaignFault, productionCommit: stri
   let released: string | null = null
   let escaped: string | null = null
   try {
-    const reasoned = await withInferenceTransport(stub.transport, () => runWithTurnDeadline(startedAt + FAULT_TURN_DEADLINE_MS, () => callRawCosReasoner({
+    const reasoned = await runWithoutTurnDeadline(() => withInferenceTransport(stub.transport, () => runWithTurnDeadline(startedAt + FAULT_TURN_DEADLINE_MS, () => callRawCosReasoner({
       usageContext: { feature: 'cos_interactive_answer', purpose: 'verification_campaign_fault' },
       writesUserAnswer: true,
       temperature: 0,
@@ -206,7 +206,7 @@ export async function isolatedFault(fault: CampaignFault, productionCommit: stri
       systemPrompt: 'You are COS. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
       prompt: FAULT_PROMPT,
       signal,
-    })))
+    }))))
     released = reasoned?.text ?? null
   } catch (error) {
     escaped = error instanceof Error ? `${error.name}: ${error.message}` : String(error)

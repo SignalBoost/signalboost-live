@@ -1,5 +1,6 @@
 import { compileCosInstructionContract, decideCosLoopContinuation, USER_OUTCOME_AUTHORITY } from './instructionContract.ts'
 import { missingAnalyticalTasks } from './answerTaskContract.ts'
+import { decideOutcome } from '../../agentic/outcomeGate.ts'
 
 /** Shared across the reasoning, prompt, context and continuation boundaries. */
 export function cosExecutionEnvelope(prompt: string) {
@@ -31,5 +32,13 @@ export function cosAnswerProgress(prompt: string, answer: string, previousMissin
     latestStepAddedEvidence: addedEvidence,
     budgetRemaining: true,
   })
-  return { missing, decision, complete: missing.length === 0 }
+  const outcome = decideOutcome({
+    requirements: ['all_requested_analytical_tasks'],
+    satisfied: missing.length === 0 && answer.trim() ? ['all_requested_analytical_tasks'] : [],
+    verifiedReceipts: answer.trim() ? 1 : 0,
+    lastStepChangedEvidence: addedEvidence,
+    repeatedUnproductiveSteps: previousMissing !== null && missing.length >= previousMissing ? 2 : 0,
+    budgetRemaining: true,
+  })
+  return { missing, decision, complete: outcome.status === 'complete' }
 }

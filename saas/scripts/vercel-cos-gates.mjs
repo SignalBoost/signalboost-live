@@ -700,6 +700,7 @@ const tests = [
   'tests/cosNeuralEvidenceReasoning.node.test.ts',
 
   'tests/cosPragmaticIntentCore.node.test.ts',
+  'tests/cosTurnIntentLane.node.test.ts',
 
   'tests/cosModelFirstAgentLoop.node.test.ts',
 

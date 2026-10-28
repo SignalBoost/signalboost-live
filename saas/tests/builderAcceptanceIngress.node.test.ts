@@ -100,6 +100,8 @@ function setup(owner: boolean, specialistResponse?: any, forceClassifierFalse = 
     '@/lib/ai/cos/publicConciergeIdentity': { publicConciergeIdentityReply: () => null },
     '@/lib/ai/cos/publicConciergeIdentityIntent': { shouldResolveSemanticPublicIdentity: () => true, resolveSemanticPublicIdentity: unexpected('identity model') },
     '@/lib/public-brand': { PUBLIC_BRAND: { name: 'iTMounts' } },
+    // One judge decision per turn; this build request never reaches a lane the judge would have to confirm.
+    '@/lib/ai/cos/cosTurnIntent': { withCosTurnIntent: (run: () => Promise<unknown>) => run(), cosTurnIntent: unexpected('turn intent judge') },
     '@/app/api/cos-primary/route': { POST: () => { calls.model++; return NextResponse.json({ reply: 'HTTP\nPASS\nINCOMPLETE' }) } },
     // A build request in words reaches the Software Specialist through COS's planner, never through its wording
     // (2026-10-26); the planner here asks for it as the real one does for software work.

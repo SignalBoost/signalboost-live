@@ -6,7 +6,8 @@
 
 import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
-import { classifyCosSemanticTaskIntent, semanticIntentRequiresFreshness, semanticIntentSuppressesFreshness } from './cosSemanticTaskIntent.ts'
+import { semanticIntentRequiresFreshness, semanticIntentSuppressesFreshness } from './cosSemanticTaskIntent.ts'
+import { cosTurnIntent } from './cosTurnIntent.ts'
 import { mayBeNonEnglish } from './crossLanguageFreshness.ts'
 import { turnDeadlineRemainingMs } from './cosTurnBudget.ts'
 import { classifyKnowledgeAccess } from './knowledgeAccessPolicy.ts'
@@ -898,7 +899,7 @@ export async function tryCOSFirstAnswer(input: {
   // the semantic judge, so a live-fact question is not answered from memory merely because of its language.
   const nonEnglishUnflagged = !heuristicRequiresFreshEvidence && mayBeNonEnglish(input.prompt, input.language)
   const semanticTaskIntent = heuristicRequiresFreshEvidence || nonEnglishUnflagged
-    ? await classifyCosSemanticTaskIntent({
+    ? await cosTurnIntent({
         input: input.prompt,
         language: input.language,
         previousAssistant: input.previousAssistant,

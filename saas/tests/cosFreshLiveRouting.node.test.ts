@@ -53,7 +53,8 @@ test('fresh/current facts use evidence-only local COS synthesis before external 
 test('a complete deterministic historical roster is returned before model synthesis', () => {
   const source = route()
   assert.match(source, /deterministicOfficeHolderHasRequestedRoster/)
-  assert.match(source, /!asksForHistoricalRoster\(lookupInput\)\|\|deterministicOfficeHolderHasRequestedRoster/)
+  assert.match(source, /const rosterRequested=asksForHistoricalRoster\(lookupInput\)&&semanticIntentRequiresFreshness\(await cosTurnIntent\(/)
+  assert.match(source, /!rosterRequested\|\|deterministicOfficeHolderHasRequestedRoster/)
   assert.match(source, /&& !deterministicOfficeHolderHasRequestedRoster/)
 })
 

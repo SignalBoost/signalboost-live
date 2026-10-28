@@ -19,10 +19,10 @@ test('the exact production prompt routes to the visual generator deterministical
   const route = await readRepoFile('app/api/cos-browser/route.ts')
   requireWiring(route, {
     file: 'saas/app/api/cos-browser/route.ts',
-    purpose: 'Keep explicit visual requests on the zero-cost fast path while semantic ambiguity uses the deep conversation classifier.',
-    expect: /const directVisual = !softwareExecutionObjective && prompt\.length <= 8_000 && isConciergeVisualObjective\(prompt\)/,
-    insert: '    const directVisual = !softwareExecutionObjective && prompt.length <= 8_000 && isConciergeVisualObjective(prompt)',
-    after: '    // ambiguous — including follow-up language — is decided by the deep semantic reasoner',
+    purpose: 'An explicit visual request reaches the picture generator when the turn intent judge confirms a picture was asked for.',
+    expect: /isConciergeVisualObjective\(prompt\) && semanticIntentConfirmsPicture\(await turnIntent\(\)\)/,
+    insert: '      && isConciergeVisualObjective(prompt) && semanticIntentConfirmsPicture(await turnIntent())',
+    after: '    const directVisual = browserSurface === \'concierge\' && !softwareExecutionObjective',
     requiresImport: "import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
   })
 })
@@ -166,8 +166,7 @@ test('long nonvisual acceptance campaign never invokes optional semantic visual 
 })
 
 
-test('oversized user context is not blindly sent to 8000-character image endpoint', async () => {
+test('a visual word inside pasted context does not reach the image endpoint without the judge confirming a picture', async () => {
   const route = await readRepoFile('app/api/cos-browser/route.ts')
-  assert.match(route, /prompt\.length <= 8_000 && isConciergeVisualObjective\(prompt\)/)
-  assert.match(route, /!directVisual && prompt\.length <= 8_000/)
+  assert.match(route, /const directVisual = browserSurface === 'concierge' && !softwareExecutionObjective\n\s*&& isConciergeVisualObjective\(prompt\) && semanticIntentConfirmsPicture\(await turnIntent\(\)\)/)
 })

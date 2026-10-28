@@ -338,7 +338,7 @@ test('self-contained writing bypasses public identity, Software Specialist and v
   assert.ok(sharedCos < visual)
   assert.match(source, /isAuthoringObjectiveWithoutLiveLookup\(prompt\)/)
   assert.match(source, /!isCosCodingObjective\(prompt, routingContext\)/)
-  assert.match(source, /!isConciergeVisualObjective\(prompt\)/)
+  assert.match(source, /&& semanticIntentConfirmsWriting\(await turnIntent\(\)\)\n  if \(fastAuthoringIngress\)/)
 })
 
 

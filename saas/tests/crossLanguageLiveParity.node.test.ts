@@ -84,6 +84,6 @@ test('the chat route sends unflagged non-English questions to the judge and acts
 test('the shared COS entry point does the same for every other caller', () => {
   const core = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerCore.ts', import.meta.url), 'utf8')
   assert.match(core, /const nonEnglishUnflagged = !heuristicRequiresFreshEvidence && mayBeNonEnglish\(input\.prompt, input\.language\)/)
-  assert.match(core, /const semanticTaskIntent = heuristicRequiresFreshEvidence \|\| nonEnglishUnflagged\s*\n\s*\? await classifyCosSemanticTaskIntent\(/)
+  assert.match(core, /const semanticTaskIntent = heuristicRequiresFreshEvidence \|\| nonEnglishUnflagged\s*\n\s*\? await cosTurnIntent\(/)
   assert.match(core, /const baselineRequiresFreshEvidence = heuristicRequiresFreshEvidence \|\| semanticIntentRequiresFreshness\(semanticTaskIntent\)/)
 })

@@ -20,7 +20,8 @@ import { runOwnerDomainBrainstorm } from '@/lib/ai/cos/domainBrainstorm'
 import { isPlatformSelfKnowledgePrompt, isSelfContainedIncidentAnalysis, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { classifyKnowledgeAccess } from '@/lib/ai/cos/knowledgeAccessPolicy'
 import { decodePlannerSearchQueriesHeader, liveSearchQueriesForTurn, PLANNER_SEARCH_QUERIES_HEADER } from '@/lib/ai/cos/plannerSearchQueries'
-import { classifyCosSemanticTaskIntent, semanticIntentIsSelfContainedContentGeneration, semanticIntentRequiresFreshness, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
+import { semanticIntentConfirmsWriting, semanticIntentIsSelfContainedContentGeneration, semanticIntentRequiresFreshness, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
+import { cosTurnIntent, withCosTurnIntent } from '@/lib/ai/cos/cosTurnIntent'
 import { mayBeNonEnglish } from '@/lib/ai/cos/crossLanguageFreshness'
 import {
   classifyAuthoritativeVolatileFact,
@@ -782,6 +783,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     && !hasAttachments
     && isAuthoringObjectiveWithoutLiveLookup(input)
     && !isCosCodingObjective(input)
+    && semanticIntentConfirmsWriting(await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null}))
   // ONE PIPELINE, NO PRE-COS DETOUR (2026-09-27). Production evidence (cos-latency-stage rows, Concierge Polish
   // question 14:06 ET): primary:before_cos_first was 38,749ms. Two fast-authoring detours each ran their full
   // FAST_AUTHORING_TIMEOUT_MS (18s: two 9s attempts), returned nothing, and only then did COS answer in 15.5s.
@@ -898,7 +900,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     && (heuristicRequiresFreshEvidence || requiresLiveTravelPlanningEvidence(input) || freshConversationContext.contextUsed || nonEnglishUnflagged)
   const semanticIntentStartedAt=Date.now()
   const semanticTaskIntent=semanticTaskIntentNeeded
-    ? await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
+    ? await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
     : null
   if(semanticTaskIntentNeeded)recordCosLatencyStage('primary:semantic_intent',Date.now()-semanticIntentStartedAt)
   const semanticRequiresFreshEvidence=semanticIntentRequiresFreshness(semanticTaskIntent)
@@ -989,7 +991,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     // incident report was refused as "live evidence unavailable" because word rules flagged it and the web returned
     // unrelated pages; with no sources at all it would have been answered.
     const liveFactsIntent=!authoritySatisfied&&freshSources.length
-      ? semanticTaskIntent??await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
+      ? semanticTaskIntent??await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
       : semanticTaskIntent
     if(!authoritySatisfied){
       if((documentAdvisoryRequest && !directCategory)
@@ -1024,8 +1026,12 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     const deterministicFresh=resolveDeterministicDirectFlight(lookupInput,freshSources)
     const deterministicOfficeHolder=resolveDeterministicFreshOfficeHolder(lookupInput,freshSources)
     const deterministicOfficeHolderHasRequestedRoster=Boolean(deterministicOfficeHolder&&/\n\nPast[\s\S]+s for the requested period:\n- .+\n- /.test(deterministicOfficeHolder.reply))
-    const deterministicAnswer=deterministicFresh??(!asksForHistoricalRoster(lookupInput)||deterministicOfficeHolderHasRequestedRoster?deterministicOfficeHolder:null)
-    if (deterministicOfficeHolder && asksForHistoricalRoster(lookupInput) && !deterministicOfficeHolderHasRequestedRoster) {
+    // The list word rule only suggests a historical-list request; the turn's intent judge must confirm the user wants
+    // outside-world facts. Production 2026-10-28: a pasted cable with a question about the user's own options got
+    // "COS read the authoritative historical-list page but could not safely parse its dated rows".
+    const rosterRequested=asksForHistoricalRoster(lookupInput)&&semanticIntentRequiresFreshness(await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null}))
+    const deterministicAnswer=deterministicFresh??(!rosterRequested||deterministicOfficeHolderHasRequestedRoster?deterministicOfficeHolder:null)
+    if (deterministicOfficeHolder && rosterRequested && !deterministicOfficeHolderHasRequestedRoster) {
       partialFreshOfficeHolderReply=partialOfficeHolderReply(deterministicOfficeHolder.reply,language)
     }
     if(deterministicAnswer){
@@ -1041,7 +1047,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       return NextResponse.json({ok:true,reply,source:'cos-fresh-deterministic-grounded',confidence_score:deterministicFresh.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,volatile_cache_written:volatileCacheWritten,live_evidence_retrieved_this_turn:true,live_evidence_sources:deterministicFresh.sources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
 
-    if(asksForHistoricalRoster(lookupInput)&&claimResearch.pagesRead>0){
+    if(rosterRequested&&claimResearch.pagesRead>0){
       const reply='COS read the authoritative historical-list page but could not safely parse its dated rows. The list claim remains unverified; no model synthesis was used.'
       const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:freshSources,retrievedAt:freshRetrievedAt,error:'Structured dated-row parsing did not produce a safe roster.',synthesisAccepted:null})
       await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-roster-unparsed',{prompt:lookupInput,answered:false,confidence:0,branch:'fresh_roster_unparsed'})
@@ -1144,7 +1150,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // before the generic failed-closed reply. This catches natural human requests such as “help me say
   // something warm” or “come up with a greeting” without hard-coding those phrasings into routing.
   if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&!hasAttachments&&!isCosCodingObjective(input)&&!fastAuthoringEligible){
-    const rescueIntent=semanticTaskIntent??await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
+    const rescueIntent=semanticTaskIntent??await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
     if(semanticIntentIsSelfContainedContentGeneration(rescueIntent)){
       const semanticFast=await runFastAuthoring(input,language)
       if(semanticFast)return fastAuthoringResponse(startedAt,input,semanticFast,'cos-fast-authoring-semantic-rescue')
@@ -1313,7 +1319,7 @@ export async function POST(req: NextRequest) {
     const traceId = `harness:${harnessManifest.runId}`
     const traceStartedAt = Date.now()
     emitAgentTrace(agentTraceEvent({ traceId, kind: 'request', name: 'cos.primary', status: 'started', actor: 'cos', attributes: { harnessProfile: harnessManifest.profile } }))
-    const response = await postCosPrimary(req)
+    const response = await withCosTurnIntent(() => postCosPrimary(req))
     emitAgentTrace(agentTraceEvent({ traceId, kind: 'outcome', name: 'cos.primary', status: response.ok ? 'succeeded' : 'failed', actor: 'cos', durationMs: Date.now() - traceStartedAt, attributes: { httpStatus: response.status, harnessProfile: harnessManifest.profile } }))
     const headers = new Headers(response.headers)
     headers.delete('content-length')

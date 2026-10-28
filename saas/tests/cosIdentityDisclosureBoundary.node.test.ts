@@ -121,7 +121,7 @@ test('the completion rescue lane carries the same COS identity and company knowl
 
 test('interactive COS answers run with hidden thinking off so they finish inside the interactive timeout', () => {
   // Production 2026-09-27: owner answers failed at ~22-28s (20s interactive model timeout) with thinking on.
-  const callAt = enterprise.indexOf("usageContext:{ feature:input.inferenceLane === 'university_exam' ? 'university_exam' : interactiveReasonerFeature(input.prompt), purpose:input.inferenceLane === 'university_exam' ? 'independent_exam_response' : 'user_facing_response' },")
+  const callAt = enterprise.indexOf("usageContext:{ feature:input.inferenceLane === 'university_exam' ? 'university_exam' : await interactiveReasonerFeature(input), purpose:input.inferenceLane === 'university_exam' ? 'independent_exam_response' : 'user_facing_response' },")
   const call = enterprise.slice(callAt, enterprise.indexOf('systemPrompt:COS_REASONER_SYSTEM_PROMPT(', callAt))
   assert.ok(callAt > 0)
   assert.match(call, /disableThinking:true,/)

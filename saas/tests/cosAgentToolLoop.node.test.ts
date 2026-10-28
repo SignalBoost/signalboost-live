@@ -214,7 +214,7 @@ test('compute turns run behind the COS ingress, before image generation can take
   const primary = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
   const guard = browser.indexOf('const agentToolsRequired = !hasAttachments && requiresAgentTools(prompt, priorAnswer)')
   assert.ok(guard > 0 && guard < browser.indexOf('isConciergeVisualObjective(prompt)'))
-  assert.match(browser, /if \(!operationalEvidence && !agentToolsRequired\) \{\n\s*if \(isConciergeArtifactObjective\(prompt\)\)/)
+  assert.match(browser, /if \(!operationalEvidence && !agentToolsRequired\) \{\n\s*if \(isConciergeArtifactObjective\(prompt\) && semanticIntentConfirmsFile\(await turnIntent\(\)\)\)/)
   assert.match(browser, /capabilities: \['compute'\], searchQueries: \[\], reason: 'host_compute_guard'/)
   // The loop itself runs only in cos-primary, with provenance written like every other answer.
   assert.doesNotMatch(browser, /runCosAgentLoop/)

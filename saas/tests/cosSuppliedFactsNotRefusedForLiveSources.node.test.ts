@@ -23,7 +23,7 @@ test('without authoritative live evidence, only a confident self-contained readi
   assert.doesNotMatch(branch, /semanticIntentRequiresFreshness/)
   assert.match(branch, /freshMissUseLocal=true/)
   // The judge reads the request when it has not already; its verdict, not the word rules, decides.
-  assert.match(route, /const liveFactsIntent=!authoritySatisfied&&freshSources\.length\n\s*\? semanticTaskIntent\?\?await classifyCosSemanticTaskIntent\(/)
+  assert.match(route, /const liveFactsIntent=!authoritySatisfied&&freshSources\.length\n\s*\? semanticTaskIntent\?\?await cosTurnIntent\(/)
 })
 
 

@@ -68,15 +68,25 @@ test('the job runner routes engine "campaign" to the campaign slice, checkpoints
   assert.ok(start < runner.indexOf("job.metadata.builderEngine === 'v2'"))
 })
 
-test('the owner\'s planner can ask for the campaign; the public Concierge cannot, and only the owner on the Assistant surface starts it', () => {
+test('the signed-in owner starts the campaign on either surface: by its identifier directly, or through the planner; nobody else can', async () => {
+  const { namesVerificationCampaign, PAC_CAMPAIGN_ID } = await import('../lib/builder/campaign/catalog.ts')
+  assert.equal(namesVerificationCampaign('# iTMounts / COS — Production Acceptance Campaign\n\n**Campaign ID:** COS-PAC-001'), true)
+  assert.equal(namesVerificationCampaign(`run ${PAC_CAMPAIGN_ID} now`), true)
+  assert.equal(namesVerificationCampaign('COS-PAC-0010 is something else'), false)
+  assert.equal(namesVerificationCampaign('Investigate why the payment service returned 5xx errors'), false)
   const decision = read('lib/ai/cos/cosAgentDecision.ts')
   assert.match(decision, /'verification_campaign',/)
   assert.match(decision, /verification_campaign: 'Run the production acceptance campaign/)
-  // The concierge catalog is a fixed list without it; the owner's assistant catalog is the full list.
+  // The public Concierge catalog stays the fixed public-safe list; the owner reaches the campaign on that surface by identifier.
   assert.match(decision, /input\.surface === 'concierge'\n\s+\? \['live_web', 'compute', 'software_specialist'\]/)
   const route = read('app/api/cos-browser/route.ts')
-  assert.match(route, /agentDecision\.capabilities\.includes\('verification_campaign'\) && authenticatedOwner && browserSurface === 'assistant' && access\?\.userId/)
-  assert.match(route, /startVerificationCampaign\(\{/)
+  // Direct admission by identifier comes right after the owner's identity is known, before any router or planner.
+  const direct = route.indexOf("if (authenticatedOwner && access?.userId && namesVerificationCampaign(prompt))")
+  assert.ok(direct > 0)
+  assert.ok(direct < route.indexOf('const fastAuthoringIngress'))
+  assert.ok(direct < route.indexOf('agentDecision = await decideCosAgentTurn('))
+  assert.match(route, /agentDecision\.capabilities\.includes\('verification_campaign'\) && authenticatedOwner && access\?\.userId\)/)
+  assert.doesNotMatch(route, /verification_campaign'\) && authenticatedOwner && browserSurface === 'assistant'/)
   assert.match(route, /source: 'cos-verification-campaign'/)
   const starter = read('lib/builder/campaign/start.ts')
   assert.match(starter, /metadata: \{ builderEngine: CAMPAIGN_ENGINE, campaignId: PAC_CAMPAIGN_ID/)

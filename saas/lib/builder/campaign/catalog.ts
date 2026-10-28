@@ -161,3 +161,12 @@ export const PAC_CATALOG: readonly CampaignItem[] = Object.freeze([
 ])
 
 export const PAC_CAMPAIGN_ID = 'COS-PAC-001'
+
+/**
+ * Whether a request carries the campaign's own identifier. This is a lookup against the identifier the catalog
+ * owns, as exact as a command, not a reading of the request's wording: the owner pasting the campaign document
+ * (which names COS-PAC-001) is asking for that campaign.
+ */
+export function namesVerificationCampaign(request: string): boolean {
+  return new RegExp(`(?<![A-Za-z0-9-])${PAC_CAMPAIGN_ID}(?![A-Za-z0-9-])`).test(String(request || ''))
+}

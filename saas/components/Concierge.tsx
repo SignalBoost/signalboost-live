@@ -378,7 +378,7 @@ export default function Concierge() {
             }
       const data = artifactRequest
         ? await fetch('/api/artifacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal, body: JSON.stringify(requestBody) }).then(res => res.json())
-        : (await postWithAgentProgress({ target: 'concierge', body: requestBody, signal: controller.signal, onProgress: setActivity })).data
+        : (await postWithAgentProgress({ target: 'concierge', body: requestBody, signal: controller.signal, onProgress: setActivity, onJobAccepted: () => window.clearTimeout(deadline) })).data
       if (requestAbortRef.current !== controller) return
       const reply = data.reply || data.error || t(dict, 'concierge.fallback')
       const turnId = data?.execution_provenance?.turnId

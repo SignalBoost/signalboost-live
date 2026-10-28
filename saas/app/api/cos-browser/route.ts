@@ -46,6 +46,7 @@ import { mentionsPlatformConcept } from '@/lib/ai/cos/cosPlatformGlossary'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isSoftwareRepairRequest } from '@/lib/ai/cos/softwareRepairIntent'
 import { startVerificationCampaign } from '@/lib/builder/campaign/start'
+import { namesVerificationCampaign } from '@/lib/builder/campaign/catalog'
 import { recordCosLatencyStage, timeCosStage } from '@/lib/ai/cos/cosLatencyStages'
 import { runWithTurnDeadline, turnDeadlineRemainingMs, USER_ANSWER_WINDOW_MS } from '@/lib/ai/cos/cosTurnBudget'
 
@@ -166,6 +167,27 @@ function inlineVisualResponse(response: Response): Promise<NextResponse> {
   }).catch(() => new NextResponse(response.body, { status: response.status, headers: response.headers }))
 }
 
+async function startVerificationCampaignResponse(input: { userId: string; body: any; prompt: string; language: string }): Promise<NextResponse> {
+  try {
+    const started = await startVerificationCampaign({
+      userId: input.userId,
+      conversationId: String(input.body?.context?.conversationId || '') || null,
+      objective: input.prompt,
+      responseLanguage: input.language,
+    })
+    return NextResponse.json({
+      reply: started.reply, source: 'cos-verification-campaign', jobId: started.jobId, conversationId: started.conversationId,
+      status: 'queued', execution_allowed: true, external_action_taken: false, external_ai_invoked: false, local_model_invoked: false,
+    }, { status: 202 })
+  } catch (error) {
+    console.error('[cos-verification-campaign-start-failed]', error instanceof Error ? error.message : String(error))
+    return NextResponse.json({
+      reply: 'The verification campaign could not be started; nothing was run.',
+      source: 'cos-verification-campaign-start-failed', execution_allowed: false, external_action_taken: false,
+    }, { status: 503 })
+  }
+}
+
 function builderRoutingContextFromBody(body: any) {
   const attachments = Array.isArray(body?.attachments) ? body.attachments : []
   return {
@@ -239,6 +261,15 @@ async function executeBrowserTurn(req: NextRequest) {
   const auditUserId = access?.userId ?? null
   const authenticatedOwner = access?.isOwner === true && Boolean(access.userId)
   const routingContext = builderRoutingContextFromBody(body)
+
+  // VERIFICATION CAMPAIGN BY IDENTIFIER (2026-10-27): the signed-in owner, on either surface, sending a request that
+  // carries the campaign's own identifier starts the campaign job directly; no model decision stands in the way.
+  // Production 2026-10-27 23:55 UTC: the owner pasted the campaign document into the Concierge dock and got a written
+  // review, because admission was planner-decided and Assistant-only.
+  if (authenticatedOwner && access?.userId && namesVerificationCampaign(prompt)) {
+    const started = await startVerificationCampaignResponse({ userId: access.userId, body, prompt, language })
+    return browserSurface === 'concierge' ? publicConciergePresentation(started) : started
+  }
 
   // AGENT TOOL LOOP: a request to chart or compute real data is a COS compute turn. It must not be
   // taken by fast authoring, artifact or image generation (a picture, not the data); it is routed to
@@ -542,26 +573,10 @@ async function executeBrowserTurn(req: NextRequest) {
     }))
 
     // VERIFICATION CAMPAIGN (2026-10-27): the planner asked for the production acceptance campaign to be executed.
-    // Only the signed-in owner on the Assistant surface may start it; for anyone else the request is answered by COS.
-    if (agentDecision.capabilities.includes('verification_campaign') && authenticatedOwner && browserSurface === 'assistant' && access?.userId) {
-      try {
-        const started = await startVerificationCampaign({
-          userId: access.userId,
-          conversationId: String(body?.context?.conversationId || '') || null,
-          objective: prompt,
-          responseLanguage: language,
-        })
-        return NextResponse.json({
-          reply: started.reply, source: 'cos-verification-campaign', jobId: started.jobId, conversationId: started.conversationId,
-          status: 'queued', execution_allowed: true, external_action_taken: false, external_ai_invoked: false, local_model_invoked: false,
-        }, { status: 202 })
-      } catch (error) {
-        console.error('[cos-verification-campaign-start-failed]', error instanceof Error ? error.message : String(error))
-        return NextResponse.json({
-          reply: 'The verification campaign could not be started; nothing was run.',
-          source: 'cos-verification-campaign-start-failed', execution_allowed: false, external_action_taken: false,
-        }, { status: 503 })
-      }
+    // Only the signed-in owner may start it, on either surface; for anyone else the request is answered by COS.
+    if (agentDecision.capabilities.includes('verification_campaign') && authenticatedOwner && access?.userId) {
+      const started = await startVerificationCampaignResponse({ userId: access.userId, body, prompt, language })
+      return browserSurface === 'concierge' ? publicConciergePresentation(started) : started
     }
 
     // Software/repository capability requests are handoffs, not authority grants. The existing

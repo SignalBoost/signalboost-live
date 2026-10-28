@@ -161,3 +161,43 @@ export async function executeDynamicWorkflow(
   }
   return {status:'completed',receipts}
 }
+
+/**
+ * Host-persistable run checkpoint. Storage must atomically fence each run and
+ * persist this record before/after invoking a capability; this reducer alone
+ * does not provide a distributed lock or exactly-once execution.
+ */
+export type WorkflowCheckpoint = Readonly<{
+  workflowId: string
+  version: number
+  completed: readonly WorkflowStepReceipt[]
+  inFlightStep: string | null
+}>
+
+export function beginWorkflowCheckpoint(def: DynamicWorkflowDefinition): WorkflowCheckpoint {
+  return {workflowId:def.id,version:def.version,completed:[],inFlightStep:null}
+}
+
+/**
+ * Resume is fail-closed. An in-flight step may have committed an external side
+ * effect before a crash, so never replay it automatically. An operator or the
+ * registered capability's authoritative reconciliation must clear it first.
+ */
+export function inspectWorkflowRecovery(
+  definition: DynamicWorkflowDefinition,
+  checkpoint: WorkflowCheckpoint,
+): Readonly<{safeToResume:boolean;reason?:string;pending:readonly string[]}> {
+  if(checkpoint.workflowId!==definition.id || checkpoint.version!==definition.version) {
+    return {safeToResume:false,reason:'checkpoint_version_mismatch',pending:[]}
+  }
+  if(checkpoint.inFlightStep) return {safeToResume:false,reason:'in_flight_requires_reconciliation',pending:[]}
+  const completed = new Set<string>()
+  for(const receipt of checkpoint.completed) {
+    const step = definition.steps.find(s=>s.id===receipt.id)
+    if(!step || completed.has(receipt.id) || step.capability!==receipt.capability || !receipt.evidenceId.trim() || !step.dependsOn.every(dep=>completed.has(dep))) {
+      return {safeToResume:false,reason:'invalid_checkpoint_receipts',pending:[]}
+    }
+    completed.add(receipt.id)
+  }
+  return {safeToResume:true,pending:definition.steps.filter(s=>!completed.has(s.id)).map(s=>s.id)}
+}

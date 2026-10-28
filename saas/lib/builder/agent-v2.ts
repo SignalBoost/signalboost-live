@@ -3,6 +3,7 @@ import { checkpointDigest, workspaceDigest } from './checkpoint.ts'
 import { BuilderV2Dispatcher, type BuilderV2Action, type BuilderV2Receipt } from './agent-v2-dispatcher.ts'
 import { BuilderBudgetError, checkBuilderInferenceDeadline } from './inference-budget.ts'
 import { builderTaskContract } from './task-contract.ts'
+import { beginAgenticTask, advanceAgenticTask } from '../agentic/taskLifecycle.ts'
 import { USER_OUTCOME_AUTHORITY } from '../ai/cos/instructionContract.ts'
 import { builderWorkspaceInterfaceRepairs, builderWorkspaceModuleInterfaces, type BuilderInterfaceRepair } from './interface-mismatches.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
@@ -237,9 +238,15 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
     browserOutput(navigation)?.url === browserTarget &&
     isProvenBrowserAction(navigation) && isProvenBrowserAction(latestSnapshot)
   )
+  const acceptancePassed = latestRunPassed && browserSatisfied && (!behavioralRepairRequested || behavioralProof) && missingFiles.length === 0
+    && pendingCommands.length === 0 && testsPassed >= contract.minimumTests
+  // Only the host's proven run receipt can certify the complete Builder outcome.
+  const task = beginAgenticTask(objective, ['builder_acceptance'])
+  const provenOutcome = acceptancePassed && runs.length > 0
+    ? advanceAgenticTask(task, { type: 'receipt', id: 'builder-run-' + String(lastChange + runs.length), satisfies: ['builder_acceptance'] })
+    : task
   return {
-    satisfied: latestRunPassed && browserSatisfied && (!behavioralRepairRequested || behavioralProof) && missingFiles.length === 0
-      && pendingCommands.length === 0 && testsPassed >= contract.minimumTests,
+    satisfied: provenOutcome.status === 'completed',
     missingFiles, pendingCommands, minimumTests: contract.minimumTests, testsPassed,
     pendingBrowser: browserTarget && !browserSatisfied ? browserTarget : null,
   }

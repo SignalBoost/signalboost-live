@@ -6,6 +6,7 @@
 
 import type { CampaignEvidence, CampaignVerdict } from './ledger.ts'
 import type { BrowserSession } from './browserChecks.ts'
+import type { FixtureSession } from './fixture.ts'
 
 export type PortResult = Readonly<{
   verdict: CampaignVerdict
@@ -52,7 +53,12 @@ export type CampaignPorts = Readonly<{
     | Readonly<{ status: 'pending'; session: BrowserSession }>
   >
   observability?: (correlationIds: readonly string[], signal?: AbortSignal) => Promise<PortResult>
-  governance?: (signal?: AbortSignal) => Promise<PortResult>
-  builderFixture?: (signal?: AbortSignal) => Promise<PortResult>
+  /** Budget and deadline enforcement read back from the records of this campaign's requests (governance.ts). */
+  governance?: (correlationIds: readonly string[], windowStart: string, signal?: AbortSignal) => Promise<PortResult>
+  /** The Builder's fail → change → pass cycle on the disposable fixture (fixture.ts); continued across slices like a browser check. */
+  builderFixture?: (session: FixtureSession | null, slice: Readonly<{ remainingMs: () => number }>, signal?: AbortSignal) => Promise<
+    | Readonly<{ status: 'done'; result: PortResult; session: FixtureSession }>
+    | Readonly<{ status: 'pending'; session: FixtureSession }>
+  >
   release?: (productionCommit: string | null, signal?: AbortSignal) => Promise<PortResult>
 }>

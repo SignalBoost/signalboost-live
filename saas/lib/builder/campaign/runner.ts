@@ -14,6 +14,7 @@ import type { CampaignEvidence, CampaignLedger, CampaignLedgerRow, CampaignVerdi
 import { pendingItems } from './ledger.ts'
 import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
 import { newBrowserSession, type BrowserSession } from './browserChecks.ts'
+import type { FixtureSession } from './fixture.ts'
 import { missingAnalyticalTasks } from '../../ai/cos/answerTaskContract.ts'
 
 /**
@@ -53,6 +54,8 @@ export type CampaignState = Readonly<{
   interruptedItem?: string | null
   /** The browser session of a check still in progress, or the sandbox kept for the next browser item. */
   browser?: BrowserSession | null
+  /** The Builder fixture run still in progress. */
+  fixture?: FixtureSession | null
 }>
 
 /** Production-path sources that mean the request did not get a released answer. Read from the response, not the reply text. */
@@ -116,9 +119,9 @@ function blocked(cause: string): PortResult {
   return { verdict: 'BLOCKED', actual: `Not executed: ${cause}.`, evidence: [{ kind: 'note', label: 'Capability', detail: cause }], failureCause: cause }
 }
 
-type Executed = Readonly<{ result: PortResult; scenario: string; servedCommit?: string | null; requestMs?: number; interrupted?: boolean; browser?: BrowserSession | null; pending?: boolean }>
+type Executed = Readonly<{ result: PortResult; scenario: string; servedCommit?: string | null; requestMs?: number; interrupted?: boolean; browser?: BrowserSession | null; fixture?: FixtureSession | null; pending?: boolean }>
 
-async function executeItem(item: CampaignItem, ports: CampaignPorts, ledger: CampaignLedger, signal: AbortSignal | undefined, context: Readonly<{ browser: BrowserSession | null; remainingMs: () => number; lastBrowserItem: boolean; now: () => number }>): Promise<Executed> {
+async function executeItem(item: CampaignItem, ports: CampaignPorts, ledger: CampaignLedger, signal: AbortSignal | undefined, context: Readonly<{ browser: BrowserSession | null; fixture: FixtureSession | null; remainingMs: () => number; lastBrowserItem: boolean; now: () => number }>): Promise<Executed> {
   switch (item.port) {
     case 'analysis': {
       if (!ports.analysis) return { result: blocked('no production-path analysis port on this host'), scenario: item.prompt || '' }
@@ -156,12 +159,16 @@ async function executeItem(item: CampaignItem, ports: CampaignPorts, ledger: Cam
       return { scenario: `trace of ${ids.length} executed request(s)`, result, interrupted: Boolean(ports.observability && signal?.aborted) }
     }
     case 'governance': {
-      const result = ports.governance ? await ports.governance(signal) : blocked('no governance read-back port on this host')
+      const ids = ledger.rows.map(r => r.correlationId).filter((id): id is string => Boolean(id))
+      const result = ports.governance ? await ports.governance(ids, ledger.startedAt, signal) : blocked('no governance read-back port on this host')
       return { scenario: 'budget and deadline records of this campaign\'s requests', result, interrupted: Boolean(ports.governance && signal?.aborted) }
     }
     case 'builder_fixture': {
-      const result = ports.builderFixture ? await ports.builderFixture(signal) : blocked('no Builder fixture port on this host')
-      return { scenario: 'disposable fixture with one deliberately failing test', result, interrupted: Boolean(ports.builderFixture && signal?.aborted) }
+      if (!ports.builderFixture) return { result: blocked('no Builder fixture port on this host'), scenario: 'disposable fixture with one deliberately failing test' }
+      const outcome = await ports.builderFixture(context.fixture, { remainingMs: context.remainingMs }, signal)
+      if (signal?.aborted) return { result: blocked('interrupted'), scenario: 'disposable fixture with one deliberately failing test', interrupted: true, fixture: outcome.session }
+      if (outcome.status === 'pending') return { result: blocked('pending'), scenario: 'disposable fixture with one deliberately failing test', pending: true, fixture: outcome.session }
+      return { scenario: 'disposable fixture with one deliberately failing test', result: outcome.result, fixture: null }
     }
     case 'release': {
       const result = ports.release ? await ports.release(ledger.productionCommit, signal) : blocked('no release-check port on this host')
@@ -193,6 +200,7 @@ export async function runCampaignSlice(input: Readonly<{
   let shortestRequestMs = input.state.shortestRequestMs ?? 0
   let interruptedItem: string | null = input.state.interruptedItem ?? null
   let browser: BrowserSession | null = input.state.browser ?? null
+  let fixture: FixtureSession | null = input.state.fixture ?? null
   const browserItems = input.catalog.filter(item => item.port === 'browser').map(item => item.id)
   const noteRequest = (ms: number | undefined) => {
     if (typeof ms !== 'number' || ms <= 0) return
@@ -201,7 +209,7 @@ export async function runCampaignSlice(input: Readonly<{
   }
   const reserveFor = (testId: string) => itemReserveMs({ shortestRequestMs, longestRequestMs }, interruptedItem === testId)
   const state = (stopped: 'complete' | 'budget' | 'aborted', progress: ReliabilityProgress | null = reliability, interrupted: string | null = null) =>
-    ({ ledger, reliability: progress, shortestRequestMs, longestRequestMs, interruptedItem: interrupted, browser, stopped })
+    ({ ledger, reliability: progress, shortestRequestMs, longestRequestMs, interruptedItem: interrupted, browser, fixture, stopped })
   if (!ledger.mainCommit) {
     const facts = await input.ports.deployment()
     ledger = { ...ledger, mainCommit: facts.mainCommit }
@@ -243,8 +251,9 @@ export async function runCampaignSlice(input: Readonly<{
       reliability = null
       continue
     }
-    const executed = await executeItem(item, input.ports, ledger, input.signal, { browser, remainingMs: input.remainingMs, lastBrowserItem: browserItems.at(-1) === item.id, now })
+    const executed = await executeItem(item, input.ports, ledger, input.signal, { browser, fixture, remainingMs: input.remainingMs, lastBrowserItem: browserItems.at(-1) === item.id, now })
     if (executed.browser !== undefined) browser = executed.browser
+    if (executed.fixture !== undefined) fixture = executed.fixture
     if (executed.interrupted) return state('aborted', reliability, item.id)
     // A browser check waiting for the page hands the slice back; the next slice continues the same session.
     if (executed.pending) return state('budget')

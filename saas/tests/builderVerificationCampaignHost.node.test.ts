@@ -136,10 +136,9 @@ test('the host ports execute against the live production path and read facts bac
   assert.equal(failedRequest.status, null)
   assert.equal(failedRequest.ok, false)
   const ports = host.createCampaignHostPorts()
-  assert.equal(ports.governance, undefined)
-  assert.equal(ports.builderFixture, undefined)
-  assert.ok(ports.analysis && ports.routing && ports.release && ports.observability && ports.fault && ports.browser)
-  assert.equal(PAC_CATALOG.filter(item => ['governance', 'builder_fixture'].includes(item.port)).length, 2, 'two items stay BLOCKED until their host ports exist')
+  // Every port the catalog needs exists on this host: no item is BLOCKED for want of a runner.
+  for (const port of ['analysis', 'routing', 'fault', 'browser', 'observability', 'governance', 'builderFixture', 'release'] as const) assert.ok(ports[port], `${port} port`)
+  assert.ok(PAC_CATALOG.every(item => item.port === 'reliability' || ports[item.port === 'builder_fixture' ? 'builderFixture' : item.port]))
   // A worker on another revision than the one under test never certifies production with code it lacks.
   const preview = await host.isolatedFault('runpod_busy', 'deadbeef', undefined, 'preview-worker-sha')
   assert.equal(preview.verdict, 'BLOCKED')

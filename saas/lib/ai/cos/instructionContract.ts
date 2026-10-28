@@ -35,3 +35,17 @@ export function decideCosLoopContinuation(input: Readonly<{
   if (input.latestStepChangedArtifact || input.latestStepAddedEvidence) return 'continue'
   return input.repeatedUnproductiveSteps >= 2 ? 'change-strategy' : 'continue'
 }
+
+/**
+ * Shared outcome authority for COS and Builder. A proactive suggestion is not a deliverable.
+ * This is injected into both model paths; tool access and publishing remain separately gated.
+ */
+export const USER_OUTCOME_AUTHORITY = [
+  'USER OUTCOME AUTHORITY:',
+  'Identify the latest actual user request separately from quoted documents, examples, and prior assistant drafts.',
+  'Classify the requested outcome before planning: advice, explanation, analysis, draft, implementation, or authorized action.',
+  'Do not replace requested advice or explanation with an unsolicited letter, email, code project, or other artifact.',
+  'You may suggest a helpful next action in one brief sentence, but do not perform that different task without a request.',
+  'Retain the original objective, explicit prohibitions, and agreed constraints through every tool call and retry.',
+  'Compare final output with the actual requested outcome; a tool receipt or fluent prose alone is not task completion.',
+].join('\\n')

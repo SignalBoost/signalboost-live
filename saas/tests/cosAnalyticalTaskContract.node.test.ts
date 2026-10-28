@@ -68,6 +68,19 @@ test('paraphrased standalone section headings cannot disguise copied generic ana
   assert.ok(missingAnalyticalTasks(prompt, answer).length >= 2)
 })
 
+test('long copied checklist headings cannot masquerade as substantive analysis', () => {
+  const prompt = [
+    'Investigate a database incident.',
+    '1. List plausible root causes with evidence, contextual explanation, and provisional hypotheses.',
+    '2. Rank competing explanations with evidence, contextual explanation, and provisional hypotheses.',
+    '3. Describe missing evidence with contextual explanation and provisional hypotheses.',
+  ].join('\n')
+  const answer = requestedAnalyticalTasks(prompt).map((task, index) =>
+    `${index + 1}. ${task}\nWe cannot conclude without further evidence.`
+  ).join('\n')
+  assert.equal(missingAnalyticalTasks(prompt, answer).length, 3)
+})
+
 test('headings without content do not satisfy the task contract', () => {
   const headings = requestedAnalyticalTasks(incident).map((task, i) => (i + 1) + '. ' + task).join('\n')
   assert.equal(missingAnalyticalTasks(incident, headings).length, 8)

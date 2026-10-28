@@ -62,10 +62,14 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
             && !/[.!?;:]$/.test(plainFirstLine)
             && !/[,;]/.test(plainFirstLine)))
       const answerBody = standaloneHeading ? section.slice(section.indexOf('\n') + 1).trim() : section
+      // Evaluate the actual answer, not its heading. A copied task title can
+      // otherwise supply enough length and vocabulary to pass an empty response.
+      const answerWords = new Set(topicWords(answerBody))
+      const answerNovel = [...answerWords].filter(word => !requestedWords.has(word))
       const normalized = answerBody.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
       const repeatsPriorSection = seenSectionBodies.has(normalized)
       seenSectionBodies.add(normalized)
-      return section.length < 100 || novel.size < 7 || repeatsPriorSection
+      return answerBody.length < 100 || answerNovel.length < 7 || repeatsPriorSection
     }
     // Some legitimate answers use prose headings instead of numbers. Permit those
     // only when the answer meaningfully mentions the task's subject matter.

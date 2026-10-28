@@ -64,6 +64,8 @@ import { correctCompoundingArithmetic } from '@/lib/ai/cos/compoundingArithmetic
 import { reportLanguageName } from '@/lib/i18n/reportLanguage'
 import { cosCurrentDateLine } from '@/lib/ai/cos/cosCurrentDate'
 import { captureEvidenceSourceUseTurnId } from './evidenceSourceUseTurnContext.ts'
+import { semanticIntentConfirmsWriting } from './cosSemanticTaskIntent.ts'
+import { cosTurnIntent } from './cosTurnIntent.ts'
 
 export type EvidenceFunnelStage = { retrieved:number; relevant:number; selected:number; injected:number; cited:number }
 export type COSEvidenceFunnel = {
@@ -207,10 +209,16 @@ export function userAnswerMaxTokens():number {
   return Math.min(USER_ANSWER_MAX_TOKENS, reasonerGlobalTokenCeiling())
 }
 
-function interactiveReasonerFeature(prompt:string):'cos_interactive_answer'|'cos_interactive_authoring' {
-  return classifyProblemClass(prompt) === 'writing and content'
-    ? 'cos_interactive_authoring'
-    : 'cos_interactive_answer'
+/**
+ * The writing setup (reasoning off) serves a request only when the writing word rule suggests it and the turn's
+ * intent judge confirms the user asked for text to be written. Production 2026-10-28: a question about the user's own
+ * retirement options, pasted with drafts and a previous answer, was served by the writing setup and came back as an
+ * unrequested rewrite.
+ */
+async function interactiveReasonerFeature(input:{prompt:string;previousAssistant?:string|null;language?:string}):Promise<'cos_interactive_answer'|'cos_interactive_authoring'> {
+  if (classifyProblemClass(input.prompt) !== 'writing and content') return 'cos_interactive_answer'
+  const intent = await cosTurnIntent({ input:input.prompt, language:input.language ?? null, previousAssistant:input.previousAssistant ?? null })
+  return semanticIntentConfirmsWriting(intent) ? 'cos_interactive_authoring' : 'cos_interactive_answer'
 }
 
 /** Apply deterministic corrections to checkable answer arithmetic before returning it. */
@@ -1086,7 +1094,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   let reasonerFailureMessage: string | null = null
   const reasonerStartedAt = Date.now()
   const reasoned = await callCosReasoner({
-    usageContext:{ feature:input.inferenceLane === 'university_exam' ? 'university_exam' : interactiveReasonerFeature(input.prompt), purpose:input.inferenceLane === 'university_exam' ? 'independent_exam_response' : 'user_facing_response' },
+    usageContext:{ feature:input.inferenceLane === 'university_exam' ? 'university_exam' : await interactiveReasonerFeature(input), purpose:input.inferenceLane === 'university_exam' ? 'independent_exam_response' : 'user_facing_response' },
     // INTERACTIVE SPEED (2026-09-27). This call runs under the 20s interactive model timeout
     // (COS_INTERACTIVE_MODEL_TIMEOUT_MS). With hidden thinking on, every owner question in Production
     // failed at ~22-28s with "Independent COS inference did not return an answer" and fell through to the
@@ -1179,7 +1187,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   const executiveSignals = releaseSignals(reasoned.text)
   if (executiveSignals.length) {
     const repair = await callCosReasoner({
-      usageContext:{ feature:interactiveReasonerFeature(input.prompt), purpose:'user_facing_release_repair' },
+      usageContext:{ feature:await interactiveReasonerFeature(input), purpose:'user_facing_release_repair' },
       temperature: 0,
       // The repair rewrites the whole answer, so it needs the same room as the answer.
       writesUserAnswer: true,

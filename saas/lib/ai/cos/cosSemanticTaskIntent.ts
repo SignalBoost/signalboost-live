@@ -1,12 +1,11 @@
 // saas/lib/ai/cos/cosSemanticTaskIntent.ts
 //
-// Model-owned task-intent classification used only to prevent the stale-world freshness gate from
-// hijacking a request whose real task is interpretation of supplied language/context, or from
-// attempting a live lookup before essential ambiguity has been resolved. This module does not
-// establish facts and cannot weaken freshness for a sufficiently specified request that actually
-// asks COS to verify the external world.
-
-import { callCosReasoner } from './cosReasoner.ts'
+// Model-owned task-intent classification: the "intent & context" step of a COS turn. It decides which lane serves
+// the request (advice/answer, writing, picture, file, live lookup) and keeps the stale-world freshness gate from
+// hijacking a request whose real task is interpretation of supplied language/context, or from attempting a live
+// lookup before essential ambiguity has been resolved. Word rules may only suggest a lane; a special lane runs only
+// when this judge confirms it (see cosTurnIntent.ts). This module does not establish facts and cannot weaken
+// freshness for a sufficiently specified request that actually asks COS to verify the external world.
 
 export type CosSemanticTaskMode =
   | 'contextual_interpretation'
@@ -14,6 +13,8 @@ export type CosSemanticTaskMode =
   | 'external_fact_verification'
   | 'general_reasoning'
   | 'content_generation'
+  | 'visual_generation'
+  | 'file_generation'
   | 'external_action'
   | 'other'
 
@@ -30,6 +31,8 @@ const VALID_MODES = new Set<CosSemanticTaskMode>([
   'external_fact_verification',
   'general_reasoning',
   'content_generation',
+  'visual_generation',
+  'file_generation',
   'external_action',
   'other',
 ])
@@ -104,6 +107,24 @@ export function semanticIntentRequiresFreshness(intent: CosSemanticTaskIntent | 
   )
 }
 
+/**
+ * The lanes a word rule can only suggest. Production 2026-10-28: a pasted State Department cable with the user's
+ * question about his retirement options was sent to the writing setup (reasoning off) because it contained drafting
+ * words, and to the picture generator because "at any point" was typo-corrected to "paint". The judge read the whole
+ * request; these confirm a suggested lane only when the judge positively found that deliverable.
+ */
+export function semanticIntentConfirmsWriting(intent: CosSemanticTaskIntent | null): boolean {
+  return Boolean(intent && intent.mode === 'content_generation' && intent.confidence >= 0.72)
+}
+
+export function semanticIntentConfirmsPicture(intent: CosSemanticTaskIntent | null): boolean {
+  return Boolean(intent && intent.mode === 'visual_generation' && intent.confidence >= 0.72)
+}
+
+export function semanticIntentConfirmsFile(intent: CosSemanticTaskIntent | null): boolean {
+  return Boolean(intent && intent.mode === 'file_generation' && intent.confidence >= 0.72)
+}
+
 export async function classifyCosSemanticTaskIntent(args: {
   input: string
   language?: string | null
@@ -116,6 +137,9 @@ export async function classifyCosSemanticTaskIntent(args: {
   const priorUser = String(args.previousUserContext || '').trim().slice(0, 4_000)
   const priorAssistant = String(args.previousAssistant || '').trim().slice(0, 4_000)
 
+  // Loaded lazily: the reasoner's module graph uses path aliases the plain test runner cannot resolve, and the lane
+  // confirmations above must stay unit-testable.
+  const { callCosReasoner } = await import('./cosReasoner.ts')
   const reasoned = await callCosReasoner({
     usageContext: { feature: 'cos_interactive_answer', purpose: 'semantic_task_intent' },
     temperature: 0,
@@ -126,7 +150,7 @@ export async function classifyCosSemanticTaskIntent(args: {
     systemPrompt: [
       'You are the COS semantic task-intent judge. Classify what help the user is actually asking for before any evidence workflow is selected.',
       'Use neural semantic understanding of the whole request and conversation context. Do not classify by keywords, regex patterns, named entities, dates, or isolated topical words.',
-      'Return ONLY strict JSON: {"mode":"contextual_interpretation|clarification_required|external_fact_verification|general_reasoning|content_generation|external_action|other","confidence":0.0,"suppliedContextPrimary":true|false,"externalFactsRequired":true|false}.',
+      'Return ONLY strict JSON: {"mode":"contextual_interpretation|clarification_required|external_fact_verification|general_reasoning|content_generation|visual_generation|file_generation|external_action|other","confidence":0.0,"suppliedContextPrimary":true|false,"externalFactsRequired":true|false}.',
       'clarification_required means an essential scope, referent, target, baseline, location, time window, object, or other piece of context is genuinely missing; at least two plausible interpretations remain; and choosing between them would materially change the correct answer or action.',
       'Before choosing clarification_required, use the supplied conversation context. Do not ask the user for information that the conversation already resolves, that can be safely inferred, that has an obvious low-risk default, or that a permitted retrieval can establish without guessing.',
       'A broad request is not automatically ambiguous. If a useful broad answer is possible, if the user clearly asked for an overview, or if a reasonable assumption would not materially change correctness, do not choose clarification_required.',
@@ -136,6 +160,11 @@ export async function classifyCosSemanticTaskIntent(args: {
       'contextual_interpretation means the user wants help understanding supplied or conversational language: meaning, tone, implication, subtext, social intent, what a person likely meant, whether wording sounds positive/negative, translation-with-meaning, or interpretation of a pasted message. The passage may mention real people, dates, offices, events, or current facts; those mentions do NOT turn the task into external verification when the user is asking what the supplied language means.',
       'external_fact_verification means the request is sufficiently specified and the answer requires establishing whether something about the outside world is true, current, accurate, still the case, supported by sources, or independently verifiable. Questions such as “is this claim true?”, “is that still the current rule?”, “prove it”, or “check whether this email is accurate” belong here when the object of verification is clear.',
       'general_reasoning means the user wants analysis, diagnosis, ranking, planning or explanation performed on facts, data or a scenario they supplied (an incident report, a log excerpt, a case, a dataset, a hypothetical). Timestamps, dates, place names or system names inside the supplied material do NOT make it an outside-world fact to verify.',
+      'Advice, a recommendation, an opinion or a decision about the user\'s own situation is general_reasoning when it rests on material the user supplied, even when that material contains drafts, emails or a previous answer.',
+      'content_generation means the deliverable the user asks COS to produce is new or rewritten text: an email, letter, post, summary, translation or an edit of their own text. Text that merely appears in pasted material is not a request to write.',
+      'visual_generation means the deliverable the user asks COS to produce is a still picture: an image, drawing, illustration, logo, poster or photo-like render. Visual words inside pasted material, idioms, or a request to explain or write about a visual are not visual_generation.',
+      'file_generation means the user asks COS to produce a downloadable file (such as a PDF or a text file) as the deliverable.',
+      'For visual_generation and file_generation set externalFactsRequired=false unless the content of that deliverable needs current outside facts.',
       'For contextual_interpretation and general_reasoning, set suppliedContextPrimary=true when the task can be answered from text/context the user supplied, and externalFactsRequired=false unless the user separately asks to verify an outside-world claim or the supplied material is insufficient without current outside facts.',
       'Infer intent equivalently in every language. The language of the request must not change the classification standard.',
       'When deciding between clarification_required and external_fact_verification, choose clarification_required only when the missing context is essential and materially outcome-changing; otherwise prefer external_fact_verification so freshness protection fails safe.',

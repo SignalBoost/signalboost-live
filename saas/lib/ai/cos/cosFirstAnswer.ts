@@ -17,7 +17,8 @@ import {
 } from './conciergeLanguageQuality.ts'
 import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
 import { tryDirectTextTransformation } from './directTextTransformation.ts'
-import { classifyCosSemanticTaskIntent, semanticIntentSuppressesFreshness } from './cosSemanticTaskIntent.ts'
+import { semanticIntentSuppressesFreshness } from './cosSemanticTaskIntent.ts'
+import { cosTurnIntent } from './cosTurnIntent.ts'
 import { ownerPlatformIdentityContext } from './platformIdentityContext.ts'
 import { mentionsPlatformConcept, ownerPlatformGlossaryContext } from './cosPlatformGlossary.ts'
 import { recordCosTurnExperience } from './cognitiveTurnExperience.ts'
@@ -263,7 +264,7 @@ async function tryNeuralContextualInterpretation(input: COSFirstAnswerInput): Pr
   const wrappedConversation = prompt.includes('PREVIOUS USER CONTEXT:') && prompt.includes('CURRENT USER REQUEST:')
   if (!wrappedConversation && !requiresFreshExternalEvidence(prompt)) return null
 
-  const intent = await classifyCosSemanticTaskIntent({
+  const intent = await cosTurnIntent({
     input: prompt,
     language: input.language,
     previousAssistant: input.previousAssistant ?? null,

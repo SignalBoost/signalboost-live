@@ -8,7 +8,7 @@ const semanticIntent = readFileSync('lib/ai/cos/cosSemanticTaskIntent.ts', 'utf8
 
 test('route-level neural interpretation suppression remains before live freshness work', () => {
   const heuristic = route.indexOf('heuristicRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested')
-  const semantic = route.indexOf('? await classifyCosSemanticTaskIntent')
+  const semantic = route.indexOf('? await cosTurnIntent')
   const semanticFresh = route.indexOf('semanticRequiresFreshEvidence=semanticIntentRequiresFreshness(semanticTaskIntent)')
   const baseline = route.indexOf('baselineRequiresFreshEvidence=!suppliedIncidentAnalysis&&(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested')
   const finalGate = route.indexOf('requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness')
@@ -24,7 +24,7 @@ test('route-level neural interpretation suppression remains before live freshnes
 })
 
 test('shared COS core cannot re-impose freshness after neural contextual interpretation', () => {
-  assert.match(core, /classifyCosSemanticTaskIntent/)
+  assert.match(core, /await cosTurnIntent\(/)
   assert.match(core, /semanticIntentSuppressesFreshness/)
   assert.match(core, /const heuristicRequiresFreshEvidence = requiresFreshExternalEvidence\(input\.prompt\)/)
   assert.match(core, /const baselineRequiresFreshEvidence = heuristicRequiresFreshEvidence \|\| semanticIntentRequiresFreshness\(semanticTaskIntent\)/)

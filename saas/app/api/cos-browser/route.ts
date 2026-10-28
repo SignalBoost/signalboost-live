@@ -45,6 +45,8 @@ import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioS
 import { mentionsPlatformConcept } from '@/lib/ai/cos/cosPlatformGlossary'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isSoftwareRepairRequest } from '@/lib/ai/cos/softwareRepairIntent'
+import { semanticIntentConfirmsFile, semanticIntentConfirmsPicture, semanticIntentConfirmsWriting } from '@/lib/ai/cos/cosSemanticTaskIntent'
+import { cosTurnIntent, withCosTurnIntent } from '@/lib/ai/cos/cosTurnIntent'
 import { startVerificationCampaign } from '@/lib/builder/campaign/start'
 import { namesVerificationCampaign } from '@/lib/builder/campaign/catalog'
 import { recordCosLatencyStage, timeCosStage } from '@/lib/ai/cos/cosLatencyStages'
@@ -280,15 +282,16 @@ async function executeBrowserTurn(req: NextRequest) {
   // interactive response budget asking unrelated public identity, Software Specialist, or visual
   // classifiers to reinterpret it. This is not a separate Concierge brain: both surfaces still
   // execute cosPrimaryPost; public Concierge retains public audit/delivery scope and presentation.
+  // The word rules only suggest writing, a file or a picture; the turn's intent judge decides (cosTurnIntent.ts).
+  const turnIntent = () => cosTurnIntent({ input: prompt, language, previousUserContext: previousUserPrompt || null, previousAssistant: priorAnswer || null })
   const fastAuthoringIngress = !directTextHasAttachments
     && isAuthoringObjectiveWithoutLiveLookup(prompt)
     && !softwareRepairRequest
     && !isCosCodingObjective(prompt, routingContext)
-    && !isConciergeArtifactObjective(prompt)
-    && !isConciergeVisualObjective(prompt)
     && !agentToolsRequired
     && !isProvenanceIntrospection(prompt)
     && !isOperationalLogEvidence(prompt)
+    && semanticIntentConfirmsWriting(await turnIntent())
   if (fastAuthoringIngress) {
     const executeAuthoring = () => cosPrimaryPost(req)
     const authoringResponse = access?.isOwner && browserSurface === 'assistant'
@@ -440,7 +443,7 @@ async function executeBrowserTurn(req: NextRequest) {
   let routedRequest = new NextRequest(req.url, { method: 'POST', headers: routedHeaders, body: JSON.stringify(routedBody) })
 
   if (!operationalEvidence && !agentToolsRequired) {
-    if (isConciergeArtifactObjective(prompt)) {
+    if (isConciergeArtifactObjective(prompt) && semanticIntentConfirmsFile(await turnIntent())) {
       const headers = new Headers(req.headers)
       headers.set('content-type', 'application/json')
       headers.delete('content-length')
@@ -449,13 +452,14 @@ async function executeBrowserTurn(req: NextRequest) {
       return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
     }
 
-    // Obvious visual requests still take the deterministic zero-cost fast path. Everything
-    // ambiguous — including follow-up language — is decided by the deep semantic reasoner using
-    // bounded recent user-authored conversation context. Deterministic code only validates and
-    // preserves the user's exact words; it does not infer the continuation itself.
+    // A picture is produced only on Concierge, when the visual word rule suggests one and the turn's intent judge
+    // confirms the user asked for a picture. Elliptical follow-up language is decided by the semantic continuation
+    // reasoner using bounded recent user-authored conversation context; deterministic code only validates and
+    // preserves the user's exact words.
     const softwareExecutionObjective = isCosCodingObjective(prompt, routingContext)
-    const directVisual = !softwareExecutionObjective && prompt.length <= 8_000 && isConciergeVisualObjective(prompt)
-    const semanticVisualEligible = !softwareExecutionObjective && !directVisual && prompt.length <= 8_000
+    const directVisual = browserSurface === 'concierge' && !softwareExecutionObjective
+      && isConciergeVisualObjective(prompt) && semanticIntentConfirmsPicture(await turnIntent())
+    const semanticVisualEligible = !softwareExecutionObjective && !directVisual
       && browserSurface === 'concierge'
       && shouldResolveSemanticVisualRequest(messages, prompt)
     semanticVisualInvoked = semanticVisualEligible
@@ -743,7 +747,7 @@ export async function POST(req: NextRequest) {
 async function postBrowserTurn(req: NextRequest) {
   // /api/cos-provenance-browser already opened a whole-turn deadline and runs its own watchdog
   // before delegating here. Nesting a second pair would only duplicate an existing bound.
-  if (turnDeadlineRemainingMs() !== null) return executeBrowserTurn(req)
+  if (turnDeadlineRemainingMs() !== null) return withCosTurnIntent(() => executeBrowserTurn(req))
 
   const startedAt = Date.now()
   const watchdogTimer: { handle: ReturnType<typeof setTimeout> | null } = { handle: null }
@@ -757,7 +761,7 @@ async function postBrowserTurn(req: NextRequest) {
     // The answer window is reserved out of the model deadline: helpers in front of the answer share the surplus.
     const worker = runWithTurnDeadline(
       startedAt + BROWSER_TURN_MODEL_DEADLINE_MS,
-      () => executeBrowserTurn(req),
+      () => withCosTurnIntent(() => executeBrowserTurn(req)),
       { answerReserveMs: USER_ANSWER_WINDOW_MS },
     )
     // The loser of the race must not surface as an unhandled rejection.

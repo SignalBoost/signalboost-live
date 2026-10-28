@@ -50,7 +50,7 @@ test('interpretation lane answers pragmatic meaning rather than demanding eviden
 })
 
 test('context-only isolation stays neural and fail-safe', () => {
-  assert.match(entrypoint, /classifyCosSemanticTaskIntent/)
+  assert.match(entrypoint, /await cosTurnIntent\(/)
   assert.match(entrypoint, /semanticIntentSuppressesFreshness\(intent\)/)
   assert.match(entrypoint, /requiresFreshExternalEvidence\(prompt\)/)
   assert.match(entrypoint, /Contextual interpretation was identified, but the independent COS reasoner returned no answer/)

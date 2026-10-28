@@ -128,7 +128,7 @@ export function builderV2IdleSliceCount(
   if (recent.some(receipt => receipt.changed ||
     (receipt.tool === 'run_tests' && receipt.ok &&
       (receipt.output as { exitCode?: unknown; timedOut?: unknown } | undefined)?.exitCode === 0 &&
-      (receipt.output as { timedOut?: unknown } | undefined)?.timedOut === false))) return 0
+      (receipt.output as { timedOut?: unknown } | undefined)?.timedOut !== true))) return 0
   const prior = previous.idleSlices
   return Math.min(24, (Number.isSafeInteger(prior) && prior! >= 0 ? prior! : 0) + 1)
 }

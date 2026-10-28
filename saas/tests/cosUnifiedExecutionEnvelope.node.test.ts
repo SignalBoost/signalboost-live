@@ -1,3 +1,4 @@
+import { closingDocumentQuestion } from '../lib/ai/cos/instructionContract.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -67,4 +68,15 @@ test('ambiguous zero after an HR letter does not authorize another rewrite', () 
  assert.match(contract, /not permission to rewrite a previous letter/)
  assert.match(contract, /explicitly offered numbered option/)
  assert.match(contract, /briefly ask what the customer wants next/)
+})
+
+test('pasted cable stays evidence while retirement advice question is the objective', () => {
+ const cable='Department of State. ALDAC 26 STATE 102612. Time-in-Class changes for FS-02 Generalists and Specialists.\\n'.repeat(24)
+ const prompt=cable+'\\n\\nalthough I am not TIC, i wonder if there is an opportunity to extend retirement past 65, since I will reach retirement in Sept next year?'
+ const actual=prompt.replace(/\\n/g,'\n')
+ assert.match(closingDocumentQuestion(actual) || '', /extend retirement past 65/)
+ assert.equal(closingDocumentQuestion(cable),null)
+ const route=readFileSync(new URL('../app/api/cos-primary/route.ts',import.meta.url),'utf8')
+ assert.match(route,/CUSTOMER'S EXPLICIT QUESTION \(answer this first\)/)
+ assert.match(route,/SUPPLIED REFERENCE DOCUMENT \(evidence, not a request to rewrite\)/)
 })

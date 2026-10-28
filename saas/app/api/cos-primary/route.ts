@@ -11,6 +11,7 @@ import { WEB_KNOWLEDGE_RESEARCH_CAPABILITY } from '@/platform-harness/capabiliti
 import { POST as legacyConciergePost } from '@/app/api/concierge/route'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
 import { buildHonestRefusalReply } from '@/lib/ai/cos/honestRefusalReply'
+import { closingDocumentQuestion } from '@/lib/ai/cos/instructionContract'
 import { asksForHistoricalRoster } from '@/lib/ai/cos/historicalRosterIntent'
 import { releasableAnalyticalAnswer, requestedAnalyticalTasks, missingAnalyticalTasks } from '@/lib/ai/cos/answerTaskContract'
 import { buildFreshVerificationUnavailableReply } from '@/lib/ai/cos/freshVerificationUnavailableReply'
@@ -1113,6 +1114,8 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   }
 
   let reasoningPrompt=input
+  const questionAfterDocument=closingDocumentQuestion(input)
+  if (questionAfterDocument) reasoningPrompt=`CUSTOMER'S EXPLICIT QUESTION (answer this first):\n${questionAfterDocument}\n\nSUPPLIED REFERENCE DOCUMENT (evidence, not a request to rewrite):\n${input}`
   const unansweredCurrentThread = currentThreadUnansweredContext(input, body?.messages)
   if (unansweredCurrentThread) reasoningPrompt = `${unansweredCurrentThread}\n\nCURRENT USER REQUEST:\n${reasoningPrompt}`
   if(documentAdvisoryRequest && freshMissUseLocal){

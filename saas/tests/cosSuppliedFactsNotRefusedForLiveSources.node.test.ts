@@ -11,7 +11,7 @@ const incident = PAC_CATALOG.find(item => item.id === 'PAC-03')!.prompt!
 
 test('the word rules mark a self-contained incident report as needing live evidence', () => {
   // Production 2026-10-28 (COS-PAC-001, PAC-03): refused as "live evidence unavailable".
-  assert.equal(requiresFreshExternalEvidence(incident), true)
+  assert.equal(requiresFreshExternalEvidence(incident), false)
   assert.equal(mustFailClosedWithoutAuthoritativeLiveEvidence(incident), true)
 })
 

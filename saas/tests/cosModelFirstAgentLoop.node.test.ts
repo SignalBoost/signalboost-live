@@ -70,7 +70,7 @@ test('live_web and conversation_history plans steer COS without a second semanti
 
   const semantic = primary.indexOf('const semanticTaskIntentNeeded=!requestedAction')
   const skip = primary.indexOf('&& !modelPlannedFreshEvidence', semantic)
-  const baseline = primary.indexOf('const baselineRequiresFreshEvidence=(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)', skip)
+  const baseline = primary.indexOf('const baselineRequiresFreshEvidence=!suppliedIncidentAnalysis&&(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)', skip)
   assert.ok(semantic > 0)
   assert.ok(skip > semantic)
   assert.ok(baseline > skip)

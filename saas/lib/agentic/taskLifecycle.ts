@@ -229,6 +229,9 @@ export async function writeWorkflowCheckpoint(
 ): Promise<WorkflowCheckpointWriteResult> {
   if (!/^[a-zA-Z0-9_-]{6,128}$/.test(runId)) return {status:'invalid',reason:'invalid_run_id'}
   if (!validateDynamicWorkflow(definition, definition.steps.map(s=>s.capability)).valid) return {status:'invalid',reason:'invalid_workflow'}
+  if (checkpoint.inFlightStep && (!definition.steps.some(step=>step.id===checkpoint.inFlightStep) || checkpoint.completed.some(receipt=>receipt.id===checkpoint.inFlightStep))) {
+    return {status:'invalid',reason:'invalid_in_flight_step'}
+  }
   const recovery=inspectWorkflowRecovery(definition,checkpoint)
   if (!recovery.safeToResume && recovery.reason!=='in_flight_requires_reconciliation') {
     return {status:'invalid',reason:recovery.reason}

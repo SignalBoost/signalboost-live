@@ -55,3 +55,22 @@ export const USER_OUTCOME_AUTHORITY = [
   'After the substantive answer, explain the most useful practical next step and offer concise relevant further help.',
   'Remain proactive but do not perform an unrequested draft, communication, deployment, purchase, or other action.',
 ].join('\n')
+
+/**
+ * Locate a user's explicit closing question after a pasted document. The document
+ * remains available as evidence, but its subject must not replace the customer's
+ * request. Do not claim the extracted question was independently verified.
+ */
+export function closingDocumentQuestion(raw: string): string | null {
+  const text = String(raw || '').trim()
+  if (text.length < 1200) return null
+  const tail = text.slice(-1200)
+  const paragraphs = tail.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean)
+  const last = paragraphs.at(-1) || ''
+  if (last.length < 18 || last.length > 650) return null
+  if (!/(?:\?|\b(?:i wonder|can i|could i|should i|would i|is there|what are my options)\b)/i.test(last)) return null
+  // Source text frequently contains numbered sections, citations and headings;
+  // do not promote those into the user's instruction.
+  if (/^\s*(?:\d{1,2}[.)]|(?:from|subject|mrn|date|signature):)/i.test(last)) return null
+  return last
+}

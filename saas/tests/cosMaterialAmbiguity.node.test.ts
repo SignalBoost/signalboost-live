@@ -85,3 +85,19 @@ test('clarification policy is structural and domain-general rather than a named 
   assert.match(source, /geography too broad to have one meaningful current value/i)
   assert.doesNotMatch(source, /Poland|Warsaw|Paramaribo/i)
 })
+test('reasoning over supplied facts overrides incidental freshness words, like interpreting supplied language does', () => {
+  // Production 2026-10-28: an incident report with UTC timestamps and numbered deliverables was refused as a current fact.
+  const intent = parseCosSemanticTaskIntent(JSON.stringify({
+    mode: 'general_reasoning', confidence: 0.9, suppliedContextPrimary: true, externalFactsRequired: false,
+  }))
+  assert.ok(intent)
+  assert.equal(semanticIntentSuppressesFreshness(intent), true)
+  // Still fail-safe: outside facts required, context not primary, or an unsure judge keep freshness protection.
+  for (const variant of [
+    { mode: 'general_reasoning', confidence: 0.9, suppliedContextPrimary: false, externalFactsRequired: false },
+    { mode: 'general_reasoning', confidence: 0.9, suppliedContextPrimary: true, externalFactsRequired: true },
+    { mode: 'general_reasoning', confidence: 0.6, suppliedContextPrimary: true, externalFactsRequired: false },
+    { mode: 'external_fact_verification', confidence: 0.95, suppliedContextPrimary: true, externalFactsRequired: false },
+  ]) assert.equal(semanticIntentSuppressesFreshness(parseCosSemanticTaskIntent(JSON.stringify(variant))), false, JSON.stringify(variant))
+  assert.match(source, /general_reasoning means the user wants analysis, diagnosis, ranking, planning or explanation performed on facts, data or a scenario they supplied/)
+})

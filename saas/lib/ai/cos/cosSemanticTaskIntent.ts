@@ -75,7 +75,7 @@ export function semanticIntentSuppressesFreshness(intent: CosSemanticTaskIntent 
   if (semanticIntentIsSelfContainedContentGeneration(intent)) return true
   return Boolean(
     intent
-      && intent.mode === 'contextual_interpretation'
+      && (intent.mode === 'contextual_interpretation' || intent.mode === 'general_reasoning')
       && intent.suppliedContextPrimary
       && !intent.externalFactsRequired
       && intent.confidence >= 0.72,
@@ -120,6 +120,7 @@ export async function classifyCosSemanticTaskIntent(args: {
       'A broad request is not automatically ambiguous. If a useful broad answer is possible, if the user clearly asked for an overview, or if a reasonable assumption would not materially change correctness, do not choose clarification_required.',
       'Structural ambiguity is domain-general: examples include an unresolved pronoun or deictic referent, a comparison with no baseline, a local or point-specific condition requested over a geography too broad to have one meaningful current value, or a task whose target could reasonably be one of several materially different objects.',
       'When clarification_required applies, freshness must wait until the missing context is resolved. The eventual task may still require external facts; externalFactsRequired should describe that eventual task rather than forcing a premature lookup now.',
+      'general_reasoning includes incident reports, hypothetical scenarios, and investigations where all observations are supplied by the user and the task is to infer, rank, and propose checks. Treat supplied observations as the evidentiary boundary: suppliedContextPrimary=true and externalFactsRequired=false unless the user explicitly asks to investigate the actual outside world.',
       'contextual_interpretation means the user wants help understanding supplied or conversational language: meaning, tone, implication, subtext, social intent, what a person likely meant, whether wording sounds positive/negative, translation-with-meaning, or interpretation of a pasted message. The passage may mention real people, dates, offices, events, or current facts; those mentions do NOT turn the task into external verification when the user is asking what the supplied language means.',
       'external_fact_verification means the request is sufficiently specified and the answer requires establishing whether something about the outside world is true, current, accurate, still the case, supported by sources, or independently verifiable. Questions such as “is this claim true?”, “is that still the current rule?”, “prove it”, or “check whether this email is accurate” belong here when the object of verification is clear.',
       'For contextual_interpretation, set suppliedContextPrimary=true when the meaning can be answered from text/context the user supplied, and externalFactsRequired=false unless the user separately asks to verify an outside-world claim.',

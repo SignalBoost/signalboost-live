@@ -86,3 +86,13 @@ test('ordinary low-confidence answers are completed instead of replaced by the g
   assert.match(primary, /cos-completion-first-rescue/)
   assert.ok(primary.indexOf('completion_first_best_effort') < primary.indexOf('buildHonestRefusalReply({prompt:input'))
 })
+
+
+test('last-chance analytical rescue checks every numbered deliverable and repairs a partial draft', () => {
+  const primary = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
+  const rescue = primary.slice(primary.indexOf('async function runCompletionFirstRescue'), primary.indexOf('function completionFirstResponse'))
+  assert.match(rescue, /requestedAnalyticalTasks\(input\)/)
+  assert.match(rescue, /missingAnalyticalTasks\(input,reply\)/)
+  assert.match(rescue, /UNDELIVERED ITEMS:/)
+  assert.match(rescue, /missingAnalyticalTasks\(input,candidateReply\)\.length\)return null/)
+})

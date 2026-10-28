@@ -11,7 +11,7 @@ import { WEB_KNOWLEDGE_RESEARCH_CAPABILITY } from '@/platform-harness/capabiliti
 import { POST as legacyConciergePost } from '@/app/api/concierge/route'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
 import { buildHonestRefusalReply } from '@/lib/ai/cos/honestRefusalReply'
-import { releasableAnalyticalAnswer } from '@/lib/ai/cos/answerTaskContract'
+import { releasableAnalyticalAnswer, requestedAnalyticalTasks, missingAnalyticalTasks } from '@/lib/ai/cos/answerTaskContract'
 import { buildFreshVerificationUnavailableReply } from '@/lib/ai/cos/freshVerificationUnavailableReply'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { tryDomainAvailabilityLookup } from '@/lib/ai/cos/domainAvailability'
@@ -435,6 +435,7 @@ function fastAuthoringResponse(startedAt:number,input:string,fast:{reply:string;
 }
 
 async function runCompletionFirstRescue(input:string,language:string,audience:CosAudience):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
+  const analyticalTasks=requestedAnalyticalTasks(input)
   // ONE BRAIN: the rescue lane carries the same COS identity and company knowledge as the main pipeline.
   // The last chance before failing closed writes the user's answer: it gets the same answer window as the main
   // answer (still clamped to the turn deadline), whatever the request looks like.
@@ -447,6 +448,7 @@ async function runCompletionFirstRescue(input:string,language:string,audience:Co
     systemPrompt:[
       cosIdentityPreamble(audience),
       'COMPLETION RESCUE: complete the user task now instead of asking them to narrow a broad but answerable request.',
+      analyticalTasks.length ? 'ANALYTICAL TASK CONTRACT: Answer ALL numbered deliverables explicitly in the original order. Each item needs specific reasoning, evidence or proposed experiments, and uncertainty where relevant; do not merely repeat the heading. Rank hypotheses when asked and state what would distinguish or refute them. Do not claim unperformed measurements.' : '',
       'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
       'Use reasonable low-risk assumptions when they do not materially change correctness, and label material uncertainty inside the answer.',
       'Give a useful partial answer when full completion is impossible. Never emit internal routing, confidence-gate, release-gate, provider, or fallback language.',
@@ -462,8 +464,26 @@ async function runCompletionFirstRescue(input:string,language:string,audience:Co
   // completed prose answer when a provider ignores the strict JSON instruction. Preserve that
   // answer instead of falling through to the generic clarification/refusal path.
   const raw=String(result?.text??' ').trim()
-  const reply=(parsed?.answer?.trim()||(!raw.startsWith('{')?raw:' ')).trim()
+  let reply=(parsed?.answer?.trim()||(!raw.startsWith('{')?raw:' ')).trim()
   if(!reply||hasUnsafePublicModelOutput(reply))return null
+  // The rescue path previously bypassed the analytical completion contract entirely.
+  // Recover missing deliverables once; never mark a partial rescue as completed.
+  const firstMissing=analyticalTasks.length?missingAnalyticalTasks(input,reply):[]
+  if(firstMissing.length){
+    if(turnDeadlineRemainingMs() < 12_000)return null
+    const repaired=await callCosReasoner({
+      temperature:0,writesUserAnswer:true,maxTokens:userAnswerMaxTokens(),disableThinking:true,
+      usageContext:{feature:'cos_interactive_answer',purpose:'completion_rescue'},
+      systemPrompt:[cosIdentityPreamble(audience),
+        'Complete the ORIGINAL user request. Preserve the existing correct analysis and write a fully revised answer with every numbered deliverable, substantive evidence, rankings or discriminating experiments as requested. Separate known facts from hypotheses. Never invent observations. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+        language?'Respond in '+reportLanguageName(language)+'.':''].filter(Boolean).join(' '),
+      prompt:`${companyKnowledgeBlock(input)}ORIGINAL REQUEST:\n${input}\n\nDRAFT ANSWER:\n${reply}\n\nUNDELIVERED ITEMS:\n${firstMissing.map((task,i)=>`${i+1}. ${task}`).join('\n')}`,
+    }).catch(()=>null)
+    const candidate=repaired?.text?parseLocalResult(repaired.text):null
+    const candidateReply=String(candidate?.answer||'').trim()
+    if(!candidateReply||hasUnsafePublicModelOutput(candidateReply)||missingAnalyticalTasks(input,candidateReply).length)return null
+    reply=candidateReply
+  }
   const resolved=resolveCosReasoner()
   return{reply,reasonerLabel:resolved.config?.label??'cos-reasoner',confidence:Math.max(.01,Math.min(1,parsed?.confidence??.5))}
 }

@@ -129,3 +129,54 @@ test('unmocked COS advice: supplied policy memorandum must not turn into an unso
   expect(unsolicitedDraft, JSON.stringify(receipt)).toBe(false)
   expect(mentionsMemoLimit, JSON.stringify(receipt)).toBe(true)
 })
+
+
+test('unmocked COS current legal advice: cite applicable authority, not unrelated source guides', async ({ request }, testInfo) => {
+  const prompt = [
+    'The Department of State announced three measures for Time-in-Class (TIC) and Senior Threshold Window employees in ALDAC 26 STATE 102612, dated October 27, 2026.',
+    'The measures expand FS-02 Generalist STIC limits, offer an FS-01 Senior Threshold Window election, and give a one-year TIC extension to certain FS-02 and FS-03 Specialists.',
+    'I am NOT retiring because of TIC. I will turn 65 in September 2027.',
+    'Can I request an extension to continue Foreign Service employment beyond 65? Explain whether the ALDAC applies and identify the actual separate legal authority, if any. Give advice, not an email draft.',
+  ].join('\n')
+  const started = Date.now()
+  const response = await request.post('/api/cos-browser', {
+    headers: { accept: 'application/json', 'content-type': 'application/json', 'x-signalboost-surface': 'cos' },
+    data: { messages: [{ role: 'user', content: prompt }], context: { language: 'en', assistanceMode: 'guide' } },
+    timeout: 170_000,
+  })
+  const raw = await response.text()
+  let payload: Record<string, unknown> = {}
+  try { payload = JSON.parse(raw) as Record<string, unknown> } catch {
+    throw new Error('COS current-legal-advice test received non-JSON response')
+  }
+  const answer = typeof payload.reply === 'string' ? payload.reply : typeof payload.answer === 'string' ? payload.answer : ''
+  const retirementAuthority = /(?:22\s*U\.?\s*S\.?\s*C\.?\s*§?\s*4052|3\s*FAM\s*6212)/i.test(answer)
+  const retirementExtension = /(?:five|5)[-\s]?year|(?:up to|not exceed)[^\n]{0,45}(?:five|5)\s*years/i.test(answer)
+  const unrelatedCitation = /libguides\.law\.ucdavis\.edu\/c\.php\?g=1035998&p=10361056/i.test(answer)
+  const refusal = /requires live authoritative evidence|No model-memory answer was used/i.test(answer)
+  const emailDraft = /(?:^|\n)\s*(?:subject:\s*request for|dear (?:hr|team|sir|madam)|sincerely,)/im.test(answer)
+  const receipt = {
+    case: 'foreign-service-age-65-retirement-authority',
+    timestamp: new Date().toISOString(),
+    expectedCommit: process.env.COS_LIVE_EXPECTED_COMMIT,
+    deploymentCommitVerified: false,
+    status: response.status(),
+    elapsedMs: Date.now()-started,
+    answerLength: answer.length,
+    retirementAuthority,
+    retirementExtension,
+    unrelatedCitation,
+    refusal,
+    emailDraft,
+  }
+  await testInfo.attach('cos-retirement-authority-receipt.json', {
+    body: Buffer.from(JSON.stringify(receipt, null, 2)),
+    contentType: 'application/json',
+  })
+  expect(response.status(), JSON.stringify(receipt)).toBe(200)
+  expect(retirementAuthority, JSON.stringify(receipt)).toBe(true)
+  expect(retirementExtension, JSON.stringify(receipt)).toBe(true)
+  expect(unrelatedCitation, JSON.stringify(receipt)).toBe(false)
+  expect(refusal, JSON.stringify(receipt)).toBe(false)
+  expect(emailDraft, JSON.stringify(receipt)).toBe(false)
+})

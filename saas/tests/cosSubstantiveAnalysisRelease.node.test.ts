@@ -67,5 +67,7 @@ test('the reasoner and the primary route release by the same rule', () => {
   const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
   assert.match(reasoner, /remainingTaskGaps\.length && !\(finalParsedForPolicy && releasableAnalyticalAnswer\(effectiveArgs\.prompt, finalParsedForPolicy\.answer\)\)/)
   assert.match(reasoner, /repairedTaskGaps\.length < firstTaskGaps\.length/)
-  assert.doesNotMatch(route, /missingAnalyticalTasks\(/)
+  assert.match(route, /missingAnalyticalTasks\(input,reply\)/)
+  assert.match(route, /releasableAnalyticalAnswer\(input,reply\)/)
+  assert.match(route, /releasableAnalyticalAnswer\(input,candidateReply\)/)
 })

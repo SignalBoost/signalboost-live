@@ -8,6 +8,7 @@ import {
   detectConversationRecallIntent,
   formatConversationRecallContext,
   recallSearchQuery,
+  currentThreadUnansweredContext,
 } from '../lib/ai/cos/cosConversationRecall.ts'
 
 const user = 'a911816e-32d9-4954-b539-0e885ce2d18b'
@@ -73,4 +74,26 @@ test('the owner COS path injects recall before reasoning, keeps it off the publi
   const cache = readFileSync(new URL('../lib/ai/cos/cacheSafetyPolicy.ts', import.meta.url), 'utf8')
   assert.match(cache, /if \(prompt\.includes\(COS_CONVERSATION_RECALL_MARKER\)\) return false/)
   assert.ok(route.indexOf('buildConversationRecallContext({') < route.indexOf('cos=await tryCOSFirstAnswer('))
+})
+
+test('same-thread unanswered follow-up reuses the actual user question without inventing missing history', () => {
+ const history = [
+  {role:'user',content:'The ALDAC concerns TIC. I am not TIC-limited; can I extend my mandatory retirement after age 65 in September 2027?'},
+  {role:'assistant',content:'Contact HR for guidance.'},
+  {role:'user',content:'yes'},
+  {role:'assistant',content:'Here is a letter.'},
+  {role:'user',content:'you did not answer my question???'},
+ ]
+ const context = currentThreadUnansweredContext('you did not answer my question???', history)
+ assert.ok(context)
+ assert.match(context, /extend my mandatory retirement after age 65/)
+ assert.match(context, /do not claim that every chat starts blank/)
+ assert.equal(currentThreadUnansweredContext('Please write a new letter', history), null)
+ assert.equal(currentThreadUnansweredContext('you did not answer my question', [{role:'user',content:'you did not answer my question'}]), null)
+})
+
+test('primary COS reasoner attaches current-thread objective before running the model', () => {
+ const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
+ assert.match(route, /currentThreadUnansweredContext\(input, body\?\.messages\)/)
+ assert.match(route, /if \(unansweredCurrentThread\) reasoningPrompt/)
 })

@@ -201,3 +201,57 @@ export function inspectWorkflowRecovery(
   }
   return {safeToResume:true,pending:definition.steps.filter(s=>!completed.has(s.id)).map(s=>s.id)}
 }
+
+/**
+ * Storage-port contract: production adapters MUST perform compare-and-swap in
+ * one durable transaction (including the expected revision comparison).
+ * An in-memory Map or read-then-write implementation is NOT safe in production.
+ */
+export type VersionedWorkflowCheckpoint = Readonly<{
+  revision: number
+  state: WorkflowCheckpoint
+}>
+export interface WorkflowCheckpointStore {
+  read(runId: string): Promise<VersionedWorkflowCheckpoint | null>
+  compareAndSwap(runId: string, expectedRevision: number | null, next: VersionedWorkflowCheckpoint): Promise<boolean>
+}
+export type WorkflowCheckpointWriteResult = Readonly<{
+  status: 'stored' | 'conflict' | 'invalid'
+  revision?: number
+  reason?: string
+}>
+export async function writeWorkflowCheckpoint(
+  store: WorkflowCheckpointStore,
+  runId: string,
+  definition: DynamicWorkflowDefinition,
+  expectedRevision: number | null,
+  checkpoint: WorkflowCheckpoint,
+): Promise<WorkflowCheckpointWriteResult> {
+  if (!/^[a-zA-Z0-9_-]{6,128}$/.test(runId)) return {status:'invalid',reason:'invalid_run_id'}
+  if (!validateDynamicWorkflow(definition, definition.steps.map(s=>s.capability)).valid) return {status:'invalid',reason:'invalid_workflow'}
+  if (checkpoint.inFlightStep && (!definition.steps.some(step=>step.id===checkpoint.inFlightStep) || checkpoint.completed.some(receipt=>receipt.id===checkpoint.inFlightStep))) {
+    return {status:'invalid',reason:'invalid_in_flight_step'}
+  }
+  const recovery=inspectWorkflowRecovery(definition,checkpoint)
+  if (!recovery.safeToResume && recovery.reason!=='in_flight_requires_reconciliation') {
+    return {status:'invalid',reason:recovery.reason}
+  }
+  if (expectedRevision!==null && (!Number.isSafeInteger(expectedRevision) || expectedRevision<0)) {
+    return {status:'invalid',reason:'invalid_revision'}
+  }
+  const revision=expectedRevision===null?0:expectedRevision+1
+  const stored=await store.compareAndSwap(runId,expectedRevision,{revision,state:checkpoint})
+  return stored?{status:'stored',revision}:{status:'conflict'}
+}
+/** Read-only recovery gate. In-flight work requires explicit reconciliation. */
+export async function loadWorkflowCheckpoint(
+  store: WorkflowCheckpointStore,
+  runId: string,
+  definition: DynamicWorkflowDefinition,
+): Promise<Readonly<{status:'missing'|'blocked'|'ready'; checkpoint?:VersionedWorkflowCheckpoint; reason?:string}>> {
+  const checkpoint=await store.read(runId)
+  if (!checkpoint) return {status:'missing'}
+  const recovery=inspectWorkflowRecovery(definition,checkpoint.state)
+  if (!recovery.safeToResume) return {status:'blocked',checkpoint,reason:recovery.reason}
+  return {status:'ready',checkpoint}
+}

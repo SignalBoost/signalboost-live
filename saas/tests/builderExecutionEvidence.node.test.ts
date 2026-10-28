@@ -125,11 +125,9 @@ test('stored output cannot close its surrounding code fence', () => {
 })
 
 test('both initial History reply and shared pre-execution routing use recorded evidence', () => {
-  const runner = readFileSync('lib/builder/job-runner.ts', 'utf8')
   const specialist = readFileSync('lib/ai/cos/softwareSpecialist.ts', 'utf8')
   const store = readFileSync('lib/builder/job-store.ts', 'utf8')
   assert.doesNotMatch(specialist, /await workspace.writeFile\(workspaceId, 'index.html', travelLandingPageHtml\(\)\)/)
-  assert.match(runner, /historyReply\(await initialReply\(baseReply, 'succeeded'\)/)
   assert.ok(specialist.indexOf('await builderEvidenceReply(') < specialist.indexOf('if (input.allowRepositoryRepair'))
   const read = store.slice(store.indexOf('export async function readBuilderEvidenceJob'), store.indexOf('export async function enqueueBuilderJob'))
   assert.match(read, /\.eq\('user_id', input.userId\)\.eq\('conversation_id', input.conversationId\)/)

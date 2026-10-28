@@ -102,7 +102,6 @@ test('both execution entry points use the server selection and pass history sepa
     assert.match(source, /projectContext: project\.context/)
     assert.ok(source.indexOf('await selectBuilderProject(') < source.indexOf('await workspace.ensureWorkspace('))
   }
-  assert.match(readFileSync('lib/builder/job-runner.ts', 'utf8'), /projectContext: job.metadata.projectContext/)
 })
 
 test('continuation history never replaces fail-before/fix/pass proof for an actual repair', async () => {

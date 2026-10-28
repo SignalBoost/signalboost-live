@@ -123,14 +123,24 @@ export function formatBuilderOperatorRepairReply(result: OperatorRepairResult): 
   } else {
     lines.push('Verification — no successful command was recorded.')
   }
-  const gateBlocked = /builder_regression_(?:evidence_required|not_reproduced)/.test(text(result.error))
+  const errorCode = text(result.error)
+  const gateBlocked = /builder_regression_(?:evidence_required|not_reproduced)/.test(errorCode)
   lines.push(gateBlocked
     ? 'Task status — the repair gate remains unsatisfied; that is separate from individual command results.'
     : 'Task status — incomplete; see the recorded blocker and command results.')
   const remediation = latestRemediation(trace)
   const evidenceBoundRemediation = remediation && !/database|storage/i.test(remediation) ? remediation : ''
-  lines.push(`Next action — ${evidenceBoundRemediation || (gateBlocked
-    ? 'check whether the requested work is a repair or an extension; a genuine repair still needs failure-before-change and passing verification.'
-    : 'inspect the remaining task blocker before choosing the next change.')}`)
+  const actionableBlocker = errorCode === 'builder_repository_repair_produced_no_patch'
+    ? 'No source patch was produced. Identify the reported behavior, create and run a narrowly targeted regression that fails on the current source, then repair it and rerun the same proof.'
+    : errorCode === 'builder_stalled_repeated_inspection'
+    ? 'Execution stalled on repeated inspection. Reuse the evidence already read, stop requesting unchanged reads or passing tests, and select a new targeted failing regression or a justified edit.'
+    : errorCode === 'builder_regression_not_reproduced'
+    ? 'The selected proof passed on the unchanged source. Verify that the test actually exercises the reported defect; add a targeted failing regression if it does not.'
+    : errorCode === 'builder_regression_evidence_required'
+    ? 'No executable failing proof was established. Name the exact blocked command or create a regression test that fails on the reported behavior before attempting a source edit.'
+    : errorCode
+    ? `Builder stopped with recorded blocker \`${errorCode.slice(0, 160)}\`. Investigate that blocker using the recorded tools and results before making a change.`
+    : 'No terminal blocker code was recorded. Investigate the missing error and the last recorded tool action; do not assume the task completed.'
+  lines.push(`Next action — ${evidenceBoundRemediation || actionableBlocker}`)
   return lines.join('\n')
 }

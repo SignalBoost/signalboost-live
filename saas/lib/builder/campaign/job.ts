@@ -71,7 +71,7 @@ export async function runCampaignJobSlice(input: Readonly<{
   const certification = certifyCampaign(next.ledger, PAC_CATALOG)
   const report = renderCampaignReport(next.ledger, PAC_CATALOG)
   return {
-    status: certification.outcome === 'FAIL' ? 'failed' : 'succeeded',
+    status: certification.outcome === 'PASS' ? 'succeeded' : 'failed',
     outcome: certification.outcome,
     reply: report,
     result: { campaignId: PAC_CAMPAIGN_ID, certification, ledger: next.ledger },

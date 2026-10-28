@@ -8,9 +8,10 @@
 // brief requires faults in isolation on the same release artifact, so the job runs the deployed reasoner in its own
 // async scope against a controlled provider stub (faults.ts); no user request and no real provider is touched.
 // The browser checks (PAC-13..15) drive the live site through the Builder's own Vercel Sandbox + Playwright CLI port
-// (browserChecks.ts); the sandbox is named and kept across slices so a two-minute answer can be waited for. Ports
-// this host does not yet provide (governance read-back, the Builder fixture) are left undefined so their items are
-// BLOCKED with that cause.
+// (browserChecks.ts); the sandbox is named and kept across slices so a two-minute answer can be waited for.
+// Governance (PAC-17) reads the turn and provider-call records of the campaign's own requests (governance.ts). The
+// Builder fixture (PAC-18) runs the real Builder V2 engine, with the production coding model and the production
+// sandbox test runner, on a throwaway in-memory workspace carried across slices (fixture.ts).
 //
 // Credentials are read from the environment inside the job; nothing here logs or returns them.
 
@@ -22,6 +23,8 @@ import { runWithTurnDeadline } from '../../ai/cos/cosTurnBudget.ts'
 import { createFaultStub, judgeFault, FAULT_PROMPT, FAULT_TURN_DEADLINE_MS, type CampaignFault } from './faults.ts'
 import { campaignBrowserOrigins, newBrowserSession, runBrowserCheck, BROWSER_SLICE_RESERVE_MS, type BrowserDriver, type BrowserSession, type DriverStep } from './browserChecks.ts'
 import { createBuilderPlaywrightCliPort, type VercelSandboxPlaywrightCliPort } from '../playwright-cli-port.ts'
+import { judgeGovernance, INTERACTIVE_FEATURES, type CallRecord, type TurnRecord } from './governance.ts'
+import { judgeFixture, newFixtureSession, FIXTURE_OBJECTIVE, FIXTURE_SLICE_MAX_STEPS, FIXTURE_TOTAL_DEADLINE_MS, FIXTURE_WORKSPACE_ID, type FixtureSession } from './fixture.ts'
 
 const GITHUB_API = 'https://api.github.com/repos/SignalBoost/signalboost-live'
 /** The live site reports the revision serving each response in this header (app/api/cos-browser/route.ts). */
@@ -296,6 +299,57 @@ export async function browserCheck(
   }
 }
 
+/** PAC-17: the campaign's turn records by id, and the interactive provider calls since the campaign started. */
+export async function governanceReadBack(correlationIds: readonly string[], windowStart: string): Promise<PortResult> {
+  const db = cosServiceDb()
+  if (!db) return { verdict: 'BLOCKED', actual: 'The production records are not reachable from this job.', evidence: [], failureCause: 'records unavailable' }
+  const turnsRead = await db.from('cos_turn_experience').select('turn_id,total_ms,model_calls,answered,failure_reason').in('turn_id', [...correlationIds])
+  if (turnsRead.error) return { verdict: 'BLOCKED', actual: `The turn records could not be read: ${turnsRead.error.message}.`, evidence: [], failureCause: 'turn read failed' }
+  const callsRead = await db.from('provider_inference_usage').select('provider,purpose,success,finish_reason,latency_ms').in('feature', [...INTERACTIVE_FEATURES]).gte('created_at', windowStart).limit(2000)
+  if (callsRead.error) return { verdict: 'BLOCKED', actual: `The provider call records could not be read: ${callsRead.error.message}.`, evidence: [], failureCause: 'usage read failed' }
+  const turns: TurnRecord[] = (Array.isArray(turnsRead.data) ? turnsRead.data : []).map((row: any) => ({
+    turnId: String(row.turn_id), totalMs: typeof row.total_ms === 'number' ? row.total_ms : null, modelCalls: typeof row.model_calls === 'number' ? row.model_calls : null,
+    answered: row.answered === true, failureReason: row.failure_reason ? String(row.failure_reason) : null,
+  }))
+  const calls: CallRecord[] = (Array.isArray(callsRead.data) ? callsRead.data : []).map((row: any) => ({
+    provider: String(row.provider || 'unknown'), purpose: row.purpose ? String(row.purpose) : null, success: row.success === true,
+    finishReason: row.finish_reason ? String(row.finish_reason) : null, latencyMs: Number(row.latency_ms) || 0,
+  }))
+  return judgeGovernance({ turns, calls, windowStart })
+}
+
+/**
+ * PAC-18: one slice of the real Builder V2 engine on the fixture. The workspace is rebuilt from the session's files,
+ * the engine resumes from the session's checkpoint, and the files and checkpoint go back into the session.
+ */
+export async function fixtureRun(session: FixtureSession | null, slice: Readonly<{ remainingMs: () => number }>, signal?: AbortSignal): Promise<
+  Readonly<{ status: 'done'; result: PortResult; session: FixtureSession }> | Readonly<{ status: 'pending'; session: FixtureSession }>
+> {
+  const { BuilderV2Agent } = await import('../agent-v2.ts')
+  const { BuilderV2Dispatcher } = await import('../agent-v2-dispatcher.ts')
+  const { InMemoryBuilderWorkspace } = await import('../workspace.ts')
+  const { VercelSandboxBuilderRunner } = await import('../vercel-sandbox-runner.ts')
+  const { createGovernedBuilderAiPort } = await import('../control-adapter.ts')
+  const { createBuilderCodingAiPort } = await import('../../cos/aiPort.ts')
+  const current = session ?? newFixtureSession(Date.now())
+  const workspace = new InMemoryBuilderWorkspace()
+  for (const [path, content] of Object.entries(current.files)) await workspace.writeFile(FIXTURE_WORKSPACE_ID, path, content)
+  const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort(), { deadlineAtMs: Date.now() + Math.max(30_000, slice.remainingMs() - BROWSER_SLICE_RESERVE_MS) })
+  const agent = new BuilderV2Agent(ai, new BuilderV2Dispatcher(workspace, new VercelSandboxBuilderRunner()), workspace)
+  const outcome = await agent.run({ workspaceId: FIXTURE_WORKSPACE_ID, objective: FIXTURE_OBJECTIVE, maxSteps: FIXTURE_SLICE_MAX_STEPS, signal, checkpoint: current.checkpoint ?? undefined })
+  const files: Record<string, string> = {}
+  for (const file of await workspace.listFiles(FIXTURE_WORKSPACE_ID)) files[file.path] = (await workspace.readFile(FIXTURE_WORKSPACE_ID, file.path))?.content ?? ''
+  const receipts = outcome.checkpoint?.steps ?? [...current.receipts, ...outcome.steps]
+  const next: FixtureSession = { ...current, files, checkpoint: outcome.checkpoint ?? null, receipts }
+  const elapsedMs = Date.now() - current.startedAt
+  // Not finished, still inside the fixture's own deadline, and able to resume: the next slice continues it.
+  const resumable = !outcome.ok && Boolean(outcome.checkpoint) && !signal?.aborted && elapsedMs < FIXTURE_TOTAL_DEADLINE_MS
+    && !/budget|deadline|scope_mismatch|workspace_changed|checkpoint_rejected/.test(outcome.reason)
+  if (resumable) return { status: 'pending', session: next }
+  const reason = elapsedMs >= FIXTURE_TOTAL_DEADLINE_MS && !outcome.ok ? `fixture deadline of ${FIXTURE_TOTAL_DEADLINE_MS / 60_000} min reached (${outcome.reason})` : outcome.reason
+  return { status: 'done', session: next, result: judgeFixture({ ok: outcome.ok, reason, receipts, files, elapsedMs }) }
+}
+
 export function createCampaignHostPorts(): CampaignPorts {
   return {
     deployment: () => deploymentFacts(),
@@ -303,6 +357,8 @@ export function createCampaignHostPorts(): CampaignPorts {
     routing: (prompt, signal) => productionRouting(prompt, signal),
     fault: (fault, productionCommit, signal) => isolatedFault(fault, productionCommit, signal),
     browser: (testId, session, slice, signal) => browserCheck(testId, session, slice, signal),
+    governance: (ids, windowStart) => governanceReadBack(ids, windowStart),
+    builderFixture: (session, slice, signal) => fixtureRun(session, slice, signal),
     release: (commit, signal) => releaseChecks(commit, signal),
     observability: ids => productionTrace(ids),
   }

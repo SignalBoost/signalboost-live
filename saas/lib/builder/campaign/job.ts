@@ -32,7 +32,7 @@ export function campaignStateFromCheckpoint(checkpoint: unknown, now = Date.now(
       return {
         ledger: { ...state.ledger, revisionChanges: state.ledger.revisionChanges ?? [] }, reliability: state.reliability ?? null,
         shortestRequestMs: state.shortestRequestMs ?? 0, longestRequestMs: state.longestRequestMs ?? 0, interruptedItem: state.interruptedItem ?? null,
-        browser: state.browser ?? null,
+        browser: state.browser ?? null, fixture: state.fixture ?? null,
       }
     }
   }
@@ -57,7 +57,7 @@ export async function runCampaignJobSlice(input: Readonly<{
   const next: CampaignState = {
     ledger: slice.ledger, reliability: slice.reliability,
     shortestRequestMs: slice.shortestRequestMs, longestRequestMs: slice.longestRequestMs, interruptedItem: slice.interruptedItem,
-    browser: slice.browser ?? null,
+    browser: slice.browser ?? null, fixture: slice.fixture ?? null,
   }
   if (slice.stopped !== 'complete') {
     const done = next.ledger.rows.length

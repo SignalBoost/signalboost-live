@@ -876,6 +876,7 @@ const tests = [
   'tests/builderVerificationCampaign.node.test.ts',
   'tests/builderCampaignFaults.node.test.ts',
   'tests/builderCampaignBrowser.node.test.ts',
+  'tests/builderCampaignGovernanceFixture.node.test.ts',
 
 
 

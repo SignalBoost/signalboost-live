@@ -4,7 +4,6 @@ import {
   isConciergeBuilderObjective,
   isCosCodingObjective,
 } from '../lib/ai/cos/cosReasoningRolePolicy.ts'
-import { planDebugFileJob } from '../lib/builder/debug-file-job.ts'
 
 test('debug words and ordinary questions do not acquire Builder authority', () => {
   assert.equal(isConciergeBuilderObjective('Debug this.'), false)
@@ -97,14 +96,6 @@ test('pasted Vercel logs and large History dumps never route to Builder', () => 
   const history = Array.from({ length: 2_000 }, (_, index) => `User: prompt ${index}\nAssistant: response ${index}`).join('\n')
   assert.ok(history.length > 64_000)
   assert.equal(isConciergeBuilderObjective(`Debug this file.\n${history}`, { attachmentNames: ['broken.js'] }), false)
-})
-
-test('logs become bounded debug evidence only when editable source files are supplied', () => {
-  const objective = 'Fix the attached file.\n16:19:34 Vercel CLI 59.3.0\nReferenceError: result is not defined'
-  assert.deepEqual(planDebugFileJob(objective, [{ path: 'broken.js', content: 'console.log(result)' }]), {
-    path: 'broken.js', command: "node 'broken.js'", runtime: 'node', files: ['broken.js'],
-  })
-  assert.equal(planDebugFileJob(objective, []), null)
 })
 
 test('Builder accepts documentation edits and common development action verbs', () => {

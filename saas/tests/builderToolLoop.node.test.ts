@@ -177,9 +177,9 @@ test('Builder fails a timed-out model round without immediate identical retry', 
 test('Production Builder lanes allow a valid slow local control round without becoming unbounded', () => {
   const jobRunner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
   const repositoryRepair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
-  for (const source of [jobRunner, repositoryRepair]) {
-    assert.match(source, /modelRoundTimeoutMs: 55_000/)
-  }
+  // The repository lane runs on V2 now, bounded by its slice deadline and the governed AI port's deadline.
+  assert.doesNotMatch(jobRunner, /BuilderToolLoop/)
+  assert.match(repositoryRepair, /createGovernedBuilderAiPort\(createBuilderCodingAiPort\(\), \{ deadlineAtMs: aiDeadlineAtMs \}\)/)
   const specialist = readFileSync(new URL('../lib/ai/cos/softwareSpecialist.ts', import.meta.url), 'utf8')
   assert.match(specialist, /await runBuilderJob\(jobId, builderUserId\)/)
 })

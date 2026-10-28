@@ -211,7 +211,8 @@ export function builderV2Acceptance(objective: string, files: readonly string[],
   const behavioralProof = passing.some(output => {
     const command = String(output?.requestedCommand ?? output?.executedCommand ?? '').trim()
     // A version query, install, echo, or syntax check does not prove repaired behavior.
-    return /^(?:node\s+(?:--test(?:\s|$)|[^-\s][^\s]*\.[cm]?js(?:\s|$))|(?:npm|pnpm|yarn|bun)\s+(?:(?:run\s+)?test(?:\s|$)|run\s+[^\s]*(?:test|spec)[^\s]*(?:\s|$))|python3?\s+[^\s]*(?:test|spec)[^\s]*\.py(?:\s|$)|npx\s+playwright\s+test(?:\s|$))/i.test(command)
+    // Node options may precede --test: the repository repair proof is `node --experimental-transform-types --test <file>`.
+    return /^(?:node\s+(?:(?:--[\w-]+(?:=\S+)?\s+)*--test(?:\s|$)|[^-\s][^\s]*\.[cm]?js(?:\s|$))|(?:npm|pnpm|yarn|bun)\s+(?:(?:run\s+)?test(?:\s|$)|run\s+[^\s]*(?:test|spec)[^\s]*(?:\s|$))|python3?\s+[^\s]*(?:test|spec)[^\s]*\.py(?:\s|$)|npx\s+playwright\s+test(?:\s|$))/i.test(command)
   })
   // Browser-dependent tasks require a host browser receipt for the requested URL
   // after the last source mutation. A green unit suite cannot substitute for UI proof.

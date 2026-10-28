@@ -92,27 +92,3 @@ export async function explainBuilderEvidence(input: {
   return `${explanation}\n\nBuilder job ${job.id} — ${job.status}.\n\n${evidence}\n\nRead from saved job evidence${files.length ? ' and current workspace files' : '; current source was unavailable'}; no code was rerun.`
 }
 
-/** Bound the entire read-and-explain operation, preserving time to persist the execution result. */
-export async function explainInitialBuilderRepair(input: Parameters<typeof explainBuilderEvidence>[0] & {
-  fallback: string
-  deadlineAtMs: number
-}): Promise<string> {
-  const fallback = `${input.fallback}\n\n${formatBuilderExecutionEvidence(input.job.result?.trace)}`
-  const budgetMs = Math.min(35_000, input.deadlineAtMs - Date.now())
-  if (budgetMs < 1_000) return fallback
-  let expired = false
-  let timer: ReturnType<typeof setTimeout> | undefined
-  try {
-    return await Promise.race([
-      explainBuilderEvidence({ ...input, presentation: 'initial', ai: {
-        generate: request => expired ? Promise.reject(new Error('explanation_deadline')) : input.ai.generate(request),
-      } }),
-      new Promise<string>(resolve => { timer = setTimeout(() => { expired = true; resolve(fallback) }, budgetMs) }),
-    ])
-  } catch {
-    return fallback
-  } finally {
-    expired = true
-    clearTimeout(timer)
-  }
-}

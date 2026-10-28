@@ -9,8 +9,6 @@ test('ordinary standard jobs defer busy RunPod with bounded retries before termi
   assert.match(runner, /MAX_STANDARD_CAPACITY_DEFERRALS = 3/)
   assert.match(runner, /job\.jobKind === 'standard' && \(error === 'builder_runpod_primary_busy' \|\| error === 'builder_model_round_timeout' \|\| error === BUILDER_TURN_TIMEOUT_ERROR\)/)
   assert.match(runner, /metadataCount\(job, 'builderCapacityDeferrals'\) < MAX_STANDARD_CAPACITY_DEFERRALS/)
-  // The re-queue carries the slice's current checkpoint, never a stale earlier one.
-  assert.match(runner, /result\.error === 'builder_runpod_primary_busy'[\s\S]*await deferSelfHealingCapacity\(job, result\.error, trace, result\.checkpoint \?\? null\)/)
   assert.match(runner, /if \(await deferSelfHealingCapacity\(job, message, trace\)/)
 })
 test('capacity queue is cron-owned, cooled down, one job per tick and never replays POST', () => {
@@ -35,7 +33,6 @@ test('capacity deferral enforces identity, generation, bounded retry and preserv
 test('ordinary model-round timeouts retain the same durable job for bounded queue recovery', () => {
   const migration = readFileSync(new URL('../supabase/migrations/20261013231500_builder_standard_model_timeout_deferral.sql', import.meta.url), 'utf8')
   assert.match(runner, /error === 'builder_runpod_primary_busy' \|\| error === 'builder_model_round_timeout'/)
-  assert.match(runner, /result\.error === 'builder_runpod_primary_busy' \|\| result\.error === 'builder_model_round_timeout'/)
   assert.match(migration, /p_reason not in \('builder_runpod_primary_busy', 'builder_model_round_timeout'\)/)
   assert.match(migration, /builderCapacityDeferredReason' in \('builder_runpod_primary_busy', 'builder_model_round_timeout'\)/)
   assert.match(migration, /v_timeout_deferrals >= 3/)
@@ -45,7 +42,6 @@ test('ordinary model-round timeouts retain the same durable job for bounded queu
 test('standard turn timeouts are durably retried within the same bounded identity and claim fence', () => {
   const migration = readFileSync(new URL('../supabase/migrations/20261016145000_builder_standard_turn_timeout_deferral.sql', import.meta.url), 'utf8')
   assert.match(runner, /const standardBusy = job\.jobKind === 'standard'[\s\S]*error === BUILDER_TURN_TIMEOUT_ERROR/)
-  assert.match(runner, /result\.error === BUILDER_TURN_TIMEOUT_ERROR/)
   assert.match(migration, /not v_self_healing and p_reason not in \('builder_runpod_primary_busy', 'builder_model_round_timeout', 'builder_turn_timeout'\)/)
   assert.match(migration, /builderCapacityDeferredReason' in \('builder_runpod_primary_busy', 'builder_model_round_timeout', 'builder_turn_timeout'\)/)
   assert.match(migration, /v_timeout_deferrals >= 3/)

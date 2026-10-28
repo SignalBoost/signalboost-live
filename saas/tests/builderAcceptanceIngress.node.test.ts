@@ -93,7 +93,7 @@ function setup(owner: boolean, specialistResponse?: any, forceClassifierFalse = 
     '@/lib/builder/workspace-supabase': {
       createSupabaseBuilderWorkspace: () => { calls.workspace++; return { ensureWorkspace: async () => {}, setObjective: async () => {}, writeFile: unexpected('unexpected staged file') } },
     },
-    '@/lib/builder/debug-file-job': { extractBuilderSourceFiles: () => [], planDebugFileJob: () => null },
+    '@/lib/builder/source-files': { extractBuilderSourceFiles: () => [] },
     '@/lib/ai/cos/cosTurnBudget': { turnDeadlineRemainingMs: () => 100_000 },
     '@/lib/i18n/responseLanguage': { resolveResponseLanguage: () => 'en' },
     '@/lib/ai/cos/pastedOperationalLog': { analyzeOperationalLog: () => ({}), isOperationalLogEvidence: () => false },

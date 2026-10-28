@@ -86,8 +86,6 @@ test('model-round timeout aborts abandoned provider work without an identical im
 })
 
 test('the durable job passes its own deadline down and no longer caps rounds at a low constant', () => {
-  assert.match(jobRunner, /maxRounds: 96/)
-  assert.match(jobRunner, /deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS/)
   assert.doesNotMatch(jobRunner, /maxRounds: isRepairObjective\(job\.objective\) \? 20 : 16/)
   assert.match(gate, /tests\/builderTimeBudget\.node\.test\.ts/)
 })

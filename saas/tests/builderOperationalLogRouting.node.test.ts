@@ -10,7 +10,8 @@ test('a pasted build log is admitted as a durable Builder job instead of a canne
   // reach the tool loop. The old synchronous template reply must not come back.
   assert.doesNotMatch(route, /operationalLogReply/)
   assert.doesNotMatch(route, /builder-operational-log-analysis/)
-  assert.match(route, /!debugPlan && !logEvidence && !newProjectRequested && !isConciergeBuilderObjective\(objective, routingContext\)/)
+  assert.match(route, /!logEvidence && !newProjectRequested && !isConciergeBuilderObjective\(objective, routingContext\)/)
+  assert.doesNotMatch(route, /debugPlan|planDebugFileJob/)
   const admission = route.indexOf('!logEvidence && !newProjectRequested && !isConciergeBuilderObjective(objective, routingContext)')
   const enqueue = route.indexOf('await enqueueBuilderJob({', admission)
   assert.ok(admission >= 0)
@@ -41,14 +42,17 @@ test('log-derived workspace jobs never acquire repository authority', () => {
   assert.match(route, /await persistSynchronousReply\(\{ conversationId, userId: access\.userId, objective, reply \}\)/)
 })
 
-test('a log plus one attached source file still enters only the fixed debug protocol', () => {
+test('a log plus attached source files becomes an ordinary V2 job over the staged files', () => {
   const files = route.indexOf('let files = cleanFiles(body?.files)')
-  const plan = route.indexOf('const debugPlan = planDebugFileJob(objective, files)', files)
-  const kind = route.indexOf("jobKind: debugPlan ? 'debug_file' : 'standard'", plan)
+  const staged = route.indexOf('for (const file of files) await workspace.writeFile(workspaceId, file.path, file.content)', files)
+  const enqueue = route.indexOf('await enqueueBuilderJob({', staged)
+  const kind = route.indexOf("jobKind: 'standard'", enqueue)
   assert.ok(files >= 0)
-  assert.ok(plan > files)
-  assert.ok(kind > plan)
-  assert.match(route, /debugPaths: debugPlan\.files/)
+  assert.ok(staged > files)
+  assert.ok(enqueue > staged)
+  assert.ok(kind > enqueue)
+  assert.doesNotMatch(route, /planDebugFileJob|jobKind: debugPlan|'debug_file'/)
+  assert.match(route.slice(enqueue), /logEvidence: true,[\s\S]*?builderEngine: 'v2'/)
 })
 
 test('non-coding, non-log objectives are still refused without creating a job', () => {

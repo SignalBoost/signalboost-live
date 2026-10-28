@@ -1,107 +1,142 @@
+// saas/tests/builderRepositoryRepairProofController.node.test.ts
+//
+// The repository repair proof is host-owned and agent-neutral: the host runs the proof on the untouched revision
+// before any model call, source edits wait for a failing proof, and the repair counts only when the host's own proof
+// run passes on the final source. The repair lane runs on Builder V2, so these tests drive the real V2 agent.
+
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
+import { BuilderV2Agent } from '../lib/builder/agent-v2.ts'
+import { BuilderV2Dispatcher } from '../lib/builder/agent-v2-dispatcher.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
-import { createRepositoryRepairProofController, discoverRepositoryRepairProofCommand, repositoryRepairProofCommand } from '../lib/builder/repository-repair-proof-controller.ts'
+import { createRepositoryRepairProofController, discoverRepositoryRepairProofCommand, repositoryRepairProofCommand, type RepositoryRepairProofController } from '../lib/builder/repository-repair-proof-controller.ts'
+import { repositoryRepairV2Objective } from '../lib/builder/repository-repair-v2.ts'
 import { formatBuilderOperatorRepairReply } from '../lib/builder/operator-narration.ts'
-import type { BuilderAiPort, BuilderBrowserCliPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
+import type { BuilderAiPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
 
 class ScriptedAi implements BuilderAiPort {
   calls = 0
   private cursor = 0
-  private readonly controls: readonly string[]
-  constructor(controls: readonly string[]) {
-    this.controls = controls
-  }
+  constructor(private readonly controls: readonly string[]) {}
   async generate() {
     this.calls += 1
-    return this.controls[this.cursor++] ?? null
+    return this.controls[this.cursor++] ?? '{"type":"finish","summary":"done"}'
   }
 }
 
-test('repository proof controller owns fail then edit then pass even when the model never requests a run', async () => {
+const tool = (action: Record<string, unknown>) => JSON.stringify({ type: 'tool', action })
+const finish = (summary = 'Repaired and verified.') => JSON.stringify({ type: 'finish', summary })
+
+async function runAgent(controller: RepositoryRepairProofController, ai: BuilderAiPort, workspaceId: string, objective: string) {
+  const agent = new BuilderV2Agent(ai, new BuilderV2Dispatcher(controller.workspace, controller.runner), controller.workspace)
+  return agent.run({ workspaceId, objective: repositoryRepairV2Objective(objective, controller.proofCommand), maxSteps: 12, retryDelay: async () => {} })
+}
+
+/** A runner over the in-memory workspace: app.js is broken until it says "fixed"; the regression test checks that. */
+function appRunner(workspace: InMemoryBuilderWorkspace, workspaceId: string, commands: string[]): BuilderRunnerPort {
+  return {
+    async run(input) {
+      commands.push(input.command)
+      if (/broad/.test(input.command)) return { exitCode: 125, stdout: '', stderr: 'builder_repository_broad_test_blocked: use targeted test', timedOut: false }
+      if (/passing/.test(input.command)) return { exitCode: 0, stdout: '# pass 1\n# fail 0\n', stderr: '', timedOut: false }
+      const app = await workspace.readFile(workspaceId, 'app.js')
+      return app?.content.includes('fixed')
+        ? { exitCode: 0, stdout: '# pass 1\n# fail 0\n', stderr: '', timedOut: false }
+        : { exitCode: 1, stdout: '# pass 0\n# fail 1\n', stderr: 'AssertionError: expected fixed', timedOut: false }
+    },
+  }
+}
+
+test('the host proves the defect before any model call; V2 refuses to finish until the required proof passes', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   await workspace.writeFile('proof-cycle', 'app.js', 'module.exports = "broken"')
   const proofCommand = 'node --test tests/app.test.js'
   const commands: string[] = []
-  const runner: BuilderRunnerPort = {
-    async run(input) {
-      commands.push(input.command)
-      const app = input.files.find(file => file.path === 'app.js')
-      return app?.content.includes('fixed')
-        ? { exitCode: 0, stdout: 'pass\n', stderr: '', timedOut: false }
-        : { exitCode: 1, stdout: '', stderr: 'AssertionError: expected fixed', timedOut: false }
-    },
-  }
-  const model = new ScriptedAi([
-    '{"type":"tool","toolId":"edit_file","input":{"path":"app.js","search":"broken","replace":"fixed"}}',
+  const controller = createRepositoryRepairProofController({ workspace, runner: appRunner(workspace, 'proof-cycle', commands), proofCommand })
+  const ai = new ScriptedAi([
+    tool({ tool: 'edit_file', path: 'app.js', search: 'broken', replace: 'fixed' }),
+    finish(),
+    tool({ tool: 'run_tests', command: proofCommand }),
+    finish(),
   ])
-  const controlled = createRepositoryRepairProofController({ ai: model, workspace, runner, proofCommand })
-  const result = await new BuilderToolLoop(controlled.ai, controlled.workspace, controlled.runner).run({
-    objective: 'fix broken app',
-    workspaceId: 'proof-cycle',
-    maxRounds: 6,
-  })
 
-  assert.equal(result.ok, true)
-  assert.equal(model.calls, 1)
-  assert.deepEqual(commands, [proofCommand, proofCommand])
-  assert.deepEqual(result.trace.map(item => [item.toolId, item.ok]), [
-    ['run', false],
-    ['edit_file', true],
-    ['run', true],
-  ])
+  const baseline = await controller.baseline('proof-cycle')
+  assert.equal(baseline.state, 'failed')
+  assert.equal(ai.calls, 0, 'no model call before the host baseline')
+  const outcome = await runAgent(controller, ai, 'proof-cycle', 'fix broken app')
+  assert.equal(outcome.ok, true, outcome.reason)
+  const final = await controller.finalProof('proof-cycle')
+  assert.equal(final.passed, true)
+  assert.equal(commands[0], proofCommand)
+  // Baseline, the agent's own run (its finish was refused until the required proof passed), the final host proof.
+  assert.deepEqual(commands, [proofCommand, proofCommand, proofCommand])
   assert.equal((await workspace.readFile('proof-cycle', 'app.js'))?.content, 'module.exports = "fixed"')
 })
 
-test('repository proof controller refuses to edit when the pinned baseline already passes', async () => {
+test('a passing baseline ends the repair as not reproduced and source stays untouched', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   await workspace.writeFile('already-green', 'app.js', 'module.exports = "fixed"')
-  const model = new ScriptedAi([
-    '{"type":"tool","toolId":"edit_file","input":{"path":"app.js","search":"fixed","replace":"changed"}}',
-  ])
-  const runner: BuilderRunnerPort = {
-    async run() { return { exitCode: 0, stdout: 'pass\n', stderr: '', timedOut: false } },
-  }
-  const controlled = createRepositoryRepairProofController({
-    ai: model,
-    workspace,
-    runner,
-    proofCommand: 'node --test tests/app.test.js',
-  })
-  const result = await new BuilderToolLoop(controlled.ai, controlled.workspace, controlled.runner).run({
-    objective: 'fix broken app',
-    workspaceId: 'already-green',
-    maxRounds: 4,
-  })
-
-  assert.equal(result.ok, false)
-  if (!result.ok) assert.equal(result.error, 'builder_regression_not_reproduced')
-  assert.equal(model.calls, 0)
-  assert.equal((await workspace.readFile('already-green', 'app.js'))?.content, 'module.exports = "fixed"')
+  const controller = createRepositoryRepairProofController({ workspace, runner: appRunner(workspace, 'already-green', []), proofCommand: 'node --test tests/app.test.js' })
+  assert.equal((await controller.baseline('already-green')).state, 'passed')
+  await assert.rejects(controller.workspace.editFile('already-green', 'app.js', 'fixed', 'changed'), /builder_regression_proof_required_before_source_edit/)
 })
 
-test('policy-blocked broad proof cannot authorize repository source edits', async () => {
+test('a policy-blocked broad proof is not evidence and cannot unlock source edits', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   await workspace.writeFile('blocked-proof', 'app.js', 'module.exports = "unchanged"')
-  const model = new ScriptedAi([
-    '{"type":"tool","toolId":"edit_file","input":{"path":"app.js","search":"unchanged","replace":"changed"}}',
-  ])
-  const controlled = createRepositoryRepairProofController({
-    ai: model, workspace, proofCommand: 'npm test',
-    runner: { async run() {
-      return { exitCode: 125, stdout: '',
-        stderr: 'builder_repository_broad_test_blocked: use targeted test', timedOut: false }
-    } },
-  })
-  const result = await new BuilderToolLoop(controlled.ai, controlled.workspace, controlled.runner).run({
-    objective: 'Fix a failing repository test', workspaceId: 'blocked-proof', maxRounds: 5,
-  })
-  assert.equal(result.ok, false)
-  assert.equal(model.calls, 0)
+  const controller = createRepositoryRepairProofController({ workspace, runner: appRunner(workspace, 'blocked-proof', []), proofCommand: 'npm run broad' })
+  assert.equal((await controller.baseline('blocked-proof')).state, 'invalid')
+  await assert.rejects(controller.workspace.editFile('blocked-proof', 'app.js', 'unchanged', 'changed'), /builder_regression_proof_required_before_source_edit/)
   assert.equal((await workspace.readFile('blocked-proof', 'app.js'))?.content, 'module.exports = "unchanged"')
-  assert.equal(result.trace.some(item => item.ok && item.toolId === 'edit_file'), false)
+})
+
+test('without a host proof the agent reproduces with its own failing test, then fail, edit, pass', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('own-proof', 'app.js', 'module.exports = "broken"')
+  const commands: string[] = []
+  const controller = createRepositoryRepairProofController({ workspace, runner: appRunner(workspace, 'own-proof', commands), proofCommand: null })
+  assert.equal((await controller.baseline('own-proof')).state, 'pending')
+  await assert.rejects(controller.workspace.editFile('own-proof', 'app.js', 'broken', 'fixed'), /builder_regression_proof_required_before_source_edit/)
+  const ai = new ScriptedAi([
+    tool({ tool: 'write_file', path: 'tests/app.test.js', content: 'test("app", () => {})' }),
+    tool({ tool: 'run_tests', command: 'node --test tests/app.test.js' }),
+    tool({ tool: 'edit_file', path: 'app.js', search: 'broken', replace: 'fixed' }),
+    tool({ tool: 'run_tests', command: 'node --test tests/app.test.js' }),
+    finish(),
+  ])
+  const outcome = await runAgent(controller, ai, 'own-proof', 'fix broken app')
+  assert.equal(outcome.ok, true, outcome.reason)
+  assert.equal(controller.proofCommand, 'node --test tests/app.test.js')
+  assert.equal(controller.state().baseline, 'failed')
+  assert.equal((await controller.finalProof('own-proof')).passed, true)
+})
+
+test('without a host proof a passing test never stands in for reproduction', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('no-repro', 'app.js', 'module.exports = "broken"')
+  const controller = createRepositoryRepairProofController({ workspace, runner: appRunner(workspace, 'no-repro', []), proofCommand: null })
+  await controller.runner.run({ workspaceId: 'no-repro', command: 'node --test tests/passing.test.js', files: [] })
+  await controller.runner.run({ workspaceId: 'no-repro', command: 'npm run broad', files: [] })
+  assert.equal(controller.proofCommand, null)
+  await assert.rejects(controller.workspace.editFile('no-repro', 'app.js', 'broken', 'fixed'), /builder_regression_proof_required_before_source_edit/)
+  // The lane reports a repair only on a passing final proof; with no proof there is none.
+  assert.deepEqual(await controller.finalProof('no-repro'), { passed: false, result: null })
+})
+
+test('the proof state survives a work slice: a resumed controller keeps the failing baseline and its command', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('resume', 'app.js', 'module.exports = "broken"')
+  const commands: string[] = []
+  const first = createRepositoryRepairProofController({ workspace, runner: appRunner(workspace, 'resume', commands), proofCommand: 'node --test tests/app.test.js' })
+  await first.baseline('resume')
+  const saved = JSON.parse(JSON.stringify(first.state()))
+  const resumed = createRepositoryRepairProofController({ workspace, runner: appRunner(workspace, 'resume', commands), proofCommand: null, state: saved })
+  assert.deepEqual(resumed.state(), { proofCommand: 'node --test tests/app.test.js', hostSelected: true, baseline: 'failed' })
+  assert.deepEqual(await resumed.baseline('resume'), { state: 'failed', result: null }, 'a resumed baseline is not run again')
+  await resumed.workspace.editFile('resume', 'app.js', 'broken', 'fixed')
+  assert.equal((await resumed.finalProof('resume')).passed, true)
+  assert.equal(commands.length, 2)
 })
 
 test('repository proof selection preserves the exact build and narrows explicit failing tests', () => {
@@ -151,67 +186,6 @@ test('operator narration never calls a failed diagnostic command a reproduced de
   assert.match(realProof, /reproduced the reported failure/i)
 })
 
-test('Playwright evidence cannot replace repository fail-before-edit-pass-after proof', async () => {
-  const workspace = new InMemoryBuilderWorkspace()
-  await workspace.writeFile('browser-proof', 'app.js', 'module.exports = "broken"')
-  const proofCommand = 'node --test tests/app.test.js'
-  let runs = 0
-  const runner: BuilderRunnerPort = {
-    async run(input) {
-      runs += 1
-      const app = input.files.find(file => file.path === 'app.js')
-      return app?.content.includes('fixed')
-        ? { exitCode: 0, stdout: 'pass\n', stderr: '', timedOut: false }
-        : { exitCode: 1, stdout: '', stderr: 'AssertionError: expected fixed', timedOut: false }
-    },
-  }
-  const browserCalls: string[] = []
-  const browser: BuilderBrowserCliPort = {
-    async capabilities() {
-      return { actions: ['snapshot'], allowedOrigins: ['https://itmounts.com'] }
-    },
-    async invoke(input) {
-      browserCalls.push(input.action)
-      return {
-        ok: true,
-        action: input.action,
-        exitCode: 0,
-        stdout: '### Page\n- Page URL: https://itmounts.com/\n- Page Title: iTMounts',
-        stderr: '',
-        timedOut: false,
-      }
-    },
-    async close() {},
-  }
-  const model = new ScriptedAi([
-    '{"type":"tool","toolId":"browser_cli","input":{"action":"snapshot"}}',
-    '{"type":"tool","toolId":"edit_file","input":{"path":"app.js","search":"broken","replace":"fixed"}}',
-  ])
-  const controlled = createRepositoryRepairProofController({ ai: model, workspace, runner, proofCommand })
-  const result = await new BuilderToolLoop(
-    controlled.ai,
-    controlled.workspace,
-    controlled.runner,
-    undefined,
-    browser,
-  ).run({
-    objective: 'fix broken app and inspect browser evidence',
-    workspaceId: 'browser-proof',
-    maxRounds: 8,
-  })
-
-  assert.equal(result.ok, true)
-  assert.equal(runs, 2)
-  assert.deepEqual(browserCalls, ['snapshot'])
-  assert.deepEqual(result.trace.map(item => [item.toolId, item.ok]), [
-    ['run', false],
-    ['browser_cli', true],
-    ['edit_file', true],
-    ['run', true],
-  ])
-})
-
-
 test('proof discovery chooses a unique test related to explicitly named source', () => {
   const target = { pathHints: ['saas/lib/builder/project-continuity.ts'], failedCommand: 'npm test' }
   assert.equal(discoverRepositoryRepairProofCommand(target, [
@@ -224,128 +198,6 @@ test('proof discovery chooses a unique test related to explicitly named source',
   assert.equal(discoverRepositoryRepairProofCommand(target, [
     'tests/project-continuity.test.ts', 'tests/project-continuity.other.test.ts',
   ]), null)
-})
-
-test('without a host proof Builder reproduces with its own failing regression test, then fail edit pass', async () => {
-  const workspace = new InMemoryBuilderWorkspace()
-  await workspace.writeFile('discover', 'lib/app.js', 'module.exports = "broken"')
-  const commands: string[] = []
-  const runner: BuilderRunnerPort = {
-    async run(input) {
-      commands.push(input.command)
-      if (input.command.startsWith('git ')) return { exitCode: 128, stdout: '', stderr: 'fatal: bad revision', timedOut: false }
-      const app = input.files.find(file => file.path === 'lib/app.js')
-      return app?.content.includes('fixed')
-        ? { exitCode: 0, stdout: 'pass\n', stderr: '', timedOut: false }
-        : { exitCode: 1, stdout: '', stderr: 'AssertionError: expected fixed', timedOut: false }
-    },
-  }
-  const model = new ScriptedAi([
-    '{"type":"tool","toolId":"run","input":{"command":"git log --oneline -3 -- lib/app.js"}}',
-    '{"type":"tool","toolId":"edit_file","input":{"path":"lib/app.js","search":"broken","replace":"guess"}}',
-    '{"type":"tool","toolId":"write_file","input":{"path":"tests/app.test.js","content":"require(\\"node:assert\\").equal(require(\\"../lib/app.js\\"),\\"fixed\\")"}}',
-    '{"type":"tool","toolId":"run","input":{"command":"node --test tests/app.test.js"}}',
-    '{"type":"tool","toolId":"edit_file","input":{"path":"lib/app.js","search":"broken","replace":"fixed"}}',
-    '{"type":"answer","answer":"fixed lib/app.js"}',
-  ])
-  const controlled = createRepositoryRepairProofController({ ai: model, workspace, runner, proofCommand: null })
-  const result = await new BuilderToolLoop(controlled.ai, controlled.workspace, controlled.runner).run({
-    objective: 'the app is broken, fix it', workspaceId: 'discover', maxRounds: 12,
-  })
-
-  assert.equal(result.ok, true)
-  assert.equal(controlled.proofCommand, 'node --test tests/app.test.js')
-  const guess = result.trace.find(item => item.toolId === 'edit_file' && item.input.replace === 'guess')
-  assert.equal(guess?.ok, false)
-  assert.match(String(guess?.error), /builder_regression_proof_required_before_source_edit/)
-  assert.equal(commands[0], 'git log --oneline -3 -- lib/app.js')
-  assert.deepEqual(commands.slice(-2), ['node --test tests/app.test.js', 'node --test tests/app.test.js'])
-  assert.equal((await workspace.readFile('discover', 'lib/app.js'))?.content, 'module.exports = "fixed"')
-})
-
-test('without a host proof a passing test never stands in for reproduction and an answer ends not reproduced', async () => {
-  const workspace = new InMemoryBuilderWorkspace()
-  await workspace.writeFile('green', 'lib/app.js', 'module.exports = "fixed"')
-  await workspace.writeFile('green', 'tests/other.test.js', 'ok')
-  const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: 'pass\n', stderr: '', timedOut: false } } }
-  const model = new ScriptedAi([
-    '{"type":"tool","toolId":"run","input":{"command":"node --test tests/other.test.js"}}',
-    '{"type":"answer","answer":"all good, fixed"}',
-  ])
-  const controlled = createRepositoryRepairProofController({ ai: model, workspace, runner, proofCommand: null })
-  const result = await new BuilderToolLoop(controlled.ai, controlled.workspace, controlled.runner).run({
-    objective: 'the app is broken, fix it', workspaceId: 'green', maxRounds: 6,
-  })
-  assert.equal(result.ok, false)
-  if (!result.ok) assert.equal(result.error, 'builder_regression_not_reproduced')
-  assert.equal(controlled.proofCommand, null)
-  assert.ok(result.trace.some(item => item.toolId === 'run' && item.ok))
-  assert.equal((await workspace.readFile('green', 'lib/app.js'))?.content, 'module.exports = "fixed"')
-})
-
-test('without a host proof a policy-blocked broad suite does not pin a proof or unlock source edits', async () => {
-  const workspace = new InMemoryBuilderWorkspace()
-  await workspace.writeFile('broad', 'lib/app.js', 'module.exports = "unchanged"')
-  const runner: BuilderRunnerPort = { async run() {
-    return { exitCode: 125, stdout: '', stderr: 'builder_repository_broad_test_blocked: use targeted test', timedOut: false }
-  } }
-  const model = new ScriptedAi([
-    '{"type":"tool","toolId":"run","input":{"command":"npm test"}}',
-    '{"type":"tool","toolId":"edit_file","input":{"path":"lib/app.js","search":"unchanged","replace":"changed"}}',
-  ])
-  const controlled = createRepositoryRepairProofController({ ai: model, workspace, runner, proofCommand: null })
-  const result = await new BuilderToolLoop(controlled.ai, controlled.workspace, controlled.runner).run({
-    objective: 'Fix the broken app', workspaceId: 'broad', maxRounds: 4,
-  })
-  assert.equal(result.ok, false)
-  assert.equal(controlled.proofCommand, null)
-  assert.equal(result.trace.some(item => item.ok && item.toolId === 'edit_file'), false)
-  assert.equal((await workspace.readFile('broad', 'lib/app.js'))?.content, 'module.exports = "unchanged"')
-})
-
-test('production 2026-10-15: blocked npm test plus an unrelated passing test continues to a reproduced repair', async () => {
-  const workspace = new InMemoryBuilderWorkspace()
-  await workspace.writeFile('prod', 'lib/app.js', 'module.exports = "broken"')
-  await workspace.writeFile('prod', 'tests/agentGateway.node.test.ts', 'ok')
-  await workspace.writeFile('prod', 'tests/cosRouter.node.test.ts', 'ok')
-  await workspace.writeFile('prod', 'tests/pressMedia.node.test.ts', 'ok')
-  await workspace.writeFile('prod', 'package.json', '{"scripts":{"test":"node --experimental-strip-types --test tests/*.test.ts"}}')
-  const runner: BuilderRunnerPort = {
-    async run(input) {
-      if (input.command === 'npm test') return { exitCode: 125, stdout: '', stderr: 'builder_repository_broad_test_blocked: select the smallest relevant test file and run it directly', timedOut: false }
-      if (input.command.includes('agentGateway')) return { exitCode: 0, stdout: 'pass 9\n', stderr: '', timedOut: false }
-      const app = input.files.find(file => file.path === 'lib/app.js')
-      return app?.content.includes('fixed')
-        ? { exitCode: 0, stdout: 'pass\n', stderr: '', timedOut: false }
-        : { exitCode: 1, stdout: '', stderr: 'AssertionError: expected fixed', timedOut: false }
-    },
-  }
-  const model = new ScriptedAi([
-    '{"type":"tool","toolId":"list_files","input":{}}',
-    '{"type":"tool","toolId":"run","input":{"command":"npm test"}}',
-    '{"type":"tool","toolId":"run","input":{"command":"node --test tests/agentGateway.node.test.ts"}}',
-    '{"type":"tool","toolId":"write_file","input":{"path":"tests/app.test.js","content":"require(\\"node:assert\\").equal(require(\\"../lib/app.js\\"),\\"fixed\\")"}}',
-    '{"type":"tool","toolId":"run","input":{"command":"node --test tests/app.test.js"}}',
-    '{"type":"tool","toolId":"edit_file","input":{"path":"lib/app.js","search":"broken","replace":"fixed"}}',
-    '{"type":"answer","answer":"fixed lib/app.js"}',
-  ])
-  const controlled = createRepositoryRepairProofController({ ai: model, workspace, runner, proofCommand: null })
-  const result = await new BuilderToolLoop(controlled.ai, controlled.workspace, controlled.runner).run({
-    objective: 'the app is broken, fix it', workspaceId: 'prod', maxRounds: 14,
-  })
-  assert.equal(result.ok, true, result.ok ? '' : result.error)
-  assert.equal(controlled.proofCommand, 'node --test tests/app.test.js')
-  assert.equal((await workspace.readFile('prod', 'lib/app.js'))?.content, 'module.exports = "fixed"')
-})
-
-test('deployed engineering repairs with recorded failing tests cannot bypass the host proof controller', () => {
-  const source = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
-  assert.match(source, /const engineeringRepair = engineeringTask/)
-  assert.match(source, /target\.pathHints\.some\(path =>/)
-  assert.match(source, /target\.failureEvidence\.some\(line =>/)
-  assert.match(source, /const needsRepairProof = !engineeringTask \|\| engineeringRepair/)
-  assert.match(source, /const proofController = needsRepairProof \? createRepositoryRepairProofController/)
-  assert.match(source, /proofController\?\.runner \?\? repositoryRunner/)
 })
 
 test('repository repair selects a single literal failing test from recorded CI evidence', () => {
@@ -366,9 +218,19 @@ test('repository repair selects a single literal failing test from recorded CI e
   }), null)
 })
 
+test('deployed engineering repairs with recorded failing tests cannot bypass the host proof controller', () => {
+  const source = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+  assert.match(source, /const engineeringRepair = engineeringTask/)
+  assert.match(source, /target\.pathHints\.some\(path =>/)
+  assert.match(source, /target\.failureEvidence\.some\(line =>/)
+  assert.match(source, /const needsRepairProof = resumeState \? resumeState\.proof !== null : !engineeringTask \|\| engineeringRepair/)
+  assert.match(source, /const proofController = needsRepairProof \? createRepositoryRepairProofController/)
+  assert.match(source, /proofController\?\.runner \?\? repositoryRunner/)
+})
+
 test('deployed engineering repair honors test paths in failure evidence, not only path hints', () => {
   const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
   assert.match(repair, /target\.failureEvidence\.some\(line => \/\(\?:saas/)
-  assert.match(repair, /const needsRepairProof = !engineeringTask \|\| engineeringRepair/)
+  assert.match(repair, /const needsRepairProof = resumeState \? resumeState\.proof !== null : !engineeringTask \|\| engineeringRepair/)
   assert.match(repair, /const proofController = needsRepairProof \? createRepositoryRepairProofController/)
 })

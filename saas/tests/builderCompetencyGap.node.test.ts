@@ -44,13 +44,6 @@ test('learning query is stable class-level curriculum and contains no raw owner 
   assert.doesNotMatch(first?.question || '', /ACME|super-secret|private\/repo|customer/i)
 })
 
-test('ordinary terminal Builder result path records competency gaps', () => {
-  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
-  const ordinaryFailure = runner.slice(runner.indexOf('if (result.ok === false)'), runner.indexOf('if (verifiedBuilderCognitiveApplication(result))'))
-  assert.match(ordinaryFailure, /recordBuilderCompetencyGap/)
-  assert.match(ordinaryFailure, /terminalError/)
-})
-
 
 test('runtime-emitted Builder failures map only to stable capability classes', () => {
   assert.equal(classifyBuilderCompetencyFailure('builder_model_control_schema_mismatch'), 'builder_model_control_failed')

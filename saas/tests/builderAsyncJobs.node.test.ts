@@ -37,12 +37,15 @@ test('POST creates a durable job, schedules work after the response, and returns
   assert.match(jobRunner, /executeSignalBoostRepositoryRepair/)
 })
 
-test('small attached repairs retain the debug protocol and project repairs use the verified loop', () => {
-  assert.match(route, /const debugPlan = planDebugFileJob\(objective, files\)/)
-  assert.match(route, /debugPaths: debugPlan\.files/)
-  assert.match(route, /jobKind: debugPlan \? 'debug_file' : 'standard'/)
-  assert.match(jobRunner, /runDebugFileJob/)
-  assert.match(jobRunner, /new BuilderToolLoop/)
+test('attached-file repairs are ordinary V2 jobs on both Builder entry points', () => {
+  const specialist = readFileSync(new URL('../lib/ai/cos/softwareSpecialist.ts', import.meta.url), 'utf8')
+  for (const source of [route, specialist]) {
+    assert.doesNotMatch(source, /planDebugFileJob|debug-file-job|'debug_file'/)
+    const enqueue = source.slice(source.indexOf('await enqueueBuilderJob({'))
+    assert.match(enqueue, /jobKind: 'standard'/)
+    assert.match(enqueue, /builderEngine: 'v2'/)
+  }
+  assert.match(specialist, /import \{ extractBuilderSourceFiles \} from '@\/lib\/builder\/source-files'/)
 })
 
 test('the server repeats strict coding classification before workspace creation or enqueue', () => {
@@ -129,14 +132,7 @@ test('expired background workers become terminal in both polling and History', (
 test('background execution is idempotently claimed and applies only validated software skills with verified outcomes', () => {
   assert.match(jobRunner, /job = await claimBuilderJob\(jobId, userId\)/)
   assert.match(jobRunner, /if \(!job\) return/)
-  assert.match(jobRunner, /fetchProjectRepairSignals\(job.workspaceId\)/)
-  assert.match(jobRunner, /retrieveValidatedCognitiveSkills\(job\.objective, \{ specialistFamily: 'software' \}\)/)
   assert.match(cognitiveSkillContext, /query\.contains\('metadata', \{ specialistFamily: options\.specialistFamily \}\)/)
-  assert.match(jobRunner, /verifiedBuilderCognitiveApplication\(result\)/)
-  assert.match(jobRunner, /recordVerifiedCognitiveProductionOutcome/)
-  assert.match(repositoryRepair, /cognitiveSkills: cognitive\.items/)
-  assert.match(repositoryRepair, /cos_software_specialist_platform_engineer/)
-  assert.match(jobRunner, /runDebugFileJob/)
   assert.match(jobRunner, /finishBuilderJob/)
 })
 

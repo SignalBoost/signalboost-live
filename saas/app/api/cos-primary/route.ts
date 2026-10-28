@@ -65,7 +65,7 @@ import { constructDatedRoster, deepenClaimResearch } from '@/lib/ai/cos/cosClaim
 import { listRepoFiles, readRepoFile } from '@/lib/ai/tools/repoReader'
 import { withCosProviderExecutionTrace, type ProviderExecutionTrace } from '@/lib/cos/textGateway'
 import { getAccess } from '@/lib/auth/access'
-import { buildConversationRecallContext, detectConversationRecallIntent } from '@/lib/ai/cos/cosConversationRecall'
+import { buildConversationRecallContext, detectConversationRecallIntent, currentThreadUnansweredContext } from '@/lib/ai/cos/cosConversationRecall'
 import { searchPastConversations } from '@/lib/ai/tools/conversationHistory'
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { reportLanguageName } from '@/lib/i18n/reportLanguage'
@@ -1113,6 +1113,8 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   }
 
   let reasoningPrompt=input
+  const unansweredCurrentThread = currentThreadUnansweredContext(input, body?.messages)
+  if (unansweredCurrentThread) reasoningPrompt = `${unansweredCurrentThread}\n\nCURRENT USER REQUEST:\n${reasoningPrompt}`
   if(documentAdvisoryRequest && freshMissUseLocal){
     reasoningPrompt = `ADVICE-ONLY EVIDENCE BOUNDARY: Answer the user's actual question using the supplied document as an explicitly unverified premise. Do not assert any external current law, eligibility, enactment, benefit, contact, or legal entitlement unless verified by authoritative sources. Clearly distinguish what the document says from what requires confirmation. Give useful reasoning and practical next verification steps; do not draft an unsolicited email or letter.\\n\\n${reasoningPrompt}`
   }

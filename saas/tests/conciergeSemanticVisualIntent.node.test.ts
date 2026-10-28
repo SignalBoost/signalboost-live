@@ -144,7 +144,7 @@ test('the public Concierge uses the deep semantic visual gate while owner Assist
     purpose: 'Use the deep semantic conversation verdict only for the public mouth; owner Assistant is COS and must not pay a separate visual-classifier call.',
     expect: /const semanticVisualEligible =[\s\S]*shouldResolveSemanticVisualRequest\(messages, prompt\)[\s\S]*const semanticResolution = semanticVisualEligible[\s\S]*await resolveSemanticVisualRequest\(messages, prompt\)/,
     insert: "    const semanticVisualEligible = !directVisual && browserSurface === 'concierge' && shouldResolveSemanticVisualRequest(messages, prompt)",
-    after: '    const directVisual = !softwareExecutionObjective && isConciergeVisualObjective(prompt)',
+    after: '    const directVisual = !softwareExecutionObjective && prompt.length <= 8_000 && isConciergeVisualObjective(prompt)',
     requiresImport: "import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
   })
   assert.match(route, /const visualObjective = browserSurface === 'assistant'[\s\S]*\? null/)

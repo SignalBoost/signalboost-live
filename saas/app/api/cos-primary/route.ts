@@ -951,8 +951,8 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     const authoritySatisfied=freshEvidenceMeetsQuestionAuthority(lookupInput, sources)&&securityScenarioEvidenceIsSpecific(lookupInput,freshSources)
     logEscalation({event:'fresh_external_evidence_result',query:queries.join(' | '),planner_search_queries:plannerSearchQueries.length,documents_acquired:freshSources.length,authority_satisfied:authoritySatisfied,error:freshError,source_urls:freshSources.map(source=>source.url),claim_research:claimResearch.claims,pages_read:claimResearch.pagesRead,assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
     // A request that supplies its own facts is answered from them when live search finds nothing authoritative. The
-    // refusal below is only for a turn whose answer depends on current outside-world facts, as the semantic judge reads
-    // it (by meaning, never wording). Production 2026-10-28 (COS-PAC-001, PAC-03): a self-contained infrastructure
+    // judge (by meaning, never wording) must positively read the request as self-contained: its own facts are primary,
+    // no outside facts are required, at the judge's confidence bar; any other reading, or none, keeps the refusal. Production 2026-10-28 (COS-PAC-001, PAC-03): a self-contained infrastructure
     // incident report was refused as "live evidence unavailable" because word rules flagged it and the web returned
     // unrelated pages; with no sources at all it would have been answered.
     const liveFactsIntent=!authoritySatisfied&&freshSources.length
@@ -960,7 +960,8 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       : semanticTaskIntent
     if(!authoritySatisfied){
       if((!freshSources.length && !mustFailClosedWithoutAuthoritativeLiveEvidence(lookupInput))
-        ||(freshSources.length>0&&liveFactsIntent!==null&&!semanticIntentRequiresFreshness(liveFactsIntent))){
+        ||(freshSources.length>0&&liveFactsIntent!==null&&liveFactsIntent.suppliedContextPrimary===true
+          &&liveFactsIntent.externalFactsRequired===false&&liveFactsIntent.confidence>=0.72)){
         freshMissUseLocal=true
       } else {
       const detail=freshError||'Live search did not return authoritative evidence required for this current fact.'

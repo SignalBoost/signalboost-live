@@ -15,17 +15,13 @@ test('the word rules mark a self-contained incident report as needing live evide
   assert.equal(mustFailClosedWithoutAuthoritativeLiveEvidence(incident), true)
 })
 
-test('only a positive live-facts reading by the judge refuses when search finds nothing authoritative', () => {
+test('without authoritative live evidence, only a confident self-contained reading answers locally', () => {
   const at = route.indexOf('if(!authoritySatisfied){')
   const branch = route.slice(at, route.indexOf('} else {', at))
-  assert.match(branch, /\|\|\(freshSources\.length>0&&liveFactsIntent!==null&&!semanticIntentRequiresFreshness\(liveFactsIntent\)\)/)
+  // Codex on #4979: a positive self-contained reading is required, never merely the absence of a live-facts finding.
+  assert.match(branch, /\|\|\(freshSources\.length>0&&liveFactsIntent!==null&&liveFactsIntent\.suppliedContextPrimary===true\s*&&liveFactsIntent\.externalFactsRequired===false&&liveFactsIntent\.confidence>=0\.72\)\)/)
+  assert.doesNotMatch(branch, /semanticIntentRequiresFreshness/)
   assert.match(branch, /freshMissUseLocal=true/)
   // The judge reads the request when it has not already; its verdict, not the word rules, decides.
   assert.match(route, /const liveFactsIntent=!authoritySatisfied&&freshSources\.length\n\s*\? semanticTaskIntent\?\?await classifyCosSemanticTaskIntent\(/)
-})
-
-test('the judge refuses only on a confident live-facts finding', () => {
-  const judge = readFileSync(new URL('../lib/ai/cos/cosSemanticTaskIntent.ts', import.meta.url), 'utf8')
-  const at = judge.indexOf('export function semanticIntentRequiresFreshness(')
-  assert.match(judge.slice(at, at + 300), /intent\.mode === 'external_fact_verification'\s*&& intent\.externalFactsRequired\s*&& intent\.confidence >= 0\.72/)
 })

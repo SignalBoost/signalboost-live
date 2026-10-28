@@ -248,3 +248,15 @@ test('the continuation migration admits only repair checkpoints and runs through
   assert.match(migration, /jsonb_typeof\(checkpoint->'repositoryRepair'\) = 'object'/)
   assert.doesNotMatch(migration, /^\s*(?:begin|commit)\s*;\s*$/im)
 })
+
+test('a request that names a test file always gets the host-run proof, whatever its wording classes it as', () => {
+  const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+  const select = repair.indexOf('selectedProofCommand = discoverRepositoryRepairProofCommand(proofTarget,')
+  const decide = repair.indexOf("const needsRepairProof = resumeState ? resumeState.proof !== null : !engineeringTask || engineeringRepair || selectedProofCommand !== null")
+  assert.ok(select > 0 && decide > select, 'the host selects the proof before deciding whether the repair needs one')
+  assert.match(repair, /target\.rawLog/)
+  // Production 2026-10-28 (job 5f60d618): the owner's request named the test file in prose.
+  const objective = 'Fix the failing test saas/tests/builderCanarySum.test.mjs on the deployed main commit. Reproduce the failure first, repair the source, rerun the same test, then open the pull request.'
+  const named = [...objective.matchAll(/(?:saas\/)?tests?\/[A-Za-z0-9_.\/-]+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)/g)].map(match => match[0])
+  assert.deepEqual(named, ['saas/tests/builderCanarySum.test.mjs'])
+})

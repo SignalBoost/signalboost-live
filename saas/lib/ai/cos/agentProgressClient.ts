@@ -164,6 +164,12 @@ function transportFailureReply(body: unknown): string {
   return ASSISTANT_TRANSPORT_TIMEOUT_COPY[locale] || ASSISTANT_TRANSPORT_TIMEOUT_COPY.en
 }
 
+function durablePendingReply(body: unknown): string {
+  const record = bodyRecord(body)
+  const locale = String(record?.context?.language || 'en').toLowerCase() as keyof typeof COS_DURABLE_PENDING_COPY
+  return COS_DURABLE_PENDING_COPY[locale] || COS_DURABLE_PENDING_COPY.en
+}
+
 function deliberateAbort(error: unknown, signal: AbortSignal): boolean {
   return signal.aborted || (error instanceof DOMException && error.name === 'AbortError')
 }
@@ -540,7 +546,7 @@ export async function postWithAgentProgress(args: {
       ok: false,
       status: 504,
       data: {
-        reply: COS_DURABLE_PENDING_COPY[localeFromBody(requestBody)],
+        reply: durablePendingReply(requestBody),
         source: 'cos-durable-history-deadline',
         turnId,
         status: 'running',

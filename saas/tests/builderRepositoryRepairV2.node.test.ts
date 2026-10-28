@@ -67,7 +67,8 @@ class FakeCheckout implements BuilderWorkspacePort, BuilderRunnerPort {
 
 class ScriptedAi implements BuilderAiPort {
   calls = 0
-  constructor(private readonly controls: readonly string[]) {}
+  private readonly controls: readonly string[]
+  constructor(controls: readonly string[]) { this.controls = controls }
   async generate() { return this.controls[this.calls++] ?? null }
 }
 const tool = (action: Record<string, unknown>) => JSON.stringify({ type: 'tool', action })

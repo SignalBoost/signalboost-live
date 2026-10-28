@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { beginAgenticTask, advanceAgenticTask, outstandingAgenticRequirements, validateDynamicWorkflow, executeDynamicWorkflow, beginWorkflowCheckpoint, inspectWorkflowRecovery } from '../lib/agentic/taskLifecycle.ts'
+import { beginAgenticTask, advanceAgenticTask, outstandingAgenticRequirements, validateDynamicWorkflow, executeDynamicWorkflow, beginWorkflowCheckpoint, inspectWorkflowRecovery, writeWorkflowCheckpoint, loadWorkflowCheckpoint, type WorkflowCheckpointStore, type VersionedWorkflowCheckpoint } from '../lib/agentic/taskLifecycle.ts'
 
 test('unverified claims cannot complete an agentic task', () => {
  const state=beginAgenticTask('Repair the source and prove the change', ['source','tests'])
@@ -94,4 +94,27 @@ test('checkpoint recovery rejects replay of potentially committed side effects',
  assert.equal(inspectWorkflowRecovery({...def,version:3},restored).reason,'checkpoint_version_mismatch')
  const fake={...start,completed:[{id:'test',capability:'verify',evidenceId:'fake'}]}
  assert.equal(inspectWorkflowRecovery(def,fake).reason,'invalid_checkpoint_receipts')
+})
+
+test('checkpoint store enforces revisions and blocks in-flight recovery',async()=>{
+ const def={id:'repair-flow',version:1,objective:'Repair only with approval',steps:[{id:'build',capability:'builder',dependsOn:[]}]}
+ const data=new Map<string,VersionedWorkflowCheckpoint>()
+ const store:WorkflowCheckpointStore={
+  async read(id){return data.get(id)??null},
+  async compareAndSwap(id,rev,next){
+   const current=data.get(id)
+   if ((current?.revision??null)!==rev) return false
+   data.set(id,structuredClone(next));return true
+  },
+ }
+ const start=beginWorkflowCheckpoint(def)
+ assert.deepEqual(await writeWorkflowCheckpoint(store,'run_0001',def,null,start),{status:'stored',revision:0})
+ assert.equal((await loadWorkflowCheckpoint(store,'run_0001',def)).status,'ready')
+ const inFlight={...start,inFlightStep:'build'}
+ assert.deepEqual(await writeWorkflowCheckpoint(store,'run_0001',def,0,inFlight),{status:'stored',revision:1})
+ assert.equal((await loadWorkflowCheckpoint(store,'run_0001',def)).reason,'in_flight_requires_reconciliation')
+ const stale=await writeWorkflowCheckpoint(store,'run_0001',def,0,start)
+ assert.equal(stale.status,'conflict')
+ const invalid=await writeWorkflowCheckpoint(store,'run_0001',{...def,version:2},1,start)
+ assert.equal(invalid.status,'invalid')
 })

@@ -36,7 +36,7 @@ test('the production enqueue boundary persists server-parsed limits and refuses 
     await enqueue(input)
     assert.deepEqual(sent.p_metadata.builderRunLimits, { maxCostNanodollars: 500000000, maxElapsedMs: 600000 })
     sent = null
-    await assert.rejects(enqueue({ ...input, metadata: { builderEngine: 'v1' } }), /builder_budget_v2_required/)
+    await assert.rejects(enqueue({ ...input, metadata: { builderEngine: 'v1' } }), /builder_v1_retired_use_v2/)
     assert.equal(sent, null)
   } finally {
     if (beforeUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL; else process.env.NEXT_PUBLIC_SUPABASE_URL = beforeUrl

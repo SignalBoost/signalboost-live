@@ -518,7 +518,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       return
     }
     // checkpoint jobs remain V1 because their engine tag is absent.
-    if (job.jobKind === 'standard' && job.metadata.builderEngine === 'v2') {
+    if (job.jobKind === 'standard' && job.metadata.builderEngine === 'v2' && job.metadata.platformRepair !== true) {
       const runLimits = readBuilderRunLimits(job.objective)
       const totalDeadlineMs = runLimits?.maxElapsedMs ?? BUILDER_JOB_TOTAL_DEADLINE_MS
       if (builderJobOverTotalDeadline(job.createdAt, Date.now(), totalDeadlineMs)) {

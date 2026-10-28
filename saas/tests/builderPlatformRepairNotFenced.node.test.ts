@@ -21,8 +21,8 @@ test('the retired-V1 fence comes after every live lane, and the repair lane no l
   assert.match(repair, /runBuilderV2JobCycle\(/)
 })
 
-test('repair jobs are enqueued the way production records them: platformRepair without an engine tag', () => {
+test('new platform repair jobs are V2-tagged, with the owner repair lane still explicit', () => {
   const enqueue = readFileSync(new URL('../lib/builder/repository-repair-job.ts', import.meta.url), 'utf8')
-  assert.match(enqueue, /platformRepair: true,/)
-  assert.doesNotMatch(enqueue, /builderEngine/)
+  assert.match(enqueue, /builderEngine: 'v2',\s*platformRepair: true,/)
+  assert.match(runner, /job\.metadata\.builderEngine === 'v2' && job\.metadata\.platformRepair !== true/)
 })

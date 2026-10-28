@@ -325,9 +325,25 @@ export function structuredLiveDataKind(input: string): StructuredLiveDataKind | 
  * semantic/exact cache, and prior conversation facts are NOT permitted to establish the answer.
  * COS must retrieve fresh external evidence on this turn, or fail closed if it cannot verify it.
  */
+/**
+ * A supplied-facts forensic assignment is reasoning, not a request to verify
+ * the actual outside world. Keep the exemption narrow: an explicit instruction
+ * to investigate live systems or fetch current evidence always wins.
+ */
+export function isSelfContainedIncidentAnalysis(input: string): boolean {
+  const text = String(input || '')
+  const hasObservations = /(?:^|\n)\s*[-•]\s+.{20,}/m.test(text)
+  const hasDeliverables = /(?:^|\n)\s*(?:Deliver:|Tasks?:)\s*\n\s*1[.)]\s+/im.test(text)
+  const boundedEvidence = /\b(?:stay within (?:the )?(?:stated|supplied|given) facts|use only (?:the )?(?:supplied|given) (?:facts|observations)|based solely on (?:the )?(?:supplied|given) (?:facts|observations))\b/i.test(text)
+  const analytical = /\b(?:incident report|root causes?|rank (?:the )?(?:remaining )?hypotheses|what would refute|plausible causes)\b/i.test(text)
+  const externalRequest = /\b(?:look up|search (?:the )?(?:web|internet)|check (?:the )?(?:live|current|actual)|verify (?:against|with) (?:the )?(?:live|current|actual)|connect to|query (?:the )?(?:production|live)|fetch (?:current|live)|browse)\b/i.test(text)
+  return hasObservations && hasDeliverables && boundedEvidence && analytical && !externalRequest
+}
+
 export function requiresFreshExternalEvidence(input: string): boolean {
   const text = normalizedText(input)
   if (!text) return false
+  if (isSelfContainedIncidentAnalysis(input)) return false
   // Advisory diagnosis / method briefs and "which files were injected?"
   // are not live current-fact lookups.
   if (detectAdvisoryDiagnosisIntent(input).suppressFreshnessAbort) return false

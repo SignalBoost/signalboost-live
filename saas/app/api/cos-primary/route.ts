@@ -992,7 +992,8 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       ? semanticTaskIntent??await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
       : semanticTaskIntent
     if(!authoritySatisfied){
-      if((documentAdvisoryRequest && !directCategory)\n        ||(!freshSources.length && !mustFailClosedWithoutAuthoritativeLiveEvidence(lookupInput))
+      if((documentAdvisoryRequest && !directCategory)
+        ||(!freshSources.length && !mustFailClosedWithoutAuthoritativeLiveEvidence(lookupInput))
         ||(freshSources.length>0&&liveFactsIntent!==null&&liveFactsIntent.suppliedContextPrimary===true
           &&liveFactsIntent.externalFactsRequired===false&&liveFactsIntent.confidence>=0.72)){
         freshMissUseLocal=true

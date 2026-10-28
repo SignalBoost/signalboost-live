@@ -105,3 +105,59 @@ export function validateDynamicWorkflow(
   for (const id of ids) visit(id)
   return { valid: errors.length === 0, errors: [...new Set(errors)], executionAuthorized: false }
 }
+
+/** Host-scoped grant is created only after separate authentication and policy checks. */
+export type WorkflowExecutionGrant = Readonly<{
+  workflowId: string
+  version: number
+  allowedCapabilities: readonly string[]
+  approvedStepIds: readonly string[]
+}>
+export type WorkflowStepReceipt = Readonly<{
+  id: string
+  capability: string
+  evidenceId: string
+}>
+export type WorkflowRunResult = Readonly<{
+  status: 'completed' | 'blocked'
+  receipts: readonly WorkflowStepReceipt[]
+  blockedStep?: string
+  reason?: string
+}>
+export type WorkflowCapabilityHandler = (step: DynamicWorkflowDefinition['steps'][number], prior: readonly WorkflowStepReceipt[]) => Promise<string>
+
+/**
+ * Executes only host-registered handlers explicitly granted for this workflow
+ * version and approved for each step. No dynamic JS is evaluated. Fail closed
+ * before any action on missing dependencies, invalid graphs or approval.
+ * Idempotency across crashes remains the responsibility of capability handlers.
+ */
+export async function executeDynamicWorkflow(
+  definition: DynamicWorkflowDefinition,
+  registeredHandlers: Readonly<Record<string, WorkflowCapabilityHandler>>,
+  grant: WorkflowExecutionGrant | null,
+): Promise<WorkflowRunResult> {
+  const validation=validateDynamicWorkflow(definition,Object.keys(registeredHandlers))
+  if (!validation.valid) return {status:'blocked',receipts:[],reason:'invalid_definition'}
+  if (!grant || grant.workflowId!==definition.id || grant.version!==definition.version) {
+    return {status:'blocked',receipts:[],reason:'missing_or_stale_grant'}
+  }
+  const receipts: WorkflowStepReceipt[]=[]
+  const remaining=new Map(definition.steps.map(step=>[step.id,step]))
+  while (remaining.size>0) {
+    const ready=[...remaining.values()].find(step=>step.dependsOn.every(dep=>receipts.some(r=>r.id===dep)))
+    if (!ready) return {status:'blocked',receipts,reason:'unsatisfied_dependencies'}
+    if (!grant.allowedCapabilities.includes(ready.capability) || (ready.requiresApproval && !grant.approvedStepIds.includes(ready.id))) {
+      return {status:'blocked',receipts,blockedStep:ready.id,reason:'authorization_required'}
+    }
+    try {
+      const evidenceId=await registeredHandlers[ready.capability](ready,receipts)
+      if (!evidenceId?.trim()) return {status:'blocked',receipts,blockedStep:ready.id,reason:'missing_host_receipt'}
+      receipts.push({id:ready.id,capability:ready.capability,evidenceId})
+      remaining.delete(ready.id)
+    } catch {
+      return {status:'blocked',receipts,blockedStep:ready.id,reason:'handler_failed'}
+    }
+  }
+  return {status:'completed',receipts}
+}

@@ -14,7 +14,7 @@ import { cosExecutionEnvelope, cosAnswerProgress } from './cosExecutionEnvelope.
 // same exact-host allow-list + API-key controls as any other remote LOCAL_AI_* endpoint.
 
 import { randomUUID } from 'node:crypto'
-import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective, releasableAnalyticalAnswer } from './answerTaskContract.ts'
+import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective, releasableAnalyticalAnswer, evaluateTaskOutcome } from './answerTaskContract.ts'
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { ANSWER_COMPLETION_CHECK_SYSTEM_PROMPT, ANSWER_COMPLETION_SYSTEM_PROMPT, parseAnswerCompletionCheck, runAnswerCompletionLoop } from './answerCompletionLoop.ts'
 import { callLocalModel, captureServedInference, localInferenceConfigFromEnv, type LocalModelCallArgs, type ServedInference } from '@/lib/ai/local-inference'
@@ -509,6 +509,17 @@ export async function callRawCosReasoner(
 
     const finalParsedForPolicy = parseLocalResult(text)
     const remainingTaskGaps = finalParsedForPolicy ? missingAnalyticalTasks(effectiveArgs.prompt, finalParsedForPolicy.answer) : []
+    // Preserve the original-request outcome independently of model/tool success.
+    // This diagnostic projection does not certify deployment or execution and never
+    // replaces the established policy, citation, and trusted verification gates.
+    if (finalParsedForPolicy && requestedAnalyticalTasks(effectiveArgs.prompt).length > 0) {
+      const outcome = evaluateTaskOutcome({ originalRequest: effectiveArgs.prompt, answer: finalParsedForPolicy.answer })
+      console.info('[cos-original-request-outcome]', JSON.stringify({
+        turnId, status: outcome.status, remainingDeliverables: outcome.remainingDeliverables.length,
+        requestedDeliverables: requestedAnalyticalTasks(effectiveArgs.prompt).length,
+        evidenceReceipts: outcome.verifiedReceiptCount,
+      }))
+    }
     // Only a non-answer is withheld; a substantive analysis with gaps is the model's real work and is released.
     if (remainingTaskGaps.length && !(finalParsedForPolicy && releasableAnalyticalAnswer(effectiveArgs.prompt, finalParsedForPolicy.answer))) {
       console.warn('[cos-task-contract-release-blocked]', JSON.stringify({ missingCount: remainingTaskGaps.length, requestedCount: firstTaskGaps.length }))

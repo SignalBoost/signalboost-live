@@ -18,6 +18,7 @@ import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairD
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { ANSWER_COMPLETION_CHECK_SYSTEM_PROMPT, ANSWER_COMPLETION_SYSTEM_PROMPT, parseAnswerCompletionCheck, runAnswerCompletionLoop } from './answerCompletionLoop.ts'
 import { callLocalModel, captureServedInference, localInferenceConfigFromEnv, type LocalModelCallArgs, type ServedInference } from '@/lib/ai/local-inference'
+import { currentInferenceTransport } from '@/lib/ai/inferenceTransport'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRepair, recordQualityRepairDecision, assessReasonerDraft } from '@/lib/ai/cos/reasonerQuality'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
@@ -163,9 +164,13 @@ export async function callRawCosReasoner(
   let answered = false
   let finalConfidence: number | null = null
   let publishedDiagnosticResearch: PublishedDiagnosticLookupResult | null = null
+  // A turn under a controlled provider transport (verification campaign fault injection) is synthetic: it runs the
+  // same code but writes nothing durable — no turn experience row, no verification audit row, no pod activity —
+  // so production statistics hold only real turns (Codex on #4977). Its evidence is the campaign's own record.
+  const syntheticTurn = currentInferenceTransport() !== null
 
   try {
-    await touchRunpodActivityLease('qwen_reasoning')
+    if (!syntheticTurn) await touchRunpodActivityLease('qwen_reasoning')
 
     // Preserve the same user objective, prohibitions and deliverables across
     // prompt compilation, model inference, critic repair, and the completion loop.
@@ -432,6 +437,7 @@ export async function callRawCosReasoner(
             return { passed: failures.length === 0, failures }
           },
           persistVerification: async receipt => {
+            if (syntheticTurn) return
             const db = cosServiceDb()
             if (!db) throw new Error('cos_verification_audit_database_unavailable')
             const eventId = randomUUID()
@@ -586,7 +592,7 @@ export async function callRawCosReasoner(
       phases: experience.phases,
       skipped: experience.skipped,
     }))
-    recordTurnExperience(experience)
+    if (!syntheticTurn) recordTurnExperience(experience)
     // TURN TIMING (2026-09-30): the reasoner's own phases (draft, quality repair, council…) join the per-stage
     // timings shown in the provenance reply, so time spent around the model call is visible, not only the call.
     for (const phase of experience.phases) recordCosLatencyStage(`reasoner:${phase.phase}`, phase.ms)

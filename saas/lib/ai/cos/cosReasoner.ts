@@ -175,10 +175,10 @@ export async function callRawCosReasoner(
     // Preserve the same user objective, prohibitions and deliverables across
     // prompt compilation, model inference, critic repair, and the completion loop.
     const execution = cosExecutionEnvelope(args.prompt)
-    let effectiveArgs = execution.contract.requestsAnalysis ? {
+    let effectiveArgs = {
       ...args,
       systemPrompt: [String(args.systemPrompt ?? ''), execution.instructionBlock].filter(Boolean).join('\n\n'),
-    } : args
+    }
     const scriptDirective = scriptRequestDirective(args.prompt)
     if (scriptDirective) {
       effectiveArgs = {

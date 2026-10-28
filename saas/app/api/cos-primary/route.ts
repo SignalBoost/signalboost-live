@@ -11,6 +11,7 @@ import { WEB_KNOWLEDGE_RESEARCH_CAPABILITY } from '@/platform-harness/capabiliti
 import { POST as legacyConciergePost } from '@/app/api/concierge/route'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
 import { buildHonestRefusalReply } from '@/lib/ai/cos/honestRefusalReply'
+import { asksForHistoricalRoster } from '@/lib/ai/cos/historicalRosterIntent'
 import { releasableAnalyticalAnswer, requestedAnalyticalTasks, missingAnalyticalTasks } from '@/lib/ai/cos/answerTaskContract'
 import { buildFreshVerificationUnavailableReply } from '@/lib/ai/cos/freshVerificationUnavailableReply'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
@@ -679,7 +680,6 @@ function persistCosPrimaryProvenanceAfterResponse(userId:string|null,reply:strin
     catch(error){console.warn('[cos-primary-provenance] post-response persistence failed:',error instanceof Error?error.message:String(error))}
   })
 }
-function asksForHistoricalRoster(input:string):boolean{return /\b(?:former|past|previous|last)\b/i.test(input)&&/\b(?:list|secretar(?:y|ies)|office holder|history)\b/i.test(input)}
 function sameFreshSourceUrl(left:string,right:string):boolean{
   try{
     const a=new URL(left),b=new URL(right)

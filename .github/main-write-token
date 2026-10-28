@@ -1,2 +1,2 @@
-base_sha=b1fe97afe21ab6dbf03e1ecae0f4d3f0470af427
-branch=feat/builder-repair-lane-v2-20261028
+base_sha=938bb8c863860a828708700905fdd0ce4a92c820
+branch=fix/freshness-honours-supplied-fact-reasoning-20261028

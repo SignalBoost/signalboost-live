@@ -115,17 +115,27 @@ export async function expireStaleDurableCosTurns(input: {
       error: 'worker_lost',
       finishedAt: new Date().toISOString(),
     }
-    const { data: updated } = await db.from('assistant_messages')
-      .update({
-        content: 'COS could not finish this turn because its background worker stopped before producing a verified response. The turn was not replayed.',
-        provenance,
+    // The same fenced transaction owns stale failure and normal completion.
+    // Do not terminalize History alone or overwrite a concurrently finished turn.
+    try {
+      const { data: committed, error: finishError } = await db.rpc('finish_cos_customer_task', {
+        p_task_id: turnId,
+        p_history_message_id: row.id,
+        p_user_id: input.userId,
+        p_status: 'failed',
+        p_reply: 'COS could not finish this turn because its background worker stopped before producing a verified response. The turn was not replayed.',
+        p_provenance: provenance,
+        p_error: 'worker_lost',
       })
-      .eq('id', row.id)
-      .eq('user_id', input.userId)
-      .eq('provenance->>status', 'running')
-      .select('id')
-      .maybeSingle()
-    if (updated?.id) expired += 1
+      if (finishError) throw finishError
+      if (committed === true) expired += 1
+    } catch (error) {
+      // A concurrent normal completion can win the task lock. Never overwrite
+      // its terminal result; leave unresolved records for controlled recovery.
+      console.warn('[cos_stale_task_atomic_finish_failed]', {
+        turnId, message: error instanceof Error ? error.message : 'unknown',
+      })
+    }
   }
   return expired
 }

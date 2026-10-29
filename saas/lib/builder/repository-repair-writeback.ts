@@ -208,6 +208,9 @@ export async function publishSignalBoostRepositoryRepair(input: {
     )
     const baseTree = String(baseCommit?.tree?.sha || '')
     if (!SAFE_SHA.test(baseTree)) throw new Error('builder_repository_writeback_base_tree_invalid')
+    const onboard = await requestJson(request, `${GITHUB_API}/contents/ONBOARD.md?ref=${baseSha}`, { method: 'GET', headers: writeHeaders }, [200])
+    const onboardSha = String(onboard?.sha || '').toLowerCase()
+    if (!SAFE_SHA.test(onboardSha) || onboard?.type !== 'file') throw new Error('builder_repository_writeback_onboard_unverified')
     const executableModes = await executableModesForChangedFiles(request, baseTree, files, writeHeaders)
 
     const tree: Array<{ path: string; mode: GitBlobMode; type: 'blob'; sha: string }> = []
@@ -302,6 +305,8 @@ export async function publishSignalBoostRepositoryRepair(input: {
             '',
             `Pinned base: \`${baseSha}\``,
             `Changed files: ${files.length}`,
+            `ONBOARD_ACK_BLOB: ${onboardSha}`,
+            `REPO_SCAN_HEAD: ${commitSha}`,
             '',
             'The repair was generated and proved in the network-denied repository sandbox.',
             'When governed auto-merge is enabled, the durable merge continuation may integrate this PR only after all checks are green, the danger classifier remains clear, and a restorable production checkpoint exists.',

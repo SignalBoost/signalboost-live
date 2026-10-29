@@ -1,2 +1,2 @@
-base_sha=a4719a17603b4b2273c8fe04de502e45014bac47
-branch=docs/developer-queue-pac-history-20261029
+base_sha=14fc5f5b38077cba0baaf184c2a0322576191bdf
+branch=fix/builder-cos-active-claim-gate-20261029

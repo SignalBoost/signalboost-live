@@ -5,6 +5,25 @@
 
 Evidence: source audit of `main` at `16ac985` (2026-10-29), every component traced to its production callers (imports from `app/` routes and crons, tests excluded), updated for #5043 and #5044. Not runtime proof: a file existing is not counted as working.
 
+## Owner release-blocking acceptance register — 2026-10-29
+
+**Certification: 0/10.** A gate requires repository, staging and exact-revision runtime evidence; PR merges alone never certify customer outcomes.
+
+1. Canonical identity: admit every COS request including read-only turns once; Builder delegation references the same customer task; keep cos_turn out of Builder scheduling (#5082 open); confirm actual deployed database binding.
+2. Component decisions: execute all recorded reuse/integrate/repair/replace decisions; eliminate leftover taskLifecycle and word-count completion rules only after caller inventory and regression.
+3. Host policy: COS spending ceilings, ads approvals bound to authenticated identities, consequential Hub changes require server-side owner approval.
+4. External actions: record before provider execution with idempotency keys; reconcile uncertain email/social/ads/deploy/merge outcomes without double-send.
+5. Replanning: monotonic persisted plan version, unchanged immutable objective, unchanged permission and budget ceiling.
+6. Independent outcomes: compare every requested deliverable with evidence including citations; no writer or word-count self-certification.
+7. Recovery: browser disconnect, page reload and full worker restart resume one COS/Builder execution without duplicate effects; prove live behavior.
+8. Customer controls: server Stop, Resume, History state and verified Results with test/PR/preview links, in 11 languages.
+9. Staging: full application-compatible staging schema and deployed app; execute real database/browser/recovery/provider-crash tests before promotion (#5091 only prerequisite).
+10. Release: canary with exact deployed revision, automatic rollback and required protected-main CI checks.
+
+**Additional release-blocking defects:** Conversation follow-ups forgetting original constraints; customer-support proactive completion; campaign requests not actually starting campaigns; duplicate History writes; completion decided by the new word rule.
+
+**Delivery order:** fix task identity and scheduling, provision staging, policy/action ledger, verification/replanning/recovery, customer UX defects, staging acceptance, safe production rollout. Evidence is required to change any gate from incomplete.
+
 ## Verified status update — 2026-10-29
 
 The original 0/10 findings are a historical baseline, not a current certification. The Builder recovery SQL migrations are installed in the connected primary application-schema Supabase project, and real PostgreSQL recovery and pause/resume checks passed in CI. The production deployment's exact database binding has not been independently confirmed.

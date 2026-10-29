@@ -1,2 +1,2 @@
-base_sha=7ce9aee65824fa331c244cc2030a3af2f39b77c6
-branch=feat/cos-canonical-task-admission-20261029
+base_sha=bb65572fc18e1bd653fa5fa146e9e173f8d29610
+branch=fix/cos-task-atomic-terminal-20261029

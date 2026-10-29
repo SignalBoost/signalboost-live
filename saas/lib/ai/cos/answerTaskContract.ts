@@ -83,40 +83,12 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
 }
 
 /**
- * Whether an analysis may be released. A draft that meets the contract always may. A draft with gaps may still be
- * released when it is a substantive analysis: long enough for the requested deliverables and covering the subject
- * matter of at least half of them anywhere in the text (section numbering varies; nested numbered lists confuse the
- * section parser). A non-answer ("I need more readings before investigating") is never released.
- * Production 2026-10-25: complete model answers (finish_reason stop, 1,000-3,140 tokens) to an 8-task incident
- * analysis were discarded because the section parser reported gaps, and the owner got a refusal instead.
+ * Analytical release uses the same task-outcome projection as other COS consumers.
+ * Completion never depends on character counts or topical vocabulary overlap.
+ * Execution requests must still be checked separately against host receipts.
  */
 export function releasableAnalyticalAnswer(prompt: string, answer: string): boolean {
-  const tasks = requestedAnalyticalTasks(prompt)
-  if (!tasks.length) return true
-  const missing = missingAnalyticalTasks(prompt, answer)
-  if (!missing.length) return true
-  // Judge only the answer's own analysis: lines that repeat a requested task heading and paragraphs repeated
-  // under several headings do not count (Codex on #4900: the checklist plus one refusal paragraph repeated
-  // eight times must stay a non-answer).
-  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
-  const headings = new Set(tasks.map(normalize))
-  const seen = new Set<string>()
-  const body = String(answer || '').split(/\n\s*\n|\n(?=\s*(?:#{1,6}\s*)?\d{1,2}[.)]\s)/)
-    .map(block => block.split('\n').filter(line => !headings.has(normalize(line.replace(/^\s*(?:#{1,6}\s*)?(?:\d{1,2}[.)]\s*)?/, '')))).join('\n').trim())
-    .filter(block => {
-      const key = normalize(block)
-      if (!key || seen.has(key)) return false
-      seen.add(key)
-      return true
-    }).join('\n\n')
-  if (missing.length) return false
-  if (body.length < tasks.length * 250) return false
-  const vocabulary = new Set(topicWords(body))
-  const covered = tasks.filter(directive => {
-    const topics = [...new Set(topicWords(directive))]
-    return !topics.length || topics.filter(word => vocabulary.has(word)).length >= Math.min(2, topics.length)
-  }).length
-  return covered * 2 >= tasks.length
+  return evaluateTaskOutcome({ originalRequest: prompt, answer }).status === 'verified'
 }
 
 export function analyticalTaskRepairDirective(prompt: string, answer: string): string {

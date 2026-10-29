@@ -13,6 +13,7 @@ import {
 import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProvenance.ts'
 import { recordLatestUserTurnProvenance } from '@/lib/ai/cos/supportTurnProvenance.ts'
 import { enqueueDurableCosTurn, finishDurableCosTurn } from '@/lib/ai/cos/durableCosTurn.ts'
+import { namesVerificationCampaign } from '@/lib/builder/campaign/catalog'
 import { runWithTurnDeadline, USER_ANSWER_WINDOW_MS } from '@/lib/ai/cos/cosTurnBudget.ts'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy.ts'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory.ts'
@@ -237,7 +238,12 @@ export async function POST(req: NextRequest): Promise<Response> {
     && attachments.length === 0
     && !isConciergeBuilderObjective(prompt, { attachmentNames: [], attachmentMimeTypes: [] })
   const externalActionRequested = Boolean(prompt) && requestsExternalAction(prompt)
-  const durableConversationTurn = ordinaryConversationTurn && externalActionRequested
+  // The signed-in owner's request naming the verification campaign is admitted on the request path, where the owner's
+  // identity is the one this boundary just verified. Production 2026-10-29 16:09 UTC: the campaign document went to the
+  // background worker instead, no campaign job was created, and COS answered with a capability denial.
+  const ownerCampaignRequest = Boolean(prompt) && namesVerificationCampaign(prompt)
+    && (await getAccess().catch(() => null))?.isOwner === true
+  const durableConversationTurn = ordinaryConversationTurn && externalActionRequested && !ownerCampaignRequest
   const synchronousReadOnlyTurn = ordinaryConversationTurn && !externalActionRequested
 
   if (durableConversationTurn) {

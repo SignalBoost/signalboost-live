@@ -77,6 +77,21 @@ jobs:
       - name: Typecheck
         run: node --max-old-space-size=7168 ./node_modules/typescript/bin/tsc --noEmit
 
+  builder-checkpoint-recovery:
+    name: Builder real checkpoint pause and resume
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify actual failing command, saved checkpoint, resume, and passing command
+        run: node --test tests/builderCheckpoint.node.test.ts
+      - name: Verify stale lease and exhausted-checkpoint recovery invariants
+        run: node --test tests/builderRecoverySingleOwner.node.test.ts tests/builderExhaustedCheckpointExpiry.node.test.ts tests/builderExhaustedClaimCronReachability.node.test.ts
+
   cos-fresh-routing:
     needs: scope
     if: needs.scope.outputs.full_suite == 'true'

@@ -16,7 +16,6 @@ import { enqueueDurableCosTurn, finishDurableCosTurn } from '@/lib/ai/cos/durabl
 import { refusedRequestedExecution } from '@/lib/ai/cos/cosExecutionVerdict.ts'
 import { runWithTurnDeadline, USER_ANSWER_WINDOW_MS } from '@/lib/ai/cos/cosTurnBudget.ts'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy.ts'
-import { persistTurn } from '@/lib/ai/tools/conversationHistory.ts'
 import { provenanceWithDeliveredVisual } from '@/lib/concierge/deliveredVisual.ts'
 import { assistanceCopy, COS_TURN_ACCEPTED } from '@/lib/ai/cos/assistanceMode'
 

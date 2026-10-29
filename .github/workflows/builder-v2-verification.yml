@@ -4,29 +4,6 @@
 name: Builder V2 Verification
 on:
   pull_request:
-    paths:
-      - 'saas/lib/builder/agent-v2*.ts'
-      - 'saas/lib/builder/syntax-check.ts'
-      - 'saas/lib/builder/checkpoint.ts'
-      - 'saas/lib/builder/contracts.ts'
-      - 'saas/lib/cos/aiPort.ts'
-      - 'saas/lib/ai/local-inference.ts'
-      - 'saas/lib/builder/task-contract.ts'
-      - 'saas/lib/builder/edit-match.ts'
-      - 'saas/lib/builder/workspace.ts'
-      - 'saas/lib/builder/job-runner.ts'
-      - 'saas/lib/builder/isolated-publication.ts'
-      - 'saas/lib/builder/inference-budget.ts'
-      - 'saas/lib/builder/inference-budget-store.ts'
-      - 'saas/supabase/migrations/*builder_inference_run_budget.sql'
-      - 'saas/tests/builderInferenceBudget.node.test.ts'
-      - 'saas/tests/builderV2*'
-      - 'saas/tests/builderStaleExpiryHeartbeatFence.node.test.ts'
-      - 'saas/tests/builderExhaustedCheckpointExpiry.node.test.ts'
-      - 'saas/tests/fixtures/builder-recovery-*.sql'
-      - 'saas/supabase/migrations/20261029*builder*.sql'
-      - 'saas/app/api/builder/route.ts'
-      - '.github/workflows/builder-v2-verification.yml'
   workflow_dispatch:
 permissions:
   contents: read

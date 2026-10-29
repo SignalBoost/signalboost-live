@@ -102,7 +102,7 @@ export async function finishDurableCosTurn(input: {
     execution_provenance: input.executionProvenance ?? null,
     answer_provenance: input.answerProvenance ?? null,
   }
-  const { error } = await db.from('assistant_messages')
+  const { data: persisted, error } = await db.from('assistant_messages')
     .update({
       content: String(input.reply || '').trim().slice(0, 16_000),
       provenance,
@@ -113,7 +113,10 @@ export async function finishDurableCosTurn(input: {
     .eq('provenance->>schema', COS_TURN_SCHEMA)
     .eq('provenance->>turnId', input.turnId)
     .eq('provenance->>status', 'running')
+    .select('id')
+    .maybeSingle()
   if (error) throw new Error(`cos_turn_finish: ${error.message}`)
+  if (persisted?.id !== input.historyMessageId) throw new Error('cos_turn_finish_not_committed')
 }
 
 export async function expireStaleDurableCosTurns(input: {

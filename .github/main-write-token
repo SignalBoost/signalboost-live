@@ -1,2 +1,2 @@
-base_sha=69638d204d4024180a565744ba18bc19ddede479
-branch=fix/builder-recovery-cron-main-sync-20261029
+base_sha=faea668ce5c03b5514b70d5c97699616b9f13a74
+branch=fix/builder-stale-expiry-heartbeat-fence-20261029

@@ -1,9 +1,0 @@
-# Builder isolated acceptance routing
-
-Production evidence: job `90a11b5c-53b6-43e4-a990-0cc4a53d1a92` was incorrectly admitted as platform repair on main at `982a515c782658685369c92403c481f7b5998329`. It repeatedly wrote sum.js without recorded failing or passing commands. This is an incomplete test, not end-to-end acceptance.
-
-An explicit isolated repository creation directive now excludes platform-repair target selection and clears selected workspace/conversation continuity. Concrete executable coding requests at browser ingress are delegated to the Software Specialist without asking the general planner or public identity classifier to reinterpret them. The existing Harness and repository authority checks remain in force. Public presentation preserves the returned job ID and workspace ID.
-
-The initial routing repair rejected the original acceptance request because a per-run dollar cap was not enforceable. The durable inference-budget follow-up adds reservation enforcement for supported DeepInfra text requests (see `BUILDER-INFERENCE-BUDGET-2026-10-19.md`). The original nine-step acceptance request remains blocked before job creation because the isolated workspace lane cannot create/publish a Git repository, PR and preview. No workspace-only test is substituted and no job ID is expected for that rejected request.
-
-Regression coverage executes the production browser, Developer and Software Specialist handlers with external ports replaced, preserves the original prompt as a fixture, verifies zero execution on publication rejection, and verifies one V2 enqueue with the same job ID through public presentation for an admitted isolated build with a dollar cap. These no-cost tests do not establish live repository/PR/deployment acceptance. No additional paid canary was started.

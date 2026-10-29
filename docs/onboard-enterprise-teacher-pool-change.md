@@ -1,1 +1,0 @@
-This change updates the root ONBOARD.md current-state handoff after Production deployment of the enterprise University teacher-pool foundation. It records provider-agnostic teacher support, buyer-owned credentials, explicit adapter gates, fail-closed routing, provenance, Apache-2.0/MIT open-model license handling, and provider-independent evaluation/graduation requirements.

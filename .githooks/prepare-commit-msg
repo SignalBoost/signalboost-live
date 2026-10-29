@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-# Do not modify or stage ONBOARD.md automatically during commit preparation.
-exit 0

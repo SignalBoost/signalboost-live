@@ -1,1 +1,0 @@
-export const INITIAL_COS_CORPUS_SEED_VERSION = '2026-08-09-cos-ready-23'

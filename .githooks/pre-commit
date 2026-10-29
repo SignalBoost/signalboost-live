@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-# ONBOARD.md documentation updates are encouraged but do not gate commits or merges.
-exit 0

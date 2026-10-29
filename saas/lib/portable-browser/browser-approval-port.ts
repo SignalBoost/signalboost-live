@@ -1,1 +1,0 @@
-export interface PortableBrowserApprovalPort { request(input:{tenantId:string; action:string; reason?:string}):Promise<{approvalReference:string; approved:boolean}>; status(approvalReference:string):Promise<'pending'|'approved'|'denied'> }

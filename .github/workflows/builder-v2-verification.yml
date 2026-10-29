@@ -23,6 +23,7 @@ on:
       - 'saas/tests/builderV2*'
       - 'saas/tests/builderStaleExpiryHeartbeatFence.node.test.ts'
       - 'saas/tests/builderExhaustedCheckpointExpiry.node.test.ts'
+      - 'saas/tests/fixtures/builder-recovery-*.sql'
       - 'saas/supabase/migrations/20261029*builder*.sql'
       - 'saas/app/api/builder/route.ts'
       - '.github/workflows/builder-v2-verification.yml'
@@ -55,3 +56,37 @@ jobs:
         run: node --experimental-transform-types --import ./scripts/test-alias-loader.mjs --test tests/builderVerificationCampaign.node.test.ts tests/builderVerificationCampaignHost.node.test.ts tests/builderCampaignFaults.node.test.ts tests/builderCampaignBrowser.node.test.ts tests/builderCampaignGovernanceFixture.node.test.ts
       - name: Builder V2 isolated publication boundary
         run: node --experimental-transform-types --test tests/builderV2IsolatedPublication.node.test.ts
+
+  recovery-postgres:
+    name: Builder recovery PostgreSQL behavior
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: builder_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d builder_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: builder_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+      - name: Execute actual Builder recovery function and assert behavior
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f saas/tests/fixtures/builder-recovery-schema.sql
+          psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261029145000_builder_expire_exhausted_checkpoint_claims.sql
+          psql -v ON_ERROR_STOP=1 -f saas/tests/fixtures/builder-recovery-assertions.sql

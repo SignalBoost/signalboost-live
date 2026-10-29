@@ -1,2 +1,2 @@
-base_sha=81047388b85a3bb722b2ee29e31cc7fdadaf8aa2
-branch=docs/hybrid-release-blockers-register-20261029
+base_sha=13371eecca02c67f0c7777a8e290fb00613ac018
+branch=fix/builder-cos-active-claim-gate-20261029

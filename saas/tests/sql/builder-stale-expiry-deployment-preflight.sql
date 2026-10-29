@@ -16,7 +16,7 @@ WITH prerequisites AS (
 SELECT
   prerequisites.*,
   body IS NOT NULL AS expiry_function_exists,
-  coalesce(body LIKE '%checkpoint is null%',false) AS checkpoint_guard_installed,
+  coalesce(body LIKE '%checkpoint is null or job_kind <> ''standard'' or claim_generation >= 24%',false) AS checkpoint_guard_installed,
   coalesce(body LIKE '%greatest(updated_at, coalesce(last_heartbeat_at, updated_at)) <= p_cutoff%',false) AS heartbeat_guard_installed
 FROM prerequisites CROSS JOIN installed;
 -- Deployment gate: all prerequisite flags must be true.

@@ -3,7 +3,22 @@ ALTER TABLE public.builder_jobs ADD COLUMN objective text NOT NULL DEFAULT 'orig
 ALTER TABLE public.builder_jobs ADD CONSTRAINT builder_jobs_kind_check CHECK (job_kind IN ('standard','debug_file'));
 \ir ../../supabase/migrations/20261029153500_customer_task_record_foundation.sql
 \ir ../../supabase/migrations/20261029230000_cos_customer_task_atomic_finish.sql
+\ir ../../supabase/migrations/20261029233500_builder_repair_plan_atomic_admission.sql
 BEGIN;
+-- Replan version is visible on the first canonical task insert, not a later update.
+INSERT INTO public.builder_jobs(id,user_id,status,claim_generation,job_kind,updated_at,objective,metadata)
+VALUES ('40000000-0000-0000-0000-000000000093','20000000-0000-0000-0000-000000000001','queued',0,'standard',now(),'unchanged customer request',
+'{"platformRepair":true,"repairExecutionObjective":"verified head proof","repairPlanVersion":2}'::jsonb);
+DO $plan_assert$
+BEGIN
+ IF (SELECT plan_version FROM public.builder_jobs WHERE id='40000000-0000-0000-0000-000000000093') <> 2 THEN
+   RAISE EXCEPTION 'Replanned job was admitted with wrong version';
+ END IF;
+ IF (SELECT objective FROM public.builder_jobs WHERE id='40000000-0000-0000-0000-000000000093') <> 'unchanged customer request' THEN
+   RAISE EXCEPTION 'Replan rewrote original customer request';
+ END IF;
+END
+$plan_assert$;
 INSERT INTO public.builder_jobs(id,user_id,status,claim_generation,job_kind,updated_at,objective)
 VALUES ('40000000-0000-0000-0000-000000000091','20000000-0000-0000-0000-000000000001','queued',0,'cos_turn',now(),'original objective');
 DO $assert$

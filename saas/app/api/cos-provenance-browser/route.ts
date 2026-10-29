@@ -269,7 +269,7 @@ export async function POST(req: NextRequest): Promise<Response> {
             })
             const worker = runWithTurnDeadline(
               requestStartedAt + DURABLE_TURN_MODEL_DEADLINE_MS,
-              () => cosBrowserPost(downstreamRequest(req, body)),
+              () => cosBrowserPost(downstreamRequest(req, { ...body, context: { ...body.context, canonicalCustomerTaskId: turnId, conversationId } })),
               { answerReserveMs: USER_ANSWER_WINDOW_MS },
             )
             worker.catch(() => undefined)

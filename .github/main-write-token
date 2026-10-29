@@ -1,2 +1,2 @@
-base_sha=87f4a24aa881e92b7446f929cd32e4603708b4bb
-branch=fix/history-builder-execution-link-20261029
+base_sha=ee0e23ef5b6b401d23552d305d45d5440d7b2834
+branch=fix/hub-approval-request-body-boundary-20261029

@@ -135,6 +135,14 @@ async function existingAttempt(key: string): Promise<{ disposition: 'already_act
     }
     if (!jobId || !userId) throw new Error('university_self_healing_stale_job_identity_missing')
     await reconcileStaleBuilderJobs({ userId, jobId })
+    // Expiry may deliberately preserve a checkpoint or a live heartbeat.
+    // Check the current persisted state before admitting another repair.
+    const { data: reconciled, error: reconcileReadError } = await admin.from('builder_jobs')
+      .select('id,status').eq('id', jobId).eq('user_id', userId).maybeSingle()
+    if (reconcileReadError) throw new Error(`university_self_healing_reconcile_read_failed:${reconcileReadError.message}`)
+    if (reconciled && ['queued', 'running', 'paused'].includes(String(reconciled.status))) {
+      return { disposition: 'already_active', jobId }
+    }
   }
 
   const since = new Date(Date.now() - RETRY_SUPPRESSION_MS).toISOString()

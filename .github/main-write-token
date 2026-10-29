@@ -1,2 +1,2 @@
-base_sha=0e05ba4d9492357fa1cb8351b1e71a387b9dc948
-branch=fix/atomic-repair-plan-current-20261029
+base_sha=b147010230ecc1d677a13707ee21fc77d6ffc944
+branch=test/hybrid-parent-identity-guards-20261029

@@ -37,8 +37,8 @@ A restart replays uncommitted messages, the aggregator double-counts them, and t
 ## 8. Most likely explanation
 Consumer replay after the periodic pod restart, counted twice by non-idempotent revenue aggregation.`
 
-test('a substantive analysis is released even when the section parser reports gaps', () => {
-  assert.ok(missingAnalyticalTasks(incident, analysis).length > 0, 'the nested numbered lists confuse the section parser')
+test('a substantive analysis with nested lists is parsed as complete and released', () => {
+  assert.deepEqual(missingAnalyticalTasks(incident, analysis), [], 'nested lists must not be mistaken for top-level tasks')
   assert.equal(releasableAnalyticalAnswer(incident, analysis), true)
 })
 

@@ -1,2 +1,2 @@
-base_sha=c5e447c0c210dff721624aa2ad9daa3d7439a9dd
-branch=fix/builder-poll-assertion-rebased-20261029
+base_sha=b3568853c82dc76d78162ade026328f6fc68ad47
+branch=fix/builder-repair-plan-version-20261029

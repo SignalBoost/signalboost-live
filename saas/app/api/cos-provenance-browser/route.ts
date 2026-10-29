@@ -324,8 +324,16 @@ export async function POST(req: NextRequest): Promise<Response> {
         console.error('[cos_durable_turn_enqueue_failed]', {
           message: error instanceof Error ? error.message : 'unknown',
         })
-        // Storage failure does not silently drop the request; fall through to the bounded
-        // synchronous path already used before this durable transport existed.
+        // Non-replayable external actions must fail closed if durable admission fails.
+        // Falling through to synchronous execution could send an action without a receipt,
+        // so a network retry could execute it again.
+        return NextResponse.json({
+          ok: false,
+          error: 'cos_task_admission_unavailable',
+          reply: 'This action was not started because its durable task record could not be saved.',
+          execution_allowed: false,
+          external_action_taken: false,
+        }, { status: 503 })
       }
     }
   }

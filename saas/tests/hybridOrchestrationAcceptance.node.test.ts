@@ -40,6 +40,26 @@ test('gate 1 foundation: database rejects objective changes and COS jobs cannot 
  assert.match(schema,/job_kind IN \('standard', 'debug_file', 'cos_turn'\)/)
 })
 
+
+test('gate 1 regression: durable COS delegation carries the admitted identity into Builder', () => {
+ const proxy=source('app/api/cos-provenance-browser/route.ts')
+ const specialist=source('lib/ai/cos/softwareSpecialist.ts')
+ const store=source('lib/builder/job-store.ts')
+ assert.match(proxy,/canonicalCustomerTaskId: turnId, conversationId/)
+ assert.match(specialist,/customerTaskId: String\(input\.body\.context\.canonicalCustomerTaskId\)/)
+ assert.match(specialist,/await enqueueBuilderJob\(\{[\s\S]*?metadata: \{[\s\S]*?customerTaskId:/)
+ assert.match(store,/db\.rpc\('enqueue_builder_job'/)
+})
+
+test('gate 1 regression: PostgreSQL enforces same user, conversation and COS parent kind', () => {
+ const migration=source('supabase/migrations/20261029235900_builder_customer_task_parent_link.sql')
+ assert.match(migration,/v_parent\.job_kind <> 'cos_turn'/)
+ assert.match(migration,/v_parent\.user_id <> NEW\.user_id/)
+ assert.match(migration,/v_parent\.conversation_id <> NEW\.conversation_id/)
+ assert.match(migration,/BEFORE INSERT OR UPDATE OF metadata,user_id,conversation_id,job_kind/)
+ assert.match(migration,/REVOKE ALL ON FUNCTION public\.enforce_builder_customer_task_parent\(\) FROM PUBLIC, anon, authenticated/)
+})
+
 test.todo('gate 1 E2E: COS, Builder and History share one persisted immutable customer task and execution identity')
 test.todo('gate 2 CI caller inventory: all module authorities classified and no parallel customer task record')
 test.todo('gate 3 E2E: consequential tools denied by host-side policy despite agent replanning')

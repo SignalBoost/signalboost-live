@@ -16,19 +16,16 @@ set search_path = public, pg_temp
 as $$
 begin
   if new.objective is distinct from old.objective then
-    raise exception 'builder_job_objective_immutable'
-      using errcode = '23514';
+    raise exception 'builder_job_objective_immutable' using errcode = '23514';
   end if;
   if new.user_id is distinct from old.user_id
      or new.conversation_id is distinct from old.conversation_id
      or new.workspace_id is distinct from old.workspace_id
      or new.job_kind is distinct from old.job_kind then
-    raise exception 'builder_job_identity_immutable'
-      using errcode = '23514';
+    raise exception 'builder_job_identity_immutable' using errcode = '23514';
   end if;
   if new.plan_version < old.plan_version then
-    raise exception 'builder_job_plan_version_regression'
-      using errcode = '23514';
+    raise exception 'builder_job_plan_version_regression' using errcode = '23514';
   end if;
   return new;
 end;

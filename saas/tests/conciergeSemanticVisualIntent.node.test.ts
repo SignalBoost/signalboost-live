@@ -168,5 +168,5 @@ test('long nonvisual acceptance campaign never invokes optional semantic visual 
 
 test('a visual word inside pasted context does not reach the image endpoint without the judge confirming a picture', async () => {
   const route = await readRepoFile('app/api/cos-browser/route.ts')
-  assert.match(route, /const directVisual = browserSurface === 'concierge' && !softwareExecutionObjective\n\s*&& prompt\.length <= MAX_VISUAL_OBJECTIVE_CHARS\n\s*&& isConciergeVisualObjective\(prompt\) && semanticIntentConfirmsPicture\(await turnIntent\(\)\)/)
+  assert.match(route, /const directVisual = !pastedConversationEvidence && browserSurface === 'concierge' && !softwareExecutionObjective\n\s*&& prompt\.length <= MAX_VISUAL_OBJECTIVE_CHARS\n\s*&& isConciergeVisualObjective\(prompt\) && semanticIntentConfirmsPicture\(await turnIntent\(\)\)/)
 })

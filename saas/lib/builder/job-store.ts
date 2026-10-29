@@ -258,20 +258,10 @@ export async function getBuilderJobForUser(jobId: string, userId: string): Promi
   const db = serviceClient()
   if (!db) throw new Error('builder_job_storage_unavailable')
   const job = await readBuilderJob(db, jobId, userId)
-  // Queued jobs have not acquired an execution lease. Never classify an
-  // unclaimed queue wait as a lost worker merely because six minutes elapsed.
-  if (!job || job.status === 'queued' || !stale(job)) return job
-
-  try {
-    await reconcileStaleBuilderJobs({ userId, jobId })
-    return await readBuilderJob(db, jobId, userId)
-  } catch (error) {
-    console.error('[builder_job_stale_recovery_failed]', {
-      jobId,
-      message: error instanceof Error ? error.message : 'unknown',
-    })
-    return job
-  }
+  // Read-only polling must never race the continuation cron by expiring a
+  // checkpointed claim or a worker whose heartbeat is still live.
+  // The continuation cron alone owns stale-claim reconciliation.
+  return job
 }
 
 export async function finishBuilderJob(input: {

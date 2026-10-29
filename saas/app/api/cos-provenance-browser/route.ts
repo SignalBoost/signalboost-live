@@ -275,7 +275,10 @@ export async function POST(req: NextRequest): Promise<Response> {
             const workerResponse = await Promise.race([worker, watchdog])
             const payload: any = await workerResponse.clone().json().catch(() => null)
             const reply = String(payload?.reply || payload?.error || '').trim()
-            const succeeded = workerResponse.ok && payload?.ok !== false && Boolean(reply)
+            // A 2xx response only confirms answer delivery. An explicit inability to carry
+            // out the requested operation is not verified completion of that task.
+            const refusedExecution = /^(?:I\\s+(?:cannot|can't|am\\s+unable\\s+to)|Unable\\s+to|Cannot)\\s+(?:execute|perform|complete|run|carry\\s+out|fulfill|fulfil)\\b/i.test(reply)
+            const succeeded = workerResponse.ok && payload?.ok !== false && Boolean(reply) && !refusedExecution
             await finishDurableCosTurn({
               turnId,
               historyMessageId,
@@ -285,7 +288,7 @@ export async function POST(req: NextRequest): Promise<Response> {
               source: String(payload?.source || 'cos-browser-worker'),
               executionProvenance: payload?.execution_provenance ?? null,
               answerProvenance: payload?.answer_provenance ?? null,
-              error: succeeded ? null : String(payload?.error || `http_${workerResponse.status}`),
+              error: succeeded ? null : refusedExecution ? 'cos_execution_refused' : String(payload?.error || `http_${workerResponse.status}`),
             })
           } catch (error) {
             const deadlineElapsed = error instanceof DurableTurnWatchdogElapsed

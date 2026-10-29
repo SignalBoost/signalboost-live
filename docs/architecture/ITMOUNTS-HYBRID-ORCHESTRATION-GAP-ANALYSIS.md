@@ -71,6 +71,18 @@ Fix: the turn's intent judge (`cosTurnIntent`, which already receives prior user
 
 **Q12 — stale COS tasks are cleaned only when History is read.** `expireStaleDurableCosTurns` is still called only from `app/api/assistant/chats/route.ts`. A COS task whose worker died stays `running` until its owner opens History. Call it from the continuation cron for all users, through `finish_cos_customer_task`. Test (PostgreSQL fixture): a stale `cos_turn` row is failed by the cron with History updated, and a row finished concurrently is not overwritten.
 
+**Q13 — a one-question COS answer takes 41 s.** Owner test 2026-10-29 17:38 (America/Asuncion), trace `a216c98eb67a536e65bf28e3a14e74e5` in `provider_inference_usage`: a pasted cable plus one question. Measured steps:
+- 0–10 s: the turn-intent judge (`semantic_task_intent`). The owned reasoner (`qwen3:30b`) ran to its 8 s deadline and failed (`timeout:inference_transport_deadline`); the managed backup (`Qwen/Qwen3.6-35B-A3B`) answered in 4.6 s. The same judge answered in 2.4 s at 17:44, so the slow call is intermittent. The judge blocks every turn, so its worst case is every turn's floor.
+- 10–23 s: no model call is recorded for 13 s. What runs there (retrieval, web lookup, context assembly) is not visible in any trace. Not yet diagnosed.
+- 23–41 s: three sequential `agent_tool_loop` calls on `deepseek-ai/DeepSeek-V4-Flash-0731` (4.1 s, 2.2 s, 10.2 s).
+
+Fix, in order:
+1. Record every non-model step of a turn (lookups, retrieval, context assembly) with its duration under the same trace id, so the 13 s gap is attributable without new dashboard sections. Then remove the cause the record shows.
+2. Bound the intent judge: it must not cost more than a few seconds when the owned reasoner is slow. Either start the backup much earlier for this call or run the judge alongside the first evidence step instead of before it. Do not add a new configuration variable.
+3. Test: a fixture where the owned reasoner stalls still yields a judge reading within the bound; a fixture turn records a duration for every step. Live acceptance: the same owner question answered in 15 s or less end to end, with the trace showing each step.
+
+Also seen: trace `20167074133a69799f6181580da37103` (17:44) — `public_self_disclosure` failed on `timeout:inference_owner_deadline` after 1.5 s. Check what the user received on that turn.
+
 **Also confirm live:** migrations `20261029233500_builder_repair_plan_atomic_admission.sql` and `20261029235900_builder_customer_task_parent_link.sql` (in addition to Q2), recorded in *Verified status update*.
 
 ## Verdict

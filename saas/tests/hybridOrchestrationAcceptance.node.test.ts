@@ -60,6 +60,15 @@ test('gate 1 regression: PostgreSQL enforces same user, conversation and COS par
  assert.match(migration,/REVOKE ALL ON FUNCTION public\.enforce_builder_customer_task_parent\(\) FROM PUBLIC, anon, authenticated/)
 })
 
+
+test('gate 1: signed-in read-only COS turns use canonical admission and atomic History completion', () => {
+ const route=source('app/api/cos-provenance-browser/route.ts')
+ assert.match(route,/const readOnlyAccess = synchronousReadOnlyTurn/)
+ assert.match(route,/const readOnlyReceipt = readOnlyTurnId[\s\S]*?enqueueDurableCosTurn\(/)
+ assert.match(route,/if \(readOnlyTurnId && readOnlyReceipt && readOnlyAccess\?\.userId\)[\s\S]*?finishDurableCosTurn\(/)
+ assert.doesNotMatch(route,/await persistTurn\(/)
+})
+
 test.todo('gate 1 E2E: COS, Builder and History share one persisted immutable customer task and execution identity')
 test.todo('gate 2 CI caller inventory: all module authorities classified and no parallel customer task record')
 test.todo('gate 3 E2E: consequential tools denied by host-side policy despite agent replanning')

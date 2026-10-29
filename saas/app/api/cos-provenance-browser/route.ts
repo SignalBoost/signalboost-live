@@ -343,6 +343,20 @@ export async function POST(req: NextRequest): Promise<Response> {
   // Direct (non-durable) turns run inside the same single whole-turn clock as durable ones. Without
   // it, every stage started its own budget, the request outlived the browser's wait, and because this
   // path saves History only after completion, the question vanished from History entirely.
+  // Synchronous read-only requests have the same canonical identity and durable History as action turns.
+  // Preserve synchronous delivery; the database admission/finish RPCs own both History messages.
+  const readOnlyAccess = synchronousReadOnlyTurn ? await getAccess().catch(() => null) : null
+  const readOnlyTurnId = readOnlyAccess?.userId ? crypto.randomUUID() : null
+  const readOnlyReceipt = readOnlyTurnId
+    ? await enqueueDurableCosTurn({
+        turnId: readOnlyTurnId,
+        userId: readOnlyAccess!.userId,
+        conversationId,
+        prompt,
+        runningReply: assistanceCopy(COS_TURN_ACCEPTED, languageFrom(body)),
+      })
+    : null
+
   const syncWatchdogTimer: { handle: ReturnType<typeof setTimeout> | null } = { handle: null }
   let deadlineElapsed = false
   let response!: Response
@@ -377,25 +391,21 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
   const delivered = await finalizeAnswer(response, req, body)
 
-  if (synchronousReadOnlyTurn) {
-    const access = await getAccess().catch(() => null)
-    const userId = access?.userId || null
-    if (userId) {
-      const payload: any = await delivered.clone().json().catch(() => null)
-      const reply = typeof payload?.reply === 'string' ? payload.reply.trim() : ''
-      const successful = delivered.ok && payload?.ok !== false && Boolean(reply)
-      // A turn that ran out of time is still recorded, so History always holds the question.
-      if (successful || (deadlineElapsed && reply)) {
-        await persistTurn({
-          conversationId,
-          userId,
-          userMessage: prompt,
-          assistantReply: reply,
-          // A chart/image delivered with the answer is saved with it, so History shows it too.
-          provenance: provenanceWithDeliveredVisual(payload?.execution_provenance ?? null, payload?.visual),
-        })
-      }
-    }
+  if (readOnlyTurnId && readOnlyReceipt && readOnlyAccess?.userId) {
+    const payload: any = await delivered.clone().json().catch(() => null)
+    const reply = String(payload?.reply || payload?.error || DURABLE_TURN_DEADLINE_REPLY).trim()
+    const succeeded = delivered.ok && payload?.ok !== false && !deadlineElapsed && Boolean(reply)
+    await finishDurableCosTurn({
+      turnId: readOnlyTurnId,
+      historyMessageId: readOnlyReceipt.historyMessageId,
+      userId: readOnlyAccess.userId,
+      status: succeeded ? 'succeeded' : 'failed',
+      reply,
+      source: String(payload?.source || 'cos-browser'),
+      executionProvenance: provenanceWithDeliveredVisual(payload?.execution_provenance ?? null, payload?.visual),
+      answerProvenance: payload?.answer_provenance ?? null,
+      error: succeeded ? null : String(payload?.error || 'cos_readonly_incomplete'),
+    })
   }
 
   return delivered

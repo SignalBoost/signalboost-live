@@ -78,8 +78,9 @@ test('repository repair preserves tracked executable mode for existing scripts',
     if (url.endsWith('/git/ref/heads/main')) return jsonResponse({ object: { sha: baseSha } })
     if (url.endsWith(`/git/commits/${baseSha}`)) return jsonResponse({ tree: { sha: baseTreeSha } })
     if (url.includes(`/git/trees/${baseTreeSha}?recursive=1`)) {
-      return jsonResponse({ tree: [{ path: 'saas/scripts/fix.sh', mode: '100755', type: 'blob', sha: '1'.repeat(40) }] })
+      return jsonResponse({ tree: [{ path: 'ONBOARD.md', mode: '100644', type: 'blob', sha: '2'.repeat(40) }, { path: 'saas/scripts/fix.sh', mode: '100755', type: 'blob', sha: '1'.repeat(40) }] })
     }
+    if (url.includes('/contents/ONBOARD.md?ref=')) return jsonResponse({ type: 'file', sha: '2'.repeat(40) })
     if (url.endsWith('/git/blobs') && method === 'POST') {
       return jsonResponse({ sha: blobIndex++ === 0 ? scriptBlobSha : tokenBlobSha }, 201)
     }

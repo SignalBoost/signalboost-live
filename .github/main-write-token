@@ -1,2 +1,2 @@
-base_sha=5c0c8c009e3f871d827ae7304cdb7bb2c54f0985
-branch=fix/repair-automerge-main-required-checks-20261029
+base_sha=0f4f377de309433ba4ca880823f9c4004866943d
+branch=fix/builder-expiry-preflight-current-main-20261029

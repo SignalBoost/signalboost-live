@@ -111,3 +111,26 @@ test('external-action durable admission failure must fail closed, never execute 
   assert.match(block, /status: 503/)
   assert.match(block, /return NextResponse\.json\(/)
 })
+
+test('stale COS recovery uses the same atomic canonical task transition as normal completion', () => {
+  const store = readFileSync(join(process.cwd(), 'lib/ai/cos/durableCosTurn.ts'), 'utf8')
+  const stale = store.slice(store.indexOf('export async function expireStaleDurableCosTurns'))
+  assert.match(stale, /db\\.rpc\\('finish_cos_customer_task'/)
+  assert.match(stale, /p_task_id: turnId/)
+  assert.match(stale, /p_history_message_id: row\\.id/)
+  assert.match(stale, /p_status: 'failed'/)
+  assert.match(stale, /p_error: 'worker_lost'/)
+  assert.doesNotMatch(stale, /db\\.from\\('assistant_messages'\\)\\s*\\.update\\(/)
+  assert.match(stale, /committed === true/)
+})
+
+test('durable COS completion persists History and task through one atomic RPC', () => {
+  const store = readFileSync(join(process.cwd(), 'lib/ai/cos/durableCosTurn.ts'), 'utf8')
+  const finish = store.slice(store.indexOf('export async function finishDurableCosTurn'), store.indexOf('export async function expireStaleDurableCosTurns'))
+  assert.match(finish, /db\\.rpc\\('finish_cos_customer_task'/)
+  assert.doesNotMatch(finish, /db\\.from\\('assistant_messages'\\)/)
+  assert.doesNotMatch(finish, /db\\.from\\('builder_jobs'\\)/)
+  const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20261029230000_cos_customer_task_atomic_finish.sql'), 'utf8')
+  assert.match(migration, /for update/i)
+  assert.match(migration, /raise exception 'cos_turn_finish_not_committed'/i)
+})

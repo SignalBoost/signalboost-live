@@ -13,7 +13,6 @@ import {
 import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProvenance.ts'
 import { recordLatestUserTurnProvenance } from '@/lib/ai/cos/supportTurnProvenance.ts'
 import { enqueueDurableCosTurn, finishDurableCosTurn } from '@/lib/ai/cos/durableCosTurn.ts'
-import { refusedRequestedExecution } from '@/lib/ai/cos/cosExecutionVerdict.ts'
 import { runWithTurnDeadline, USER_ANSWER_WINDOW_MS } from '@/lib/ai/cos/cosTurnBudget.ts'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy.ts'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory.ts'
@@ -276,8 +275,12 @@ export async function POST(req: NextRequest): Promise<Response> {
             const workerResponse = await Promise.race([worker, watchdog])
             const payload: any = await workerResponse.clone().json().catch(() => null)
             const reply = String(payload?.reply || payload?.error || '').trim()
-            const refusedExecution = refusedRequestedExecution(reply)
-            const succeeded = workerResponse.ok && payload?.ok !== false && Boolean(reply) && !refusedExecution
+            // A delivered reply proves a response was delivered, not that an action ran.
+            // For accepted asynchronous execution, require the durable job receipt from the worker.
+            const acceptedExecution = payload?.status === 'queued' || payload?.status === 'running'
+            const executionReceiptPresent = typeof payload?.jobId === 'string' && payload.jobId.trim().length > 0
+            const succeeded = workerResponse.ok && payload?.ok !== false && Boolean(reply) &&
+              (!acceptedExecution || executionReceiptPresent)
             await finishDurableCosTurn({
               turnId,
               historyMessageId,
@@ -287,7 +290,7 @@ export async function POST(req: NextRequest): Promise<Response> {
               source: String(payload?.source || 'cos-browser-worker'),
               executionProvenance: payload?.execution_provenance ?? null,
               answerProvenance: payload?.answer_provenance ?? null,
-              error: succeeded ? null : refusedExecution ? 'cos_execution_refused' : String(payload?.error || `http_${workerResponse.status}`),
+              error: succeeded ? null : String(payload?.error || (acceptedExecution && !executionReceiptPresent ? 'cos_execution_receipt_missing' : `http_${workerResponse.status}`)),
             })
           } catch (error) {
             const deadlineElapsed = error instanceof DurableTurnWatchdogElapsed

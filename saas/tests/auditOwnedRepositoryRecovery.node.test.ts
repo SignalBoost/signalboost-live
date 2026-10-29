@@ -61,3 +61,20 @@ test('a failed audit repair is not re-queued every monitoring cycle (Production 
   const recent = engine.slice(engine.indexOf('async function existingEngineAttempt'))
   assert.match(recent, /\.in\('status', \['succeeded', 'failed'\]\)\n\s*\.gte\('created_at', since\)/)
 })
+
+test('unchanged Audit run never repeats terminal Builder failures after cooldown expires', () => {
+  const source = read('../lib/audit/ownedAuditRepositoryRecovery.ts')
+  assert.match(source, /terminalAuditRecoveryFailure/)
+  for (const reason of [
+    'builder_v2_continuation_no_progress',
+    'builder_stalled_repeated_inspection',
+    'harness_provider_cost_budget_exceeded',
+    'builder_v2_model_call_budget_exhausted',
+    'builder_v2_total_deadline_exceeded',
+  ]) assert.ok(source.includes(reason), reason)
+  const lookup = source.slice(source.indexOf('const lastFailure = await admin'), source.indexOf('const failedSince ='))
+  assert.match(lookup, /\.eq\('status', 'failed'\)/)
+  assert.match(lookup, /selfHealingKey: key/)
+  assert.doesNotMatch(lookup, /\.gte\('created_at'/)
+  assert.match(lookup, /terminalAuditRecoveryFailure/)
+})

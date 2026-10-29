@@ -9,6 +9,12 @@ const BASE_BRANCH = 'main'
 // builder_regression_not_reproduced). A failed recovery waits as long as a completed one before the next attempt.
 const FAILED_RETRY_SUPPRESSION_MS = 6 * 60 * 60 * 1000
 const COMPLETED_RECHECK_WINDOW_MS = 6 * 60 * 60 * 1000
+// One unchanged Audit run must not launch the same terminally stalled repair every six hours.
+// A fresh Audit run has a different selfHealingKey and remains eligible.
+export function terminalAuditRecoveryFailure(error: string): boolean {
+  return /^(?:builder_v2_continuation_no_progress|builder_stalled_repeated_inspection|harness_provider_cost_budget_exceeded|builder_v2_model_call_budget_exhausted|builder_v2_total_deadline_exceeded)$/.test(String(error || ''))
+}
+
 
 // These categories have deterministic source-local reproduction rules. Model-written
 // security/logic findings may depend on imports, cookie policy, database policy,
@@ -138,6 +144,25 @@ async function existingRecovery(admin: any, key: string): Promise<ExistingRecove
   if (succeeded.error) throw new Error(`audit_findings_recovery_success_lookup_failed:${succeeded.error.message}`)
   if (succeeded.data?.id) {
     return { disposition: 'completed_pending_verification', jobId: String(succeeded.data.id), error: '' }
+  }
+
+  // Check the latest failed attempt for this exact Audit run, regardless of age.
+  // Terminal stagnation and exhausted-budget outcomes must not be retried on a timer.
+  const lastFailure = await admin
+    .from('builder_jobs')
+    .select('id,status,error,created_at')
+    .eq('status', 'failed')
+    .contains('metadata', { selfHealingOwnedAudit: true, selfHealingKey: key })
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (lastFailure.error) throw new Error(`audit_findings_last_failure_lookup_failed:${lastFailure.error.message}`)
+  if (lastFailure.data?.id && terminalAuditRecoveryFailure(String(lastFailure.data.error || ''))) {
+    return {
+      disposition: 'recently_failed',
+      jobId: String(lastFailure.data.id),
+      error: `Audit repair for this unchanged run stopped with ${String(lastFailure.data.error)}. A new Audit run or explicit owner-directed repair is required before retrying.`,
+    }
   }
 
   const failedSince = new Date(Date.now() - FAILED_RETRY_SUPPRESSION_MS).toISOString()

@@ -80,3 +80,14 @@ test('pasted cable stays evidence while retirement advice question is the object
  assert.match(route,/CUSTOMER'S EXPLICIT QUESTION \(answer this first\)/)
  assert.match(route,/SUPPLIED REFERENCE DOCUMENT \(evidence, not a request to rewrite\)/)
 })
+
+
+test('numbered pasted dialogues are evidence rather than new authoring requests', () => {
+ const transcript = 'YOUR REQUEST 1\nRetirement question\nCOS response 1\nDraft an email\nYOUR REQUEST 2\nPrevious transcript\nCOS response 2\nRevised email'
+ assert.match(cosExecutionEnvelope(transcript).instructionBlock,/PASTED CONVERSATION/)
+ const route=readFileSync(new URL('../app/api/cos-browser/route.ts',import.meta.url),'utf8')
+ assert.match(route,/const fastAuthoringIngress = !pastedConversationEvidence/)
+ assert.match(route,/if \(!pastedConversationEvidence && isConciergeArtifactObjective/)
+ assert.match(route,/const directVisual = !pastedConversationEvidence/)
+ assert.match(route,/const semanticVisualEligible = !pastedConversationEvidence/)
+})

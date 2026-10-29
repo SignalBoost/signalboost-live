@@ -99,8 +99,9 @@ export async function GET(req: NextRequest) {
       const { data: builderExecutions, error: builderReadError } = await db
         .from('builder_jobs')
         .select('id,conversation_id,history_message_id,status,created_at,updated_at')
-        .eq('user_id', userId)
+         .eq('user_id', userId)
         .eq('conversation_id', id)
+        .eq('job_kind', 'standard')
         .order('created_at', { ascending: false })
         .limit(100)
       if (builderReadError) {

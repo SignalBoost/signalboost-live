@@ -108,7 +108,23 @@ export async function GET(req: NextRequest) {
         return response({ error: 'Could not load linked executions' }, { status: 500 })
       }
 
-      return response({ conversation: conv, messages: messages ?? [], builderExecutions: builderExecutions ?? [] })
+      // Expose persisted turn identity separately from child Builder executions. A conversation
+      // can contain multiple objectives; do not infer a parent-child relationship from conversation_id.
+      const cosTurns = (messages ?? []).flatMap(message => {
+        const provenance = message.provenance
+        if (message.role !== 'assistant' || !provenance || typeof provenance !== 'object' || Array.isArray(provenance)) return []
+        const recorded = provenance as Record<string, unknown>
+        if (recorded.schema !== 'signalboost-cos-turn-v1' || typeof recorded.turnId !== 'string' || !UUID.test(recorded.turnId)) return []
+        return [{
+          turnId: recorded.turnId,
+          historyMessageId: message.id,
+          status: recorded.status === 'running' || recorded.status === 'failed' || recorded.status === 'succeeded'
+            ? recorded.status : 'unknown',
+          createdAt: message.created_at,
+        }]
+      })
+
+      return response({ conversation: conv, messages: messages ?? [], cosTurns, builderExecutions: builderExecutions ?? [] })
     }
 
     const { data: conversations, error } = await db

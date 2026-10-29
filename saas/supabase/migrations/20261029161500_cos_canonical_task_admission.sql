@@ -10,6 +10,7 @@ BEGIN
    OR length(p_objective) > 16000 THEN
    RAISE EXCEPTION 'cos_task_invalid_admission' USING ERRCODE='22023';
  END IF;
+ PERFORM pg_advisory_xact_lock(hashtextextended(p_task_id::text, 0));
  -- A repeated task ID must never silently change owner, conversation or objective.
  SELECT * INTO v_existing FROM public.builder_jobs WHERE id=p_task_id;
  IF FOUND THEN

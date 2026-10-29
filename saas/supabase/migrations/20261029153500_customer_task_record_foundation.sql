@@ -28,7 +28,7 @@ CREATE TRIGGER protect_builder_task_objective BEFORE UPDATE ON public.builder_jo
 -- The existing claim_builder_job_slice accepts any queued job_kind while claim_generation < 4.
 -- Protect COS-only tasks even if a caller mistakenly invokes that RPC.
 CREATE OR REPLACE FUNCTION public.prevent_cos_task_builder_claim()
-RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_temp AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_temp AS $cos_claim_guard$
 BEGIN
   IF OLD.job_kind = 'cos_turn'
     AND (NEW.claim_generation IS DISTINCT FROM OLD.claim_generation
@@ -37,7 +37,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$cos_claim_guard$;
 DROP TRIGGER IF EXISTS prevent_cos_task_builder_claim ON public.builder_jobs;
 CREATE TRIGGER prevent_cos_task_builder_claim BEFORE UPDATE ON public.builder_jobs
   FOR EACH ROW EXECUTE FUNCTION public.prevent_cos_task_builder_claim();

@@ -1,4 +1,4 @@
-import { claimBuilderJob, enqueueBuilderJob, finishBuilderJob } from './job-store.ts'
+import { advanceBuilderRepairPlanVersion, claimBuilderJob, enqueueBuilderJob, finishBuilderJob } from './job-store.ts'
 import { verifySignalBoostRepositoryRepairTargetCurrent } from './repository-repair-freshness.ts'
 import { replanSupersededRepositoryRepair, type SupersededRepositoryRepairReplan } from './repository-repair-replan.ts'
 import type { SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
@@ -123,6 +123,14 @@ export async function enqueueSignalBoostRepositoryRepairJob(input: {
     ownerAuthorized: true,
     runningReply: reply,
   })
+
+  // A changed branch head is a new execution plan, not a new customer request.
+  // Persist the version before returning the admission receipt to the caller.
+  if (replan) {
+    await advanceBuilderRepairPlanVersion({
+      jobId, userId: input.userId, expectedVersion: 1, nextVersion: 2,
+    })
+  }
 
   if (unverifiable) {
     const error = 'builder_repository_target_unverified'

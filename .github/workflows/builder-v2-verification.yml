@@ -68,3 +68,4 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261029145000_builder_expire_exhausted_checkpoint_claims.sql
           psql -v ON_ERROR_STOP=1 -f saas/tests/fixtures/builder-recovery-assertions.sql
           psql -v ON_ERROR_STOP=1 -f saas/tests/fixtures/customer-task-foundation-assertions.sql
+          psql -v ON_ERROR_STOP=1 -f saas/tests/fixtures/builder-repair-plan-lifecycle-assertions.sql

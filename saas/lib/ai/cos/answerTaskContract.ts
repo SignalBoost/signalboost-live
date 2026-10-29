@@ -106,6 +106,7 @@ export function releasableAnalyticalAnswer(prompt: string, answer: string): bool
       seen.add(key)
       return true
     }).join('\n\n')
+  if (missing.length) return false
   if (body.length < tasks.length * 250) return false
   const vocabulary = new Set(topicWords(body))
   const covered = tasks.filter(directive => {

@@ -1,2 +1,2 @@
-base_sha=13371eecca02c67f0c7777a8e290fb00613ac018
-branch=fix/builder-cos-active-claim-gate-20261029
+base_sha=f6f17eb8f318625005bcbd80545136cc3f3403a0
+branch=fix/cos-no-wordcount-bypass-20261029

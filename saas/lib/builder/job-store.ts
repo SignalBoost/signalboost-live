@@ -187,34 +187,6 @@ export async function enqueueBuilderJob(input: {
  * The expected version fences competing plan changes; a second update cannot
  * silently overwrite the earlier plan decision.
  */
-export async function advanceBuilderRepairPlanVersion(input: {
-  jobId: string
-  userId: string
-  expectedVersion: number
-  nextVersion: number
-}): Promise<void> {
-  if (![input.jobId, input.userId].every(value => UUID.test(value))
-    || !Number.isSafeInteger(input.expectedVersion)
-    || input.expectedVersion < 1
-    || input.nextVersion !== input.expectedVersion + 1) {
-    throw new Error('builder_replan_invalid_version')
-  }
-  const db = serviceClient()
-  if (!db) throw new Error('builder_job_storage_unavailable')
-  const { data, error } = await db.from('builder_jobs')
-    .update({ plan_version: input.nextVersion })
-    .eq('id', input.jobId)
-    .eq('user_id', input.userId)
-    .eq('job_kind', 'standard')
-    .eq('plan_version', input.expectedVersion)
-    .eq('status', 'queued')
-    .select('id')
-  if (error) throw new Error(`builder_replan_version_update: ${error.message}`)
-  if (!Array.isArray(data) || data.length !== 1) {
-    throw new Error('builder_replan_version_conflict')
-  }
-}
-
 export async function claimBuilderJob(jobId: string, userId: string): Promise<BuilderJobRecord | null> {
   if (!UUID.test(jobId) || !UUID.test(userId)) return null
   const db = serviceClient()

@@ -1,2 +1,2 @@
-base_sha=3732400cb2f8d12d216129552ac263ec9f9ff72d
-branch=test/builder-expiry-deployment-preflight-20261029
+base_sha=d9327a77f256fcf4214e4e058b73918db77a0c8f
+branch=fix/builder-expiry-cron-exhausted-main-sync-20261029

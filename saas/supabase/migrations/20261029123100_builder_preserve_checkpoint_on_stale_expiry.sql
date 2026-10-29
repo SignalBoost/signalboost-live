@@ -1,5 +1,5 @@
 -- Preserve resumable Builder claims during stale-worker terminalization.
--- Only uncheckpointed claims with an expired heartbeat may become worker_lost.
+-- Only claims not eligible for checkpoint resume, with an expired heartbeat, may become worker_lost.
 -- Requeue checkpointed claims through the existing fenced continuation RPC.
 create or replace function public.expire_stale_builder_jobs(
   p_user_id uuid,
@@ -26,7 +26,7 @@ begin
     from public.builder_jobs
     where user_id = p_user_id
       and status = 'running' and claim_generation > 0
-      and checkpoint is null
+      and (checkpoint is null or job_kind <> 'standard' or claim_generation >= 24 or coalesce((metadata->>'builderStaleRequeues')::integer, 0) >= 3)
       and greatest(updated_at, coalesce(last_heartbeat_at, updated_at)) <= p_cutoff
       and (p_job_id is null or id = p_job_id)
       and (p_conversation_id is null or conversation_id = p_conversation_id)
@@ -50,7 +50,7 @@ begin
     where id = v_job.id
       and user_id = p_user_id
       and status = 'running' and claim_generation > 0
-      and checkpoint is null
+      and (checkpoint is null or job_kind <> 'standard' or claim_generation >= 24 or coalesce((metadata->>'builderStaleRequeues')::integer, 0) >= 3)
       and greatest(updated_at, coalesce(last_heartbeat_at, updated_at)) <= p_cutoff;
 
     if not found then
@@ -82,7 +82,7 @@ end;
 $$;
 
 comment on function public.expire_stale_builder_jobs(uuid, timestamptz, uuid, uuid) is
-  'Service-role-only Builder execution-lease reconciliation. Converts only stale, uncheckpointed running jobs to worker-loss; preserves checkpointed claims and fresh heartbeats.';
+  'Service-role-only Builder execution-lease reconciliation. Converts stale running jobs not eligible for further continuation to worker-loss; preserves resumable checkpoints and fresh heartbeats.';
 
 revoke all on function public.expire_stale_builder_jobs(uuid, timestamptz, uuid, uuid) from public, anon, authenticated;
 grant execute on function public.expire_stale_builder_jobs(uuid, timestamptz, uuid, uuid) to service_role;

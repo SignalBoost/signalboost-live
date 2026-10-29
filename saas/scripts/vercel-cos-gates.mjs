@@ -484,7 +484,7 @@ const tests = [
   'tests/cosAnswersActionRequestsWithoutExecutor.node.test.ts',
   'tests/cosPublicAnswersWholeRequest.node.test.ts',
   'tests/cosSuppliedFactsNotRefusedForLiveSources.node.test.ts',
-  'tests/cosSubstantiveAnalysisRelease.node.test.ts',
+  'tests/cosAnswerOutcomeVerifier.node.test.ts',
 
   'tests/visualObjectiveContract.node.test.ts',
 

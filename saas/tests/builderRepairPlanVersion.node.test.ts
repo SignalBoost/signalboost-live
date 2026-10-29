@@ -2,24 +2,17 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-test('current-head repair retains customer objective and advances the canonical plan version', () => {
+test('repair replan keeps original customer objective and embeds versioned execution plan at admission', () => {
   const repair = readFileSync('lib/builder/repository-repair-job.ts', 'utf8')
   assert.match(repair, /const objective = input\.objective/)
-  assert.match(repair, /repairExecutionObjective: executionObjective/)
-  assert.match(repair, /if \(replan\) \{\s*await advanceBuilderRepairPlanVersion\(/)
-  assert.match(repair, /expectedVersion: 1, nextVersion: 2/)
+  assert.match(repair, /repairExecutionObjective: executionObjective, repairPlanVersion: 2/)
+  assert.doesNotMatch(repair, /advanceBuilderRepairPlanVersion/)
 })
-test('plan advance is optimistic, owner-scoped, and does not rewrite objective, budget, or grants', () => {
-  const store = readFileSync('lib/builder/job-store.ts', 'utf8')
-  const start = store.indexOf('export async function advanceBuilderRepairPlanVersion')
-  const end = store.indexOf('export async function claimBuilderJob', start)
-  assert.ok(start >= 0 && end > start)
-  const advance = store.slice(start, end)
-  assert.match(advance, /input\.nextVersion !== input\.expectedVersion \+ 1/)
-  assert.match(advance, /\.update\(\{ plan_version: input\.nextVersion \}\)/)
-  assert.match(advance, /\.eq\('id', input\.jobId\)/)
-  assert.match(advance, /\.eq\('user_id', input\.userId\)/)
-  assert.match(advance, /\.eq\('plan_version', input\.expectedVersion\)/)
-  assert.match(advance, /\.eq\('status', 'queued'\)/)
-  assert.doesNotMatch(advance, /\.update\(\{[^}]*objective/)
+
+test('database initializes replanned task version in the same transaction as insertion', () => {
+  const migration = readFileSync('supabase/migrations/20261029233500_builder_repair_plan_atomic_admission.sql', 'utf8')
+  assert.match(migration, /before insert on public\.builder_jobs/i)
+  assert.match(migration, /new\.plan_version := 2/)
+  assert.match(migration, /new\.metadata->>'repairExecutionObjective'/)
+  assert.match(migration, /new\.metadata->>'repairPlanVersion' is distinct from '2'/)
 })

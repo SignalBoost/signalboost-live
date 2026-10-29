@@ -99,3 +99,15 @@ test('failed durable turn is never recovered as successful History answer', () =
   assert.deepEqual(findDurableCosTurnReply(failed, '11111111-1111-4111-8111-111111111111'),
     { content: 'COS failed to send invoice', status: 'failed' })
 })
+
+test('external-action durable admission failure must fail closed, never execute synchronously', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/cos-provenance-browser/route.ts'), 'utf8')
+  const start = route.indexOf("console.error('[cos_durable_turn_enqueue_failed]'")
+  const fallback = route.indexOf('// Direct (non-durable) turns', start)
+  assert.ok(start >= 0 && fallback > start)
+  const block = route.slice(start, fallback)
+  assert.match(block, /error: 'cos_task_admission_unavailable'/)
+  assert.match(block, /external_action_taken: false/)
+  assert.match(block, /status: 503/)
+  assert.match(block, /return NextResponse\.json\(/)
+})

@@ -1,2 +1,2 @@
-base_sha=bb65572fc18e1bd653fa5fa146e9e173f8d29610
-branch=fix/cos-task-atomic-terminal-20261029
+base_sha=a1d23860555523ea81957e8e80b0db6d95f6a266
+branch=fix/cos-admission-fail-closed-20261029

@@ -139,3 +139,23 @@ export async function expireStaleDurableCosTurns(input: {
   }
   return expired
 }
+
+/** Bounded, system-wide sweep. Reuses the existing fenced completion RPC per owner. */
+export async function expireStaleDurableCosTurnsSystemWide(): Promise<number> {
+  const db = serviceClient()
+  if (!db) throw new Error('cos_turn_storage_unavailable')
+  const cutoff = new Date(Date.now() - COS_TURN_STALE_AFTER_MS).toISOString()
+  const { data, error } = await db.from('assistant_messages')
+    .select('user_id')
+    .eq('role', 'assistant')
+    .eq('provenance->>schema', COS_TURN_SCHEMA)
+    .eq('provenance->>status', 'running')
+    .lt('created_at', cutoff)
+    .order('created_at', { ascending: true })
+    .limit(100)
+  if (error) throw new Error(`cos_stale_turn_scan_failed:${error.message}`)
+  const owners = [...new Set((data || []).map(row => String(row.user_id)).filter(id => UUID.test(id)))]
+  let expired = 0
+  for (const userId of owners) expired += await expireStaleDurableCosTurns({ userId })
+  return expired
+}

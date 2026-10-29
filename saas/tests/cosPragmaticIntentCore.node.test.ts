@@ -80,8 +80,9 @@ test('ordinary COS questions return before non-critical provenance persistence',
   assert.match(ownerBlock, /persistCosPrimaryProvenanceAfterResponse/)
   assert.doesNotMatch(ownerBlock, /await writeCosPrimaryProvenance/)
 
-  const ordinaryHandled = route.indexOf('if(cos?.handled&&releasableAnalyticalAnswer(input,cos.reply))')
-  assert.ok(ordinaryHandled >= 0, 'ordinary handled replies must preserve the analytical acceptance guard')
+  // A handled reply already passed the reasoner's independent outcome verifier; it is not re-judged by a word rule here.
+  const ordinaryHandled = route.indexOf('if(cos?.handled){')
+  assert.ok(ordinaryHandled >= 0, 'ordinary handled replies return on the fast path')
   const bestEffort = route.indexOf("source:'cos-local-best-effort'", ordinaryHandled)
   const ordinaryBlock = route.slice(ordinaryHandled, bestEffort)
   assert.match(ordinaryBlock, /persistCosPrimaryProvenanceAfterResponse/)

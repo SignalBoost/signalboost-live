@@ -10,7 +10,9 @@ import {
   FAULT_PROMPT, FAULT_COMPLETE_ANSWER, FAULT_MAX_PROVIDER_CALLS, FAULT_TURN_DEADLINE_MS, FAULT_DEADLINE_GRACE_MS,
   type FaultObservation, type ProviderCall,
 } from '../lib/builder/campaign/faults.ts'
-import { missingAnalyticalTasks, requestedAnalyticalTasks } from '../lib/ai/cos/answerTaskContract.ts'
+import { requestedAnalyticalTasks } from '../lib/ai/cos/answerTaskContract.ts'
+import { verifyAnswerOutcome } from '../lib/ai/cos/answerOutcomeVerifier.ts'
+import { stubOutcomeJudge, unavailableOutcomeJudge } from './helpers/answerOutcomeJudgeStub.ts'
 import { parseLocalResult } from '../lib/ai/cos/reasonerOutput.ts'
 import { withInferenceTransport, currentInferenceTransport } from '../lib/ai/inferenceTransport.ts'
 import { callLocalModelTurn, LOCAL_MODEL_OUTPUT_TRUNCATED } from '../lib/ai/local-inference.ts'
@@ -19,13 +21,15 @@ import { withHostProductionHarnessIngress } from '../platform-harness/runtime/ho
 const init = (signal: AbortSignal = new AbortController().signal) => ({ method: 'POST', headers: {}, body: '{}', signal })
 const completeText = JSON.stringify({ answer: FAULT_COMPLETE_ANSWER, confidence: 0.7 })
 const call = (index: number, outcome: string, cancelled = false): ProviderCall => ({ index, outcome, cancelled, startedAfterMs: 0, endedAfterMs: 10 })
+const completeOutcome = await verifyAnswerOutcome({ request: FAULT_PROMPT, answer: FAULT_COMPLETE_ANSWER, judge: stubOutcomeJudge })
 const observe = (partial: Partial<FaultObservation> & { fault: FaultObservation['fault'] }): FaultObservation => ({
-  calls: [call(1, '200')], released: null, escaped: null, elapsedMs: 1_000, ...partial,
+  calls: [call(1, '200')], released: null, escaped: null, elapsedMs: 1_000, releasedOutcome: partial.released === completeText ? completeOutcome : null, ...partial,
 })
 
-test('the fault prompt is a three-task analytical request and the stub answer satisfies the answer contract', () => {
+test('the fault prompt is a three-task analytical request and the verifier finds the stub answer complete', () => {
   assert.equal(requestedAnalyticalTasks(FAULT_PROMPT).length, 3)
-  assert.deepEqual(missingAnalyticalTasks(FAULT_PROMPT, FAULT_COMPLETE_ANSWER), [])
+  assert.equal(completeOutcome.status, 'verified')
+  assert.equal(completeOutcome.deliverables.length, 3)
   const truncated = parseLocalResult(truncatedAnswerText())
   assert.equal(truncated?.truncated, true)
 })
@@ -72,6 +76,13 @@ test('malformed_output: broken JSON, empty text and missing keys, in turn', asyn
   assert.equal(contents[1], '')
   assert.deepEqual(Object.keys(JSON.parse(contents[2])), ['result', 'score'])
   assert.equal(contents[3], contents[0])
+})
+
+test('judge: a parseable release the verifier could not grade is BLOCKED, never PASS', async () => {
+  const ungraded = await verifyAnswerOutcome({ request: FAULT_PROMPT, answer: FAULT_COMPLETE_ANSWER, judge: unavailableOutcomeJudge })
+  const result = judgeFault(observe({ fault: 'runpod_busy', calls: [call(1, '503'), call(2, '200')], released: completeText, releasedOutcome: ungraded }))
+  assert.equal(result.verdict, 'BLOCKED')
+  assert.equal(result.failureCause, 'independent outcome verifier unavailable')
 })
 
 test('judge: governed recovery and bounded failure both pass runpod_busy; a retry storm fails it', () => {

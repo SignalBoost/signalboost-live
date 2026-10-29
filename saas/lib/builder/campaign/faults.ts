@@ -20,7 +20,7 @@
 // Pure: no I/O. The host (hostPorts.ts) runs the reasoner under the stub and hands the observation here.
 
 import type { InferenceTransport } from '../../ai/inferenceTransport.ts'
-import { missingAnalyticalTasks } from '../../ai/cos/answerTaskContract.ts'
+import type { AnswerOutcome } from '../../ai/cos/answerOutcomeVerifier.ts'
 import { parseLocalResult } from '../../ai/cos/reasonerOutput.ts'
 import type { PortResult } from './ports.ts'
 
@@ -33,7 +33,7 @@ export const FAULT_DEADLINE_GRACE_MS = 5_000
 /** More provider calls than this inside one faulted turn is an uncontrolled retry loop. */
 export const FAULT_MAX_PROVIDER_CALLS = 8
 
-/** A three-part analytical request: enough for the deterministic answer contract to apply, short enough for a stub. */
+/** A three-part analytical request: enough deliverables for the outcome verifier to grade, short enough for a stub. */
 export const FAULT_PROMPT = [
   'A nightly ETL job that loads warehouse tables started finishing 40 minutes late this week.',
   'Row counts are unchanged; the source database shows no slow queries; the job host shows CPU at 95% for the whole run.',
@@ -70,6 +70,11 @@ export type FaultObservation = Readonly<{
   /** An exception that escaped the reasoner, or null. */
   escaped: string | null
   elapsedMs: number
+  /**
+   * The independent verifier's verdict on the released answer, judged by the host after the stub run ends (inside it
+   * the stub is the only provider, so no independent judge exists there). Null when nothing parseable was released.
+   */
+  releasedOutcome: AnswerOutcome | null
 }>
 
 export type FaultStub = Readonly<{
@@ -150,11 +155,17 @@ function callsEvidence(observation: FaultObservation) {
   }))
 }
 
-/** A released answer is complete when it parses, is not marked truncated, and covers every requested task. */
-function releasedComplete(released: string): boolean {
+/** A released answer is complete when it parses, is not marked truncated, and the verifier found every deliverable delivered. */
+function releasedComplete(released: string, outcome: AnswerOutcome | null): boolean {
   const parsed = parseLocalResult(released)
   if (!parsed || parsed.truncated === true) return false
-  return missingAnalyticalTasks(FAULT_PROMPT, parsed.answer).length === 0
+  return outcome?.status === 'verified'
+}
+
+/** A parseable, untruncated release the verifier could not judge cannot be graded either way. */
+function releasedUngraded(released: string, outcome: AnswerOutcome | null): boolean {
+  const parsed = parseLocalResult(released)
+  return Boolean(parsed && parsed.truncated !== true && (!outcome || outcome.status === 'unverified'))
 }
 
 /** Decide PASS or FAIL for one fault from what the stub recorded and what the reasoner released. */
@@ -163,12 +174,15 @@ export function judgeFault(observation: FaultObservation): PortResult {
   const calls = observation.calls.length
   const releasedSummary = observation.released === null
     ? 'nothing released'
-    : releasedComplete(observation.released) ? 'complete answer released' : 'released text is not a complete answer'
+    : releasedComplete(observation.released, observation.releasedOutcome) ? 'complete answer released'
+      : releasedUngraded(observation.released, observation.releasedOutcome) ? 'answer released, not graded: the independent outcome verifier could not run'
+        : 'released text is not a complete answer'
   if (observation.escaped !== null) failures.push(`exception escaped the reasoner: ${observation.escaped}`)
   if (calls === 0) failures.push('the reasoner made no provider call')
   if (calls > FAULT_MAX_PROVIDER_CALLS) failures.push(`${calls} provider calls in one turn exceeds the ceiling of ${FAULT_MAX_PROVIDER_CALLS}`)
   if (observation.elapsedMs > FAULT_TURN_DEADLINE_MS + FAULT_DEADLINE_GRACE_MS) failures.push(`turn ran ${observation.elapsedMs} ms, past its ${FAULT_TURN_DEADLINE_MS} ms deadline and ${FAULT_DEADLINE_GRACE_MS} ms grace`)
-  if (observation.released !== null && !releasedComplete(observation.released)) failures.push('an incomplete answer was released')
+  const ungraded = observation.released !== null && releasedUngraded(observation.released, observation.releasedOutcome)
+  if (observation.released !== null && !ungraded && !releasedComplete(observation.released, observation.releasedOutcome)) failures.push('an incomplete answer was released')
   if (observation.fault === 'model_timeout') {
     const uncancelled = observation.calls.filter(call => !call.cancelled)
     if (uncancelled.length) failures.push(`${uncancelled.length} hung call(s) were not cancelled by the reasoner`)
@@ -183,5 +197,6 @@ export function judgeFault(observation: FaultObservation): PortResult {
     { kind: 'note' as const, label: 'turn', detail: `${calls} provider call(s); ${observation.elapsedMs} ms; ${releasedSummary}${observation.escaped ? `; escaped: ${observation.escaped}` : ''}` },
   ]
   if (failures.length) return { verdict: 'FAIL', actual: failures.join('; '), evidence, failureCause: failures[0] }
+  if (ungraded) return { verdict: 'BLOCKED', actual: `${releasedSummary}; ${calls} provider call(s); ${observation.elapsedMs} ms`, evidence, failureCause: 'independent outcome verifier unavailable' }
   return { verdict: 'PASS', actual: `${releasedSummary}; ${calls} provider call(s); ${observation.elapsedMs} ms`, evidence }
 }

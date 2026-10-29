@@ -3,7 +3,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { evaluateTaskOutcome } from '../lib/ai/cos/answerTaskContract.ts'
+import { verifyAnswerOutcome } from '../lib/ai/cos/answerOutcomeVerifier.ts'
 
 const source = (path:string) => readFileSync(join(process.cwd(),path),'utf8')
 
@@ -12,10 +12,11 @@ test('gate 1 diagnostic: current workflow state has identity but lacks canonical
  assert.match(existing,/readonly workflowId: string; readonly requestId: string; readonly userId: string; readonly idempotencyKey: string/)
  assert.doesNotMatch(existing,/immutable_objective|completed_actions_ledger|final_verification_result/)
 })
-test('gate 6 partial: executable proof does not turn missing execution evidence into success',()=>{
- const verdict=evaluateTaskOutcome({originalRequest:'Deploy feature and verify production',answer:'Tests passed; deployment READY',requiresExecutionEvidence:true,receipts:[{kind:'test',reference:'ci:123',verified:true}]})
- assert.notEqual(verdict.status,'verified')
- assert.ok(verdict.blockers.includes('verified_execution_receipt_missing'))
+test('gate 6 partial: a claimed delivery without evidence in the answer is not verified',async()=>{
+ const claimed=async()=>JSON.stringify({deliverables:[{item:'deploy the feature',delivered:true,quote:'the deployment completed and production was verified'}]})
+ const verdict=await verifyAnswerOutcome({request:'Deploy feature and verify production',answer:'Tests passed; deployment READY',judge:claimed})
+ assert.equal(verdict.status,'incomplete')
+ assert.equal(verdict.verification.verified,false)
 })
 
 test('gate 1 foundation: admission and terminal History use the canonical builder_jobs identity', () => {

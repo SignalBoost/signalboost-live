@@ -3,9 +3,10 @@
 // THE CAMPAIGN RUNNER. Executes the catalog in order through the host's ports, one real check at a time, and writes
 // a ledger row per item with the item's own evidence. It is a slice runner: it stops when the slice's time is nearly
 // spent and resumes from the ledger on the next slice, so a twenty-item campaign with real model calls survives the
-// per-slice deadline of the job runner. Acceptance for an analysis item is the deterministic answer contract the
-// production path itself uses (answerTaskContract.ts): a reply is PASS only when the production path released it and
-// every numbered deliverable has real substance; a refusal, a timeout, a generic or duplicated reply is FAIL.
+// per-slice deadline of the job runner. Acceptance for an analysis item is the independent outcome verifier the
+// production path itself releases answers with (answerOutcomeVerifier.ts): a reply is PASS only when the production
+// path released it and the verifier quotes the answer's delivery of every requested deliverable; a refusal, a timeout
+// or a reply missing a deliverable is FAIL; a verifier that could not run makes the item BLOCKED, never PASS.
 //
 // Pure: no I/O of its own, every effect goes through a port.
 
@@ -15,7 +16,7 @@ import { pendingItems } from './ledger.ts'
 import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
 import { newBrowserSession, type BrowserSession } from './browserChecks.ts'
 import type { FixtureSession } from './fixture.ts'
-import { missingAnalyticalTasks } from '../../ai/cos/answerTaskContract.ts'
+import { verifyAnswerOutcome, type AnswerOutcomeJudge } from '../../ai/cos/answerOutcomeVerifier.ts'
 
 /**
  * SLICE SCHEDULING. Before any request has completed, an item needs at least one minute. Afterwards the reserve is the
@@ -69,15 +70,18 @@ export function analysisFailureCause(outcome: AnalysisOutcome): string | null {
   return null
 }
 
-export function judgeAnalysis(prompt: string, outcome: AnalysisOutcome): Readonly<{ verdict: CampaignVerdict; actual: string; failureCause: string | null }> {
+export async function judgeAnalysis(prompt: string, outcome: AnalysisOutcome, judge: AnswerOutcomeJudge | undefined): Promise<Readonly<{ verdict: CampaignVerdict; actual: string; failureCause: string | null }>> {
   const cause = analysisFailureCause(outcome)
   if (cause) return { verdict: 'FAIL', actual: `No released answer. ${cause}.`, failureCause: cause }
-  const missing = missingAnalyticalTasks(prompt, outcome.reply)
-  if (missing.length) {
-    const cause2 = `deliverables without real substance: ${missing.map(item => item.slice(0, 60)).join('; ')}`
-    return { verdict: 'FAIL', actual: `Answer released (${outcome.reply.length} chars) but ${missing.length} deliverable(s) lack substance.`, failureCause: cause2 }
+  if (!judge) return { verdict: 'BLOCKED', actual: `Answer released (${outcome.reply.length} chars); not graded: no independent outcome verifier on this host.`, failureCause: 'no independent outcome verifier on this host' }
+  const verified = await verifyAnswerOutcome({ request: prompt, answer: outcome.reply, judge })
+  if (verified.status === 'unverified') {
+    return { verdict: 'BLOCKED', actual: `Answer released (${outcome.reply.length} chars); not graded: the independent outcome verifier could not run (${verified.verification.reason}).`, failureCause: 'independent outcome verifier unavailable' }
   }
-  return { verdict: 'PASS', actual: `Answer released (${outcome.reply.length} chars); every requested deliverable has substance.`, failureCause: null }
+  if (verified.status === 'incomplete') {
+    return { verdict: 'FAIL', actual: `Answer released (${outcome.reply.length} chars) but ${verified.missing.length} of ${verified.deliverables.length} requested deliverable(s) are not delivered.`, failureCause: `undelivered: ${verified.missing.map(item => item.slice(0, 60)).join('; ')}` }
+  }
+  return { verdict: 'PASS', actual: `Answer released (${outcome.reply.length} chars); the independent verifier found every one of ${verified.deliverables.length} requested deliverable(s) delivered, each with a quoted passage.`, failureCause: null }
 }
 
 export function analysisEvidence(outcome: AnalysisOutcome): CampaignEvidence[] {
@@ -127,14 +131,14 @@ async function executeItem(item: CampaignItem, ports: CampaignPorts, ledger: Cam
       if (!ports.analysis) return { result: blocked('no production-path analysis port on this host'), scenario: item.prompt || '' }
       const outcome = await ports.analysis(item.prompt || '', signal)
       if (signal?.aborted) return { result: blocked('interrupted'), scenario: item.prompt || '', interrupted: true }
-      const judged = judgeAnalysis(item.prompt || '', outcome)
+      const judged = await judgeAnalysis(item.prompt || '', outcome, ports.outcomeJudge)
       return { scenario: item.prompt || '', servedCommit: outcome.servedCommit, requestMs: outcome.latencyMs, result: { ...judged, correlationId: outcome.correlationId, evidence: analysisEvidence(outcome) } }
     }
     case 'routing': {
       if (!ports.routing) return { result: blocked('no routing read-back port on this host'), scenario: item.prompt || '' }
       const { outcome, enteredBuilder } = await ports.routing(item.prompt || '', signal)
       if (signal?.aborted) return { result: blocked('interrupted'), scenario: item.prompt || '', interrupted: true }
-      const judged = judgeAnalysis(item.prompt || '', outcome)
+      const judged = await judgeAnalysis(item.prompt || '', outcome, ports.outcomeJudge)
       const evidence = [...analysisEvidence(outcome), { kind: 'record' as const, label: 'Routing', detail: enteredBuilder ? 'entered Builder as coding work' : 'answered as analysis, no Builder job' }]
       if (enteredBuilder) return { scenario: item.prompt || '', servedCommit: outcome.servedCommit, requestMs: outcome.latencyMs, result: { verdict: 'FAIL', actual: 'The investigation entered the Builder as coding work.', correlationId: outcome.correlationId, evidence, failureCause: 'misrouted to Builder' } }
       return { scenario: item.prompt || '', servedCommit: outcome.servedCommit, requestMs: outcome.latencyMs, result: { ...judged, correlationId: outcome.correlationId, evidence } }
@@ -226,7 +230,7 @@ export async function runCampaignSlice(input: Readonly<{
       const required = item.count ?? 20
       const prompts = input.reliabilityPrompts?.length ? input.reliabilityPrompts : [item.prompt || '']
       let progress: ReliabilityProgress = reliability?.testId === item.id ? reliability : { testId: item.id, completed: 0, correlationIds: [] }
-      let failure: Readonly<{ at: number; cause: string; evidence: CampaignEvidence[]; correlationId: string | null }> | null = null
+      let failure: Readonly<{ at: number; verdict: CampaignVerdict; cause: string; evidence: CampaignEvidence[]; correlationId: string | null }> | null = null
       while (progress.completed < required) {
         if (input.signal?.aborted) return state('aborted', progress, item.id)
         if (input.remainingMs() < reserveFor(item.id)) return state('budget', progress)
@@ -237,15 +241,17 @@ export async function runCampaignSlice(input: Readonly<{
         interruptedItem = null
         noteRequest(outcome.latencyMs)
         ledger = noteServedRevision(ledger, outcome.servedCommit)
-        const judged = judgeAnalysis(prompt, outcome)
+        const judged = await judgeAnalysis(prompt, outcome, input.ports.outcomeJudge)
         if (judged.verdict !== 'PASS') {
-          failure = { at: progress.completed + 1, cause: judged.failureCause || judged.actual, evidence: analysisEvidence(outcome), correlationId: outcome.correlationId }
+          failure = { at: progress.completed + 1, verdict: judged.verdict, cause: judged.failureCause || judged.actual, evidence: analysisEvidence(outcome), correlationId: outcome.correlationId }
           break
         }
         progress = { ...progress, completed: progress.completed + 1, correlationIds: [...progress.correlationIds, ...(outcome.correlationId ? [outcome.correlationId] : [])] }
       }
       const result: PortResult = failure
-        ? { verdict: 'FAIL', actual: `Request ${failure.at} of ${required} did not produce a complete analysis; ${failure.at - 1} consecutive completions before it.`, correlationId: failure.correlationId, evidence: [{ kind: 'record', label: 'Consecutive completions', detail: `${failure.at - 1} of ${required}` }, ...failure.evidence], failureCause: failure.cause }
+        ? failure.verdict === 'BLOCKED'
+          ? { verdict: 'BLOCKED', actual: `Request ${failure.at} of ${required} could not be graded (${failure.cause}); ${failure.at - 1} consecutive verified completions before it.`, correlationId: failure.correlationId, evidence: [{ kind: 'record', label: 'Consecutive completions', detail: `${failure.at - 1} of ${required}` }, ...failure.evidence], failureCause: failure.cause }
+          : { verdict: 'FAIL', actual: `Request ${failure.at} of ${required} did not produce a complete analysis; ${failure.at - 1} consecutive completions before it.`, correlationId: failure.correlationId, evidence: [{ kind: 'record', label: 'Consecutive completions', detail: `${failure.at - 1} of ${required}` }, ...failure.evidence], failureCause: failure.cause }
         : { verdict: 'PASS', actual: `${required} of ${required} consecutive analytical requests completed with every deliverable delivered.`, correlationId: progress.correlationIds.at(-1) ?? null, evidence: [{ kind: 'record', label: 'Consecutive completions', detail: `${required} of ${required}; correlation ids: ${progress.correlationIds.join(', ') || 'none recorded'}` }] }
       ledger = { ...ledger, rows: [...ledger.rows, row(item, ledger, executedAt, now, result, `reliability loop: ${required} requests over ${prompts.length} prompt(s)`)] }
       reliability = null

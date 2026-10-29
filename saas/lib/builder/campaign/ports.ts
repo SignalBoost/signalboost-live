@@ -7,6 +7,7 @@
 import type { CampaignEvidence, CampaignVerdict } from './ledger.ts'
 import type { BrowserSession } from './browserChecks.ts'
 import type { FixtureSession } from './fixture.ts'
+import type { AnswerOutcomeJudge } from '../../ai/cos/answerOutcomeVerifier.ts'
 
 export type PortResult = Readonly<{
   verdict: CampaignVerdict
@@ -35,6 +36,11 @@ export type AnalysisOutcome = Readonly<{
 export type CampaignPorts = Readonly<{
   /** The repository's current main commit. The production commit is what the live site reports serving each request. */
   deployment: () => Promise<Readonly<{ mainCommit: string | null }>>
+  /**
+   * The independent outcome verifier's judge (answerOutcomeVerifier.ts), the same one COS releases answers with. Without
+   * it an analysis item is BLOCKED: whether an answer delivered what was asked is never decided by a word rule.
+   */
+  outcomeJudge?: AnswerOutcomeJudge
   /** One real request on the production path. */
   analysis?: (prompt: string, signal?: AbortSignal) => Promise<AnalysisOutcome>
   /** One real request whose routing decision is read back (did it enter the Builder?). */

@@ -24,7 +24,8 @@ function topicWords(text: string): string[] {
 /**
  * Conservative heuristic: numbered sections establish explicit completion, while
  * non-numbered prose must substantively cover task-specific nouns. This is an
- * inexpensive host check, not a substitute for semantic adjudication.
+ * inexpensive host hint that steers a repair draft. It never decides whether an
+ * answer is complete or released; answerOutcomeVerifier.ts does.
  */
 export function missingAnalyticalTasks(prompt: string, answer: string): string[] {
   const tasks = requestedAnalyticalTasks(prompt)
@@ -82,43 +83,6 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
   })
 }
 
-/**
- * Whether an analysis may be released. A draft that meets the contract always may. A draft with gaps may still be
- * released when it is a substantive analysis: long enough for the requested deliverables and covering the subject
- * matter of at least half of them anywhere in the text (section numbering varies; nested numbered lists confuse the
- * section parser). A non-answer ("I need more readings before investigating") is never released.
- * Production 2026-10-25: complete model answers (finish_reason stop, 1,000-3,140 tokens) to an 8-task incident
- * analysis were discarded because the section parser reported gaps, and the owner got a refusal instead.
- */
-export function releasableAnalyticalAnswer(prompt: string, answer: string): boolean {
-  const tasks = requestedAnalyticalTasks(prompt)
-  if (!tasks.length) return true
-  const missing = missingAnalyticalTasks(prompt, answer)
-  if (!missing.length) return true
-  // Judge only the answer's own analysis: lines that repeat a requested task heading and paragraphs repeated
-  // under several headings do not count (Codex on #4900: the checklist plus one refusal paragraph repeated
-  // eight times must stay a non-answer).
-  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
-  const headings = new Set(tasks.map(normalize))
-  const seen = new Set<string>()
-  const body = String(answer || '').split(/\n\s*\n|\n(?=\s*(?:#{1,6}\s*)?\d{1,2}[.)]\s)/)
-    .map(block => block.split('\n').filter(line => !headings.has(normalize(line.replace(/^\s*(?:#{1,6}\s*)?(?:\d{1,2}[.)]\s*)?/, '')))).join('\n').trim())
-    .filter(block => {
-      const key = normalize(block)
-      if (!key || seen.has(key)) return false
-      seen.add(key)
-      return true
-    }).join('\n\n')
-  if (missing.length) return false
-  if (body.length < tasks.length * 250) return false
-  const vocabulary = new Set(topicWords(body))
-  const covered = tasks.filter(directive => {
-    const topics = [...new Set(topicWords(directive))]
-    return !topics.length || topics.filter(word => vocabulary.has(word)).length >= Math.min(2, topics.length)
-  }).length
-  return covered * 2 >= tasks.length
-}
-
 export function analyticalTaskRepairDirective(prompt: string, answer: string): string {
   const missing = missingAnalyticalTasks(prompt, answer)
   return missing.length
@@ -126,54 +90,4 @@ export function analyticalTaskRepairDirective(prompt: string, answer: string): s
       + missing.map((item, index) => (index + 1) + '. ' + item).join('\n')
       + '\nAnswer the full ORIGINAL request. Give each requested deliverable substantive treatment; distinguish observations, hypotheses, and uncertainty. Missing production telemetry limits certainty, not preliminary analytical work. Never claim to have run investigations you did not run.'
     : ''
-}
-
-/**
- * Outcome ledger projection: a completed agent/tool call is not evidence that the
- * original user request was fulfilled. Consumers persist this structured verdict
- * alongside the original request and immutable execution receipts.
- *
- * No model-supplied "done" flag can turn a missing deliverable into success.
- */
-export type OutcomeEvidenceReceipt = Readonly<{
-  kind: 'test' | 'source' | 'execution' | 'artifact' | 'human'
-  reference: string
-  verified: boolean
-}>
-
-export type TaskOutcomeVerdict = Readonly<{
-  status: 'verified' | 'incomplete' | 'awaiting_verification'
-  originalRequest: string
-  remainingDeliverables: readonly string[]
-  verifiedReceiptCount: number
-  blockers: readonly string[]
-}>
-
-export function evaluateTaskOutcome(input: Readonly<{
-  originalRequest: string
-  answer: string
-  receipts?: readonly OutcomeEvidenceReceipt[]
-  requiresExecutionEvidence?: boolean
-  blockers?: readonly string[]
-}>): TaskOutcomeVerdict {
-  const originalRequest = String(input.originalRequest || '')
-  const remainingDeliverables = missingAnalyticalTasks(originalRequest, input.answer)
-  const blockers = [...new Set((input.blockers ?? []).map(String).filter(Boolean))]
-  const receipts = input.receipts ?? []
-  const verifiedReceiptCount = receipts.filter(receipt =>
-    receipt.verified === true && receipt.reference.trim().length > 0
-  ).length
-  const executionVerified = receipts.some(receipt =>
-    receipt.verified === true
-      && receipt.kind === 'execution'
-      && receipt.reference.trim().length > 0
-  )
-  const missingExecution = input.requiresExecutionEvidence === true && !executionVerified
-  if (missingExecution) blockers.push('verified_execution_receipt_missing')
-  const status = remainingDeliverables.length || blockers.length
-    ? 'incomplete'
-    : input.requiresExecutionEvidence === true && !verifiedReceiptCount
-      ? 'awaiting_verification'
-      : 'verified'
-  return { status, originalRequest, remainingDeliverables, verifiedReceiptCount, blockers }
 }

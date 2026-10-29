@@ -13,7 +13,8 @@ import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
 import { buildHonestRefusalReply } from '@/lib/ai/cos/honestRefusalReply'
 import { closingDocumentQuestion } from '@/lib/ai/cos/instructionContract'
 import { asksForHistoricalRoster } from '@/lib/ai/cos/historicalRosterIntent'
-import { releasableAnalyticalAnswer, requestedAnalyticalTasks, missingAnalyticalTasks } from '@/lib/ai/cos/answerTaskContract'
+import { requestedAnalyticalTasks } from '@/lib/ai/cos/answerTaskContract'
+import { answerOutcomeReleasable, verifyAnswerOutcome } from '@/lib/ai/cos/answerOutcomeVerifier'
 import { buildFreshVerificationUnavailableReply } from '@/lib/ai/cos/freshVerificationUnavailableReply'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { tryDomainAvailabilityLookup } from '@/lib/ai/cos/domainAvailability'
@@ -56,7 +57,7 @@ import { hashPrompt } from '@/lib/ai/cos/turnExperienceStore'
 import { buildNormativeFreshEvidenceFallback } from '@/lib/ai/cos/normativeFreshEvidenceFallback'
 import { buildSourceSummaryFallback } from '@/lib/ai/cos/sourceDigestFallback'
 import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExternalSynthesis'
-import { callCosReasoner, callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { callCosReasoner, callRawCosReasoner, cosAnswerOutcomeJudge, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { companyKnowledgeBlock, cosAudience, cosIdentityPreamble, userAnswerMaxTokens, type CosAudience } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { callLocalModel, callLocalModelTurn, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
@@ -469,26 +470,25 @@ async function runCompletionFirstRescue(input:string,language:string,audience:Co
   const raw=String(result?.text??' ').trim()
   let reply=(parsed?.answer?.trim()||(!raw.startsWith('{')?raw:' ')).trim()
   if(!reply||hasUnsafePublicModelOutput(reply))return null
-  // The rescue path previously bypassed the analytical completion contract entirely.
-  // Recover missing deliverables once; never mark a partial rescue as completed.
-  const firstMissing=analyticalTasks.length?missingAnalyticalTasks(input,reply):[]
-  if(firstMissing.length){
+  // The rescue lane writes its own answer, so the independent verifier judges it like every COS answer: a missing
+  // deliverable gets one rewrite while the turn has time, and an answer the verifier finds incomplete is not released.
+  const firstOutcome=await verifyAnswerOutcome({request:input,answer:reply,judge:cosAnswerOutcomeJudge})
+  if(firstOutcome.status==='incomplete'){
     const timeLeft=turnDeadlineRemainingMs()
-    if(timeLeft!==null && timeLeft<12_000)return releasableAnalyticalAnswer(input,reply)?{reply,reasonerLabel:resolveCosReasoner().config?.label??'cos-reasoner',confidence:Math.max(.01,Math.min(1,parsed?.confidence??.5))}:null
+    if(timeLeft!==null && timeLeft<12_000)return null
     const repaired=await callCosReasoner({
       temperature:0,writesUserAnswer:true,maxTokens:userAnswerMaxTokens(),disableThinking:true,
       usageContext:{feature:'cos_interactive_answer',purpose:'completion_rescue'},
       systemPrompt:[cosIdentityPreamble(audience),
-        'Complete the ORIGINAL user request. Preserve the existing correct analysis and write a fully revised answer with every numbered deliverable, substantive evidence, rankings or discriminating experiments as requested. Separate known facts from hypotheses. Never invent observations. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+        'Complete the ORIGINAL user request. Preserve the existing correct analysis and write a fully revised answer with every requested deliverable, substantive evidence, rankings or discriminating experiments as requested. Separate known facts from hypotheses. Never invent observations. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
         language?'Respond in '+reportLanguageName(language)+'.':''].filter(Boolean).join(' '),
-      prompt:`${companyKnowledgeBlock(input)}ORIGINAL REQUEST:\n${input}\n\nDRAFT ANSWER:\n${reply}\n\nUNDELIVERED ITEMS:\n${firstMissing.map((task,i)=>`${i+1}. ${task}`).join('\n')}`,
+      prompt:`${companyKnowledgeBlock(input)}ORIGINAL REQUEST:\n${input}\n\nDRAFT ANSWER:\n${reply}\n\nUNDELIVERED ITEMS:\n${firstOutcome.missing.map((task,i)=>`${i+1}. ${task}`).join('\n')}`,
     }).catch(()=>null)
     const candidate=repaired?.text?parseLocalResult(repaired.text):null
     const candidateReply=String(candidate?.answer||'').trim()
-    if(candidateReply&&!hasUnsafePublicModelOutput(candidateReply)&&(
-      missingAnalyticalTasks(input,candidateReply).length===0 || releasableAnalyticalAnswer(input,candidateReply)
-    )) reply=candidateReply
-    else if(!releasableAnalyticalAnswer(input,reply))return null
+    if(!candidateReply||hasUnsafePublicModelOutput(candidateReply))return null
+    if(!answerOutcomeReleasable(await verifyAnswerOutcome({request:input,answer:candidateReply,judge:cosAnswerOutcomeJudge})))return null
+    reply=candidateReply
   }
   const resolved=resolveCosReasoner()
   return{reply,reasonerLabel:resolved.config?.label??'cos-reasoner',confidence:Math.max(.01,Math.min(1,parsed?.confidence??.5))}
@@ -726,12 +726,8 @@ function freshEvidenceUnavailableReply(language:string,input=''):string{const co
 function freshSynthesisRejectedReply(language:string,input=''):string{const continuity=securityReleaseContinuityReply(input);if(continuity)return continuity;return buildFreshVerificationUnavailableReply({prompt:input,language})}
 function securityScenarioEvidenceIsSpecific(input:string,sources:FreshEvidenceSource[]):boolean{if(!/\b(?:zero[- ]day|vulnerabilit|infosec|tenant\s+metadata)\b/i.test(input))return true;const locator=input.match(/\bCVE-\d{4}-\d{4,}\b|\b(?:npm|pypi|maven|cargo|gem|composer)\s*[:/]\s*[@\w./-]+/i)?.[0];if(!locator)return false;return sources.some(source=>new RegExp(locator.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i').test(`${source.title}\n${source.snippet}\n${source.url}`))}
 
-function lowConfidenceDraftReply(cos: Awaited<ReturnType<typeof tryCOSFirstAnswer>>, reason: { detail: string }, userRequest: string): string | null {
+function lowConfidenceDraftReply(cos: Awaited<ReturnType<typeof tryCOSFirstAnswer>>, reason: { detail: string }): string | null {
   if (!cos || cos.handled || !('bestEffortReply' in cos) || !cos.bestEffortReply) return null
-  if (!releasableAnalyticalAnswer(userRequest, cos.bestEffortReply)) {
-    console.warn('[cos-task-contract-fallback-blocked]', JSON.stringify({ blocked: true }))
-    return null
-  }
   return [`⚠️ Low-confidence draft (COS confidence ${cos.confidence.toFixed(2)}, below the ${confidenceThreshold().toFixed(2)} threshold; no external model was available to do better). ${reason.detail}`,'',cos.bestEffortReply].join('\n')
 }
 function localDraft(cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null):string|null{if(!cos)return null;if(cos.handled)return cos.reply;return 'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'?cos.bestEffortReply:null}
@@ -1139,12 +1135,12 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)){
     try{recordCosLatencyStage('primary:before_cos_first',Date.now()-startedAt);cos=await timeCosStage('primary:cos_first_answer',()=>tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest||modelPlannedSemanticMemory||modelPlannedCreativeMemory}))}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
   }
-  if(cos?.handled&&releasableAnalyticalAnswer(input,cos.reply)){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';persistCosPrimaryProvenanceAfterResponse(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
+  if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';persistCosPrimaryProvenanceAfterResponse(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
   // A low confidence score is learning/calibration telemetry, not permission to throw away a
   // useful guarded answer. For ordinary non-live, non-action tasks, release the best-effort answer
   // that already survived the normal COS pipeline instead of replacing it with a generic refusal.
-  if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&cos&&!cos.handled&&'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'&&cos.bestEffortReply.trim()&&releasableAnalyticalAnswer(input,cos.bestEffortReply)){
+  if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&cos&&!cos.handled&&'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'&&cos.bestEffortReply.trim()){
     const reply=cos.bestEffortReply.trim()
     const executionProvenance=authoritativeProvenance(cos,{invoked:false})
     ;(executionProvenance as any).completion_first={released_best_effort:true,confidence:cos.confidence,threshold:confidenceThreshold()}
@@ -1211,7 +1207,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     const sourceDigestFallback=freshHardFail&&!normativeEvidenceFallback&&freshSources.length
       ? buildSourceSummaryFallback(lookupInput,freshSources,language) : null
     const partialCompletion=Boolean(requiresFreshEvidence&&(partialFreshOfficeHolderReply||normativeEvidenceFallback||sourceDigestFallback))
-    const baseFailureReply=partialFreshOfficeHolderReply??normativeEvidenceFallback??sourceDigestFallback??(freshHardFail?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(lowConfidenceDraftReply(cos,reason,input)??buildHonestRefusalReply({prompt:input,language})))
+    const baseFailureReply=partialFreshOfficeHolderReply??normativeEvidenceFallback??sourceDigestFallback??(freshHardFail?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(lowConfidenceDraftReply(cos,reason)??buildHonestRefusalReply({prompt:input,language})))
     const ownerDiagnostics=isPrivileged&&requiresFreshEvidence?{
       build:String(process.env.VERCEL_GIT_COMMIT_SHA||'unknown').slice(0,7),
       search:{status:freshSources.length?'ok':'fail',sourceCount:freshSources.length,sources:freshSources.slice(0,10).map(source=>({id:source.id,title:source.title,url:source.url}))},
@@ -1224,9 +1220,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     // rejected by the analytical task contract. Never log draft or user prompt text.
     const availableDraft=localDraft(cos)
     const analyticalFailureCode=!freshHardFail&&!requestedAction
-      ? !availableDraft?.trim() ? 'cos_no_answer_draft'
-        : !releasableAnalyticalAnswer(input,availableDraft) ? 'cos_analytical_contract_rejected'
-        : 'cos_answer_unreleased_other'
+      ? !availableDraft?.trim() ? 'cos_no_answer_draft' : 'cos_answer_unreleased_other'
       : null
     if(analyticalFailureCode) console.warn('[cos-answer-release-rejected]', JSON.stringify({ code:analyticalFailureCode, draft_present:Boolean(availableDraft?.trim()) }))
     const reply=baseFailureReply,liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:partialCompletion?'deterministic':'failed_closed',confidence:sourceDigestFallback?0:partialCompletion?(normativeEvidenceFallback?0.75:0.99):(cos?.confidence??0),provenance:requiresFreshEvidence?freshTelemetryProvenance(freshLocalAttempted,freshLocalModel):cos?.provenance,externalAiInvoked:false})
@@ -1272,7 +1266,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       : embeddedMatchesGenerator
         ? embedded!
         : authoritativeProvenance(cos,{invoked:externalInvoked,provider:external.provider,model:external.model})
-    const reply=continuityFailed?(lowConfidenceDraftReply(cos,reason,input)??`COS independent reasoning could not complete this request: ${reason.detail} External fallback was also unavailable. No action was executed.`):rawReply
+    const reply=continuityFailed?(lowConfidenceDraftReply(cos,reason)??`COS independent reasoning could not complete this request: ${reason.detail} External fallback was also unavailable. No action was executed.`):rawReply
     const innerSource=String(payload?.source||'').trim()
     const responseSource=continuityFailed?'cos-independent-reasoner-unavailable':externalInvoked?'external_fallback':innerSource&&innerSource!=='external_fallback'?innerSource:'cos-local-retry'
     const finalConfidence=finiteNumber(payload?.confidence_score)??finiteNumber((executionProvenance as any)?.local_reasoning?.confidence)??(continuityFailed?cos?.confidence??0:null)

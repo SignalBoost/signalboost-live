@@ -1,2 +1,2 @@
-base_sha=d9327a77f256fcf4214e4e058b73918db77a0c8f
-branch=fix/builder-expiry-cron-exhausted-main-sync-20261029
+base_sha=6d813b1d77415cb06f3c29551e4890915c99cb7b
+branch=test/builder-recovery-assertion-sync-20261029

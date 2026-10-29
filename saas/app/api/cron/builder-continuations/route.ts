@@ -214,7 +214,7 @@ export async function GET(request: Request) {
   // Fail closed on database errors rather than treating an unknown count as idle.
   const { count: activeRunningClaims, error: activeClaimsError } = await admin
     .from('builder_jobs').select('id', { count: 'exact', head: true })
-    .eq('status', 'running')
+    .eq('status', 'running').eq('job_kind', 'standard')
   if (activeClaimsError) {
     console.error('[builder.continuation.admission_read_failed]', { code: activeClaimsError.code })
     return NextResponse.json({ ok: false, error: 'builder_continuation_admission_unavailable' }, { status: 503 })

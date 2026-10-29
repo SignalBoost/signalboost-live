@@ -208,6 +208,11 @@ export async function publishSignalBoostRepositoryRepair(input: {
     )
     const baseTree = String(baseCommit?.tree?.sha || '')
     if (!SAFE_SHA.test(baseTree)) throw new Error('builder_repository_writeback_base_tree_invalid')
+    // Inspect the pinned repository tree before attesting to a repository scan.
+    const scan = await requestJson(request, `${GITHUB_API}/git/trees/${baseTree}?recursive=1`, { method: 'GET', headers: writeHeaders }, [200])
+    if (scan?.truncated === true || !Array.isArray(scan?.tree) || !scan.tree.some((entry: JsonRecord) => entry?.path === 'ONBOARD.md')) {
+      throw new Error('builder_repository_writeback_repo_scan_unverified')
+    }
     const onboard = await requestJson(request, `${GITHUB_API}/contents/ONBOARD.md?ref=${baseSha}`, { method: 'GET', headers: writeHeaders }, [200])
     const onboardSha = String(onboard?.sha || '').toLowerCase()
     if (!SAFE_SHA.test(onboardSha) || onboard?.type !== 'file') throw new Error('builder_repository_writeback_onboard_unverified')

@@ -1,2 +1,2 @@
-base_sha=b147010230ecc1d677a13707ee21fc77d6ffc944
+base_sha=3c360d2b1d7c4d4030567ad2bc9e3702880a4444
 branch=fix/builder-audit-terminal-retry-loop-20261029

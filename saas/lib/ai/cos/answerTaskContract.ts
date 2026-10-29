@@ -36,7 +36,10 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
   const seenSectionBodies = new Set<string>()
   // Parse all numbered sections once. Searching independently for each heading and
   // slicing from that match can accidentally include the NEXT heading as content.
-  const sections = [...body.matchAll(/(?:^|\n)[ \t]*(?:#{1,6}[ \t]*)?(\d{1,2})[.)][ \t]+/g)]
+  const markdownSections = [...body.matchAll(/(?:^|\n)[ \t]*#{1,6}[ \t]+(\d{1,2})[.)][ \t]+/g)]
+  const sections = markdownSections.length >= tasks.length
+    ? markdownSections
+    : [...body.matchAll(/(?:^|\n)[ \t]*(?:#{1,6}[ \t]*)?(\d{1,2})[.)][ \t]+/g)]
   return tasks.filter((directive, index) => {
     const position = sections.findIndex(item => Number(item[1]) === index + 1)
     if (position >= 0) {
@@ -106,6 +109,7 @@ export function releasableAnalyticalAnswer(prompt: string, answer: string): bool
       seen.add(key)
       return true
     }).join('\n\n')
+  if (missing.length) return false
   if (body.length < tasks.length * 250) return false
   const vocabulary = new Set(topicWords(body))
   const covered = tasks.filter(directive => {

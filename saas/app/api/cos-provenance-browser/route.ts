@@ -281,7 +281,12 @@ export async function POST(req: NextRequest): Promise<Response> {
             const workerResponse = await Promise.race([worker, watchdog])
             const payload: any = await workerResponse.clone().json().catch(() => null)
             const reply = String(payload?.reply || payload?.error || '').trim()
-            const succeeded = workerResponse.ok && payload?.ok !== false && Boolean(reply)
+            // A queued/running campaign requires a persisted job receipt. A message alone
+            // is not evidence that an asynchronous operation was admitted.
+            const asynchronousExecution = payload?.status === 'queued' || payload?.status === 'running'
+            const hasExecutionReceipt = typeof payload?.jobId === 'string' && payload.jobId.trim().length > 0
+            const succeeded = workerResponse.ok && payload?.ok !== false && Boolean(reply) &&
+              (!asynchronousExecution || hasExecutionReceipt)
             await finishDurableCosTurn({
               turnId,
               historyMessageId,

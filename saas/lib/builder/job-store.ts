@@ -105,7 +105,7 @@ export async function readBuilderEvidenceJob(input: EvidenceLookup): Promise<Bui
   const db = serviceClient()
   if (!db) return null
   let query = db.from('builder_jobs').select(JOB_SELECT)
-    .eq('user_id', input.userId).eq('conversation_id', input.conversationId)
+    .eq('user_id', input.userId).eq('conversation_id', input.conversationId).eq('job_kind', 'standard')
   if (input.jobId) query = query.eq('id', input.jobId)
   if (input.workspaceId) query = query.eq('workspace_id', input.workspaceId)
   const { data, error } = await query.order('created_at', { ascending: false }).limit(1).maybeSingle()
@@ -339,7 +339,7 @@ export async function builderSoleResumableJob(jobId: string): Promise<boolean> {
   const db = serviceClient()
   if (!db) return false
   const { count, error } = await db.from('builder_jobs').select('id', { count: 'exact', head: true })
-    .or('status.eq.running,and(status.eq.paused,job_kind.eq.standard,checkpoint.not.is.null)').neq('id', jobId)
+    .eq('job_kind', 'standard').or('status.eq.running,and(status.eq.paused,checkpoint.not.is.null)').neq('id', jobId)
   return !error && count === 0
 }
 

@@ -77,7 +77,8 @@ export async function enqueueSignalBoostRepositoryRepairJob(input: {
   const targetFreshness = await verifySignalBoostRepositoryRepairTargetCurrent(input.target)
   const replan = replanSupersededRepositoryRepair(targetFreshness, input.objective)
   const target = replan?.target ?? targetFreshness.target
-  const objective = replan?.objective ?? input.objective
+  const objective = input.objective
+  const executionObjective = replan?.objective ?? objective
 
   const workspace = createSupabaseBuilderWorkspace(input.userId)
   if (!workspace) throw new Error('builder_job_storage_unavailable')
@@ -97,7 +98,7 @@ export async function enqueueSignalBoostRepositoryRepairJob(input: {
       : repositoryRepairRunningReply(input.responseLanguage)
 
   await workspace.ensureWorkspace(workspaceId)
-  await workspace.setObjective(workspaceId, objective)
+  await workspace.setObjective(workspaceId, executionObjective)
   await enqueueBuilderJob({
     jobId,
     workspaceId,
@@ -108,6 +109,7 @@ export async function enqueueSignalBoostRepositoryRepairJob(input: {
     metadata: {
       builderEngine: 'v2',
       platformRepair: true,
+      ...(replan ? { repairExecutionObjective: executionObjective, repairPlanVersion: 2 } : {}),
       productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null,
       commitSha: target.fullCommitSha || target.commitSha,
       branch: target.branch,

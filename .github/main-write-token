@@ -1,2 +1,2 @@
-base_sha=b3982ec3df690082b8b1c77bd4f28caa2158aa60
-branch=docs/developer-queue-q9-q12-20261029
+base_sha=5857b8615503592c8664d973fa546d1eb6c09ac6
+branch=fix/cos-runtime-verdict-remove-dead-replan-20261029

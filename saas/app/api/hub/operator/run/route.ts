@@ -112,8 +112,8 @@ export async function POST(req: NextRequest) {
     providerId, actionId, input,
     user: { id: ctx.userId || 'unknown', role },
     executionMode,
-    approvalGranted: decision.autoApproved ? true : !!body?.approvalGranted,
-    approverRole: typeof body?.approverRole === 'string' ? body.approverRole : undefined,
+    approvalGranted: decision.autoApproved,
+    approverRole: decision.autoApproved ? role : undefined,
     preflight,
   })
 

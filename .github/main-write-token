@@ -1,2 +1,2 @@
-base_sha=3c8917b1c1e8fdc7692eb1e06f0be207dc94521f
-branch=fix/repair-original-objective-clean-20261029
+base_sha=8bf700bfd56d702946e47fdbde9ce7e03856eb6b
+branch=fix/builder-poll-standard-kind-regression-20261029

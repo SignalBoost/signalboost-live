@@ -1,2 +1,5 @@
-base_sha=e09a637db27085464670c06a8eb9127cafa20ba5
-branch=fix/history-durable-cos-turn-trace-20261029
+# SignalBoost main integration serialization token
+# Every pull request targeting main must replace BOTH values below.
+# This shared-file write intentionally makes concurrent PRs conflict after one merges.
+base_sha=db4d635a67c24aca10c4d6a3ea1a3e03b689ac72
+branch=fix/cos-repair-pr-onboard-evidence-20261029

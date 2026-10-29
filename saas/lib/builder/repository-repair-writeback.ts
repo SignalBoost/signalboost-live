@@ -208,6 +208,14 @@ export async function publishSignalBoostRepositoryRepair(input: {
     )
     const baseTree = String(baseCommit?.tree?.sha || '')
     if (!SAFE_SHA.test(baseTree)) throw new Error('builder_repository_writeback_base_tree_invalid')
+    // Inspect the pinned repository tree before attesting to a repository scan.
+    const scan = await requestJson(request, `${GITHUB_API}/git/trees/${baseTree}?recursive=1`, { method: 'GET', headers: writeHeaders }, [200])
+    if (scan?.truncated === true || !Array.isArray(scan?.tree) || !scan.tree.some((entry: JsonRecord) => entry?.path === 'ONBOARD.md')) {
+      throw new Error('builder_repository_writeback_repo_scan_unverified')
+    }
+    const onboard = await requestJson(request, `${GITHUB_API}/contents/ONBOARD.md?ref=${baseSha}`, { method: 'GET', headers: writeHeaders }, [200])
+    const onboardSha = String(onboard?.sha || '').toLowerCase()
+    if (!SAFE_SHA.test(onboardSha) || onboard?.type !== 'file') throw new Error('builder_repository_writeback_onboard_unverified')
     const executableModes = await executableModesForChangedFiles(request, baseTree, files, writeHeaders)
 
     const tree: Array<{ path: string; mode: GitBlobMode; type: 'blob'; sha: string }> = []
@@ -302,6 +310,8 @@ export async function publishSignalBoostRepositoryRepair(input: {
             '',
             `Pinned base: \`${baseSha}\``,
             `Changed files: ${files.length}`,
+            `ONBOARD_ACK_BLOB: ${onboardSha}`,
+            `REPO_SCAN_HEAD: ${commitSha}`,
             '',
             'The repair was generated and proved in the network-denied repository sandbox.',
             'When governed auto-merge is enabled, the durable merge continuation may integrate this PR only after all checks are green, the danger classifier remains clear, and a restorable production checkpoint exists.',

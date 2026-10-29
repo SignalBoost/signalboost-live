@@ -17,6 +17,29 @@ test('gate 6 partial: executable proof does not turn missing execution evidence 
  assert.notEqual(verdict.status,'verified')
  assert.ok(verdict.blockers.includes('verified_execution_receipt_missing'))
 })
+
+test('gate 1 foundation: admission and terminal History use the canonical builder_jobs identity', () => {
+ const admission=source('supabase/migrations/20261029161500_cos_canonical_task_admission.sql')
+ const finish=source('supabase/migrations/20261029230000_cos_customer_task_atomic_finish.sql')
+ const durable=source('lib/ai/cos/durableCosTurn.ts')
+ assert.match(admission,/INSERT INTO public\.builder_jobs\(id,workspace_id,user_id,conversation_id,objective,job_kind/)
+ assert.match(admission,/VALUES \(p_task_id,p_task_id,p_user_id,p_conversation_id/)
+ assert.match(admission,/v_existing\.objective <> btrim\(p_objective\)/)
+ assert.match(admission,/v_existing\.user_id <> p_user_id/)
+ assert.match(finish,/select id into v_task_id from public\.builder_jobs[\s\S]*for update;/)
+ assert.match(finish,/update public\.assistant_messages[\s\S]*update public\.builder_jobs/)
+ assert.match(durable,/db\.rpc\('admit_cos_customer_task'/)
+ assert.match(durable,/db\.rpc\('finish_cos_customer_task'/)
+})
+
+test('gate 1 foundation: database rejects objective changes and COS jobs cannot be claimed as Builder slices', () => {
+ const schema=source('supabase/migrations/20261029153500_customer_task_record_foundation.sql')
+ assert.match(schema,/NEW\.objective IS DISTINCT FROM OLD\.objective/)
+ assert.match(schema,/CREATE TRIGGER protect_builder_task_objective BEFORE UPDATE ON public\.builder_jobs/)
+ assert.match(schema,/CREATE TRIGGER prevent_cos_task_builder_claim BEFORE UPDATE ON public\.builder_jobs/)
+ assert.match(schema,/job_kind IN \('standard', 'debug_file', 'cos_turn'\)/)
+})
+
 test.todo('gate 1 E2E: COS, Builder and History share one persisted immutable customer task and execution identity')
 test.todo('gate 2 CI caller inventory: all module authorities classified and no parallel customer task record')
 test.todo('gate 3 E2E: consequential tools denied by host-side policy despite agent replanning')

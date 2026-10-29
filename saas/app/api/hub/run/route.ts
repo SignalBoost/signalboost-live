@@ -67,8 +67,8 @@ export async function POST(req: NextRequest) {
     input,
     user: { id: ctx.userId || 'unknown', role },
     executionMode,
-    approvalGranted: !!body?.approvalGranted,
-    approverRole: typeof body?.approverRole === 'string' ? body.approverRole : undefined,
+    approvalGranted: false,
+    approverRole: undefined,
     preflight,
   })
 

@@ -410,7 +410,7 @@ async function tryCosSoftwareSpecialistLegacy(
       conversationId,
       objective,
       jobKind: 'standard',
-      metadata: { productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null, ...(project.context ? { projectContext: project.context } : {}),
+      metadata: { ...(UUID.test(String(input.body?.context?.canonicalCustomerTaskId || '')) ? { customerTaskId: String(input.body.context.canonicalCustomerTaskId) } : {}), productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null, ...(project.context ? { projectContext: project.context } : {}),
             // The claimed worker re-reads the existing workspace before any edit (same rule as /api/builder).
             ...(project.context && !stagedFiles.length ? { requiresExistingSource: true } : {}),
             ...builderModeMetadata(input.body, rawObjective),

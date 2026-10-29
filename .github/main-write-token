@@ -1,2 +1,2 @@
-base_sha=9c2f04c5d29d2f8c02af9e8fbf4203beb18773ee
-branch=fix/cos-remove-analytical-wordcount-fallback-20261029
+base_sha=ea1b544bb0f5361b1a81a4eb3ccac9476f0cc804
+branch=fix/cos-systemwide-stale-turn-cron-20261029

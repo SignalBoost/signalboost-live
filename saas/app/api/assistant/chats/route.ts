@@ -11,7 +11,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAccess } from '@/lib/auth/access'
-import { reconcileStaleBuilderJobs } from '@/lib/builder/job-store'
 import { expireStaleDurableCosTurns } from '@/lib/ai/cos/durableCosTurn'
 
 export const runtime = 'nodejs'
@@ -44,7 +43,6 @@ async function authedUserId(): Promise<string | null> {
 async function reconcileBuilderHistory(userId: string, conversationId?: string | null): Promise<void> {
   try {
     await Promise.all([
-      reconcileStaleBuilderJobs({ userId, conversationId: conversationId || null }),
       expireStaleDurableCosTurns({ userId, conversationId: conversationId || null }),
     ])
   } catch (error) {
@@ -65,8 +63,8 @@ export async function GET(req: NextRequest) {
     const id = req.nextUrl.searchParams.get('id')
     if (id && !UUID.test(id)) return response({ error: 'Invalid conversation id' }, { status: 400 })
 
-    // A killed `after()` invocation cannot leave History permanently at "Builder is running".
-    // Reconciliation only terminalizes jobs older than the six-minute execution lease.
+    // History only expires abandoned COS turn placeholders. Builder lease recovery belongs
+    // exclusively to the continuation cron, which checks checkpoints and heartbeats.
     await reconcileBuilderHistory(userId, id)
 
     if (id) {

@@ -101,6 +101,7 @@ export async function GET(req: NextRequest) {
         .select('id,conversation_id,history_message_id,status,created_at,updated_at')
         .eq('user_id', userId)
         .eq('conversation_id', id)
+        .eq('job_kind', 'standard')
         .order('created_at', { ascending: false })
         .limit(100)
       if (builderReadError) {

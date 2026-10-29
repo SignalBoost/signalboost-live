@@ -1,2 +1,2 @@
-base_sha=caa5d3057ac310547840574babd47eee8cad9faf
-branch=fix/builder-expiry-exhausted-checkpoints-20261029
+base_sha=3732400cb2f8d12d216129552ac263ec9f9ff72d
+branch=test/builder-expiry-deployment-preflight-20261029

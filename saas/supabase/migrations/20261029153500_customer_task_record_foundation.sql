@@ -25,6 +25,20 @@ DROP TRIGGER IF EXISTS protect_builder_task_objective ON public.builder_jobs;
 CREATE TRIGGER protect_builder_task_objective BEFORE UPDATE ON public.builder_jobs
   FOR EACH ROW EXECUTE FUNCTION public.protect_builder_task_objective();
 
--- COS turns must never be claimed by the Builder execution worker.
--- Existing claim_builder_job_slice only selects executable standard jobs;
--- admission and worker-side integration require a separate verified change.
+-- The existing claim_builder_job_slice accepts any queued job_kind while claim_generation < 4.
+-- Protect COS-only tasks even if a caller mistakenly invokes that RPC.
+CREATE OR REPLACE FUNCTION public.prevent_cos_task_builder_claim()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_temp AS $
+BEGIN
+  IF OLD.job_kind = 'cos_turn'
+    AND (NEW.claim_generation IS DISTINCT FROM OLD.claim_generation
+      OR (NEW.status = 'running' AND OLD.status <> 'running')) THEN
+    RAISE EXCEPTION 'cos_task_not_builder_executable' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$;
+DROP TRIGGER IF EXISTS prevent_cos_task_builder_claim ON public.builder_jobs;
+CREATE TRIGGER prevent_cos_task_builder_claim BEFORE UPDATE ON public.builder_jobs
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_cos_task_builder_claim();
+

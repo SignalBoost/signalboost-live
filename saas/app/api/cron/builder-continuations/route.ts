@@ -122,14 +122,22 @@ export async function GET(request: Request) {
   // A live heartbeat prevents declaring an actively executing tool round stale.
   const cutoff = new Date(Date.now() - BUILDER_JOB_STALE_AFTER_MS).toISOString()
   const { data: stranded, error: strandedError } = await db.from('builder_jobs')
-    .select('id,user_id,last_heartbeat_at,updated_at')
-    .eq('status', 'running').is('checkpoint', null).lt('updated_at', cutoff).limit(100)
+    .select('id,user_id,last_heartbeat_at,updated_at,checkpoint,job_kind,claim_generation,metadata')
+    .eq('status', 'running').lt('updated_at', cutoff).limit(100)
   if (strandedError) {
     console.error('[builder_stale_claim_scan_failed]', { code: strandedError.code })
     return NextResponse.json({ ok: false, error: 'builder_stale_claim_scan_unavailable' }, { status: 503 })
   }
   for (const stuck of stranded || []) {
     if (stuck.last_heartbeat_at && Date.parse(stuck.last_heartbeat_at) > Date.parse(cutoff)) continue
+    // The requeue RPC exclusively owns recoverable checkpoints; however,
+    // exhausted checkpoint claims can no longer requeue and must reach expiry.
+    const attempts = Number(stuck.metadata?.builderStaleRequeues || 0)
+    const recoverable = stuck.checkpoint !== null
+      && stuck.job_kind === 'standard'
+      && stuck.claim_generation < 24
+      && attempts < 3
+    if (recoverable) continue
     const { error } = await db.rpc('expire_stale_builder_jobs', {
       p_user_id: stuck.user_id, p_job_id: stuck.id,
       p_conversation_id: null, p_cutoff: cutoff,

@@ -27,52 +27,19 @@ export async function enqueueDurableCosTurn(input: {
   const db = serviceClient()
   if (!db) throw new Error('cos_turn_storage_unavailable')
 
-  const { data: existing, error: readError } = await db.from('assistant_conversations')
-    .select('id,user_id,message_count').eq('id', input.conversationId).maybeSingle()
-  if (readError) throw new Error(`cos_turn_conversation_read: ${readError.message}`)
-  if (existing && existing.user_id !== input.userId) throw new Error('cos_turn_conversation_ownership_mismatch')
-  if (!existing) {
-    const { error } = await db.from('assistant_conversations').insert({
-      id: input.conversationId,
-      user_id: input.userId,
-      title: prompt.slice(0, 80),
-      message_count: 0,
-    })
-    if (error) throw new Error(`cos_turn_conversation_create: ${error.message}`)
-  }
-
-  const startedAt = new Date().toISOString()
-  const runningProvenance = {
-    schema: COS_TURN_SCHEMA,
-    turnId: input.turnId,
-    status: 'running',
-    startedAt,
-  }
-  const { data: rows, error: insertError } = await db.from('assistant_messages').insert([
-    {
-      conversation_id: input.conversationId,
-      user_id: input.userId,
-      role: 'user',
-      content: prompt.slice(0, 16_000),
-    },
-    {
-      conversation_id: input.conversationId,
-      user_id: input.userId,
-      role: 'assistant',
-      content: String(input.runningReply || '').trim().slice(0, 4_000),
-      provenance: runningProvenance,
-    },
-  ]).select('id,role')
-  if (insertError) throw new Error(`cos_turn_message_create: ${insertError.message}`)
-  const historyMessageId = String(rows?.find((row: any) => row.role === 'assistant')?.id || '')
-  if (!UUID.test(historyMessageId)) throw new Error('cos_turn_history_message_missing')
-
-  const nextCount = Number(existing?.message_count || 0) + 2
-  const { error: bumpError } = await db.from('assistant_conversations')
-    .update({ message_count: nextCount, updated_at: startedAt })
-    .eq('id', input.conversationId).eq('user_id', input.userId)
-  if (bumpError) console.error('[cos_turn_conversation_bump_failed]', { turnId: input.turnId, message: bumpError.message })
-
+  // A single database transaction creates the canonical task and both History rows.
+  // The browser-provided task ID is stable across retries; the RPC rejects owner or
+  // objective changes and returns the existing receipt without replaying execution.
+  const { data: admitted, error } = await db.rpc('admit_cos_customer_task', {
+    p_task_id: input.turnId,
+    p_user_id: input.userId,
+    p_conversation_id: input.conversationId,
+    p_objective: prompt,
+    p_running_reply: input.runningReply,
+  })
+  if (error) throw new Error(`cos_task_admission: ${error.message}`)
+  const historyMessageId = String(admitted || '')
+  if (!UUID.test(historyMessageId)) throw new Error('cos_task_admission_receipt_missing')
   return { historyMessageId }
 }
 
@@ -117,6 +84,24 @@ export async function finishDurableCosTurn(input: {
     .maybeSingle()
   if (error) throw new Error(`cos_turn_finish: ${error.message}`)
   if (persisted?.id !== input.historyMessageId) throw new Error('cos_turn_finish_not_committed')
+  // History and the canonical task must agree; a failed task-state write is not
+  // silently reported as successful. Do not mark a second turn as completed.
+  const { data: task, error: taskError } = await db.from('builder_jobs')
+    .update({
+      status: input.status,
+      finished_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      ...(input.status === 'failed' ? { error: input.error || 'cos_turn_failed' } : {}),
+    })
+    .eq('id', input.turnId)
+    .eq('user_id', input.userId)
+    .eq('history_message_id', input.historyMessageId)
+    .eq('job_kind', 'cos_turn')
+    .eq('status', 'running')
+    .select('id')
+    .maybeSingle()
+  if (taskError) throw new Error(`cos_task_finish: ${taskError.message}`)
+  if (task?.id !== input.turnId) throw new Error('cos_task_finish_not_committed')
 }
 
 export async function expireStaleDurableCosTurns(input: {

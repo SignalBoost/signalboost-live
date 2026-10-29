@@ -5,6 +5,14 @@
 
 Evidence: source audit of `main` at `16ac985` (2026-10-29), every component traced to its production callers (imports from `app/` routes and crons, tests excluded), updated for #5043 and #5044. Not runtime proof: a file existing is not counted as working.
 
+## Verified status update — 2026-10-29
+
+The original 0/10 findings are a historical baseline, not a current certification. The Builder recovery SQL migrations are installed in the connected primary application-schema Supabase project, and real PostgreSQL recovery and pause/resume checks passed in CI. The production deployment's exact database binding has not been independently confirmed.
+
+GitHub main-protection actively requires three checks: Builder recovery PostgreSQL behavior, ONBOARD/repository scan/main integration token, and PR serialization. Typecheck, unit tests, production build, and Vercel COS release gate are not yet required by ruleset.
+
+**Phase 1 remains incomplete:** COS turns are still persisted in assistant_messages rather than a single shared builder_jobs task identity. The immediate next implementation is owner-scoped, idempotent COS task admission in the existing builder_jobs table, linked to History and persisted intent/permissions/deliverables, with executable acceptance tests. Do not create a second task store.
+
 ## Verdict
 
 0 of 10 gates pass; 5 are partial, 4 are missing, and 1 (the component decisions below) is delivered for owner approval. The parts exist but are not connected. A Builder job has a real task record (`builder_jobs`: objective never updated after insert, fenced checkpoints, host-run proof). A COS turn has none: it is a pair of `assistant_messages` rows tagged in `provenance`, and nothing links it to the Builder job it starts. The plan makes `builder_jobs` the single Customer Task Record and routes every COS turn through it.

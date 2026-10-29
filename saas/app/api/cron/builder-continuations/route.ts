@@ -123,7 +123,7 @@ export async function GET(request: Request) {
   const cutoff = new Date(Date.now() - BUILDER_JOB_STALE_AFTER_MS).toISOString()
   const { data: stranded, error: strandedError } = await db.from('builder_jobs')
     .select('id,user_id,last_heartbeat_at,updated_at,checkpoint,job_kind,claim_generation,metadata')
-    .eq('status', 'running').lt('updated_at', cutoff).limit(100)
+    .eq('status', 'running').eq('job_kind', 'standard').lt('updated_at', cutoff).limit(100)
   if (strandedError) {
     console.error('[builder_stale_claim_scan_failed]', { code: strandedError.code })
     return NextResponse.json({ ok: false, error: 'builder_stale_claim_scan_unavailable' }, { status: 503 })
@@ -175,7 +175,7 @@ export async function GET(request: Request) {
   const heartbeatCutoff = new Date(Date.now() - 120_000).toISOString()
   const { data: overdueJobs, error: heartbeatScanError } = await admin.from('builder_jobs')
     .select('id,user_id,claim_generation,last_heartbeat_at,started_at')
-    .eq('status', 'running')
+    .eq('status', 'running').eq('job_kind', 'standard')
     .lt('last_heartbeat_at', heartbeatCutoff)
     .limit(20)
   if (heartbeatScanError) console.warn('[builder_heartbeat_scan_failed]', { code: heartbeatScanError.code })
@@ -214,7 +214,7 @@ export async function GET(request: Request) {
   // Fail closed on database errors rather than treating an unknown count as idle.
   const { count: activeRunningClaims, error: activeClaimsError } = await admin
     .from('builder_jobs').select('id', { count: 'exact', head: true })
-    .eq('status', 'running')
+    .eq('status', 'running').eq('job_kind', 'standard')
   if (activeClaimsError) {
     console.error('[builder.continuation.admission_read_failed]', { code: activeClaimsError.code })
     return NextResponse.json({ ok: false, error: 'builder_continuation_admission_unavailable' }, { status: 503 })

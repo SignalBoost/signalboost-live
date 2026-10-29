@@ -1,2 +1,2 @@
-base_sha=307e6d26bbf7e62161e22d17608b1cbfee67af31
-branch=test/cos-durable-recovery-identity-20261029
+base_sha=5b505438a23a8dc1a4040fba15810da43970353f
+branch=fix/cos-durable-regression-regex-20261029

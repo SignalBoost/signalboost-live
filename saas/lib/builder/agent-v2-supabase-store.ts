@@ -24,7 +24,10 @@ export function createBuilderV2SupabaseLeaseStore(db: SupabaseClient, userId: st
       if (checkpoint && checkpoint.version !== 2) throw new Error('builder_v2_checkpoint_version_mismatch')
       return {
         workspaceId: String(data.workspace_id),
-        objective: String(data.objective),
+        // This instruction is a plan snapshot; immutable builder_jobs.objective remains customer authority.
+        objective: data.metadata?.platformRepair === true && typeof data.metadata?.executionObjective === 'string'
+          ? data.metadata.executionObjective
+          : String(data.objective),
         claimGeneration: Number(data.claim_generation),
         checkpoint,
       }

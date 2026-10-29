@@ -36,7 +36,7 @@ GitHub main-protection actively requires three checks: Builder recovery PostgreS
 
 Owner-run audit of `main` at `1622f73` plus a live COS conversation. Each item names the defect, the evidence, the required fix and the test that proves it. Fix one item per PR, with an executable test; update this section when an item is done.
 
-**Q1 — COS tasks are counted as Builder work (blocker; introduced by #5075–#5081).** `cos_turn` rows now live in `builder_jobs` with `status = 'running'`, but Builder queries do not filter by kind:
+**Q1 — COS tasks are counted as Builder work (blocker; introduced by #5075–#5081).** *Done in #5094 except the stale-task cleanup, now Q12.* `cos_turn` rows now live in `builder_jobs` with `status = 'running'`, but Builder queries do not filter by kind:
 - `app/api/cron/builder-continuations/route.ts` (active-claims admission count, `.eq('status','running')` with no `job_kind` filter): a running COS task blocks the scheduler from starting or resuming any Builder job, for every user.
 - `lib/builder/job-store.ts` `builderSoleResumableJob` (same blind count) and `readBuilderEvidenceJob` (newest row of any kind for a conversation, so it can return a COS task).
 - `app/api/assistant/chats/route.ts` `builderExecutions` lists COS tasks as Builder runs.
@@ -60,6 +60,18 @@ Fix: the turn's intent judge (`cosTurnIntent`, which already receives prior user
 **Q7 — History duplicates and internal text (live, 2026-10-29).** The owner's database shows each user message and reply stored twice about one second apart (16:19:35/16:19:36 and two rows at 16:21:38 UTC), and an internal lookup string ("Previous user context: … Current follow-up question: …") stored as a `role = user` message. History must store each turn once, and only the person's own words as user messages. Test: one request through the Assistant path produces exactly one user row and one assistant row, with the user row equal to the typed text.
 
 **Q8 — no new word rules.** `pastedConversationEvidence` in `app/api/cos-browser/route.ts` (#5035) decides routing by matching text such as "YOUR REQUEST 1" / "COS response 1". The owner forbids deciding behaviour from wording; this belongs to the intent judge (Q3). Remove it when Q3 lands, and do not add others.
+
+### Owner audit of 2026-10-29 17:11 (`main` at `b3982ec`) — next, in this order
+
+**Q9 — Q6 is not fixed; remove the new word rule.** #5090 added `refusedRequestedExecution` (`lib/ai/cos/cosExecutionVerdict.ts`, used in `app/api/cos-provenance-browser/route.ts`), which marks a task failed when the reply starts with "I cannot execute…". That decides by wording (forbidden; see Q8), and the owner's campaign request still does not start the campaign: the refusal is only recorded as a failure. Fix Q6 itself, so that the campaign request from the signed-in owner starts the campaign on the durable path. Determine the task outcome from what was executed (a campaign job created, a Builder job admitted, an answer released), never from reply wording. Then delete `refusedRequestedExecution` and its test. Test: the Q6 fixture creates exactly one campaign job and its task is `succeeded` because the job exists.
+
+**Q10 — replace the word-count completion check; do not tighten it.** #5104 (`releasableAnalyticalAnswer`: `if (missing.length) return false`) now withholds the whole answer when the word-count heuristic judges any requested section thin. That is the rule Q4 and the plan mark for replacement, and the register says to eliminate it. Tightening it withholds more real answers, and the campaign's analysis checks (PAC-01 to PAC-05, PAC-11, PAC-20) still grade with the same heuristic, so their verdicts stay unreliable. Build the independent verifier from Q4 (a separate call that compares each requested deliverable and each cited claim against evidence). Use it both to release COS answers and to grade the campaign, then remove `missingAnalyticalTasks` / `releasableAnalyticalAnswer` from the release decision. Test: an answer whose sections are short but complete is released; an answer missing one requested deliverable is not; the campaign grader and COS agree because they use the same verifier.
+
+**Q11 — no dead code.** `advanceBuilderRepairPlanVersion` (`lib/builder/job-store.ts`, #5100) has no caller. Either wire it into the replan path with its version-conflict test, or delete it in the same PR.
+
+**Q12 — stale COS tasks are cleaned only when History is read.** `expireStaleDurableCosTurns` is still called only from `app/api/assistant/chats/route.ts`. A COS task whose worker died stays `running` until its owner opens History. Call it from the continuation cron for all users, through `finish_cos_customer_task`. Test (PostgreSQL fixture): a stale `cos_turn` row is failed by the cron with History updated, and a row finished concurrently is not overwritten.
+
+**Also confirm live:** migrations `20261029233500_builder_repair_plan_atomic_admission.sql` and `20261029235900_builder_customer_task_parent_link.sql` (in addition to Q2), recorded in *Verified status update*.
 
 ## Verdict
 

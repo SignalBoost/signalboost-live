@@ -65,7 +65,16 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
       .order('updated_at', { ascending: false })
       .limit(20)
     if (error) throw new Error(`builder_workspace_list: ${error.message}`)
-    const summaries = await Promise.all((data ?? []).map(async row => {
+    // COS tasks reuse builder_workspaces for foreign-key ownership, but must never
+    // appear as Developer Builder workspaces. Filter before deriving summaries.
+    const workspaceIds = (data ?? []).map(row => String(row.id))
+    const { data: cosTasks, error: cosReadError } = workspaceIds.length
+      ? await this.db.from('builder_jobs').select('workspace_id')
+        .eq('user_id', this.userId).eq('job_kind', 'cos_turn').in('workspace_id', workspaceIds)
+      : { data: [], error: null }
+    if (cosReadError) throw new Error(`builder_workspace_cos_filter: ${cosReadError.message}`)
+    const cosWorkspaceIds = new Set((cosTasks ?? []).map(row => String(row.workspace_id)))
+    const summaries = await Promise.all((data ?? []).filter(row => !cosWorkspaceIds.has(String(row.id))).map(async row => {
       const { count, error: countError } = await this.db.from('builder_workspace_files')
         .select('path', { count: 'exact', head: true })
         .eq('workspace_id', row.id).eq('user_id', this.userId)

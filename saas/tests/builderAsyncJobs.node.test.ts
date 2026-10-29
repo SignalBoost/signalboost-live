@@ -115,10 +115,12 @@ test('running and terminal History share one durable assistant message', () => {
   assert.match(jobStore, /\.rpc\('finish_builder_job_slice'/)
 })
 
-test('expired background workers become terminal in both polling and History', () => {
+test('expired Builder claims are reconciled only by the continuation worker, not History or polling', () => {
   assert.match(jobStore, /BUILDER_JOB_STALE_AFTER_MS = 6 \* 60 \* 1000/)
   assert.match(jobStore, /\.rpc\('expire_stale_builder_jobs'/)
-  assert.match(jobStore, /await reconcileStaleBuilderJobs\(\{ userId, jobId \}\)/)
+  const polling = jobStore.slice(jobStore.indexOf('export async function getBuilderJobForUser('), jobStore.indexOf('\n}', jobStore.indexOf('export async function getBuilderJobForUser(')))
+  assert.doesNotMatch(polling, /reconcileStaleBuilderJobs/)
+  assert.doesNotMatch(historyRoute, /reconcileStaleBuilderJobs/)
   assert.match(historyRoute, /await reconcileBuilderHistory\(userId, id\)/)
   assert.match(staleRecoveryMigration, /updated_at <= p_cutoff/)
   assert.match(staleRecoveryMigration, /for update skip locked/)
@@ -128,7 +130,6 @@ test('expired background workers become terminal in both polling and History', (
   assert.match(staleRecoveryMigration, /revoke all on function public\.expire_stale_builder_jobs/)
   assert.match(staleRecoveryMigration, /grant execute on function public\.expire_stale_builder_jobs[\s\S]*service_role/)
 })
-
 test('background execution is idempotently claimed and applies only validated software skills with verified outcomes', () => {
   assert.match(jobRunner, /job = await claimBuilderJob\(jobId, userId\)/)
   assert.match(jobRunner, /if \(!job\) return/)

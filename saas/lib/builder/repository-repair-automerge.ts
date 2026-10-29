@@ -123,8 +123,17 @@ export async function evaluatePullRequestChecks(
   const runs = await requestJson(request, `${GITHUB_API}/commits/${headSha}/check-runs?per_page=100`, { method: 'GET', headers }, [200])
   const status = await requestJson(request, `${GITHUB_API}/commits/${headSha}/status`, { method: 'GET', headers }, [200])
 
+  // GitHub repository settings may not enforce required checks. Never treat an
+  // arbitrary green check as sufficient authority for an unattended main merge.
+  const targetMain = String(pull?.base?.ref || '') === 'main'
+  const requiredMainChecks = ['Require current ONBOARD, repo scan, and main integration token', 'Serialize every PR targeting main', 'Typecheck (tsc --noEmit)']
   const checkRuns = Array.isArray(runs?.check_runs) ? runs.check_runs : []
   const statuses = Array.isArray(status?.statuses) ? status.statuses : []
+  if (targetMain) {
+    const names = new Set(checkRuns.filter((run: any) => run?.status === 'completed' && run?.conclusion === 'success').map((run: any) => String(run?.name || '')))
+    const missing = requiredMainChecks.filter(name => !names.has(name))
+    if (missing.length) return { green: false, detail: `Required main checks missing or not successful: ${missing.join(', ')}.` }
+  }
   if (!checkRuns.length && !statuses.length) {
     return { green: false, detail: `No checks have reported on ${headSha.slice(0, 7)}, so there is no evidence the project still builds.` }
   }

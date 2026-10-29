@@ -373,3 +373,28 @@ test('merge continuation is cron-authenticated, bounded-scheduled, branch-aware,
   assert.match(lifecycle, /merged into \$\{input\.baseBranch\}/)
   assert.match(lifecycle, /builder_repository_target_superseded/)
 })
+
+test('unattended production merge refuses a green head without required governance checks', async () => {
+  const headSha = 'b'.repeat(40)
+  let merged = false
+  const request = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
+    const url = String(input)
+    if (url.endsWith('/pulls/1842')) return jsonResponse({ head: { sha: headSha }, base: { ref: 'main' } })
+    if (url.includes('/check-runs')) return jsonResponse({ check_runs: [{ name: 'build', status: 'completed', conclusion: 'success' }] })
+    if (url.endsWith('/status')) return jsonResponse({ state: 'success', statuses: [{ state: 'success' }] })
+    if (String(init.method || 'GET') === 'PUT') merged = true
+    return jsonResponse({ message: 'unexpected request' }, 500)
+  }) as typeof fetch
+  const result = await attemptSignalBoostRepositoryAutoMerge({
+    files: [{ path: 'lib/demo/rounding.ts', content: '' }],
+    patch: '',
+    pullRequestNumber: 1842,
+    snapshotPort: fakePort(),
+    request,
+    token: 'server-write-token',
+  })
+  assert.equal(result.merged, false)
+  assert.equal(result.reason, 'checks_not_green')
+  assert.match(String(result.detail), /Required main checks missing/)
+  assert.equal(merged, false)
+})

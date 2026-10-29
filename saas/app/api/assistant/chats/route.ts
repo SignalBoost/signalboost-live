@@ -96,7 +96,21 @@ export async function GET(req: NextRequest) {
         return response({ error: 'Could not load messages' }, { status: 500 })
       }
 
-      return response({ conversation: conv, messages: messages ?? [] })
+      // Read-only child execution linkage. A conversation may contain several tasks:
+      // never promote conversation_id or a Builder status to canonical customer success.
+      const { data: builderExecutions, error: builderReadError } = await db
+        .from('builder_jobs')
+        .select('id,conversation_id,history_message_id,status,created_at,updated_at')
+        .eq('user_id', userId)
+        .eq('conversation_id', id)
+        .order('created_at', { ascending: false })
+        .limit(100)
+      if (builderReadError) {
+        console.error('[assistant_history_builder_link_read_failed]', { message: builderReadError.message })
+        return response({ error: 'Could not load linked executions' }, { status: 500 })
+      }
+
+      return response({ conversation: conv, messages: messages ?? [], builderExecutions: builderExecutions ?? [] })
     }
 
     const { data: conversations, error } = await db

@@ -69,39 +69,19 @@ export async function finishDurableCosTurn(input: {
     execution_provenance: input.executionProvenance ?? null,
     answer_provenance: input.answerProvenance ?? null,
   }
-  const { data: persisted, error } = await db.from('assistant_messages')
-    .update({
-      content: String(input.reply || '').trim().slice(0, 16_000),
-      provenance,
-    })
-    .eq('id', input.historyMessageId)
-    .eq('user_id', input.userId)
-    .eq('role', 'assistant')
-    .eq('provenance->>schema', COS_TURN_SCHEMA)
-    .eq('provenance->>turnId', input.turnId)
-    .eq('provenance->>status', 'running')
-    .select('id')
-    .maybeSingle()
-  if (error) throw new Error(`cos_turn_finish: ${error.message}`)
-  if (persisted?.id !== input.historyMessageId) throw new Error('cos_turn_finish_not_committed')
-  // History and the canonical task must agree; a failed task-state write is not
-  // silently reported as successful. Do not mark a second turn as completed.
-  const { data: task, error: taskError } = await db.from('builder_jobs')
-    .update({
-      status: input.status,
-      finished_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      ...(input.status === 'failed' ? { error: input.error || 'cos_turn_failed' } : {}),
-    })
-    .eq('id', input.turnId)
-    .eq('user_id', input.userId)
-    .eq('history_message_id', input.historyMessageId)
-    .eq('job_kind', 'cos_turn')
-    .eq('status', 'running')
-    .select('id')
-    .maybeSingle()
-  if (taskError) throw new Error(`cos_task_finish: ${taskError.message}`)
-  if (task?.id !== input.turnId) throw new Error('cos_task_finish_not_committed')
+  // One PostgreSQL transaction owns both terminal writes. Never allow History
+  // to claim completion while the canonical customer task remains running.
+  const { data: committed, error } = await db.rpc('finish_cos_customer_task', {
+    p_task_id: input.turnId,
+    p_history_message_id: input.historyMessageId,
+    p_user_id: input.userId,
+    p_status: input.status,
+    p_reply: String(input.reply || '').trim(),
+    p_provenance: provenance,
+    p_error: input.error || null,
+  })
+  if (error) throw new Error(`cos_task_finish: ${error.message}`)
+  if (committed !== true) throw new Error('cos_task_finish_not_committed')
 }
 
 export async function expireStaleDurableCosTurns(input: {

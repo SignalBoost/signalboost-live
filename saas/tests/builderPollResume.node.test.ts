@@ -28,7 +28,7 @@ test('only a resumable paused checkpoint is resumed by a poll — the same set t
 test('a poll resumes only when nothing runs and no other checkpoint waits, so two polls can never start two jobs (Codex P1)', () => {
   const store = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
   const admission = store.slice(store.indexOf('export async function builderSoleResumableJob'))
-  assert.match(admission, /\.select\('id', \{ count: 'exact', head: true \}\)\s*\.or\('status\.eq\.running,and\(status\.eq\.paused,job_kind\.eq\.standard,checkpoint\.not\.is\.null\)'\)\.neq\('id', jobId\)/)
+  assert.match(admission, /\.select\('id', \{ count: 'exact', head: true \}\)\s*\.eq\('job_kind', 'standard'\)\.or\('status\.eq\.running,and\(status\.eq\.paused,checkpoint\.not\.is\.null\)'\)\.neq\('id', jobId\)/)
   assert.match(admission, /return !error && count === 0/)
   assert.match(admission, /if \(!db\) return false/)
   assert.doesNotMatch(store, /builderNoRunningClaim/)

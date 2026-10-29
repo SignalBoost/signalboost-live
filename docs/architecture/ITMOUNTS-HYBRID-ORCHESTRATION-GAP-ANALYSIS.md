@@ -1,72 +1,97 @@
-# iTMounts Hybrid Orchestration — Gap Analysis and Integration Plan
+<!-- docs/architecture/ITMOUNTS-HYBRID-ORCHESTRATION-GAP-ANALYSIS.md -->
+# iTMounts Orchestration — Gap Analysis and Integration Plan (canonical)
 
-**Decision:** Adopt as the canonical engineering standard. **Hold:** new orchestration engines and duplicate task stores. **Scope:** repository evidence at main `e98fe15f48829589e97b525d44e53d5acf563f3e` (2026-10-29). Runtime, production, and staging acceptance have **not** been demonstrated by this source-only audit.
+**This is the single canonical plan** for making COS and Builder V2 one dependable assistant under the iTMounts Formal Engineering Standard. It supersedes `ITMOUNTS-CUSTOMER-TASK-IDENTITY-TRACE.md`, `ITMOUNTS-HYBRID-CALLER-DATAFLOW-TRACE.md` and `ITMOUNTS-LIVE-TASK-STORE-SCHEMA-AUDIT-20261029.md`, which remain as dated evidence only. Change the plan here, in one place; do not start a parallel plan, task store or orchestrator.
 
-## Non-negotiable ownership model
-- **COS:** customer relationship, immutable customer objective and explicitly recorded amendments.
-- **Orchestrator:** versioned, revisable execution plan; preserves completed proof and original objective.
-- **Independent policy:** host-side authorization, spend/time ceilings, provider-specific idempotency and reconciliation. Model output cannot grant authority.
-- **Capability executors:** Builder, Provider Hub, Playwright, REA, University, APIs; scoped to grants.
-- **Independent verifier:** determines whether original objective has been met, using receipts and external evidence where appropriate; an executor cannot certify its own success.
-- **Customer:** one task in History with progress, Stop, Resume, and final evidence, irrespective of browser connection.
+Evidence: source audit of `main` at `16ac985` (2026-10-29), every component traced to its production callers (imports from `app/` routes and crons, tests excluded), updated for #5043 and #5044. Not runtime proof: a file existing is not counted as working.
 
-## Repository evidence and decisions
+## Verdict
 
-| Responsibility | Current evidence (file) | Observed implementation | Decision | Gap / integration requirement |
+0 of 10 gates pass; 5 are partial, 4 are missing, and 1 (the component decisions below) is delivered for owner approval. The parts exist but are not connected. A Builder job has a real task record (`builder_jobs`: objective never updated after insert, fenced checkpoints, host-run proof). A COS turn has none: it is a pair of `assistant_messages` rows tagged in `provenance`, and nothing links it to the Builder job it starts. The plan makes `builder_jobs` the single Customer Task Record and routes every COS turn through it.
+
+## The 10-point gate today
+
+| # | Gate | Status | What exists | What is missing |
 |---|---|---|---|---|
-| COS intent and instruction integrity | `saas/lib/ai/cos/cosExecutionEnvelope.ts`, `saas/app/api/cos-browser/route.ts` | Instruction contract, routing and transcript guards | **Reuse + repair** | Persist objective separately from editable prompts/plans; prove ambiguous quoted text cannot authorize execution |
-| General orchestration | `saas/lib/orchestration.ts`, `saas/app/api/orchestration/route.ts` | Intent and workflow planning | **Integrate** | Identify real live consumers; do not nominate it as a new source of task truth |
-| Existing durable workflow runtime | `saas/lib/agent-runtime/workflow-state.ts`, `workflow-store.ts`, `workflow-store-supabase.ts` | `requestId`, `workflowId`, `userId`, `idempotencyKey`, request fingerprint, status, version, lease, cancellation, compare-and-set, recoverable listing | **Reuse first** | Determine runtime scope and whether it can back one customer-visible task without rewriting active jobs |
-| Declarative workflows | `saas/lib/agentic/dynamicWorkflowDefinition.ts`, `workflowContract.ts`, `dynamicWorkflowStore.ts` | Governed definitions and historical conversion | **Integrate; no third schema** | Map definition revisions to canonical task/plan versions; reconcile duplicate legacy contract |
-| Additional workflow checkpoints | `saas/lib/agentic/dynamicWorkflowRun.ts`, `dynamicWorkflowRunStore.ts` | Revision-pinned runs and generation-fenced state writes | **Evaluate for consolidation** | Must not become a second authoritative customer task; verify creation and live database migration before adoption |
-| Legacy agentic executor | `saas/lib/agentic/taskLifecycle.ts` | Dependency ordering, approval grant, host receipts | **Repair or adapt** | Existing executor is distinct from durable runtime; decide adapter or retirement after usage inventory |
-| Builder durable jobs | `saas/lib/builder/agent-v2-job-cycle.ts`, `saas/lib/builder/job-store.ts` | Leased jobs, checkpoint and claim-generation protection, stale-job reconciliation | **Reuse + integrate** | Builder jobs become child executions of a customer task; don't copy their checkpoint implementation |
-| COS durable turns and History | `saas/lib/ai/cos/durableCosTurn.ts`, `saas/lib/ai/cos/agentProgressClient.ts`, `saas/app/api/assistant/chats/route.ts` | History-backed durable turn IDs, server completion, browser GET polling, stale reconciliation | **Repair + integrate** | Turn ID must map to customer task ID; distinguish pending, succeeded, failed, unknown; recover exact request without repeat POST |
-| Independent execution policy | `saas/lib/ai/cos/autonomy/guard.ts`, `saas/lib/supervisor/policy-engine.ts`, `saas/lib/supervisor/execution-contracts.ts` | Host capability guard, supervisor policy contracts | **Reuse + unify boundary** | Prove all high-impact tool routes cross policy; model-selected plan cannot widen grants |
-| Supervisor | `saas/lib/supervisor/orchestrator.ts` | Separates thinker, policy engine, executor, verifier, audit and transaction checkpoints | **Reuse as policy/repair capability** | Keep operational security/recovery responsibility distinct; do not make Supervisor a parallel public COS |
-| Platform harness and verifier | `saas/platform-harness/runtime/runner.ts`, `saas/platform-harness/verification/outcome-verifier.ts` | Governed action execution, compensation, trajectory evidence, outcome-verifier interface | **Reuse + integrate** | Bind verification to original customer acceptance contract and production evidence; separate executor and verifier trust |
-| University | University and supervisor references in `ONBOARD.md` | Existing learning, evaluation and graduate pathways | **Integrate later** | Learn only from verified, policy-compliant outcomes; not a completion authority |
+| 1 | One canonical objective and execution identity | Missing | `builder_jobs.objective` never updated by code; job `id` fenced by `claim_generation` | COS turns have no table (`turnId` inside `assistant_messages.provenance`); no turn↔job link; no database guard on the objective |
+| 2 | Decision per component | Delivered for approval | This document | Owner approval |
+| 3 | Policy enforced outside the model prompt | Partial | Harness manifest fails closed (`platform-harness/core/policy.ts`); governed executor halts financial and destructive actions; Builder spend cap enforced in the database (`reserve_builder_inference`); request body can no longer grant Hub approval (#5044) | Ads approvers are free text (`app/api/ads/route.ts:428-435`); a COS turn has a deadline but no spend ceiling (`adapters/cos-ingress.ts`) |
+| 4 | Durable external-action ledger, idempotency, reconciliation | Missing | Only Stripe inbound webhooks (`stripe_processed_events`) and Builder inference reservations | Email, social, ads, deploys and PR merges send no idempotency key and record the action only after the provider call (ads: a `pending` row never resolved) |
+| 5 | Replanning without changing the objective | Partial | Builder V2 rejects a resume whose objective digest changed (`agent-v2.ts:416-418`) | Repair replan rewrites the stored objective (`repository-repair-job.ts:78-80`); no plan version anywhere |
+| 6 | Independent outcome verification | Partial | Builder: host re-runs the proof and reads receipts (`repository-repair-proof-controller.ts`, `final-proof.ts`) | Builder criteria regex-parsed from the objective; COS "done" is word rules (`answerTaskContract.ts`) plus a checker on the writer's own model; `evaluateTaskOutcome` is log-only; the harness verifier serves only University training |
+| 7 | Recovery from browser disconnect and restart | Partial | Builder resumes from checkpoint (cron every minute); Developer page re-attaches after reload | History and polling expiry mark a checkpointed job `worker_lost` from `updated_at` only (migration `20261014210000`), racing the resume; a COS turn is never resumed and a reload cannot re-attach |
+| 8 | History, Stop, Resume, verified Results | Partial | Builder Stop cancels on the server; Developer page shows test evidence; History returns a conversation's Builder jobs (#5043) | Assistant-page Stop aborts only the browser; no Resume; History list shows no task status; no PR or preview link; Builder labels English only |
+| 9 | Staging end-to-end acceptance | Missing | Production-only Playwright run (University) every 6 hours; a staging Supabase project exists without the app schema (per #5041) | No staging environment for the app; no browser test of Assistant, Builder or Concierge in CI |
+| 10 | Controlled rollout with automatic rollback | Missing | Rollback for Builder auto-merge only | `vercel-promote-main` promotes straight to production with no health check; merge-watch cron not scheduled; GitHub reports `main` unprotected (no required checks, no rulesets) |
 
-**Evidence limits:** A file's existence is not proof of deployment, adoption, correct permission wiring, active DB migration, or live recovery. This report is a repository architecture inventory, not a claim that an end-to-end system is already functioning.
+## Component decisions
 
-## Integration work, in order
+| Component | Production callers | Decision | Why |
+|---|---|---|---|
+| `builder_jobs` + `lib/builder/job-store.ts`, `job-runner.ts`, `agent-v2-job-cycle.ts` | `/api/builder`, `/api/cos-browser`, cron `builder-continuations` | Reuse | Only store with typed status, fencing, checkpoint, heartbeat, immutable-by-code objective and a DB spend cap. Becomes the Customer Task Record. |
+| `lib/ai/cos/durableCosTurn.ts`, `app/api/cos-provenance-browser/route.ts` | Assistant, Concierge | Repair | Only external-action turns are durable. Every turn gets a task record; `turnId` = record id. |
+| `app/api/assistant/chats/route.ts` | Assistant | Repair | No task status in the list; its lazy expiry kills checkpointed jobs. Read status from the record; leave recovery to the cron. |
+| `app/api/cos-browser/route.ts`, `app/api/cos-primary/route.ts` | All chat surfaces | Reuse | Front door opens or attaches the task record before any lane runs. |
+| `lib/ai/cos/cosTurnIntent.ts`, `cosSemanticTaskIntent.ts` | Front door, COS, answer step | Integrate | One model decision per turn (#5007); its kind, permission and deliverables are written into the record. |
+| `lib/ai/cos/instructionContract.ts` (`compileCosInstructionContract`), `lib/builder/task-contract.ts` | `/api/builder`, Software Specialist, agent loop, Builder V2 | Replace | Permission and deliverables guessed by regex; replaced by what the intent judge records. Host spend and approval gates stay as the hard floor. |
+| `lib/ai/cos/answerTaskContract.ts`, `cosExecutionEnvelope.ts` | `cosReasoner.ts`, `cos-primary` | Repair | Word-count "done"; `complete:false` hard-coded; `evaluateTaskOutcome` log-only. Become verifier inputs, not the verdict. |
+| `lib/agentic/taskLifecycle.ts` | `agent-v2.ts`, `cosExecutionEnvelope.ts` | Remove | Wrapper around Builder's existing `acceptancePassed`; in COS constructed and never advanced. |
+| `lib/agentic/dynamicWorkflow*.ts`, `workflowContract.ts`, migrations for `agentic_workflow_definitions` / `agentic_workflow_runs` | None (tests only) | Removed 2026-10-29 | Parallel task store with no production writer; tables not observed in the live database (#5041). |
+| `platform-harness/core/policy.ts`, `runtime/governed-executor.ts`, `runtime/host-ingress.ts`, `adapters/cos-ingress.ts` | `cos-primary`, `job-runner`, supervisor routes | Reuse | Host-side policy floor; grants snapshotted into the record. |
+| `platform-harness/runtime/cost-budget.ts`, `execution-context.ts` | Builder only | Repair | Port unimplemented; in-memory ledger resets per call. Implement on `builder_inference_budgets`; give COS turns a ceiling. |
+| `repository-repair-proof-controller.ts`, `final-proof.ts`, `acceptance-ledger.ts`, `acceptance-report.ts` | `job-runner`, `repository-repair` | Reuse | Host-run, separate from the agent: the pattern for every capability. |
+| `platform-harness/verification/outcome-verifier.ts` | University only | Reuse | Already refuses "verified" without evidence; becomes the one verifier contract for customer tasks. |
+| `agent-v2.ts:180-252` completion criteria | Builder V2 | Repair | Criteria regex-parsed from the objective; take them from the record's deliverables. |
+| Builder checkpoints + cron `builder-continuations` | Cron every minute | Reuse | Fenced, digest-checked, resumes up to 3 times. |
+| `repository-repair-replan.ts` | Repair enqueue | Integrate | Writes a plan revision instead of rewriting the objective. |
+| `repository-repair-automerge.ts`, `repository-merge-watch.ts`, `repository-production-acceptance.ts`, cron `builder-merge-watch` | Repository repair | Integrate | Schedule the cron; pin the merge to the checked commit (`automerge.ts:228`). |
+| `app/dashboard/assistant/page.tsx` Stop | Assistant | Repair | Calls the server cancel (`stopBuilderJobForUser`), extended to COS turns. |
+| `app/dashboard/developer/page.tsx`, `components/AssistantTransportBoundary.tsx` | Developer, Assistant | Repair | Add PR and preview links; translate Builder labels into the 11 languages. |
+| `app/api/hub/run/route.ts` | Hub console | Repair (partly done, #5044) | Body can no longer grant approval; owner-approved actions need a server-side approval flow. |
+| Outreach send, social publish, campaign publish, ads | Marketing & Sales | Integrate | Write through the external-action ledger. |
+| `.github/scripts/vercel-promote-main.mjs` | Every merge | Repair | Live check on the new deployment, rollback on failure (reuse `lib/supervisor/adapters/vercel-snapshot-host.ts`). |
+| `platform-harness/acceptance/production-canary.ts` | Cron every minute | Repair | Add one COS and one Builder check. |
+| `lib/supervisor/policy-engine.ts` | Self-Healing | Repair | Trusts a plan's own risk labels; fix inside Self-Healing (not on the customer-task path). |
+| `lib/agent-runtime/workflow-store*.ts` (`agent_workflows`) | None | Out of scope | Agent Operations portable; no production writer, no objective column, table not observed live. |
+| `lib/supervisor/missions/*` (`mission_records`) | Read-only review routes | Out of scope | Self-Healing domain; nothing creates missions. |
 
-### P0 — One authoritative task and acceptance contract
-1. Inventory actual callers, database tables, migrations and API owners for `agent-runtime`, `agentic`, COS turns and Builder jobs. Publish a mapping, including references that cannot safely share identifiers.
-2. Select a **single existing store** as canonical after reviewing its access controls and migrations; avoid creating yet another task table by default.
-3. Record immutable objective + immutable amendment history, user scope, stable task ID, acceptance criteria, policy grant references, budget, plan version, child execution IDs, action evidence and terminal verifier outcome.
-4. Enforce a single public task status and monotonic/compare-and-set transitions. No agent can declare terminal customer success without verifier evidence.
+## Integration plan
 
-### P0 — Cross-capability admission, idempotency and reconciliation
-1. Bind tool calls to a host-owned grant and capability-specific operation key; reject widened permission after replanning.
-2. Inventory irreversible writes (payments, email, deployment, filesystem, external APIs); per capability specify read-before-retry, provider lookup, re-entry rules and compensating action.
-3. Distinguish **retryable**, **checkpoint-resumable**, **uncertain external outcome**, **authorization blocked**, and **terminal** states. Uncertain external outcomes must be reconciled, not blindly retried.
+**Customer Task Record = `builder_jobs`, extended.**
 
-### P1 — Controlled adaptive replanning and independent verification
-1. Persist each plan revision independently from the original objective. Record why a strategy changes and which receipts remain valid.
-2. A verifier checks every customer requirement against authoritative evidence. Report `verified_success`, `repairable_failure`, `blocked_permission`, `external_dependency`, or `unverified`; no implied success from tests/PR/READY status alone.
-3. Bounded repair may change plan but cannot increase budget, privilege or external side effects. Use deadlines, stagnation checks and transparent terminal states.
+| Required field | Existing | Change |
+|---|---|---|
+| `immutable_objective` | `objective` | Database trigger rejecting updates |
+| `customer_identity` | `user_id`, `conversation_id` | None |
+| `execution_id` | `id`, `claim_generation` | COS turns get a row; `turnId` = `id` |
+| `current_plan_version` | — | New column; replans bump it |
+| `authorized_capabilities` | Harness manifest (in memory) | Store the snapshot at admission |
+| `budget` | `builder_inference_budgets` | Every task gets one |
+| `completed_actions_ledger` | — | New `task_external_actions` table (phase 2) |
+| `evidence_store` | `result`, acceptance ledger | Typed evidence list |
+| `final_verification_result` | `status` + `result` | Set only by the verifier |
 
-### P1 — Customer controls and acceptance
-1. One History task view with status, Stop, Resume, child jobs and attached evidence. Stop must request host-side cancellation where permitted; cancelling UI polling alone is insufficient.
-2. Staging tests: lost HTTP envelope after server accept, browser reload, concurrent duplicate POST, worker crash after external success but before receipt, stale lease, policy denial, partial Builder success, deployment READY but feature failure.
-3. Production canary and rollback: one low-risk read-only task, then governed mutating task; verify real customer outcome, monitoring, and rollback before broad enablement.
+**Phase 1 — one task, one truth.** (1) Remove the unused `lib/agentic` modules (done 2026-10-29) and `taskLifecycle.ts`. (2) Extend `builder_jobs` with a COS-turn kind, the objective trigger and the plan version. (3) `cos-browser` opens or attaches the record before any lane; every COS turn becomes durable via `durableCosTurn.ts`. (4) The intent judge writes kind, permission and deliverables into the record; delete the regex contracts. (5) History and polling stop expiring checkpointed jobs; recovery belongs to the cron.
 
-## Commercial readiness gate — 0 of 10 independently confirmed
+**Phase 2 — policy and side effects.** (6) Server-side approval flow for owner-approved Hub actions; verified ads approvers. (7) One spend ceiling for every task on `reserve_builder_inference`. (8) `task_external_actions`: a row with an idempotency key before the provider call, the outcome after; email, social, ads, deploy and PR merge write through it; a reconciler checks `pending` rows against the provider. (9) Pin PR merges to the checked commit; schedule the merge-watch cron.
 
-- [ ] Canonical customer objective and stable execution identity, with amendment journal.
-- [ ] Every existing component assigned **reuse / integrate / repair / replace**, backed by caller analysis.
-- [ ] Independent policy enforcement on all consequential execution paths.
-- [ ] Durable external-action ledger with provider idempotency/reconciliation.
-- [ ] Adaptive replanning without objective mutation or privilege escalation.
-- [ ] Independent objective-level outcome verification.
-- [ ] Proven browser-disconnect and worker-restart recovery without duplicated effects.
-- [ ] Customer-facing History, Stop, Resume and verifiable final results.
-- [ ] Staging end-to-end acceptance evidence, including failure injection.
-- [ ] Controlled production rollout and verified rollback.
+**Phase 3 — verify, replan, recover.** (10) One verifier for customer tasks on `outcome-verifier.ts`: each recorded deliverable checked against evidence (Builder host proof; for COS a separate verifier call the writer cannot override). Only the verifier sets `final_verification_result`. (11) Incomplete → the orchestrator gets the missing items and new evidence, bumps the plan version, retries within the same budget and grants. (12) Repair replan writes a plan revision, not a new objective.
 
-**Release rule:** Missing, ambiguous or unverified evidence means NOT PASS. Do not treat code commits, green CI, merged PRs or Vercel READY as customer-outcome proof.
+**Phase 4 — customer controls and release.** (13) History with task status; Stop calls the server cancel for COS and Builder; Resume for paused or recoverable tasks; Results with tests, PR and preview links; 11 languages. (14) Staging environment with the app schema, running the acceptance tests below. (15) Promotion runs one live COS and one live Builder check on the new deployment and rolls back automatically on failure. (16) Branch protection on `main` with the required checks.
 
-## Immediate next engineering deliverable
+## Acceptance tests for the 10 gates
 
-A **caller-and-data-flow trace** from `/api/cos-browser` and durable COS turns through task identity, host authorization, Builder/other executors, verifier, and History, with file+function references and real staging receipts. This trace determines which existing state store becomes the task authority. Until that evidence exists, adding a new orchestration runtime remains **on hold**.
+Each gate passes only when its test passes against a running deployment (staging, then the production canary). Each test is written in the same change as the phase that makes it pass. The pending items in `saas/tests/hybridOrchestrationAcceptance.node.test.ts` track them.
+
+| Gate | Test | Passes when |
+|---|---|---|
+| 1 | `taskRecordIdentity.live.spec.ts` | Turn and the Builder job it starts share one record id; a direct update of `objective` is rejected by the database; History shows one task |
+| 2 | `componentDecisions.node.test.ts` | No module marked Remove is referenced; no new task store appears without a row in this document |
+| 3 | `policyFloor.node.test.ts` + `.live.spec.ts` | Non-owner approval claim, prompt-driven budget overrun and an ungranted tool are all refused by host code and recorded on the task |
+| 4 | `externalActionLedger.live.spec.ts` | Worker killed after the provider accepts an email: exactly one delivered; the ledger row reconciles `pending → confirmed` without resending |
+| 5 | `replanImmutableObjective.node.test.ts` | Plan version increases; objective, grants and budget unchanged |
+| 6 | `independentVerifier.live.spec.ts` | A Builder run claiming success with a failing test, and a COS answer missing a requested deliverable, are both not complete; the verifier names the gap |
+| 7 | `recovery.live.spec.ts` | Reload mid-turn and mid-job re-attaches without re-sending; worker restart resumes from checkpoint; no duplicate action or message |
+| 8 | `taskControls.live.spec.ts` | Stop halts server work; Resume continues; Results show tests, PR and preview links (English and Arabic) |
+| 9 | `.github/workflows/staging-acceptance.yml` | Gates 1, 3, 4, 6, 7, 8 green against staging before merge |
+| 10 | `promoteWithRollback.live.spec.ts` | A broken build fails the live check; production stays on the previous deployment; the rollback is recorded |

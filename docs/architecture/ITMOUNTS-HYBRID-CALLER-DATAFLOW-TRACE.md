@@ -1,4 +1,7 @@
+<!-- docs/architecture/ITMOUNTS-HYBRID-CALLER-DATAFLOW-TRACE.md -->
 # Hybrid task authority: caller and data-flow trace (read-only findings)
+
+> **Superseded 2026-10-29 by [`ITMOUNTS-HYBRID-ORCHESTRATION-GAP-ANALYSIS.md`](ITMOUNTS-HYBRID-ORCHESTRATION-GAP-ANALYSIS.md), the single canonical plan.** Kept as dated evidence only; do not plan from this file.
 
 Audit date: 2026-10-29. Source-level evidence only. No customer task authority is yet selected, and no commercial gate is declared passed.
 
@@ -17,8 +20,8 @@ Audit date: 2026-10-29. Source-level evidence only. No customer task authority i
 | `saas/lib/agent-runtime/workflow-state.ts` | `AgentWorkflowState` | workflowId, requestId, userId, idempotencyKey, fingerprint, lease, cancellation | **REUSE CANDIDATE:** inspect live consumers and DB ownership before selecting as canonical authority; objective/ledger/verifier fields not present |
 | `saas/lib/agent-runtime/workflow-store-supabase.ts` | `SupabaseAgentWorkflowStore` | Durable CAS workflow state | **REUSE:** preserve existing compare-and-set/lease policies |
 | `saas/agent-operations-host/signalboostAgentOperationsHost.ts` | `AgentWorkflowCoordinator` | Agent operations workflow | **INTEGRATE:** distinct execution domain, not evidence COS uses this as its task store |
-| `saas/lib/agentic/dynamicWorkflowDefinition.ts` / `dynamicWorkflowStore.ts` | Definition validation / immutable revision storage | Plans and graph revisions | **INTEGRATE:** plans remain subordinate to customer task |
-| `saas/lib/agentic/dynamicWorkflowRun.ts` / `dynamicWorkflowRunStore.ts` | `claimDynamicWorkflowStep`, generation-fenced save | Separate run state | **CONSOLIDATE AFTER USAGE AUDIT:** do not create second task authority |
+| `saas/lib/agentic/dynamicWorkflowDefinition.ts` / `dynamicWorkflowStore.ts` | Definition validation / immutable revision storage | Plans and graph revisions | **INTEGRATE:** plans remain subordinate to customer task **Removed 2026-10-29: no production caller.** |
+| `saas/lib/agentic/dynamicWorkflowRun.ts` / `dynamicWorkflowRunStore.ts` | `claimDynamicWorkflowStep`, generation-fenced save | Separate run state | **CONSOLIDATE AFTER USAGE AUDIT:** do not create second task authority **Removed 2026-10-29: no production caller.** |
 | `saas/lib/agentic/taskLifecycle.ts` | `executeDynamicWorkflow`, `validateDynamicWorkflow` | Overlapping flow interpreter | **REPAIR/RETIRE AFTER CALLER AUDIT:** do not build more parallel engines |
 | `saas/lib/ai/cos/autonomy/guard.ts` / `saas/lib/supervisor/policy-engine.ts` | capability guard / policy evaluator | Execution authority decisions | **REUSE + INTEGRATE:** prove every consequential boundary invokes host policy |
 | `saas/lib/supervisor/orchestrator.ts` | thinker, policy, executor, verifier, rollback | Operational remediation | **REUSE:** infrastructure recovery is not a public task store |

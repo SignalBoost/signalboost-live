@@ -1,2 +1,2 @@
-base_sha=3c360d2b1d7c4d4030567ad2bc9e3702880a4444
-branch=fix/builder-audit-terminal-retry-loop-20261029
+base_sha=1c47aef30fb3abe82facfb905dccc08289eb91db
+branch=fix/cos-readonly-canonical-admission-20261029

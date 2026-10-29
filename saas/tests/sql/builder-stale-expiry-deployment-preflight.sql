@@ -16,8 +16,8 @@ WITH prerequisites AS (
 SELECT
   prerequisites.*,
   body IS NOT NULL AS expiry_function_exists,
-  coalesce(body LIKE '%checkpoint is null or job_kind <> ''standard'' or claim_generation >= 24%',false) AS checkpoint_guard_installed,
-  coalesce(body LIKE '%greatest(updated_at, coalesce(last_heartbeat_at, updated_at)) <= p_cutoff%',false) AS heartbeat_guard_installed
+  coalesce((length(body) - length(replace(body, 'checkpoint is null or job_kind <> ''standard'' or claim_generation >= 24', ''))) / nullif(length('checkpoint is null or job_kind <> ''standard'' or claim_generation >= 24'), 0) >= 2, false) AS checkpoint_guard_installed,
+  coalesce((length(body) - length(replace(body, 'greatest(updated_at, coalesce(last_heartbeat_at, updated_at)) <= p_cutoff', ''))) / nullif(length('greatest(updated_at, coalesce(last_heartbeat_at, updated_at)) <= p_cutoff'), 0) >= 2, false) AS heartbeat_guard_installed
 FROM prerequisites CROSS JOIN installed;
 -- Deployment gate: all prerequisite flags must be true.
 -- BEFORE migration both *_guard_installed may be false; AFTER migration both must be true.

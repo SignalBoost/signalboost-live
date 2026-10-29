@@ -16,10 +16,14 @@ test('Builder GET polling never expires a running claim or checkpoint',()=>{
  assert.match(body,/return job/)
  assert.doesNotMatch(body,/reconcileStaleBuilderJobs/)
 })
-test('continuation cron checks lease and does not terminalize checkpointed jobs',()=>{
+test('continuation cron preserves recoverable checkpoints but can expire exhausted claims',()=>{
  const cron=read('../app/api/cron/builder-continuations/route.ts')
  assert.ok(cron.indexOf("requeue_stale_builder_claims")<cron.indexOf("expire_stale_builder_jobs"))
- assert.match(cron,/\.eq\('status', 'running'\)\.is\('checkpoint', null\)\.lt\('updated_at', cutoff\)/)
+ assert.match(cron,/\.eq\('status', 'running'\)\.lt\('updated_at', cutoff\)/)
+ assert.match(cron,/stuck\.checkpoint !== null/)
+ assert.match(cron,/stuck\.claim_generation < 24/)
+ assert.match(cron,/attempts < 3/)
+ assert.match(cron,/if \(recoverable\) continue/)
  assert.match(cron,/last_heartbeat_at.*Date\.parse/)
 })
 test.todo('staging: concurrent History GET, poll GET and cron with checkpoint and live heartbeat must never terminalize active job')

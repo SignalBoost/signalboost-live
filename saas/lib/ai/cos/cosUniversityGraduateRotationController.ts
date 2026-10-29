@@ -43,7 +43,7 @@ export async function runGraduateRotationController(now = new Date()): Promise<G
     : { ok: true, model: row.runtime_model_id }
 
   if (!health.ok || health.model !== row.runtime_model_id) {
-    const evidence = { ok: false, reason: 'selected_runtime_unhealthy', candidateId: selected.candidateId, artifactHash: selected.trainedArtifactHash, authorityExpanded: false }
+    const evidence = { ok: false, reason: 'selected_runtime_unhealthy', healthReason: clean(('error' in health ? health.error : undefined) || 'model_identity_mismatch', 160), probeMode: 'via' in health ? health.via : undefined, probeAttempts: 'attempts' in health ? health.attempts : 0, candidateId: selected.candidateId, artifactHash: selected.trainedArtifactHash, authorityExpanded: false }
     console.error('[cos-graduate-24h-rotation-controller]', JSON.stringify(evidence))
     return { status: 503, body: { ok: false, error: 'selected_runtime_unhealthy', authorityExpanded: false } }
   }

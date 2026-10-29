@@ -5,8 +5,8 @@
 // remained. This is the observe -> check -> act -> check loop harness engineering prescribes (LangChain's
 // Terminal-Bench harness: check the work against the task before finishing; stop a loop that makes no progress):
 //
-//   1. Check: list what the request asked for that the answer does not yet deliver. The model reads the whole
-//      request and answer; numbered deliverables the person wrote are also checked deterministically.
+//   1. Check: list what the request asked for that the answer does not yet deliver. The independent verifier
+//      (answerOutcomeVerifier.ts) reads the whole request and answer and must quote the evidence for each deliverable.
 //   2. Act: write only the missing parts, appended to the answer (nothing already written is rewritten or lost).
 //   3. Repeat at most three rounds, and only while the turn has time for a check and a completion.
 //   4. Stop as soon as nothing is missing, a round makes no progress, the checker is unavailable, or time runs out.
@@ -52,8 +52,6 @@ function unique(items: readonly string[]): string[] {
 export async function runAnswerCompletionLoop(input: Readonly<{
   request: string
   answer: string
-  /** Deliverables the request itself numbers, checked deterministically on every round. */
-  deterministicMissing?: (answer: string) => readonly string[]
   ports: AnswerCompletionPorts
   maxRounds?: number
   roundReserveMs?: number
@@ -74,16 +72,12 @@ export async function runAnswerCompletionLoop(input: Readonly<{
     // completed draft is rejected before either checker or trusted verifier runs.
     if (input.ports.remainingMs() <= 0) return { answer: accepted, rounds: round, missing, stopped: 'budget' }
     const checked = await input.ports.check(input.request, answer).catch(() => null)
-    const floor = input.deterministicMissing ? [...input.deterministicMissing(answer)] : []
-    // With no checker verdict, the deterministic floor is the verification: an addition that left no numbered
-    // deliverable missing is accepted on that evidence alone.
-    if (checked === null && input.deterministicMissing && !floor.length) accepted = answer
-    if (checked === null && !floor.length) {
+    if (checked === null) {
       // A model-checker outage is not a finding that the answer is incomplete.
       // A trusted host verifier can still certify it, but an absent verifier or
       // failed audit receipt must never be treated as a pass.
       if (!input.ports.verify || !input.ports.persistVerification) {
-        return { answer: accepted, rounds: round, missing: floor, stopped: 'checker_unavailable' }
+        return { answer: accepted, rounds: round, missing: [], stopped: 'checker_unavailable' }
       }
       const result = await input.ports.verify(input.request, answer).catch(() => null)
       const failures = result && Array.isArray(result.failures) ? unique(result.failures) : []
@@ -97,7 +91,7 @@ export async function runAnswerCompletionLoop(input: Readonly<{
       if (passed) return { answer, rounds: round, missing: [], stopped: 'complete' }
       return { answer: accepted, rounds: round, missing: receipt.failures.length ? receipt.failures : ['trusted_verification_failed'], stopped: 'checker_unavailable' }
     }
-    missing = unique([...floor, ...(checked ?? [])])
+    missing = unique(checked)
     if (!missing.length && input.ports.verify) {
       const result = await input.ports.verify(input.request, answer).catch(() => null)
       const failures = result && Array.isArray(result.failures) ? unique(result.failures) : []
@@ -120,28 +114,6 @@ export async function runAnswerCompletionLoop(input: Readonly<{
     previousMissing = missing.length
   }
 }
-
-/** The checker's reply: {"missing":["…"]}. Anything else is "could not check", never "complete". */
-export function parseAnswerCompletionCheck(raw: string | null | undefined): string[] | null {
-  const text = String(raw || '')
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start < 0 || end <= start) return null
-  try {
-    const parsed = JSON.parse(text.slice(start, end + 1)) as { missing?: unknown }
-    if (!Array.isArray(parsed.missing)) return null
-    return parsed.missing.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 12)
-  } catch {
-    return null
-  }
-}
-
-export const ANSWER_COMPLETION_CHECK_SYSTEM_PROMPT = [
-  'You check an answer against the request it answers. Read the whole request: every question, deliverable, constraint and format the person asked for.',
-  'List each requested item the answer does not yet deliver with real, specific substance. A heading without content, a restated question, or a generic paragraph does not deliver an item.',
-  'Do not ask for more than the request asked for. Do not judge style. Missing evidence that the person could not supply is not a missing item when the answer handles it honestly.',
-  'Return ONLY strict JSON: {"missing":["short description of each undelivered item"]}. Return {"missing":[]} when everything requested is delivered.',
-].join(' ')
 
 export const ANSWER_COMPLETION_SYSTEM_PROMPT = [
   'You continue an answer that left parts of the request undelivered.',

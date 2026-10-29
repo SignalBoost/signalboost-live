@@ -24,7 +24,8 @@ function topicWords(text: string): string[] {
 /**
  * Conservative heuristic: numbered sections establish explicit completion, while
  * non-numbered prose must substantively cover task-specific nouns. This is an
- * inexpensive host check, not a substitute for semantic adjudication.
+ * inexpensive host hint that steers a repair draft. It never decides whether an
+ * answer is complete or released; answerOutcomeVerifier.ts does.
  */
 export function missingAnalyticalTasks(prompt: string, answer: string): string[] {
   const tasks = requestedAnalyticalTasks(prompt)
@@ -82,15 +83,6 @@ export function missingAnalyticalTasks(prompt: string, answer: string): string[]
   })
 }
 
-/**
- * Analytical release uses the same task-outcome projection as other COS consumers.
- * Completion never depends on character counts or topical vocabulary overlap.
- * Execution requests must still be checked separately against host receipts.
- */
-export function releasableAnalyticalAnswer(prompt: string, answer: string): boolean {
-  return evaluateTaskOutcome({ originalRequest: prompt, answer }).status === 'verified'
-}
-
 export function analyticalTaskRepairDirective(prompt: string, answer: string): string {
   const missing = missingAnalyticalTasks(prompt, answer)
   return missing.length
@@ -98,54 +90,4 @@ export function analyticalTaskRepairDirective(prompt: string, answer: string): s
       + missing.map((item, index) => (index + 1) + '. ' + item).join('\n')
       + '\nAnswer the full ORIGINAL request. Give each requested deliverable substantive treatment; distinguish observations, hypotheses, and uncertainty. Missing production telemetry limits certainty, not preliminary analytical work. Never claim to have run investigations you did not run.'
     : ''
-}
-
-/**
- * Outcome ledger projection: a completed agent/tool call is not evidence that the
- * original user request was fulfilled. Consumers persist this structured verdict
- * alongside the original request and immutable execution receipts.
- *
- * No model-supplied "done" flag can turn a missing deliverable into success.
- */
-export type OutcomeEvidenceReceipt = Readonly<{
-  kind: 'test' | 'source' | 'execution' | 'artifact' | 'human'
-  reference: string
-  verified: boolean
-}>
-
-export type TaskOutcomeVerdict = Readonly<{
-  status: 'verified' | 'incomplete' | 'awaiting_verification'
-  originalRequest: string
-  remainingDeliverables: readonly string[]
-  verifiedReceiptCount: number
-  blockers: readonly string[]
-}>
-
-export function evaluateTaskOutcome(input: Readonly<{
-  originalRequest: string
-  answer: string
-  receipts?: readonly OutcomeEvidenceReceipt[]
-  requiresExecutionEvidence?: boolean
-  blockers?: readonly string[]
-}>): TaskOutcomeVerdict {
-  const originalRequest = String(input.originalRequest || '')
-  const remainingDeliverables = missingAnalyticalTasks(originalRequest, input.answer)
-  const blockers = [...new Set((input.blockers ?? []).map(String).filter(Boolean))]
-  const receipts = input.receipts ?? []
-  const verifiedReceiptCount = receipts.filter(receipt =>
-    receipt.verified === true && receipt.reference.trim().length > 0
-  ).length
-  const executionVerified = receipts.some(receipt =>
-    receipt.verified === true
-      && receipt.kind === 'execution'
-      && receipt.reference.trim().length > 0
-  )
-  const missingExecution = input.requiresExecutionEvidence === true && !executionVerified
-  if (missingExecution) blockers.push('verified_execution_receipt_missing')
-  const status = remainingDeliverables.length || blockers.length
-    ? 'incomplete'
-    : input.requiresExecutionEvidence === true && !verifiedReceiptCount
-      ? 'awaiting_verification'
-      : 'verified'
-  return { status, originalRequest, remainingDeliverables, verifiedReceiptCount, blockers }
 }

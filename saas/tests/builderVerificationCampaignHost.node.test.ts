@@ -1,6 +1,7 @@
 // saas/tests/builderVerificationCampaignHost.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { stubOutcomeJudge } from './helpers/answerOutcomeJudgeStub.ts'
 import { readFileSync } from 'node:fs'
 import { runCampaignJobSlice, campaignStateFromCheckpoint, CAMPAIGN_ENGINE, CAMPAIGN_TOTAL_DEADLINE_MS } from '../lib/builder/campaign/job.ts'
 import { PAC_01_PROMPT, PAC_CATALOG } from '../lib/builder/campaign/catalog.ts'
@@ -16,6 +17,7 @@ function fullAnswer(prompt: string): string {
 test('a campaign job slice pauses with its ledger in the checkpoint and resumes from it; the final reply is the evidence package', async () => {
   let clock = 0
   const ports: CampaignPorts = {
+    outcomeJudge: stubOutcomeJudge,
     deployment: async () => ({ mainCommit: 'c0ffee' }),
     analysis: async prompt => { clock += 45_000; return { status: 200, ok: true, reply: fullAnswer(prompt), source: 'cos-local-primary', correlationId: 'turn-' + clock, latencyMs: 45_000, servedCommit: 'c0ffee', model: 'owned', localModelInvoked: true, executionAllowed: false } },
   }

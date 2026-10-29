@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective, evaluateTaskOutcome } from '../lib/ai/cos/answerTaskContract.ts'
+import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective } from '../lib/ai/cos/answerTaskContract.ts'
 
 const incident = readFileSync(new URL('./fixtures/cos-incident-analysis-brief.txt', import.meta.url), 'utf8')
 const incomplete = 'To answer it properly I need readings and baseline values. I cannot stand behind a single cause.'
@@ -124,40 +124,4 @@ test('ordinary coding and prose requests do not create an analytical acceptance 
   assert.deepEqual(requestedAnalyticalTasks('Fix src/login.ts and run npm test.'), [])
   assert.deepEqual(requestedAnalyticalTasks('Write a Node.js calculator with two files.'), [])
   assert.deepEqual(missingAnalyticalTasks('Explain what Kafka is.', 'Kafka is an event streaming platform.'), [])
-})
-
-test('task outcome rejects self-declared completion when analytical deliverables are missing', () => {
-  const result = evaluateTaskOutcome({ originalRequest: incident, answer: incomplete,
-    receipts: [{kind:'execution',reference:'job-succeeded',verified:true}] })
-  assert.equal(result.status, 'incomplete')
-  assert.equal(result.remainingDeliverables.length, 8)
-  assert.equal(result.verifiedReceiptCount, 1)
-})
-
-test('task outcome requires verified execution evidence, not provider success text', () => {
-  const result = evaluateTaskOutcome({
-    originalRequest: 'Create and deploy a verified endpoint',
-    answer: 'Completed and deployed successfully.',
-    requiresExecutionEvidence: true,
-    receipts: [{kind:'execution',reference:'model claims deployment',verified:false}],
-  })
-  assert.equal(result.status, 'incomplete')
-  assert.deepEqual(result.blockers, ['verified_execution_receipt_missing'])
-  const verified = evaluateTaskOutcome({
-    originalRequest: 'Create and deploy a verified endpoint',
-    answer: 'Completed and deployed successfully.',
-    requiresExecutionEvidence: true,
-    receipts: [{kind:'execution',reference:'CI job 123 - tests passed',verified:true}],
-  })
-  assert.equal(verified.status, 'verified')
-})
-
-
-test('COS answer release projects original request outcome before policy release gates', () => {
-  const source = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
-  const outcome = source.indexOf('const outcome = evaluateTaskOutcome({ originalRequest: effectiveArgs.prompt')
-  const policy = source.indexOf('if (remainingTaskGaps.length && !(')
-  assert.ok(outcome > 0 && policy > outcome)
-  assert.match(source, /\[cos-original-request-outcome\]/)
-  assert.match(source, /remainingDeliverables: outcome.remainingDeliverables.length/)
 })

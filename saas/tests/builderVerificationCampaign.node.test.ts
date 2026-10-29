@@ -1,6 +1,7 @@
 // saas/tests/builderVerificationCampaign.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { stubOutcomeJudge, unavailableOutcomeJudge } from './helpers/answerOutcomeJudgeStub.ts'
 import { PAC_CATALOG, PAC_01_PROMPT, PAC_CAMPAIGN_ID } from '../lib/builder/campaign/catalog.ts'
 import { certifyCampaign, renderCampaignReport, pendingItems } from '../lib/builder/campaign/ledger.ts'
 import { runCampaignJobSlice } from '../lib/builder/campaign/job.ts'
@@ -32,18 +33,27 @@ test('the catalog is the brief: twenty items, PAC-01 keeps the original Kafka pr
   assert.equal(PAC_CAMPAIGN_ID, 'COS-PAC-001')
 })
 
-test('an analysis is PASS only when the production path released it and every deliverable has substance', () => {
-  assert.equal(judgeAnalysis(PAC_01_PROMPT, released(PAC_01_PROMPT)).verdict, 'PASS')
-  assert.equal(judgeAnalysis(PAC_01_PROMPT, released(PAC_01_PROMPT, { ok: false, reply: 'I could not finish a reliable answer…', source: 'failed_closed' })).verdict, 'FAIL')
-  assert.equal(judgeAnalysis(PAC_01_PROMPT, released(PAC_01_PROMPT, { source: 'cos-bounded-timeout' })).verdict, 'FAIL')
-  assert.equal(judgeAnalysis(PAC_01_PROMPT, released(PAC_01_PROMPT, { status: 500 })).verdict, 'FAIL')
-  const headingsOnly = judgeAnalysis(PAC_01_PROMPT, released(PAC_01_PROMPT, { reply: '1. Root causes\n2. Hypotheses\n3. Correlation\n4. Evidence\n5. Plan\n6. Experiments\n7. Mechanisms\n8. Explanation' }))
+test('an analysis is PASS only when the production path released it and the independent verifier found every deliverable delivered', async () => {
+  assert.equal((await judgeAnalysis(PAC_01_PROMPT, released(PAC_01_PROMPT), stubOutcomeJudge)).verdict, 'PASS')
+  assert.equal((await judgeAnalysis(PAC_01_PROMPT, released(PAC_01_PROMPT, { ok: false, reply: 'I could not finish a reliable answer…', source: 'failed_closed' }), stubOutcomeJudge)).verdict, 'FAIL')
+  assert.equal((await judgeAnalysis(PAC_01_PROMPT, released(PAC_01_PROMPT, { source: 'cos-bounded-timeout' }), stubOutcomeJudge)).verdict, 'FAIL')
+  assert.equal((await judgeAnalysis(PAC_01_PROMPT, released(PAC_01_PROMPT, { status: 500 }), stubOutcomeJudge)).verdict, 'FAIL')
+  const headingsOnly = await judgeAnalysis(PAC_01_PROMPT, released(PAC_01_PROMPT, { reply: '1. Root causes\n2. Hypotheses\n3. Correlation\n4. Evidence\n5. Plan\n6. Experiments\n7. Mechanisms\n8. Explanation' }), stubOutcomeJudge)
   assert.equal(headingsOnly.verdict, 'FAIL')
-  assert.match(headingsOnly.failureCause || '', /without real substance/)
+  assert.match(headingsOnly.failureCause || '', /^undelivered: /)
+})
+
+test('an analysis the verifier could not grade is BLOCKED, never PASS and never FAIL', async () => {
+  const outage = await judgeAnalysis(PAC_01_PROMPT, released(PAC_01_PROMPT), unavailableOutcomeJudge)
+  assert.equal(outage.verdict, 'BLOCKED')
+  assert.equal(outage.failureCause, 'independent outcome verifier unavailable')
+  const noVerifier = await judgeAnalysis(PAC_01_PROMPT, released(PAC_01_PROMPT), undefined)
+  assert.equal(noVerifier.verdict, 'BLOCKED')
+  assert.match(noVerifier.failureCause || '', /on this host/)
 })
 
 test('a host without a port leaves the item BLOCKED with the cause, never PASS and never skipped', async () => {
-  const ports: CampaignPorts = { deployment, analysis: async prompt => released(prompt) }
+  const ports: CampaignPorts = { outcomeJudge: stubOutcomeJudge, deployment, analysis: async prompt => released(prompt) }
   const result = await runCampaignSlice({ catalog: PAC_CATALOG, state: { ledger: emptyCampaignLedger(PAC_CAMPAIGN_ID), reliability: null }, ports, remainingMs: () => 10 * 60_000, reliabilityPrompts: [PAC_01_PROMPT] })
   assert.equal(result.stopped, 'complete')
   assert.equal(result.ledger.rows.length, 20)
@@ -66,7 +76,7 @@ test('a host without a port leaves the item BLOCKED with the cause, never PASS a
 test('the slice stops before an item it cannot finish and resumes from the ledger; the reliability loop keeps its count', async () => {
   let calls = 0
   let clock = 0
-  const ports: CampaignPorts = { deployment, analysis: async prompt => { calls++; clock += 30_000; return released(prompt) } }
+  const ports: CampaignPorts = { outcomeJudge: stubOutcomeJudge, deployment, analysis: async prompt => { calls++; clock += 30_000; return released(prompt) } }
   const sliceMs = 200_000
   let state = { ledger: emptyCampaignLedger(PAC_CAMPAIGN_ID), reliability: null as any }
   const slices: string[] = []
@@ -87,7 +97,7 @@ test('the slice stops before an item it cannot finish and resumes from the ledge
 
 test('one failed request in the reliability loop is FAIL with the count reached; any FAIL makes the campaign FAIL', async () => {
   let n = 0
-  const ports: CampaignPorts = { deployment, analysis: async prompt => (++n === 11 ? released(prompt, { ok: false, source: 'failed_closed', reply: '' }) : released(prompt)) }
+  const ports: CampaignPorts = { outcomeJudge: stubOutcomeJudge, deployment, analysis: async prompt => (++n === 11 ? released(prompt, { ok: false, source: 'failed_closed', reply: '' }) : released(prompt)) }
   const onlyPac20 = PAC_CATALOG.filter(item => item.id === 'PAC-20')
   const result = await runCampaignSlice({ catalog: onlyPac20, state: { ledger: emptyCampaignLedger(PAC_CAMPAIGN_ID), reliability: null }, ports, remainingMs: () => 10 * 60_000, reliabilityPrompts: [PAC_01_PROMPT] })
   const row = result.ledger.rows[0]
@@ -98,6 +108,7 @@ test('one failed request in the reliability loop is FAIL with the count reached;
 
 test('a routing item fails when the investigation entered the Builder, and the certification needs production to match main', async () => {
   const ports: CampaignPorts = {
+    outcomeJudge: stubOutcomeJudge,
     deployment: async () => ({ mainCommit: 'def' }),
     analysis: async prompt => released(prompt, { servedCommit: 'abc' }),
     routing: async prompt => ({ outcome: released(prompt, { servedCommit: 'abc' }), enteredBuilder: true }),
@@ -123,7 +134,7 @@ test('the item reserve is the shortest completed request, or the longest right a
 
 test('twenty-eight 116-second requests fit the 24-slice continuation budget (Codex on #4974)', async () => {
   let clock = 0
-  const ports: CampaignPorts = { deployment, analysis: async prompt => { clock += 116_000; return released(prompt, { latencyMs: 116_000 }) }, routing: async prompt => { clock += 116_000; return { outcome: released(prompt, { latencyMs: 116_000 }), enteredBuilder: false } } }
+  const ports: CampaignPorts = { outcomeJudge: stubOutcomeJudge, deployment, analysis: async prompt => { clock += 116_000; return released(prompt, { latencyMs: 116_000 }) }, routing: async prompt => { clock += 116_000; return { outcome: released(prompt, { latencyMs: 116_000 }), enteredBuilder: false } } }
   let state: any = { ledger: emptyCampaignLedger(PAC_CAMPAIGN_ID), reliability: null }
   let slices = 0
   while (pendingItems(state.ledger, PAC_CATALOG).length && slices < 24) {
@@ -142,6 +153,7 @@ test('a request cut by the slice deadline is an interruption: not recorded, run 
   let calls = 0
   const controller = new AbortController()
   const ports: CampaignPorts = {
+    outcomeJudge: stubOutcomeJudge,
     deployment,
     analysis: async prompt => {
       calls++
@@ -174,7 +186,7 @@ test('a request cut by the slice deadline is an interruption: not recorded, run 
 
 test('the production commit is what the live site reported serving the first request; a change mid-campaign blocks certification', async () => {
   let n = 0
-  const ports: CampaignPorts = { deployment: async () => ({ mainCommit: 'rev-a' }), analysis: async prompt => released(prompt, { servedCommit: ++n <= 2 ? 'rev-a' : 'rev-b' }) }
+  const ports: CampaignPorts = { outcomeJudge: stubOutcomeJudge, deployment: async () => ({ mainCommit: 'rev-a' }), analysis: async prompt => released(prompt, { servedCommit: ++n <= 2 ? 'rev-a' : 'rev-b' }) }
   const only = PAC_CATALOG.filter(item => ['PAC-01', 'PAC-02', 'PAC-03'].includes(item.id))
   const result = await runCampaignSlice({ catalog: only, state: { ledger: emptyCampaignLedger(PAC_CAMPAIGN_ID), reliability: null }, ports, remainingMs: () => 10 * 60_000 })
   assert.equal(result.ledger.productionCommit, 'rev-a')
@@ -188,7 +200,7 @@ test('the production commit is what the live site reported serving the first req
 
 
 test('a completed campaign with unavailable host ports terminates failed, never succeeded', async () => {
-  const ports: CampaignPorts = { deployment, analysis: async prompt => released(prompt) }
+  const ports: CampaignPorts = { outcomeJudge: stubOutcomeJudge, deployment, analysis: async prompt => released(prompt) }
   const result = await runCampaignJobSlice({ checkpoint: null, workspaceId: 'fixture', ports, remainingMs: () => 10 * 60_000 })
   assert.equal(result.status, 'failed')
   if (result.status !== 'paused') assert.equal(result.outcome, 'BLOCKED')

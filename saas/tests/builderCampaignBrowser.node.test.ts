@@ -4,6 +4,7 @@
 // carrying the browser session between slices. The driver is a fake page; the real one is the Builder's sandbox port.
 
 import test from 'node:test'
+import { stubOutcomeJudge } from './helpers/answerOutcomeJudgeStub.ts'
 import assert from 'node:assert/strict'
 import {
   runBrowserCheck, newBrowserSession, checkRequest, occurrences, productionRequestStatus,
@@ -172,6 +173,7 @@ test('runner: a pending browser check ends the slice with its session checkpoint
   const calls: Array<{ testId: string; session: BrowserSession | null; last: boolean }> = []
   let pendingOnce = true
   const ports: CampaignPorts = {
+    outcomeJudge: stubOutcomeJudge,
     deployment,
     browser: async (testId, session, slice) => {
       calls.push({ testId, session, last: slice.last })

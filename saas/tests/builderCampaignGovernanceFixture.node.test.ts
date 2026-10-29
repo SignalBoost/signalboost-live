@@ -4,6 +4,7 @@
 // judges, and the runner carrying a fixture run across slices.
 
 import test from 'node:test'
+import { stubOutcomeJudge } from './helpers/answerOutcomeJudgeStub.ts'
 import assert from 'node:assert/strict'
 import { judgeGovernance, GOVERNANCE_TURN_CEILING_MS, GOVERNANCE_MAX_CALLS_PER_TURN, type CallRecord, type TurnRecord } from '../lib/builder/campaign/governance.ts'
 import { judgeFixture, newFixtureSession, FIXTURE_COMMAND, FIXTURE_FILES, FIXTURE_OBJECTIVE, FIXTURE_RESUMABLE_REASONS, type FixtureSession } from '../lib/builder/campaign/fixture.ts'
@@ -92,6 +93,7 @@ test('runner: a pending fixture run is checkpointed and continued; governance re
   let governanceInput: { ids: readonly string[]; windowStart: string } | null = null
   let first = true
   const ports: CampaignPorts = {
+    outcomeJudge: stubOutcomeJudge,
     deployment: async () => ({ mainCommit: 'abc' }),
     analysis: async prompt => ({ status: 200, ok: true, reply: prompt, source: 'x', correlationId: 'turn-1', latencyMs: 1_000, servedCommit: 'abc', model: 'm', localModelInvoked: true, executionAllowed: false }),
     governance: async (ids, windowStart) => { governanceInput = { ids, windowStart }; return { verdict: 'PASS', actual: 'ok', evidence: [] } },

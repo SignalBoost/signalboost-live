@@ -9,7 +9,6 @@ import test from 'node:test'
 import {
   ANSWER_COMPLETION_MAX_ROUNDS,
   ANSWER_COMPLETION_ROUND_RESERVE_MS,
-  parseAnswerCompletionCheck,
   runAnswerCompletionLoop,
 } from '../lib/ai/cos/answerCompletionLoop.ts'
 
@@ -74,22 +73,13 @@ test('without enough repair time the checker still runs but completion is withhe
   assert.deepEqual({ stopped: result.stopped, calls, answer: result.answer }, { stopped: 'budget', calls: 1, answer: 'a' })
 })
 
-test('a checker that cannot answer is never read as "complete"; numbered deliverables are still checked', async () => {
+test('a checker that cannot answer is never read as "complete"', async () => {
   const unavailable = await runAnswerCompletionLoop({
     request: 'r', answer: 'a',
     ports: { remainingMs: plenty, check: async () => null, complete: async () => 'never' },
   })
   assert.equal(unavailable.stopped, 'checker_unavailable')
-  let written = ''
-  const floor = await runAnswerCompletionLoop({
-    request: 'r', answer: 'a',
-    deterministicMissing: answer => answer.includes('2.') ? [] : ['2. Rank hypotheses'],
-    ports: { remainingMs: plenty, check: async () => null, complete: async () => { written = '2. Ranked: …'; return written } },
-  })
-  // The numbered deliverable was written; with no checker the loop still does not claim the answer complete.
-  assert.equal(floor.rounds, 1)
-  assert.equal(floor.stopped, 'checker_unavailable')
-  assert.match(floor.answer, /2\. Ranked/)
+  assert.equal(unavailable.answer, 'a')
 })
 
 test('a completion round that closed nothing is dropped; the last verified answer is returned', async () => {
@@ -121,21 +111,16 @@ test('a completion round that closed nothing is dropped; the last verified answe
   assert.equal(progress.answer, 'base\n\nwrote x')
 })
 
-test('the checker reply must be the agreed JSON', () => {
-  assert.deepEqual(parseAnswerCompletionCheck('{"missing":["experiments"]}'), ['experiments'])
-  assert.deepEqual(parseAnswerCompletionCheck('Sure! {"missing":[]}'), [])
-  assert.equal(parseAnswerCompletionCheck('Looks complete to me.'), null)
-  assert.equal(parseAnswerCompletionCheck('{"complete":true}'), null)
-})
-
 test('the reasoner runs the loop only for the answer the person reads, and never on a cut-off draft', () => {
   const reasoner = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
   assert.match(reasoner, /const loopDraft = args\.writesUserAnswer === true \? parseLocalResult\(text\) : null\s*\n\s*if \(loopDraft && !loopDraft\.truncated\)/)
-  assert.match(reasoner, /deterministicMissing: answer => missingAnalyticalTasks\(args\.prompt, answer\)/)
+  // The check is the independent verifier, never a word rule.
+  assert.doesNotMatch(reasoner, /deterministicMissing/)
+  assert.match(reasoner, /check: async \(request, answer\) => \{\s*\n\s*const outcome = await outcomeOf\(request, answer\)/)
   // The loop runs before the release gates, so they judge the completed answer.
   assert.ok(reasoner.indexOf("recorder.time('answer_completion_loop'") < reasoner.indexOf('const finalParsedForPolicy = parseLocalResult(text)'))
-  // The check itself is a helper call, not an answer: it never gets the answer window.
-  assert.match(reasoner, /writesUserAnswer: false,\s*\n\s*temperature: 0,\s*\n\s*maxTokens: 400,/)
+  // The verifier's judge is a helper call, not an answer: it never gets the answer window.
+  assert.match(reasoner, /writesUserAnswer: false,\s*\n\s*temperature: 0,\s*\n\s*disableThinking: true,\s*\n\s*maxTokens: ANSWER_OUTCOME_JUDGE_MAX_TOKENS,/)
 })
 
 test('trusted host verifier must pass before the COS loop declares completion', async () => {
@@ -223,9 +208,9 @@ test('COS reasoner never discards a written answer because the optional loop cou
   // Production 2026-10-27: checker_unavailable (RunPod busy, DeepInfra timeout) threw away a finished answer.
   assert.doesNotMatch(block, /return null/)
   assert.match(block, /text = JSON\.stringify\(\{ answer: completion\?\.answer \|\| loopDraft\.answer, confidence: loopDraft\.confidence \}\)/)
-  // The deterministic gates that follow are the only veto: task contract and advisory quality defects.
+  // The gates that follow are the only veto: the independent verifier's finding and the advisory quality defects.
   const after = source.slice(gates)
-  assert.match(after, /if \(remainingTaskGaps\.length && !\(finalParsedForPolicy && releasableAnalyticalAnswer\(effectiveArgs\.prompt, finalParsedForPolicy\.answer\)\)\)/)
+  assert.match(after, /if \(finalOutcome && !answerOutcomeReleasable\(finalOutcome\)\)/)
   assert.match(after, /if \(remainingAdvisoryDefects\.length\)/)
 })
 
@@ -283,11 +268,10 @@ test('unavailable checker never bypasses failed host verdict or failed audit per
 })
 
 
-test('numbered completion checked by host does not consume optional model capacity', () => {
+test('the verifier judge starts only with time for it, and never inside an isolated fault run', () => {
   const source = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
-  const check = source.slice(source.indexOf('check: async (request, answer) => {'), source.indexOf('complete: async (request, answer, missing)'))
-  assert.match(check, /requestedAnalyticalTasks\(request\)\.length > 0 && missingAnalyticalTasks\(request, answer\)\.length === 0\) return null/)
-  assert.match(check, /remainingMs\(budget\) < 30_000\) return null/)
-  assert.match(check, /timeoutMs: Math\.min\(8_000,/)
+  const judge = source.slice(source.indexOf('const outcomeJudge: AnswerOutcomeJudge = async'), source.indexOf('const outcomeOf = async'))
+  assert.match(judge, /if \(syntheticTurn \|\| remainingMs\(budget\) < ANSWER_OUTCOME_JUDGE_MIN_MS\) return null/)
+  assert.match(judge, /timeoutMs: Math\.min\(ANSWER_OUTCOME_JUDGE_TIMEOUT_MS, boundedInference\(\)\.timeoutMs\)/)
   assert.match(source, /persistVerification: async receipt/)
 })

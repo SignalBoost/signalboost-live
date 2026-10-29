@@ -21,6 +21,8 @@ import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
 import { withInferenceTransport } from '../../ai/inferenceTransport.ts'
 import { runWithTurnDeadline, runWithoutTurnDeadline } from '../../ai/cos/cosTurnBudget.ts'
 import { createFaultStub, judgeFault, FAULT_PROMPT, FAULT_TURN_DEADLINE_MS, type CampaignFault } from './faults.ts'
+import { verifyAnswerOutcome } from '../../ai/cos/answerOutcomeVerifier.ts'
+import { parseLocalResult } from '../../ai/cos/reasonerOutput.ts'
 import { campaignBrowserOrigins, newBrowserSession, runBrowserCheck, BROWSER_SLICE_RESERVE_MS, type BrowserDriver, type BrowserSession, type DriverStep } from './browserChecks.ts'
 import { createBuilderPlaywrightCliPort, type VercelSandboxPlaywrightCliPort } from '../playwright-cli-port.ts'
 import { judgeGovernance, INTERACTIVE_FEATURES, type CallRecord, type TurnRecord } from './governance.ts'
@@ -191,7 +193,7 @@ export async function isolatedFault(fault: CampaignFault, productionCommit: stri
   }
   // The reasoner module needs the Next runtime; load it only when a fault actually runs so the host's other ports
   // stay loadable outside it.
-  const { callRawCosReasoner, resolveCosReasoner } = await import('../../ai/cos/cosReasoner.ts')
+  const { callRawCosReasoner, cosAnswerOutcomeJudge, resolveCosReasoner } = await import('../../ai/cos/cosReasoner.ts')
   if (!resolveCosReasoner().config) return { verdict: 'BLOCKED', actual: 'no COS reasoner is configured on this host', evidence: [], failureCause: 'reasoner_not_configured' }
   const stub = createFaultStub(fault)
   const startedAt = Date.now()
@@ -211,7 +213,13 @@ export async function isolatedFault(fault: CampaignFault, productionCommit: stri
   } catch (error) {
     escaped = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
   }
-  return judgeFault({ fault, calls: stub.calls(), released, escaped, elapsedMs: Date.now() - startedAt })
+  const elapsedMs = Date.now() - startedAt
+  // Graded after the stub run, outside its scope, by the same independent verifier COS releases answers with.
+  const releasedAnswer = released ? parseLocalResult(released) : null
+  const releasedOutcome = releasedAnswer && releasedAnswer.truncated !== true
+    ? await verifyAnswerOutcome({ request: FAULT_PROMPT, answer: releasedAnswer.answer, judge: cosAnswerOutcomeJudge })
+    : null
+  return judgeFault({ fault, calls: stub.calls(), released, escaped, elapsedMs, releasedOutcome })
 }
 
 /** The browser sandbox lives long enough for the three checks in sequence, each waited for across slices. */
@@ -355,6 +363,8 @@ export async function fixtureRun(session: FixtureSession | null, slice: Readonly
 export function createCampaignHostPorts(): CampaignPorts {
   return {
     deployment: () => deploymentFacts(),
+    // The reasoner module needs the Next runtime; it is loaded only when an answer is actually graded.
+    outcomeJudge: async (request, answer) => (await import('../../ai/cos/cosReasoner.ts')).cosAnswerOutcomeJudge(request, answer),
     analysis: (prompt, signal) => productionAnalysis(prompt, signal),
     routing: (prompt, signal) => productionRouting(prompt, signal),
     fault: (fault, productionCommit, signal) => isolatedFault(fault, productionCommit, signal),

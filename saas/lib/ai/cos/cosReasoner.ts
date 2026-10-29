@@ -14,9 +14,10 @@ import { cosExecutionEnvelope, cosAnswerProgress } from './cosExecutionEnvelope.
 // same exact-host allow-list + API-key controls as any other remote LOCAL_AI_* endpoint.
 
 import { randomUUID } from 'node:crypto'
-import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective, releasableAnalyticalAnswer, evaluateTaskOutcome } from './answerTaskContract.ts'
+import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective } from './answerTaskContract.ts'
+import { ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT, answerOutcomeReleasable, verifyAnswerOutcome, type AnswerOutcome, type AnswerOutcomeJudge } from './answerOutcomeVerifier.ts'
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
-import { ANSWER_COMPLETION_CHECK_SYSTEM_PROMPT, ANSWER_COMPLETION_SYSTEM_PROMPT, parseAnswerCompletionCheck, runAnswerCompletionLoop } from './answerCompletionLoop.ts'
+import { ANSWER_COMPLETION_SYSTEM_PROMPT, runAnswerCompletionLoop } from './answerCompletionLoop.ts'
 import { callLocalModel, captureServedInference, localInferenceConfigFromEnv, type LocalModelCallArgs, type ServedInference } from '@/lib/ai/local-inference'
 import { currentInferenceTransport } from '@/lib/ai/inferenceTransport'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
@@ -42,6 +43,11 @@ import {
 import { retrievePublishedDiagnosticReferences, type PublishedDiagnosticLookupResult } from './advisoryDiagnosisPublishedLookup.ts'
 import { recordAdvisoryDiagnosisResearchForAnswer } from './advisoryDiagnosisResearchTrace.ts'
 import { currentReasoningEvaluationContext } from './reasoningEvaluationContext.ts'
+
+/** The verifier needs a short judge call; below this much turn time it does not start, and the answer is unverified. */
+const ANSWER_OUTCOME_JUDGE_MIN_MS = 30_000
+const ANSWER_OUTCOME_JUDGE_TIMEOUT_MS = 25_000
+const ANSWER_OUTCOME_JUDGE_MAX_TOKENS = 900
 
 export type CosReasonerKind = 'independent-local' | 'managed-open-model'
 
@@ -418,6 +424,32 @@ export async function callRawCosReasoner(
       }
     }
 
+    // THE INDEPENDENT VERIFIER (answerOutcomeVerifier.ts): a separate call that reads only the request and the answer
+    // and must quote the passage delivering each requested deliverable. It decides completion and release; the word
+    // and vocabulary rules no longer do. Inside an isolated fault run (a controlled provider stub is the only provider)
+    // there is no independent judge, so the answer stays unverified and the campaign grades it outside the stub.
+    const outcomes = new Map<string, AnswerOutcome>()
+    const outcomeJudge: AnswerOutcomeJudge = async (request, answer) => {
+      if (syntheticTurn || remainingMs(budget) < ANSWER_OUTCOME_JUDGE_MIN_MS) return null
+      return await callLocalModel({
+        ...effectiveArgs,
+        writesUserAnswer: false,
+        temperature: 0,
+        disableThinking: true,
+        maxTokens: ANSWER_OUTCOME_JUDGE_MAX_TOKENS,
+        usageContext: { ...(effectiveArgs.usageContext ?? { feature: 'cos_interactive_answer' }), purpose: 'answer_outcome_verification' },
+        systemPrompt: ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT,
+        prompt: `REQUEST:\n${request}\n\nANSWER:\n${answer}`,
+      }, { ...boundedInference(), timeoutMs: Math.min(ANSWER_OUTCOME_JUDGE_TIMEOUT_MS, boundedInference().timeoutMs) })
+    }
+    const outcomeOf = async (request: string, answer: string): Promise<AnswerOutcome> => {
+      const known = outcomes.get(answer)
+      if (known) return known
+      const outcome = await verifyAnswerOutcome({ request, answer, judge: outcomeJudge })
+      outcomes.set(answer, outcome)
+      return outcome
+    }
+
     // THE ANSWER LOOP: before the answer the person reads is released, check it against the whole request and write
     // only what is still missing, for up to three rounds while the turn has time (answerCompletionLoop.ts).
     const loopDraft = args.writesUserAnswer === true ? parseLocalResult(text) : null
@@ -425,13 +457,14 @@ export async function callRawCosReasoner(
       const completion = await recorder.time('answer_completion_loop', () => runAnswerCompletionLoop({
         request: args.prompt,
         answer: loopDraft.answer,
-        deterministicMissing: answer => missingAnalyticalTasks(args.prompt, answer),
         ports: {
           remainingMs: () => remainingMs(budget),
-          // Deterministic host-side quality gate. A model's self-verdict cannot override these defects.
+          // The verifier's verdict plus the advisory-diagnosis policy. A writer's self-verdict cannot override either.
           verify: async (request, answer) => {
+            const outcome = await outcomeOf(request, answer)
+            if (outcome.status === 'unverified') return null
             const failures = [
-              ...missingAnalyticalTasks(request, answer),
+              ...outcome.missing,
               ...(advisoryDiagnosis ? advisoryDiagnosisBriefDefects(request, answer) : []),
             ]
             return { passed: failures.length === 0, failures }
@@ -451,29 +484,16 @@ export async function callRawCosReasoner(
                 round: receipt.round,
                 passed: receipt.passed,
                 failureCodes: [...receipt.failures],
-                verifier: 'cos_deterministic_answer_contract',
+                verifier: 'cos_answer_outcome_verifier',
                 outputReleased: false,
               },
               schema_version: 'cos-answer-completion-verification-v1',
             })
             if (persisted.error) throw new Error('cos_verification_audit_persist_failed')
           },
-          // A complete numbered contract already has a trusted host verifier below.
-          // Skip the optional neural checker in this case: it can contend with
-          // background RunPod work or exhaust the fallback model context window.
-          // The host verifier and durable audit receipt are still required.
           check: async (request, answer) => {
-            if (requestedAnalyticalTasks(request).length > 0 && missingAnalyticalTasks(request, answer).length === 0) return null
-            if (remainingMs(budget) < 30_000) return null
-            return parseAnswerCompletionCheck(await callLocalModel({
-            ...effectiveArgs,
-            writesUserAnswer: false,
-            temperature: 0,
-            maxTokens: 400,
-            usageContext: { ...(effectiveArgs.usageContext ?? { feature: 'cos_interactive_answer' }), purpose: 'answer_completion_check' },
-            systemPrompt: ANSWER_COMPLETION_CHECK_SYSTEM_PROMPT,
-            prompt: `REQUEST:\n${request}\n\nANSWER:\n${answer}`,
-          }, { ...boundedInference(), timeoutMs: Math.min(8_000, boundedInference().timeoutMs) }))
+            const outcome = await outcomeOf(request, answer)
+            return outcome.status === 'unverified' ? null : outcome.missing
           },
           complete: async (request, answer, missing) => {
             const written = await callLocalModel({
@@ -508,22 +528,14 @@ export async function callRawCosReasoner(
     }
 
     const finalParsedForPolicy = parseLocalResult(text)
-    const remainingTaskGaps = finalParsedForPolicy ? missingAnalyticalTasks(effectiveArgs.prompt, finalParsedForPolicy.answer) : []
-    // Preserve the original-request outcome independently of model/tool success.
-    // This diagnostic projection does not certify deployment or execution and never
-    // replaces the established policy, citation, and trusted verification gates.
-    if (finalParsedForPolicy && requestedAnalyticalTasks(effectiveArgs.prompt).length > 0) {
-      const outcome = evaluateTaskOutcome({ originalRequest: effectiveArgs.prompt, answer: finalParsedForPolicy.answer })
-      console.info('[cos-original-request-outcome]', JSON.stringify({
-        turnId, status: outcome.status, remainingDeliverables: outcome.remainingDeliverables.length,
-        requestedDeliverables: requestedAnalyticalTasks(effectiveArgs.prompt).length,
-        evidenceReceipts: outcome.verifiedReceiptCount,
-      }))
-    }
-    // Only a non-answer is withheld; a substantive analysis with gaps is the model's real work and is released.
-    if (remainingTaskGaps.length && !(finalParsedForPolicy && releasableAnalyticalAnswer(effectiveArgs.prompt, finalParsedForPolicy.answer))) {
-      console.warn('[cos-task-contract-release-blocked]', JSON.stringify({ missingCount: remainingTaskGaps.length, requestedCount: firstTaskGaps.length }))
-      recorder.skip('skill_citation_repair', 'task_contract_unmet')
+    // Only the verifier's finding that a requested deliverable is missing withholds the answer. An unverified answer
+    // (no time, judge unavailable) is released: an outage is not a finding about the answer.
+    const finalOutcome = finalParsedForPolicy && args.writesUserAnswer === true && !finalParsedForPolicy.truncated
+      ? await outcomeOf(args.prompt, finalParsedForPolicy.answer)
+      : null
+    if (finalOutcome && !answerOutcomeReleasable(finalOutcome)) {
+      console.warn('[cos-answer-outcome-release-blocked]', JSON.stringify({ turnId, missingCount: finalOutcome.missing.length, deliverables: finalOutcome.deliverables.length }))
+      recorder.skip('skill_citation_repair', 'answer_outcome_incomplete')
       return null
     }
     const remainingAdvisoryDefects = advisoryDiagnosis && finalParsedForPolicy
@@ -666,4 +678,24 @@ export async function callCosReasoner(
     },
     turnId: execution.result.turnId || randomUUID(),
   }
+}
+
+/**
+ * The verifier's judge for answers written outside the reasoner's own turn loop (the completion-first rescue lane) and
+ * for the verification campaign's grading: the same separate call, through the COS control plane. Inside an isolated
+ * fault run there is no independent judge, so it does not run.
+ */
+export const cosAnswerOutcomeJudge: AnswerOutcomeJudge = async (request, answer) => {
+  if (currentInferenceTransport() !== null) return null
+  const result = await callCosReasoner({
+    writesUserAnswer: false,
+    temperature: 0,
+    disableThinking: true,
+    maxTokens: ANSWER_OUTCOME_JUDGE_MAX_TOKENS,
+    timeoutMs: ANSWER_OUTCOME_JUDGE_TIMEOUT_MS,
+    usageContext: { feature: 'cos_interactive_answer', purpose: 'answer_outcome_verification' },
+    systemPrompt: ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT,
+    prompt: `REQUEST:\n${request}\n\nANSWER:\n${answer}`,
+  }).catch(() => null)
+  return result?.text ?? null
 }

@@ -23,7 +23,8 @@ test('any unanswered request fails honestly the same way, never claiming a compl
 test('terminal analytical refusal reports a safe, specific rejection category', () => {
   const source = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
   assert.match(source, /cos_no_answer_draft/)
-  assert.match(source, /cos_analytical_contract_rejected/)
+  // Completion is no longer judged here by a word rule; the reasoner's independent verifier withholds an incomplete draft.
+  assert.doesNotMatch(source, /cos_analytical_contract_rejected/)
   assert.match(source, /cos_answer_unreleased_other/)
   assert.match(source, /answer_failure_code:analyticalFailureCode/)
   assert.match(source, /draft_present:Boolean\(availableDraft\?\.trim\(\)\)/)

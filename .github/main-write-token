@@ -1,2 +1,2 @@
-base_sha=87f4a24aa881e92b7446f929cd32e4603708b4bb
-branch=fix/history-builder-execution-link-20261029
+base_sha=9bfc2b5f7c878d46bd9c97329bc71b5a8dcd88e4
+branch=chore/remove-unused-agentic-workflow-modules-20261029

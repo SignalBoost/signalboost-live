@@ -1,4 +1,7 @@
+<!-- docs/architecture/ITMOUNTS-LIVE-TASK-STORE-SCHEMA-AUDIT-20261029.md -->
 # Live database inventory — canonical customer task authority decision
+
+> **Superseded 2026-10-29 by [`ITMOUNTS-HYBRID-ORCHESTRATION-GAP-ANALYSIS.md`](ITMOUNTS-HYBRID-ORCHESTRATION-GAP-ANALYSIS.md), the single canonical plan.** Kept as dated evidence only; do not plan from this file.
 
 Audit date: October 29, 2026. GitHub main `b947c733cfe626beec57c9a047b527a51a184132`. **Read-only queries** through connected Supabase project inventory and information_schema. No database writes or migrations applied.
 
@@ -16,7 +19,7 @@ Audit date: October 29, 2026. GitHub main `b947c733cfe626beec57c9a047b527a51a184
 | `saas/lib/ai/cos/durableCosTurn.ts` → `assistant_conversations`, `assistant_messages` | Conversation/message rows exist, `assistant_messages.provenance` jsonb stores `turnId`; `assistant_conversations` carries owner ID, title and summary. | **REUSE** and extend owner-scoped mapping to task; not yet canonical task truth |
 | `saas/lib/builder/job-runner.ts`, `job-store.ts` → `builder_jobs` | `builder_jobs` has `id`, `user_id`, `conversation_id`, `objective`, `status`, `checkpoint`, `claim_generation`, `metadata`, `result`, `history_message_id`. | **REUSE** durable Builder lifecycle; exact conversation and message links are existing bridge |
 | `saas/lib/agent-runtime/workflow-state.ts`, `workflow-store-supabase.ts` | Rich type with `workflowId`, owner ID, idempotency, lease, version; corresponding `agent_workflows` table not found in inspected databases. | **HOLD as canonical authority candidate** until active callers and migration verified; types alone do not establish a live store |
-| `saas/lib/agentic/dynamicWorkflowRunStore.ts` | CAS checkpoint code exists, staging inventory shows one differently named `agentic_workflow_checkpoint` table; runtime deployment and exact binding unproven. | **CONSOLIDATE**, never create a parallel customer-task authority |
+| `saas/lib/agentic/dynamicWorkflowRunStore.ts` | CAS checkpoint code exists, staging inventory shows one differently named `agentic_workflow_checkpoint` table; runtime deployment and exact binding unproven. | **CONSOLIDATE**, never create a parallel customer-task authority **Removed 2026-10-29: no production caller.** |
 | `saas/app/api/assistant/chats/route.ts` | Conversation/message GET with owner scoping; stale Builder and COS turn reconciliation | **REUSE + INTEGRATE** for customer visibility |
 
 ## Concrete finding: an existing link to preserve

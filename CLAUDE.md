@@ -2,6 +2,8 @@
 
 MANDATORY: before scanning, diagnosing, or changing anything in this repository, read `ONBOARD.md` (full current onboarding) and `AGENTS.md` (capability card and agent rules) at the repository root, in that order. Then read `docs/HANDOFF-2026-08-13.md` for the current dated takeover state. For COS active-learning work also read `docs/HANDOFF-COS-ACTIVE-LEARNING-2026-08-13.md`; for Self-Healing work read `docs/portables/self-healing-monitoring-current-state-20260813.md`. Then scan current `main`, read the task-specific files, and act. Never work from memory alone — the current repository and live evidence are the source of truth.
 
+For any COS, Builder, History, task-state, verification or orchestration work, also read `docs/architecture/ITMOUNTS-HYBRID-ORCHESTRATION-GAP-ANALYSIS.md`: it is the single canonical gap analysis and integration plan. Change the plan there; do not add a parallel plan, task store, workflow engine or orchestrator.
+
 For Marketing & Sales work, also read `docs/marketing-sales-current-state.md`, `saas/docs/marketing-sales-module-design.md`, `docs/business-intelligence-corpus.md`, and `docs/enterprise-release-candidate.md` before using older status estimates or build sequences. The core Marketing & Sales architecture is built; enterprise Release Candidate status remains evidence-based and must not be inferred from architecture or a green deployment. The Business Intelligence Corpus workflow is complete while population toward 5,000 companies continues as operational data growth.
 
 Current COS/Self-Healing facts that are easy to misreport:

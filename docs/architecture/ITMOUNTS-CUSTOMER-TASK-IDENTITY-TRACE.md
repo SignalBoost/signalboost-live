@@ -1,4 +1,7 @@
+<!-- docs/architecture/ITMOUNTS-CUSTOMER-TASK-IDENTITY-TRACE.md -->
 # Customer Task Identity: COS → Builder → Verification → History
+
+> **Superseded 2026-10-29 by [`ITMOUNTS-HYBRID-ORCHESTRATION-GAP-ANALYSIS.md`](ITMOUNTS-HYBRID-ORCHESTRATION-GAP-ANALYSIS.md), the single canonical plan.** Kept as dated evidence only; do not plan from this file.
 
 Source snapshot: main `16ac985a0cf7e5701804bbaeec8c841abef44fe6`, October 29, 2026. This is source evidence, **not runtime verification**. All commercial gates remain **0/10**.
 
@@ -14,7 +17,7 @@ Source snapshot: main `16ac985a0cf7e5701804bbaeec8c841abef44fe6`, October 29, 20
 | `saas/lib/builder/agent-v2-job-cycle.ts` | Claim-generation fence, verified checkpoint state across work slices | **REUSE:** preserve independently validated checkpoint/retry semantics |
 | `saas/lib/agent-runtime/workflow-state.ts` | `workflowId`, `requestId`, `userId`, `idempotencyKey`, `requestFingerprint`, version, lease, cancellation | **REUSE candidate:** schema is promising but does not yet contain mandated immutable objective, plan/evidence ledger and verification record |
 | `saas/lib/agent-runtime/workflow-store-supabase.ts` | Scoped idempotency lookup and compare-and-set implementation; factory `workflow-store-factory.ts` | **REUSE candidate, NOT selected:** search found no direct `createAgentWorkflowStore` caller; requires verified live consumers, DB schema, migration and access audit |
-| `saas/lib/agentic/dynamicWorkflowRunStore.ts` | Separate `workflow_id` and definition-revision CAS checkpoint persistence | **CONSOLIDATE:** not a customer task authority; avoid a second active orchestration ledger |
+| `saas/lib/agentic/dynamicWorkflowRunStore.ts` | Separate `workflow_id` and definition-revision CAS checkpoint persistence | **CONSOLIDATE:** not a customer task authority; avoid a second active orchestration ledger **Removed 2026-10-29: no production caller.** |
 | `saas/lib/agentic/taskLifecycle.ts` | Separate workflow definition/grant and in-memory execution | **ADAPT OR RETIRE after usage audit:** no demonstrated production usage from initial references |
 | `saas/lib/supervisor/orchestrator.ts` | Separate policy, executor, verifier, audit contracts and checkpoint boundary | **REUSE:** retain operational safety role, consume task references without taking ownership |
 | `saas/platform-harness/runtime/runner.ts` | `HarnessOutcomeVerifier` plus governed executor and trajectory receipts | **REUSE + INTEGRATE:** independent acceptance check must trace to immutable customer objective |

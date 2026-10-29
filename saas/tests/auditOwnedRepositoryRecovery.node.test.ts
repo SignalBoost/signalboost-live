@@ -73,8 +73,8 @@ test('unchanged Audit run never repeats terminal Builder failures after cooldown
     'builder_v2_total_deadline_exceeded',
   ]) assert.ok(source.includes(reason), reason)
   const lookup = source.slice(source.indexOf('const lastFailure = await admin'), source.indexOf('const failedSince ='))
-  assert.match(lookup, /\\.eq\\('status', 'failed'\\)/)
+  assert.match(lookup, /\.eq\('status', 'failed'\)/)
   assert.match(lookup, /selfHealingKey: key/)
-  assert.doesNotMatch(lookup, /\\.gte\\('created_at'/)
+  assert.doesNotMatch(lookup, /\.gte\('created_at'/)
   assert.match(lookup, /terminalAuditRecoveryFailure/)
 })

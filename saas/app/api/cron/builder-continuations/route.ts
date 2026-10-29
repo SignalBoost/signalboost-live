@@ -117,13 +117,13 @@ export async function GET(request: Request) {
     console.error('[builder_stale_claim_requeue_failed]', { code: staleRecoveryError.code })
     return NextResponse.json({ ok: false, error: 'builder_stale_claim_recovery_unavailable' }, { status: 503 })
   }
-  // Recover non-checkpointed/exhausted claims too: the checkpoint RPC above can only
-  // pause safe, resumable jobs. The existing scoped RPC terminally fences the rest.
+  // Recover non-checkpointed claims only. A checkpointed claim must never be
+  // terminalized by this generic expiry route: the fenced requeue owns recovery. The existing scoped RPC terminally fences the rest.
   // A live heartbeat prevents declaring an actively executing tool round stale.
   const cutoff = new Date(Date.now() - BUILDER_JOB_STALE_AFTER_MS).toISOString()
   const { data: stranded, error: strandedError } = await db.from('builder_jobs')
     .select('id,user_id,last_heartbeat_at,updated_at')
-    .eq('status', 'running').lt('updated_at', cutoff).limit(100)
+    .eq('status', 'running').is('checkpoint', null).lt('updated_at', cutoff).limit(100)
   if (strandedError) {
     console.error('[builder_stale_claim_scan_failed]', { code: strandedError.code })
     return NextResponse.json({ ok: false, error: 'builder_stale_claim_scan_unavailable' }, { status: 503 })

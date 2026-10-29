@@ -28,7 +28,10 @@ test('only a resumable paused checkpoint is resumed by a poll — the same set t
 test('a poll resumes only when nothing runs and no other checkpoint waits, so two polls can never start two jobs (Codex P1)', () => {
   const store = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
   const admission = store.slice(store.indexOf('export async function builderSoleResumableJob'))
-  assert.match(admission, /\.select\('id', \{ count: 'exact', head: true \}\)\s*\.eq\('job_kind', 'standard'\)\.or\('status\.eq\.running,and\(status\.eq\.paused,checkpoint\.not\.is\.null\)'\)\.neq\('id', jobId\)/)
+  // The canonical COS task kind is intentionally excluded from Builder's execution queue.
+  // Preserve the kind filter: an unrelated running COS turn must not block Builder.
+  assert.ok(admission.includes(".eq('job_kind', 'standard').or('status.eq.running,and(status.eq.paused,checkpoint.not.is.null)').neq('id', jobId)"))
+  assert.ok(admission.includes(".select('id', { count: 'exact', head: true })"))
   assert.match(admission, /return !error && count === 0/)
   assert.match(admission, /if \(!db\) return false/)
   assert.doesNotMatch(store, /builderNoRunningClaim/)

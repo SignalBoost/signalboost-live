@@ -134,3 +134,10 @@ test('durable COS completion persists History and task through one atomic RPC', 
   assert.match(migration, /for update/i)
   assert.match(migration, /raise exception 'cos_turn_finish_not_committed'/i)
 })
+
+test('COS refuses to mark an explicit inability to execute as task success', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/cos-provenance-browser/route.ts'), 'utf8')
+  assert.match(route, /const refusedExecution =/)
+  assert.match(route, /Boolean\(reply\) && !refusedExecution/)
+  assert.match(route, /cos_execution_refused/)
+})

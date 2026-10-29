@@ -1,2 +1,2 @@
-base_sha=6d813b1d77415cb06f3c29551e4890915c99cb7b
-branch=test/builder-recovery-assertion-sync-20261029
+base_sha=ed25f7612a0fff53ea1eededfb844e689618e553
+branch=fix/builder-expiry-preflight-current-policy-20261029

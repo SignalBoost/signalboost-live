@@ -267,6 +267,8 @@ test('verified owner repair can publish a serialized review branch and PR but ne
     calls.push({ url, method, body })
     if (url.endsWith('/git/ref/heads/main')) return jsonResponse({ object: { sha: baseSha } })
     if (url.endsWith(`/git/commits/${baseSha}`)) return jsonResponse({ tree: { sha: baseTreeSha } })
+    if (url.includes('/git/trees/'+baseTreeSha+'?recursive=1')) return jsonResponse({ truncated: false, tree: [{ path: 'ONBOARD.md', type: 'blob', sha: '2'.repeat(40) }] })
+    if (url.includes('/contents/ONBOARD.md?ref=')) return jsonResponse({ type: 'file', sha: '2'.repeat(40) })
     if (url.endsWith('/git/blobs') && method === 'POST') return jsonResponse({ sha: blobShas[blobIndex++] }, 201)
     if (url.endsWith('/git/trees') && method === 'POST') return jsonResponse({ sha: createdTreeSha }, 201)
     if (url.endsWith('/git/commits') && method === 'POST') return jsonResponse({ sha: createdCommitSha }, 201)

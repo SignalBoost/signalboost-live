@@ -164,3 +164,12 @@ test('Q10 repair selection uses the independent verifier rather than word-count 
   assert.match(source, /repairedOutcome && repairedOutcome\.status !== 'incomplete'/)
   assert.doesNotMatch(source, /cosAnswerProgress|missingAnalyticalTasks|analyticalTaskRepairDirective/)
 })
+
+test('Q10 verifier-guided recovery preserves non-analytical writing and translation objectives', () => {
+  const source = read('lib/ai/cos/cosReasoner.ts')
+  assert.match(source, /\.\.\.\(analyticalTasks\.length > 0\s*\? \[/)
+  assert.match(source, /ANALYTICAL RECOVERY/)
+  assert.match(source, /DELIVERABLE RECOVERY — revise the requested output, preserving its original format, language requirements and constraints/)
+  assert.match(source, /Do not convert writing, translation or other non-analytical requests into an investigation/)
+  assert.match(source, /Independently verified missing deliverables:/)
+})

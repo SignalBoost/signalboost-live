@@ -20,9 +20,12 @@ import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
 import { CHAT_ANSWER_LENGTH_RULE } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { hasUnsafePublicModelOutput } from '@/lib/ai/cos/publicPromptSecurity'
+import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import {
   acceptFreshEvidenceGroundedAnswer,
+  acceptFreshEvidenceWrittenDeliverable,
   freshEvidenceGroundedAnswerPrompt,
+  freshEvidenceWritingPrompt,
   FRESH_GROUNDED_ANSWER_MAX_TOKENS,
   FRESH_GROUNDED_ANSWER_TIMEOUT_MS,
   type FreshEvidenceGroundedPrompt,
@@ -46,6 +49,8 @@ export type FreshEvidenceLocalSynthesisOutcome =
   | { kind: 'citation_grounding_rejected'; reason: FreshEvidenceGroundingRejection; rejectedDraftHead?: string }
 
 const FRESH_GROUNDED_ANSWER_TEMPERATURE = 0.2
+/** Room for a complete letter plus its advice section. */
+const FRESH_WRITTEN_DELIVERABLE_MAX_TOKENS = 2_000
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -88,13 +93,69 @@ async function groundedAnswerCall(prompt: FreshEvidenceGroundedPrompt, structure
   }
 }
 
-export async function synthesizeFreshEvidenceLocally(args: {
+/**
+ * A writing request on live evidence (Q15): the full COS answer turn writes the deliverable, so the independent answer
+ * verifier checks that every requested part (the letter AND the advice) is delivered and the completion loop adds a
+ * missing part before release. The turn returns null when the verifier finds a part still missing.
+ */
+async function writtenDeliverableOnEvidence(args: {
   input: string
   sources: FreshEvidenceSource[]
   retrievedAt: string
   language: string
 }): Promise<FreshEvidenceLocalSynthesisOutcome> {
+  const startedAt = Date.now()
+  let result: Awaited<ReturnType<typeof callCosReasoner>> = null
+  try {
+    result = await callCosReasoner({
+      ...freshEvidenceWritingPrompt(args),
+      temperature: FRESH_GROUNDED_ANSWER_TEMPERATURE,
+      disableThinking: true,
+      // The deliverable the person reads: it gets the answer window and room, and the reasoner's verifier.
+      writesUserAnswer: true,
+      maxTokens: FRESH_WRITTEN_DELIVERABLE_MAX_TOKENS,
+      allowConfiguredFallback: true,
+      usageContext: { feature: 'cos_interactive_answer', purpose: 'fresh_grounded_writing' },
+    })
+  } catch (error) {
+    return { kind: 'local_synthesis_failed', error: errorText(error) }
+  }
+  const parsed = result?.text ? parseLocalResult(result.text) : null
+  if (!parsed || parsed.truncated) {
+    console.warn('[cos-fresh-grounded-writing]', JSON.stringify({ accepted: false, reason: result ? 'unparseable_or_cut_off' : 'no_answer', latencyMs: Date.now() - startedAt }))
+    return { kind: 'local_synthesis_unparseable' }
+  }
+  const accepted = acceptFreshEvidenceWrittenDeliverable({ text: parsed.answer, input: args.input, sources: args.sources })
+  console.info('[cos-fresh-grounded-writing]', JSON.stringify({
+    accepted: accepted.ok,
+    reason: accepted.reason,
+    answerOutcome: result?.answerOutcome ?? null,
+    citedSourceIds: accepted.citedSourceIds,
+    sources: args.sources.length,
+    latencyMs: Date.now() - startedAt,
+  }))
+  if (!accepted.ok) {
+    const rejectedDraftHead = accepted.reason === 'unsafe_public_output' ? undefined : parsed.answer.replace(/\s+/g, ' ').trim().slice(0, 300)
+    return { kind: 'citation_grounding_rejected', reason: accepted.reason ?? 'empty_answer', rejectedDraftHead }
+  }
+  return {
+    kind: 'accepted',
+    reply: accepted.reply,
+    reasonerLabel: result?.reasoner?.label || resolveCosReasoner()?.config?.label || 'cos-reasoner',
+    citedSourceIds: accepted.citedSourceIds,
+  }
+}
+
+export async function synthesizeFreshEvidenceLocally(args: {
+  input: string
+  sources: FreshEvidenceSource[]
+  retrievedAt: string
+  language: string
+  /** 'writing' when the turn's intent judge read the request as writing (a letter, email, memo) that needs facts. */
+  deliverable?: 'answer' | 'writing'
+}): Promise<FreshEvidenceLocalSynthesisOutcome> {
   if (!args.sources.length) return { kind: 'local_synthesis_unparseable' }
+  if (args.deliverable === 'writing') return writtenDeliverableOnEvidence(args)
   const startedAt = Date.now()
   const answerTokens = FRESH_GROUNDED_ANSWER_MAX_TOKENS
 

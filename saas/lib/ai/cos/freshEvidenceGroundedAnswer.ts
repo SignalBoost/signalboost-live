@@ -334,3 +334,69 @@ export function freshEvidenceGroundedRepairPrompt(args: {
   }
 }
 
+
+/**
+ * WRITTEN DELIVERABLES ON LIVE EVIDENCE (gap analysis Q15, owner retest 2026-10-30 19:45).
+ *
+ * The acceptance above is built for a factual answer: it keeps only sentences that cite a source and drops every
+ * first-person sentence as process narration. A letter written in the user's voice is mostly uncited first-person
+ * text (greeting, the ask, the sign-off), so that filter cut a correctly cited letter to fragments, or rejected it
+ * whole, and the user got "did not meet the verification requirement" with no letter and no advice.
+ *
+ * A writing request that depends on outside facts gets its own prompt and acceptance. Deterministic code still
+ * checks what it can verify: every cited id is a source retrieved this turn, at least one source is cited, the
+ * host's citation requirement is met, and the text is safe to publish. It does not police the wording of the
+ * letter. Whether every requested part (the letter AND the advice) is delivered is decided by the independent
+ * answer verifier inside the reasoner turn, not here.
+ */
+export function freshEvidenceWritingPrompt(args: {
+  input: string
+  sources: FreshEvidenceSource[]
+  retrievedAt: string
+  language: string
+}): FreshEvidenceGroundedPrompt {
+  const requirement = freshCitationRequirement(args.input, args.sources)
+  const systemPrompt = [
+    'You are COS. The user asked you to write something (a letter, email, message, memo or similar) whose content depends on outside facts. Live evidence for those facts was retrieved by the server moments ago.',
+    `Write in ${reportLanguageName(args.language)} unless the request is clearly written in another language; then use that language.`,
+    'Deliver EVERY part the user asked for, complete and ready to use. When the user asks for a piece of writing and also asks what to do, give both: the finished piece of writing, then a short, practical section on what to do.',
+    'Write the piece in the user\'s own voice, as the user would send it, with placeholders in square brackets only for details you do not have (for example [Your name]).',
+    'For every outside fact the writing or the advice relies on (a law, rule, deadline, eligibility condition, office, figure), use only the supplied evidence and cite its id in square brackets right after the fact, e.g. [LIVE1]. Do not write URLs; the server appends the source list.',
+    'If the evidence does not confirm something the user heard or assumed, say plainly that it is not confirmed and what to check; never present it as fact and never invent a rule, number or citation.',
+    'Keep names and acronyms as the user wrote them unless the request or the evidence states what they stand for; never guess an expansion.',
+    'Do not describe your process, the sources, or verification. Output only the deliverable.',
+    `CITATION REQUIREMENT (enforced by the server before release): ${describeFreshCitationRequirement(requirement, args.sources)}`,
+    'Return ONLY strict JSON: {"answer":"<the complete deliverable, as plain text with line breaks>","confidence":0.0}.',
+  ].join('\n')
+  const compact = compactFreshEvidenceForReasoning(args.sources, args.input)
+  const prompt = `REQUEST: ${args.input}\n\n--- LIVE EVIDENCE ---\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nREQUEST: ${args.input}\nWrite every requested part now, citing [LIVEn] after each outside fact.`
+  return { systemPrompt, prompt }
+}
+
+export function acceptFreshEvidenceWrittenDeliverable(args: {
+  text: string
+  input: string
+  sources: FreshEvidenceSource[]
+}): FreshEvidenceGroundedAcceptance {
+  const byId = new Map(args.sources.map(source => [source.id, source] as const))
+  // No sentence trimming: a letter legitimately ends on a closing ("Sincerely,\n[Your name]"), and a cut-off model
+  // output never reaches this point (the caller rejects truncated output). Codex on #5145.
+  const answer = normalizeLiveCitations(String(args.text || '').replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, ''))
+    // A cited id that is not a source retrieved this turn is removed; the rest of the sentence stays.
+    .replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+  if (!answer) return { ok: false, reason: 'empty_answer', reply: '', answer: '', citedSourceIds: [] }
+  const citedSourceIds: string[] = []
+  for (const match of answer.matchAll(LIVE_CITATION)) {
+    if (!citedSourceIds.includes(match[1])) citedSourceIds.push(match[1])
+  }
+  if (!citedSourceIds.length) return { ok: false, reason: 'no_evidence_cited', reply: '', answer, citedSourceIds }
+  if (hasUnsafePublicModelOutput(answer)) return { ok: false, reason: 'unsafe_public_output', reply: '', answer, citedSourceIds }
+  const citations = citedSourceIds.map(id => `[${id}] (${byId.get(id)!.url})`)
+  const reply = `${answer}\n\nSources: ${citations.join(' and ')}`
+  if (!replyCitesRequiredFreshEvidence(reply, args.input, args.sources)) {
+    return { ok: false, reason: 'citation_requirement_unmet', reply: '', answer, citedSourceIds }
+  }
+  return { ok: true, reason: null, reply, answer, citedSourceIds }
+}

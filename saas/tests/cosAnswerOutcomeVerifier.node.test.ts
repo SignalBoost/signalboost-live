@@ -135,3 +135,23 @@ test('a full verdict on the maximum number of deliverables fits the judge token 
   assert.match(prompt, /\(5 to 8 words\)/)
   assert.match(prompt, /at most 6 words/)
 })
+
+test('Q15 retirement letter must deliver both the legal basis and requested next steps', async () => {
+  const request = 'Draft a letter to my CDO about possibly staying at the Department of State five years past age 65, and tell me what I should do.';
+  const incompleteLetter = 'Dear CDO, I turn 65 next year and would like to ask whether I can stay five more years. Thank you.';
+  const missing = await verifyAnswerOutcome({ request, answer: incompleteLetter, judge: judgeSays([
+    { item: 'draft CDO letter', delivered: true, quote: 'I turn 65 next year and would like to ask whether I can stay five more years' },
+    { item: 'legal basis for extension', delivered: false, quote: '' },
+    { item: 'what to do next', delivered: false, quote: '' },
+  ]) });
+  assert.equal(missing.status, 'incomplete');
+  assert.deepEqual(missing.missing, ['legal basis for extension', 'what to do next']);
+
+  const complete = incompleteLetter + ' Under 22 U.S.C. § 4052(b), the Secretary may retain a Foreign Service member beyond 65 in the public interest for up to five years. Ask your CDO and HR about eligibility, the required request, and approval deadlines.';
+  const verified = await verifyAnswerOutcome({ request, answer: complete, judge: judgeSays([
+    { item: 'draft CDO letter', delivered: true, quote: 'I turn 65 next year and would like to ask whether I can stay five more years' },
+    { item: 'legal basis for extension', delivered: true, quote: 'the Secretary may retain a Foreign Service member beyond 65 in the public interest' },
+    { item: 'what to do next', delivered: true, quote: 'Ask your CDO and HR about eligibility, the required request, and approval deadlines' },
+  ]) });
+  assert.equal(verified.status, 'verified');
+});

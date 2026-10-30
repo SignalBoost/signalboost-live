@@ -38,7 +38,7 @@ import { resolveSemanticPublicIdentity, shouldResolveSemanticPublicIdentity } fr
 import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
-import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective, isConciergeBuilderObjective, pastedSourceCode } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { isCosCodingObjective, isConciergeBuilderObjective, pastedSourceCode } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { decideCosAgentTurn, stableKnowledgeQuestionNeedsNoPlanner, type CosAgentDecision } from '@/lib/ai/cos/cosAgentDecision'
 import { encodePlannerSearchQueriesHeader, PLANNER_SEARCH_QUERIES_HEADER } from '@/lib/ai/cos/plannerSearchQueries'
 import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
@@ -279,6 +279,24 @@ async function executeBrowserTurn(req: NextRequest) {
   // COS with the compute capability, where the governed agent loop runs behind the COS ingress.
   const agentToolsRequired = !hasAttachments && requiresAgentTools(prompt, priorAnswer)
 
+  // Public Concierge identity answers are deterministic. Resolve them before the writing
+  // intent judge, which can otherwise introduce unnecessary model latency for identity questions.
+  // Keep software repair and Builder requests on their existing authoritative routes.
+  const deterministicPublicIdentity = browserSurface === 'concierge'
+    && !softwareRepairRequest && !isConciergeBuilderObjective(prompt, routingContext)
+    ? publicConciergeIdentityReply(prompt)
+    : null
+  if (deterministicPublicIdentity) {
+    return publicConciergePresentation(await withSuggestedFollowups(NextResponse.json({
+      ...deterministicPublicIdentity,
+      identity_routing: 'deterministic',
+      external_ai_invoked: false,
+      local_model_invoked: false,
+      execution_allowed: false,
+      external_action_taken: false,
+    }), prompt, auditUserId))
+  }
+
   // Self-contained writing/translation is already a complete COS objective. Do not spend the
   // interactive response budget asking unrelated public identity, Software Specialist, or visual
   // classifiers to reinterpret it. This is not a separate Concierge brain: both surfaces still
@@ -287,13 +305,13 @@ async function executeBrowserTurn(req: NextRequest) {
   const turnIntent = () => cosTurnIntent({ input: prompt, language, previousUserContext: previousUserPrompt || null, previousAssistant: priorAnswer || null })
   const pastedConversationEvidence = /(?:^|\n)\s*(?:YOUR REQUEST\s+\d+|COS response\s+\d+|assistant response\s+\d+)\s*(?:\n|$)/im.test(prompt)
   const fastAuthoringIngress = !pastedConversationEvidence && !directTextHasAttachments
-    && isAuthoringObjectiveWithoutLiveLookup(prompt)
     && !softwareRepairRequest
     && !isCosCodingObjective(prompt, routingContext)
     && !agentToolsRequired
     && !isProvenanceIntrospection(prompt)
     && !isOperationalLogEvidence(prompt)
     && semanticIntentConfirmsWriting(await turnIntent())
+    && !(await turnIntent())?.externalFactsRequired
   if (fastAuthoringIngress) {
     const executeAuthoring = () => cosPrimaryPost(req)
     const authoringResponse = access?.isOwner && browserSurface === 'assistant'
@@ -305,17 +323,16 @@ async function executeBrowserTurn(req: NextRequest) {
   }
 
   if (browserSurface === 'concierge' && !softwareRepairRequest && !isConciergeBuilderObjective(prompt, routingContext)) {
-    const deterministicIdentity = publicConciergeIdentityReply(prompt)
-    const semanticIdentityEligible = !deterministicIdentity && shouldResolveSemanticPublicIdentity(prompt)
+    const semanticIdentityEligible = shouldResolveSemanticPublicIdentity(prompt)
     semanticIdentityInvoked = semanticIdentityEligible
     const semanticIdentity = semanticIdentityEligible ? await resolveSemanticPublicIdentity(prompt) : null
-    const identity = deterministicIdentity || (semanticIdentity
+    const identity = semanticIdentity
       ? publicConciergeIdentityReplyForIntent(semanticIdentity.intent, semanticIdentity.language)
-      : null)
+      : null
     if (identity) {
       return publicConciergePresentation(await withSuggestedFollowups(NextResponse.json({
         ...identity,
-        identity_routing: deterministicIdentity ? 'deterministic' : 'deep-semantic',
+        identity_routing: 'deep-semantic',
         external_ai_invoked: false,
         local_model_invoked: semanticIdentity !== null,
         execution_allowed: false,

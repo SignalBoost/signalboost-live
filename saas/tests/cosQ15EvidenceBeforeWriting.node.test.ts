@@ -19,6 +19,8 @@ test('browser and primary fast-authoring lanes exclude factual writing', () => {
   const browser = read('app/api/cos-browser/route.ts')
   const primary = read('app/api/cos-primary/route.ts')
   assert.match(browser, /&& !\(await turnIntent\(\)\)\?\.externalFactsRequired/)
+  assert.doesNotMatch(browser, /isAuthoringObjectiveWithoutLiveLookup/)
+  assert.match(browser, /semanticIntentConfirmsWriting\(await turnIntent\(\)\)/)
   assert.match(primary, /&& !\(await cosTurnIntent\(/)
   assert.match(primary, /const semanticTaskIntentNeeded=!requestedAction[\s\S]{0,240}isAuthoringObjectiveWithoutLiveLookup\(input\)/)
 })

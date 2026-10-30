@@ -106,7 +106,8 @@ test('the live-fact path is one interactive-lane call with at most one repair, a
 test('COS avoids repeating expensive search and inference after a rejected answer', () => {
   const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(route, /primary:web_search_recovery|primary:web_page_reads_recovery/)
-  assert.match(route, /const sourceDigestFallback=freshHardFail/)
+  // A rejected answer is never replaced by a list of the search results (gap analysis Q4).
+  assert.doesNotMatch(route, /sourceDigestFallback|buildSourceSummaryFallback/)
   assert.match(route, /primary:web_page_reads/)
   const local = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(local, /const second = await groundedAnswerCall/)

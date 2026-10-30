@@ -14,6 +14,12 @@ VALUES ('30000000-0000-4000-8000-000000000005','30000000-0000-4000-8000-00000000
 INSERT INTO public.builder_jobs(id,user_id,workspace_id,conversation_id,status,claim_generation,job_kind,updated_at,objective,metadata)
 VALUES ('30000000-0000-4000-8000-000000000006','30000000-0000-4000-8000-000000000001','30000000-0000-4000-8000-000000000002','30000000-0000-4000-8000-000000000003','queued',0,'standard',now(),'Implement calculator',
 '{"customerTaskId":"30000000-0000-4000-8000-000000000005"}'::jsonb);
+-- A second valid same-owner COS parent ensures the immutability guard,
+-- rather than the older ownership guard, is what rejects reparenting.
+INSERT INTO public.builder_jobs(id,user_id,workspace_id,conversation_id,status,claim_generation,job_kind,updated_at,objective,metadata)
+VALUES ('30000000-0000-4000-8000-000000000009','30000000-0000-4000-8000-000000000001',
+'30000000-0000-4000-8000-000000000002','30000000-0000-4000-8000-000000000003',
+'running',0,'cos_turn',now(),'Separate customer task','{}'::jsonb);
 DO $gate1$
 DECLARE v_count int; v_completed boolean;
 BEGIN
@@ -26,7 +32,7 @@ BEGIN
   AND receipt.provenance->>'turnId'=parent.id::text;
  IF v_count<>1 THEN RAISE EXCEPTION 'Gate 1 linked execution and History receipt missing'; END IF;
  BEGIN
-  UPDATE public.builder_jobs SET metadata='{"customerTaskId":"30000000-0000-4000-8000-000000000007"}'::jsonb
+  UPDATE public.builder_jobs SET metadata='{"customerTaskId":"30000000-0000-4000-8000-000000000009"}'::jsonb
   WHERE id='30000000-0000-4000-8000-000000000006';
   RAISE EXCEPTION 'Gate 1 parent relink accepted';
  EXCEPTION WHEN check_violation THEN

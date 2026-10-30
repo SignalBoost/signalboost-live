@@ -22,7 +22,8 @@ import { runOwnerDomainBrainstorm } from '@/lib/ai/cos/domainBrainstorm'
 import { isPlatformSelfKnowledgePrompt, isSelfContainedIncidentAnalysis, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { classifyKnowledgeAccess } from '@/lib/ai/cos/knowledgeAccessPolicy'
 import { decodePlannerSearchQueriesHeader, liveSearchQueriesForTurn, PLANNER_SEARCH_QUERIES_HEADER } from '@/lib/ai/cos/plannerSearchQueries'
-import { semanticIntentConfirmsWriting, semanticIntentIsSelfContainedContentGeneration, semanticIntentRequiresFreshness, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
+import { semanticIntentComposesWithEvidence, semanticIntentConfirmsWriting, semanticIntentIsSelfContainedContentGeneration, semanticIntentRequiresFreshness, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
+import { liveEvidenceCompositionBlock, withCitedLiveSources } from '@/lib/ai/cos/composeWithLiveEvidence'
 import { cosTurnIntent, pendingCosTurnIntent, withCosTurnIntent } from '@/lib/ai/cos/cosTurnIntent'
 import { mayBeNonEnglish } from '@/lib/ai/cos/crossLanguageFreshness'
 import {
@@ -437,7 +438,7 @@ function fastAuthoringResponse(startedAt:number,input:string,fast:{reply:string;
   return NextResponse.json({ok:true,reply:fast.reply,source,cognitive_mode:fast.cognitiveMode,confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
 }
 
-async function runCompletionFirstRescue(input:string,language:string,audience:CosAudience):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
+async function runCompletionFirstRescue(input:string,language:string,audience:CosAudience,userRequest:string=input):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
   const analyticalTasks=requestedAnalyticalTasks(input)
   // ONE BRAIN: the rescue lane carries the same COS identity and company knowledge as the main pipeline.
   // The last chance before failing closed writes the user's answer: it gets the same answer window as the main
@@ -471,7 +472,7 @@ async function runCompletionFirstRescue(input:string,language:string,audience:Co
   if(!reply||hasUnsafePublicModelOutput(reply))return null
   // The rescue lane writes its own answer, so the independent verifier judges it like every COS answer: a missing
   // deliverable gets one rewrite while the turn has time, and an answer the verifier finds incomplete is not released.
-  const firstOutcome=await verifyAnswerOutcome({request:input,answer:reply,judge:cosAnswerOutcomeJudge})
+  const firstOutcome=await verifyAnswerOutcome({request:userRequest,answer:reply,judge:cosAnswerOutcomeJudge})
   if(firstOutcome.status==='incomplete'){
     const timeLeft=turnDeadlineRemainingMs()
     if(timeLeft!==null && timeLeft<12_000)return null
@@ -486,7 +487,7 @@ async function runCompletionFirstRescue(input:string,language:string,audience:Co
     const candidate=repaired?.text?parseLocalResult(repaired.text):null
     const candidateReply=String(candidate?.answer||'').trim()
     if(!candidateReply||hasUnsafePublicModelOutput(candidateReply))return null
-    if(!answerOutcomeReleasable(await verifyAnswerOutcome({request:input,answer:candidateReply,judge:cosAnswerOutcomeJudge})))return null
+    if(!answerOutcomeReleasable(await verifyAnswerOutcome({request:userRequest,answer:candidateReply,judge:cosAnswerOutcomeJudge})))return null
     reply=candidateReply
   }
   const resolved=resolveCosReasoner()
@@ -955,6 +956,8 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   let freshGroundingRejection:string|null=null
   let freshRejectedDraftHead:string|null=null
   let freshMissUseLocal=false
+  // Sources for a deliverable COS writes whole from live evidence (composeWithLiveEvidence.ts); null on a fact lookup.
+  let composeEvidence:FreshEvidenceSource[]|null=null
   if(requiresFreshEvidence){
     freshRetrievedAt=new Date().toISOString()
     const queries=liveSearchQueriesForTurn(plannerSearchQueries,freshEvidenceSearchQueries(lookupInput)).slice(0,2)
@@ -985,10 +988,16 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     // no outside facts are required, at the judge's confidence bar; any other reading, or none, keeps the refusal. Production 2026-10-28 (COS-PAC-001, PAC-03): a self-contained infrastructure
     // incident report was refused as "live evidence unavailable" because word rules flagged it and the web returned
     // unrelated pages; with no sources at all it would have been answered.
+    // A letter, advice or analysis that needs outside facts is written whole by COS from these sources; only a fact
+    // lookup goes to the fact-only lane below, which keeps cited sentences alone and cannot write a letter.
+    if(semanticIntentComposesWithEvidence(semanticTaskIntent)){
+      composeEvidence=freshSources
+      freshMissUseLocal=true
+    }
     const liveFactsIntent=!authoritySatisfied&&freshSources.length
       ? semanticTaskIntent??await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
       : semanticTaskIntent
-    if(!authoritySatisfied){
+    if(!authoritySatisfied&&!composeEvidence){
       if((documentAdvisoryRequest && !directCategory)
         ||(!freshSources.length && !mustFailClosedWithoutAuthoritativeLiveEvidence(lookupInput))
         ||(freshSources.length>0&&liveFactsIntent!==null&&liveFactsIntent.suppliedContextPrimary===true
@@ -1129,9 +1138,15 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     ? await timeCosStage('primary:conversation_recall',()=>buildConversationRecallContext({userId,request:input,currentConversationId:String(body?.context?.conversationId||body?.conversationId||'')||null,search:searchPastConversations}))
     : null
   if(conversationRecall) reasoningPrompt=`${conversationRecall}\n\nCURRENT USER REQUEST:\n${reasoningPrompt}`
+  if(composeEvidence) reasoningPrompt=`${liveEvidenceCompositionBlock(composeEvidence)}\n\nCURRENT USER REQUEST:\n${reasoningPrompt}`
   let cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null=null,localError:string|null=null
   if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)){
-    try{recordCosLatencyStage('primary:before_cos_first',Date.now()-startedAt);cos=await timeCosStage('primary:cos_first_answer',()=>tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest||modelPlannedSemanticMemory||modelPlannedCreativeMemory}))}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
+    try{recordCosLatencyStage('primary:before_cos_first',Date.now()-startedAt);cos=await timeCosStage('primary:cos_first_answer',()=>tryCOSFirstAnswer({prompt:reasoningPrompt,liveEvidenceSupplied:Boolean(composeEvidence),previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest||modelPlannedSemanticMemory||modelPlannedCreativeMemory}))}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
+  }
+  // The sources a written deliverable cites are listed under it by the host, never by the model.
+  if(cos&&composeEvidence){
+    if(cos.handled)cos={...cos,reply:withCitedLiveSources(cos.reply,composeEvidence)}
+    else if('bestEffortReply' in cos&&typeof cos.bestEffortReply==='string')cos={...cos,bestEffortReply:withCitedLiveSources(cos.bestEffortReply,composeEvidence)}
   }
   if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';persistCosPrimaryProvenanceAfterResponse(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
@@ -1162,8 +1177,8 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // authoring: explanation, analysis, planning, and other low-risk tasks should still receive a
   // useful answer when the primary confidence gate declined to release one.
   if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&!hasAttachments&&!isCosCodingObjective(input)){
-    const completionRescue=await timeCosStage('primary:completion_rescue',()=>runCompletionFirstRescue(input,language,cosAudience(isPrivileged)))
-    if(completionRescue)return completionFirstResponse(startedAt,input,completionRescue,'cos-completion-first-rescue')
+    const completionRescue=await timeCosStage('primary:completion_rescue',()=>runCompletionFirstRescue(composeEvidence?reasoningPrompt:input,language,cosAudience(isPrivileged),input))
+    if(completionRescue)return completionFirstResponse(startedAt,input,composeEvidence?{...completionRescue,reply:withCitedLiveSources(completionRescue.reply,composeEvidence)}:completionRescue,'cos-completion-first-rescue')
   }
 
   const freshHardFail=requiresFreshEvidence&&!freshMissUseLocal

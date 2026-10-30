@@ -169,7 +169,10 @@ test('deep semantic identity routing separates current identity from naming work
   const route = await readFile(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.match(route, /await resolveSemanticPublicIdentity\(prompt\)/)
   assert.match(route, /publicConciergeIdentityReplyForIntent\(semanticIdentity\.intent, semanticIdentity\.language\)/)
-  assert.match(route, /identity_routing: deterministicIdentity \? 'deterministic' : 'deep-semantic'/)
+  assert.match(route, /identity_routing: 'deterministic'/)
+  assert.match(route, /identity_routing: 'deep-semantic'/)
+  assert.ok(route.indexOf('if (deterministicPublicIdentity)') < route.indexOf('const turnIntent = ()'))
+  assert.ok(route.indexOf('if (deterministicPublicIdentity)') < route.indexOf('const fastAuthoringIngress ='))
 })
 
 test('new semantic-only public visual requests still reach bounded semantic detection without pre-classifying ordinary questions', async () => {

@@ -1,2 +1,2 @@
-base_sha=17f473806694a14b3de26e8c0d83ee96ced4464a
-branch=docs/developer-queue-q19-cache-20261030
+base_sha=75bda04cde5e728c06b837f0242ebf2a74cf3c2e
+branch=fix/immutable-builder-parent-task-rebased-20261030

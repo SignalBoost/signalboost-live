@@ -71,3 +71,11 @@ test.todo('gate 7 staging: browser disconnect and worker restart recover the sam
 test.todo('gate 8 Playwright: customer History Stop Resume Results control authoritative job and show evidence')
 test.todo('gate 9 staging: real DB, provider and worker failure-injection receipts retained')
 test.todo('gate 10 production: low-risk canary rollout and verified automatic rollback')
+
+test('gate 1 regression: Builder delegation cannot be relinked or detached from its COS parent', () => {
+ const migration = source('supabase/migrations/20261030160000_immutable_builder_customer_task_parent.sql')
+ assert.match(migration,/\(OLD\.metadata->>'customerTaskId'\) IS DISTINCT FROM/)
+ assert.match(migration,/\(NEW\.metadata->>'customerTaskId'\)/)
+ assert.match(migration,/RAISE EXCEPTION 'builder_customer_task_parent_immutable' USING ERRCODE = '23514'/)
+ assert.match(migration,/BEFORE UPDATE OF metadata ON public\.builder_jobs/)
+})

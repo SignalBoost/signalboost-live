@@ -57,6 +57,15 @@ test('the written-deliverable acceptance releases the whole letter and the advic
   assert.match(accepted.reply, /\n\nSources: \[LIVE1\] \(https:\/\/www\.law\.cornell\.edu\/uscode\/text\/22\/4052\) and \[LIVE2\] \(https:\/\/fam\.state\.gov\/fam\/03fam\/03fam6210\.html\)$/)
 })
 
+test('a letter that ends on its closing keeps the closing and the signature placeholder', () => {
+  const advice = 'What to do: ask your CDO now, well before your 65th birthday, and be ready to show why your retention serves the public interest [LIVE2].'
+  const closingLast = [advice, '', letter.replace(advice, '').trim()].join('\n')
+  assert.ok(closingLast.trimEnd().endsWith('Sincerely,\n[Your name]'))
+  const accepted = acceptFreshEvidenceWrittenDeliverable({ text: closingLast, input: request, sources })
+  assert.equal(accepted.ok, true, String(accepted.reason))
+  assert.ok(accepted.answer.endsWith('Sincerely,\n[Your name]'), 'closing kept')
+})
+
 test('deterministic checks still hold for writing: real ids only, at least one source, safe text', () => {
   const invented = acceptFreshEvidenceWrittenDeliverable({ text: `${letter}\nAnother rule applies [LIVE9].`, input: request, sources })
   assert.equal(invented.ok, true)

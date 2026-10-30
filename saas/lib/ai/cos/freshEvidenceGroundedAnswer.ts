@@ -379,7 +379,9 @@ export function acceptFreshEvidenceWrittenDeliverable(args: {
   sources: FreshEvidenceSource[]
 }): FreshEvidenceGroundedAcceptance {
   const byId = new Map(args.sources.map(source => [source.id, source] as const))
-  const answer = trimToCompleteSentence(normalizeLiveCitations(String(args.text || '').replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')))
+  // No sentence trimming: a letter legitimately ends on a closing ("Sincerely,\n[Your name]"), and a cut-off model
+  // output never reaches this point (the caller rejects truncated output). Codex on #5145.
+  const answer = normalizeLiveCitations(String(args.text || '').replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, ''))
     // A cited id that is not a source retrieved this turn is removed; the rest of the sentence stays.
     .replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '')
     .replace(/[ \t]{2,}/g, ' ')

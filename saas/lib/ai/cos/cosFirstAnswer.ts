@@ -269,7 +269,12 @@ async function tryNeuralContextualInterpretation(input: COSFirstAnswerInput): Pr
     language: input.language,
     previousAssistant: input.previousAssistant ?? null,
   })
-  if (!semanticIntentSuppressesFreshness(intent)) return null
+  // This lane reads the meaning of supplied language. Only the judge's contextual_interpretation reading enters it;
+  // reasoning over supplied facts (general_reasoning: an incident, a dataset, numbered tasks) goes to the full
+  // reasoner, with its answer loop and outcome verifier. Production 2026-10-30: an incident with three numbered tasks
+  // was sent here, both providers ran to their 30 s deadline on an interpretation prompt, and the user got a thin
+  // rescue answer after about 100 s.
+  if (intent?.mode !== 'contextual_interpretation' || !semanticIntentSuppressesFreshness(intent)) return null
 
   const previousAssistant = String(input.previousAssistant ?? '').trim().slice(0, 8_000)
   // Labeled interactive call with thinking off (2026-09-27): unlabeled chat calls ran on the slow background reasoner.

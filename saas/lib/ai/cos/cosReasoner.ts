@@ -410,10 +410,11 @@ export async function callRawCosReasoner(
       const repairedAdvisoryDefects = advisoryDiagnosis && repairedParsedForPolicy
         ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, repairedParsedForPolicy.answer)
         : []
-      const advisoryPolicyRepairAccepted = firstAdvisoryDefects.length > 0 && repairedAdvisoryDefects.length === 0
+      // A repair is judged only when it parses: an unparsed repair carries no advisory reading and cannot replace the draft.
+      const advisoryPolicyRepairAccepted = firstAdvisoryDefects.length > 0 && repairedParsedForPolicy !== null && repairedAdvisoryDefects.length === 0
       const generalRepairAccepted = Boolean(repaired && preferRepairedDraft(effectiveArgs.prompt, initialDraft, repaired))
 
-      if (repaired && (advisoryPolicyRepairAccepted || (firstAdvisoryDefects.length === 0 && generalRepairAccepted))) {
+      if (repaired && parseableDraft(repaired) && (advisoryPolicyRepairAccepted || (firstAdvisoryDefects.length === 0 && generalRepairAccepted))) {
         console.info('[cos-local-quality-repair]', JSON.stringify({
           at: new Date().toISOString(),
           reasoner: config.label,

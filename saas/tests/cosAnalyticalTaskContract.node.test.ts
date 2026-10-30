@@ -40,3 +40,9 @@ test('ordinary coding and prose requests do not create an analytical acceptance 
   assert.deepEqual(requestedAnalyticalTasks('Fix src/login.ts and run npm test.'), [])
   assert.deepEqual(requestedAnalyticalTasks('Write a Node.js calculator with two files.'), [])
 })
+
+test('a repair that does not parse never replaces the draft, so the verifier loop still sees a parsed answer', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
+  assert.match(source, /const advisoryPolicyRepairAccepted = firstAdvisoryDefects\.length > 0 && repairedParsedForPolicy !== null && repairedAdvisoryDefects\.length === 0/)
+  assert.match(source, /if \(repaired && parseableDraft\(repaired\) && \(advisoryPolicyRepairAccepted \|\|/)
+})

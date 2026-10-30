@@ -38,7 +38,7 @@ import { resolveSemanticPublicIdentity, shouldResolveSemanticPublicIdentity } fr
 import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
-import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective, isConciergeBuilderObjective, pastedSourceCode } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { isCosCodingObjective, isConciergeBuilderObjective, pastedSourceCode } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { decideCosAgentTurn, stableKnowledgeQuestionNeedsNoPlanner, type CosAgentDecision } from '@/lib/ai/cos/cosAgentDecision'
 import { encodePlannerSearchQueriesHeader, PLANNER_SEARCH_QUERIES_HEADER } from '@/lib/ai/cos/plannerSearchQueries'
 import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
@@ -287,13 +287,13 @@ async function executeBrowserTurn(req: NextRequest) {
   const turnIntent = () => cosTurnIntent({ input: prompt, language, previousUserContext: previousUserPrompt || null, previousAssistant: priorAnswer || null })
   const pastedConversationEvidence = /(?:^|\n)\s*(?:YOUR REQUEST\s+\d+|COS response\s+\d+|assistant response\s+\d+)\s*(?:\n|$)/im.test(prompt)
   const fastAuthoringIngress = !pastedConversationEvidence && !directTextHasAttachments
-    && isAuthoringObjectiveWithoutLiveLookup(prompt)
     && !softwareRepairRequest
     && !isCosCodingObjective(prompt, routingContext)
     && !agentToolsRequired
     && !isProvenanceIntrospection(prompt)
     && !isOperationalLogEvidence(prompt)
     && semanticIntentConfirmsWriting(await turnIntent())
+    && !(await turnIntent())?.externalFactsRequired
   if (fastAuthoringIngress) {
     const executeAuthoring = () => cosPrimaryPost(req)
     const authoringResponse = access?.isOwner && browserSurface === 'assistant'

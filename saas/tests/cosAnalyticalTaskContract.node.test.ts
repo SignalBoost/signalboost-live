@@ -1,89 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective } from '../lib/ai/cos/answerTaskContract.ts'
+import { requestedAnalyticalTasks } from '../lib/ai/cos/answerTaskContract.ts'
 
 const incident = readFileSync(new URL('./fixtures/cos-incident-analysis-brief.txt', import.meta.url), 'utf8')
-const incomplete = 'To answer it properly I need readings and baseline values. I cannot stand behind a single cause.'
 
 test('exact payment incident derives eight deliverables without hardcoded payment logic', () => {
   assert.equal(requestedAnalyticalTasks(incident).length, 8)
-  assert.equal(missingAnalyticalTasks(incident, incomplete).length, 8)
-  assert.match(analyticalTaskRepairDirective(incident, incomplete), /full ORIGINAL request/)
-})
-
-test('eight substantively distinct incident sections pass the contract', () => {
-  const details = [
-    'Likely causes include consumer replay during partition reassignments and accounting double counting even when primary keys remain unique. Compare business payment identifiers.',
-    'Rank redelivery plus insufficient payment idempotency first, reporting aggregation defects next, and a pure settlement cutoff mismatch third; this ranking is provisional.',
-    'Kafka lag and pod restarts correlate in time but do not prove replay caused an inflated ledger. Confirm event identifiers and commit order before assigning causation.',
-    'Missing evidence includes settlement identifiers, bank cutoff dates, raw Kafka offsets, restart reasons, source ledger writes, and complete unsampled transaction traces.',
-    'Preserve immutable payment records, align timestamps and consumer rebalances, reconstruct one affected transaction from producer to bank settlement, and audit aggregations.',
-    'Simulate a consumer interruption after ledger commit but before offset acknowledgement; verify that duplicate deliveries cannot create another accounting effect in staging.',
-    'A restart can trigger replay while a stale Redis key bypasses deduplication; a reporting projection may then count two events though the processor settled one payment.',
-    'The leading unverified mechanism is Kafka event redelivery interacting with inadequate business-level accounting idempotency. Verify with immutable settlement identifiers.',
-  ]
-  const answer = requestedAnalyticalTasks(incident).map((task, index) =>
-    (index + 1) + '. ' + task + '\n' + details[index]
-  ).join('\n')
-  assert.deepEqual(missingAnalyticalTasks(incident, answer), [])
-})
-
-test('eight copied generic paragraphs are not eight completed investigations', () => {
-  const generic = 'Each working hypothesis is linked to observations, alternative explanations, a discriminating check, and what cannot be concluded without operational records and end-to-end event traces.'
-  const answer = requestedAnalyticalTasks(incident).map((task, index) =>
-    (index + 1) + '. ' + task + '\n' + generic
-  ).join('\n')
-  assert.ok(missingAnalyticalTasks(incident, answer).length >= 7)
-})
-
-test('inline numbered analysis retains distinct first lines before shared caveats', () => {
-  const prompt = [
-    'Investigate the database service degradation.',
-    '1. List plausible root causes.',
-    '2. Rank competing explanations.',
-    '3. Describe missing evidence.',
-  ].join('\n')
-  const caveat = 'This remains provisional until operational telemetry confirms it. Additional system evidence is needed before a final determination.'
-  const answer = [
-    '1. Replication slot retention can grow WAL files and exhaust disk during an outage, particularly when a downstream consumer stops acknowledging new positions.',
-    caveat,
-    '2. Rank runaway WAL retention first because replication lag rose alongside storage; rank a batch ingestion surge second, and table bloat third pending query history.',
-    caveat,
-    '3. Obtain replication slot restart LSN values, WAL generation rates, ingestion records, and database storage breakdowns to distinguish sustained retention from transient load.',
-    caveat,
-  ].join('\n')
-  assert.deepEqual(missingAnalyticalTasks(prompt, answer), [])
-})
-
-test('paraphrased standalone section headings cannot disguise copied generic analysis', () => {
-  const prompt = [
-    'Investigate database errors and latency.',
-    '1. List plausible root causes.',
-    '2. Rank competing explanations.',
-    '3. Describe missing evidence.',
-  ].join('\n')
-  const copied = 'Each working hypothesis is linked to observations, alternative explanations, a discriminating check, and what cannot be concluded without operational records and end-to-end event traces.'
-  const answer = ['1. **Root causes**', copied, '2. **Ranking**', copied, '3. **Missing evidence**', copied].join('\n')
-  assert.ok(missingAnalyticalTasks(prompt, answer).length >= 2)
-})
-
-test('long copied checklist headings cannot masquerade as substantive analysis', () => {
-  const prompt = [
-    'Investigate a database incident.',
-    '1. List plausible root causes with evidence, contextual explanation, and provisional hypotheses.',
-    '2. Rank competing explanations with evidence, contextual explanation, and provisional hypotheses.',
-    '3. Describe missing evidence with contextual explanation and provisional hypotheses.',
-  ].join('\n')
-  const answer = requestedAnalyticalTasks(prompt).map((task, index) =>
-    `${index + 1}. ${task}\nWe cannot conclude without further evidence.`
-  ).join('\n')
-  assert.equal(missingAnalyticalTasks(prompt, answer).length, 3)
-})
-
-test('headings without content do not satisfy the task contract', () => {
-  const headings = requestedAnalyticalTasks(incident).map((task, i) => (i + 1) + '. ' + task).join('\n')
-  assert.equal(missingAnalyticalTasks(incident, headings).length, 8)
 })
 
 test('unseen database incident follows the same contract', () => {
@@ -94,22 +17,15 @@ test('unseen database incident follows the same contract', () => {
 4. Design experiments to distinguish hypotheses.
 5. Explain the most likely mechanism.`
   assert.equal(requestedAnalyticalTasks(prompt).length, 5)
-  assert.equal(missingAnalyticalTasks(prompt, 'Please send me more readings first.').length, 5)
 })
 
-test('analytical recovery directive requires provisional investigation despite missing telemetry', () => {
-  const repair = analyticalTaskRepairDirective(incident, incomplete)
-  assert.match(repair, /Missing production telemetry limits certainty, not preliminary analytical work/)
-  assert.match(repair, /Answer the full ORIGINAL request/)
-  assert.ok(missingAnalyticalTasks(incident, incomplete).length > 0)
-})
-
-test('reasoner recovery uses analytical-specific reasoning instead of the generic diagnostic rewrite', () => {
+test('Q10: the word-count completion check is deleted; the verifier alone judges deliverables', () => {
+  const contract = readFileSync(new URL('../lib/ai/cos/answerTaskContract.ts', import.meta.url), 'utf8')
   const source = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
-  assert.match(source, /ANALYTICAL RECOVERY/)
-  assert.match(source, /A lack of telemetry prevents confirmation, NOT generation of provisional, ranked hypotheses/)
-  assert.match(source, /firstTaskGaps\.length && firstParsedForPolicy/)
-  assert.match(source, /: buildDiagnosticRepairPrompt\(effectiveArgs\.prompt, initialDraft\)/)
+  assert.doesNotMatch(contract, /export function missingAnalyticalTasks|export function analyticalTaskRepairDirective|topicWords/)
+  assert.doesNotMatch(source, /ANALYTICAL RECOVERY|firstTaskGaps|repairedTaskGaps|taskContractRepairAccepted/)
+  assert.match(source, /buildDiagnosticRepairPrompt\(effectiveArgs\.prompt, initialDraft\)/)
+  assert.match(source, /const outcome = await outcomeOf\(request, answer\)/)
 })
 
 test('analytical no-draft recovery is bounded and uses original request', () => {
@@ -123,5 +39,4 @@ test('analytical no-draft recovery is bounded and uses original request', () => 
 test('ordinary coding and prose requests do not create an analytical acceptance checklist', () => {
   assert.deepEqual(requestedAnalyticalTasks('Fix src/login.ts and run npm test.'), [])
   assert.deepEqual(requestedAnalyticalTasks('Write a Node.js calculator with two files.'), [])
-  assert.deepEqual(missingAnalyticalTasks('Explain what Kafka is.', 'Kafka is an event streaming platform.'), [])
 })

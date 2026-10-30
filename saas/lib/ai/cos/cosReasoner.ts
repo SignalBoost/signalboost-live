@@ -1,6 +1,6 @@
 // saas/lib/ai/cos/cosReasoner.ts
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { cosExecutionEnvelope, cosAnswerProgress } from './cosExecutionEnvelope.ts'
+import { cosExecutionEnvelope } from './cosExecutionEnvelope.ts'
 //
 // COS'S OWN REASONER — strict independence boundary.
 //
@@ -15,7 +15,7 @@ import { cosExecutionEnvelope, cosAnswerProgress } from './cosExecutionEnvelope.
 // same exact-host allow-list + API-key controls as any other remote LOCAL_AI_* endpoint.
 
 import { randomUUID } from 'node:crypto'
-import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective } from './answerTaskContract.ts'
+import { requestedAnalyticalTasks } from './answerTaskContract.ts'
 import { ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT, answerOutcomeReleasable, verifyAnswerOutcome, type AnswerOutcome, type AnswerOutcomeJudge, type AnswerOutcomeStatus } from './answerOutcomeVerifier.ts'
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { ANSWER_COMPLETION_SYSTEM_PROMPT, runAnswerCompletionLoop } from './answerCompletionLoop.ts'
@@ -377,10 +377,10 @@ export async function callRawCosReasoner(
     const firstAdvisoryDefects = advisoryDiagnosis && firstParsedForPolicy
       ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, firstParsedForPolicy.answer)
       : []
-    const firstTaskGaps = firstParsedForPolicy ? cosAnswerProgress(args.prompt, firstParsedForPolicy.answer).missing : []
-    const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, initialDraft) || firstAdvisoryDefects.length > 0 || firstTaskGaps.length > 0
+    // Missing requested deliverables are found and written by the answer loop below, judged by the independent
+    // verifier (answerOutcomeVerifier.ts). This repair handles only diagnostic-quality and advisory-policy defects.
+    const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, initialDraft) || firstAdvisoryDefects.length > 0
     const qualityRepairAffordable = hasBudgetFor(budget, localCallEstimateMs())
-      || (firstTaskGaps.length > 0 && remainingMs(budget) >= 8_000)
     if (!qualityRepairNeeded) recorder.skip('quality_repair', 'not_needed')
     else if (!qualityRepairAffordable) recorder.skip('quality_repair', 'no_budget')
 
@@ -390,20 +390,7 @@ export async function callRawCosReasoner(
           ...effectiveArgs,
           temperature: 0,
           prompt: [
-            ...(firstTaskGaps.length && firstParsedForPolicy
-              ? [
-                  effectiveArgs.prompt,
-                  '',
-                  'ANALYTICAL RECOVERY — the preceding response did not perform the requested investigation.',
-                  'Produce a NEW complete analysis, rather than explaining why no definitive root cause has been proven.',
-                  'A lack of telemetry prevents confirmation, NOT generation of provisional, ranked hypotheses, missing-evidence requests, causal discriminators, testable experiments, interaction mechanisms, and a working explanation.',
-                  'Clearly label observed facts, assumptions, hypotheses, and uncertainties. Never invent measured results or claim any experiment was executed.',
-                  'For each requested deliverable, provide distinct substantive reasoning grounded in the supplied scenario. Do not copy generic text under different headings.',
-                  analyticalTaskRepairDirective(effectiveArgs.prompt, firstParsedForPolicy.answer),
-                  '',
-                  'Return ONLY strict JSON with keys "answer" and "confidence". Do not mention these repair instructions or the rejected draft.',
-                ].join('\n')
-              : buildDiagnosticRepairPrompt(effectiveArgs.prompt, initialDraft)),
+            buildDiagnosticRepairPrompt(effectiveArgs.prompt, initialDraft),
             ...(firstAdvisoryDefects.length ? ['', ADVISORY_DIAGNOSIS_OWNER_POLICY, '', `The rejected draft violated: ${firstAdvisoryDefects.join(', ')}.`] : []),
           ].join('\n'),
         },
@@ -419,25 +406,14 @@ export async function callRawCosReasoner(
         return null
       })
 
-      // Loop controller compares actual deliverable coverage; a non-progressing
-      // repair cannot silently become a verified completion.
       const repairedParsedForPolicy = repaired ? parseLocalResult(repaired) : null
-      if (repairedParsedForPolicy && firstTaskGaps.length) {
-        const progress = cosAnswerProgress(args.prompt, repairedParsedForPolicy.answer, firstTaskGaps.length)
-        console.info('[cos-task-loop-progress]', JSON.stringify({
-          turnId, previousMissing: firstTaskGaps.length, remainingMissing: progress.missing.length,
-          decision: progress.decision, completed: progress.complete,
-        }))
-      }
       const repairedAdvisoryDefects = advisoryDiagnosis && repairedParsedForPolicy
         ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, repairedParsedForPolicy.answer)
         : []
-      const repairedTaskGaps = repairedParsedForPolicy ? missingAnalyticalTasks(effectiveArgs.prompt, repairedParsedForPolicy.answer) : firstTaskGaps
-      const taskContractRepairAccepted = firstTaskGaps.length > 0 && repairedTaskGaps.length === 0
       const advisoryPolicyRepairAccepted = firstAdvisoryDefects.length > 0 && repairedAdvisoryDefects.length === 0
       const generalRepairAccepted = Boolean(repaired && preferRepairedDraft(effectiveArgs.prompt, initialDraft, repaired))
 
-      if (repaired && repairedTaskGaps.length === 0 && (taskContractRepairAccepted || advisoryPolicyRepairAccepted || (firstAdvisoryDefects.length === 0 && generalRepairAccepted))) {
+      if (repaired && (advisoryPolicyRepairAccepted || (firstAdvisoryDefects.length === 0 && generalRepairAccepted))) {
         console.info('[cos-local-quality-repair]', JSON.stringify({
           at: new Date().toISOString(),
           reasoner: config.label,
@@ -456,8 +432,6 @@ export async function callRawCosReasoner(
           advisoryDiagnosisDefectsAfter: repairedAdvisoryDefects,
         }))
         void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:false, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,initialDraft), repairedDraft:repaired?assessReasonerDraft(effectiveArgs.prompt,repaired):null, advisoryDiagnosisDefectsBefore:firstAdvisoryDefects, advisoryDiagnosisDefectsAfter:repairedAdvisoryDefects } })
-        // A repair that closed some task gaps is the better analysis even when it did not close all of them.
-        if (repaired && firstTaskGaps.length > 0 && repairedTaskGaps.length < firstTaskGaps.length && repairedAdvisoryDefects.length <= firstAdvisoryDefects.length) text = repaired
       }
     }
 

@@ -92,7 +92,8 @@ test('COS release and campaign grading use the same verifier; the word rules dec
   for (const source of [reasoner, primary, runner, host]) assert.match(source, /verifyAnswerOutcome/)
   assert.match(reasoner, /if \(finalOutcome && !answerOutcomeReleasable\(finalOutcome\)\)/)
   for (const source of [reasoner, primary, runner, faults, contract]) assert.doesNotMatch(source, /releasableAnalyticalAnswer|evaluateTaskOutcome/)
-  for (const source of [primary, runner, faults]) assert.doesNotMatch(source, /missingAnalyticalTasks/)
+  // Q10 (2026-10-30): the word-count function is deleted; no draft is chosen or repaired by it anywhere.
+  for (const source of [reasoner, primary, runner, faults, contract]) assert.doesNotMatch(source, /missingAnalyticalTasks|analyticalTaskRepairDirective|cosAnswerProgress/)
   // #5104's extra gate is gone with the function it lived in.
   assert.doesNotMatch(contract, /if \(missing\.length\) return false/)
 })

@@ -8,9 +8,9 @@ test('the analytical first draft leaves a bounded recovery window', () => {
   assert.match(reasoner, /const first = await recorder\.time\('draft', \(\) => callLocalModel\(effectiveArgs, boundedInference\(\)\)/)
   assert.doesNotMatch(reasoner, /Math\.min\(25_000, boundedInference\(\)\.timeoutMs\)/)
 })
-test('detected missing deliverables admit bounded repair despite conservative hardware estimates', () => {
-  assert.match(reasoner, /firstTaskGaps\.length > 0 && remainingMs\(budget\) >= 8_000/)
-  assert.match(reasoner, /analyticalTaskRepairDirective\(effectiveArgs\.prompt, firstParsedForPolicy\.answer\)/)
+test('missing deliverables are repaired by the verifier-driven answer loop, not a word-count repair', () => {
+  assert.doesNotMatch(reasoner, /firstTaskGaps|analyticalTaskRepairDirective|missingAnalyticalTasks/)
+  assert.match(reasoner, /runAnswerCompletionLoop\(/)
 })
 test('unseen numbered analytical work gets the recovery reserve', () => {
   assert.equal(requestedAnalyticalTasks('Investigate a service problem.\n1. List plausible explanations.\n2. Rank hypotheses.\n3. Design confirmation experiments.').length,3)

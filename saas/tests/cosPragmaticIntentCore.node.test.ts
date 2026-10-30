@@ -55,7 +55,7 @@ test('ordinary answerable turns do not pay a semantic-classifier round trip', ()
   // 2026-10-09: an unflagged NON-English question is the one addition — the word rules recognise live facts
   // reliably only in English, so the judge adjudicates it. Unflagged English turns still never pay the round trip.
   assert.match(route, /const nonEnglishUnflagged=!heuristicRequiresFreshEvidence&&!conversationRecallRequested&&mayBeNonEnglish\(input,language\)/)
-  assert.match(route, /const semanticTaskIntentNeeded=!requestedAction\s*&& \(modelPlannedFreshEvidence \|\| heuristicRequiresFreshEvidence \|\| requiresLiveTravelPlanningEvidence\(input\) \|\| freshConversationContext\.contextUsed \|\| nonEnglishUnflagged\)/)
+  assert.match(route, /const semanticTaskIntentNeeded=!requestedAction\s*&& \(modelPlannedFreshEvidence \|\| heuristicRequiresFreshEvidence \|\| requiresLiveTravelPlanningEvidence\(input\) \|\| freshConversationContext\.contextUsed \|\| nonEnglishUnflagged \|\| isAuthoringObjectiveWithoutLiveLookup\(input\) \|\| Boolean\(pendingCosTurnIntent\(\)\)\)/)
   const ownerFastPath = route.indexOf('if(access?.isOwner&&isPlatformSelfKnowledgePrompt(input))')
   const semanticGate = route.indexOf('const semanticTaskIntentNeeded=')
   assert.ok(ownerFastPath >= 0)

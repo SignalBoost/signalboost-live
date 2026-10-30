@@ -20,6 +20,7 @@ import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
 import { withInferenceTransport } from '../../ai/inferenceTransport.ts'
 import { runWithTurnDeadline, runWithoutTurnDeadline } from '../../ai/cos/cosTurnBudget.ts'
+import { CAMPAIGN_LIVE_INFERENCE_HEADER, campaignLiveInferenceToken } from '../../ai/cos/campaignLiveInference.ts'
 import { createFaultStub, judgeFault, FAULT_PROMPT, FAULT_TURN_DEADLINE_MS, type CampaignFault } from './faults.ts'
 import { verifyAnswerOutcome } from '../../ai/cos/answerOutcomeVerifier.ts'
 import { parseLocalResult } from '../../ai/cos/reasonerOutput.ts'
@@ -45,6 +46,16 @@ function withTimeout(signal: AbortSignal | undefined, ms: number): AbortSignal {
   return signal ? AbortSignal.any([signal, timeout]) : timeout
 }
 
+/** Campaign requests measure live inference: the signed header makes production skip the answer cache (Q19). */
+function campaignRequestHeaders(): Record<string, string> {
+  const token = campaignLiveInferenceToken()
+  return {
+    accept: 'application/json',
+    'content-type': 'application/json',
+    ...(token ? { [CAMPAIGN_LIVE_INFERENCE_HEADER]: token } : {}),
+  }
+}
+
 /** One real request on the production path: the public Concierge ingress of the live site. */
 export async function productionAnalysis(prompt: string, signal?: AbortSignal, fetchImpl: typeof fetch = fetch): Promise<AnalysisOutcome> {
   const startedAt = Date.now()
@@ -52,7 +63,7 @@ export async function productionAnalysis(prompt: string, signal?: AbortSignal, f
   try {
     response = await fetchImpl(`${PUBLIC_BRAND.siteUrl}/api/cos-browser`, {
       method: 'POST',
-      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      headers: campaignRequestHeaders(),
       body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], context: { language: 'en', surface: 'concierge' } }),
       signal: withTimeout(signal, CAMPAIGN_REQUEST_TIMEOUT_MS),
     })
@@ -86,7 +97,7 @@ export async function productionRouting(prompt: string, signal?: AbortSignal, fe
   try {
     response = await fetchImpl(`${PUBLIC_BRAND.siteUrl}/api/cos-browser`, {
       method: 'POST',
-      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      headers: campaignRequestHeaders(),
       body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], context: { language: 'en', surface: 'concierge' } }),
       signal: withTimeout(signal, CAMPAIGN_REQUEST_TIMEOUT_MS),
     })

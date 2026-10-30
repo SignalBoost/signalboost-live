@@ -1,2 +1,2 @@
-base_sha=bb8ffe5633182b3b1533e8a31a5f4b3dbf79c837
-branch=fix/q15-writing-ingress-evidence-20261030
+base_sha=e7a7ce32366f90fc7ed851de481819f032464403
+branch=fix/q19-cache-verified-only-20261030

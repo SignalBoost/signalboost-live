@@ -486,6 +486,7 @@ const tests = [
   'tests/cosSuppliedFactsNotRefusedForLiveSources.node.test.ts',
   'tests/cosSuppliedFactsNeverWebLookup.node.test.ts',
   'tests/cosAnswerOutcomeVerifier.node.test.ts',
+  'tests/cosCacheVerifiedOnly.node.test.ts',
 
   'tests/visualObjectiveContract.node.test.ts',
 

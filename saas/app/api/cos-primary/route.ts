@@ -777,9 +777,9 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const hasAttachments=Array.isArray(body?.attachments)&&body.attachments.length>0
   const fastAuthoringEligible=!artifactContinuation
     && !hasAttachments
-    && isAuthoringObjectiveWithoutLiveLookup(input)
     && !isCosCodingObjective(input)
     && semanticIntentConfirmsWriting(await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null}))
+    && !(await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null}))?.externalFactsRequired
   // ONE PIPELINE, NO PRE-COS DETOUR (2026-09-27). Production evidence (cos-latency-stage rows, Concierge Polish
   // question 14:06 ET): primary:before_cos_first was 38,749ms. Two fast-authoring detours each ran their full
   // FAST_AUTHORING_TIMEOUT_MS (18s: two 9s attempts), returned nothing, and only then did COS answer in 15.5s.

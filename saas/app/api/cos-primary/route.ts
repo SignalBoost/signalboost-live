@@ -900,6 +900,9 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     : null
   if(semanticTaskIntentNeeded)recordCosLatencyStage('primary:semantic_intent',Date.now()-semanticIntentStartedAt)
   const semanticRequiresFreshEvidence=semanticIntentRequiresFreshness(semanticTaskIntent)
+  // Q15: a writing request that needs outside facts is written as the deliverable (letter + advice) on the evidence,
+  // not squeezed through the factual-answer filter. The intent judge decides, never the wording.
+  const freshDeliverable=async():Promise<'answer'|'writing'>=>((semanticTaskIntent??await pendingCosTurnIntent())?.mode==='content_generation'?'writing':'answer')
   // A bounded, supplied-facts incident exercise must not become a live-world lookup
   // merely because a planner requested web or the semantic judge timed out.
   const baselineRequiresFreshEvidence=!suppliedIncidentAnalysis&&(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested
@@ -1087,7 +1090,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       if(agentAnswered)return agentAnswered
       freshLocalAttempted=true
       freshLocalModel=localReasonerLabel()
-      let localSynthesis=await synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})
+      let localSynthesis=await synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language,deliverable:await freshDeliverable()})
       if(localSynthesis.kind === 'accepted'){
         freshLocalModel=localSynthesis.reasonerLabel
         const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:localSynthesis.reasonerLabel,confidence:1,accepted:true})
@@ -1228,7 +1231,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   }
 
   if(freshHardFail&&freshRetrievedAt){
-    const externalFresh=await synthesizeFreshEvidenceExternally({ input: lookupInput, sources:freshSources,retrievedAt:freshRetrievedAt,language})
+    const externalFresh=await synthesizeFreshEvidenceExternally({ input: lookupInput, sources:freshSources,retrievedAt:freshRetrievedAt,language,deliverable:await freshDeliverable()})
     const externalInvoked=externalFresh.source==='provider'||(externalFresh.source===null&&externalFresh.attempted)
     const externalProvider=normalizeProvider(externalFresh.provider)
     let baseProvenance=authoritativeProvenance(null,{invoked:externalInvoked,provider:externalProvider,model:externalFresh.model})

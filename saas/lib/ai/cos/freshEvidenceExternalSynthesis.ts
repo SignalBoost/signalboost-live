@@ -31,6 +31,7 @@ export async function synthesizeFreshEvidenceExternally(args: {
   sources: FreshEvidenceSource[]
   retrievedAt: string
   language: string
+  deliverable?: 'answer' | 'writing'
 }): Promise<FreshEvidenceExternalSynthesis> {
   const rejected = (execution?: { provider?: string | null; model?: string | null; source?: 'provider' | 'cache' | null } | null): FreshEvidenceExternalSynthesis => ({
     attempted: true,

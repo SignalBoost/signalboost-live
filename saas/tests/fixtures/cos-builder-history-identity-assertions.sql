@@ -2,6 +2,7 @@
 -- Uses the CI fixture tables; NEVER run against customer/production databases.
 \ir ../../supabase/migrations/20261029235900_builder_customer_task_parent_link.sql
 \ir ../../supabase/migrations/20261030160000_immutable_builder_customer_task_parent.sql
+ALTER TABLE public.assistant_messages ADD COLUMN IF NOT EXISTS role text;
 BEGIN;
 INSERT INTO public.assistant_conversations(id,user_id,updated_at)
 VALUES ('30000000-0000-4000-8000-000000000003','30000000-0000-4000-8000-000000000001',now());

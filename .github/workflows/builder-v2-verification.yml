@@ -69,3 +69,4 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f saas/tests/fixtures/builder-recovery-assertions.sql
           psql -v ON_ERROR_STOP=1 -f saas/tests/fixtures/customer-task-foundation-assertions.sql
           psql -v ON_ERROR_STOP=1 -f saas/tests/fixtures/builder-repair-plan-lifecycle-assertions.sql
+          psql -v ON_ERROR_STOP=1 -f saas/tests/fixtures/cos-builder-history-identity-assertions.sql

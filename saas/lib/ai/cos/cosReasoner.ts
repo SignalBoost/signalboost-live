@@ -413,11 +413,19 @@ export async function callRawCosReasoner(
               ? [
                   effectiveArgs.prompt,
                   '',
-                  'ANALYTICAL RECOVERY — the preceding response did not perform the requested investigation.',
-                  'Produce a NEW complete analysis, rather than explaining why no definitive root cause has been proven.',
-                  'A lack of telemetry prevents confirmation, NOT generation of provisional, ranked hypotheses, missing-evidence requests, causal discriminators, testable experiments, interaction mechanisms, and a working explanation.',
-                  'Clearly label observed facts, assumptions, hypotheses, and uncertainties. Never invent measured results or claim any experiment was executed.',
-                  'For each requested deliverable, provide distinct substantive reasoning grounded in the supplied scenario. Do not copy generic text under different headings.',
+                  ...(analyticalTasks.length > 0
+                    ? [
+                        'ANALYTICAL RECOVERY — the preceding response did not perform the requested investigation.',
+                        'Produce a NEW complete analysis, rather than explaining why no definitive root cause has been proven.',
+                        'A lack of telemetry prevents confirmation, NOT generation of provisional, ranked hypotheses, missing-evidence requests, causal discriminators, testable experiments, interaction mechanisms, and a working explanation.',
+                        'Clearly label observed facts, assumptions, hypotheses, and uncertainties. Never invent measured results or claim any experiment was executed.',
+                        'For each requested deliverable, provide distinct substantive reasoning grounded in the supplied scenario. Do not copy generic text under different headings.',
+                      ]
+                    : [
+                        'DELIVERABLE RECOVERY — revise the requested output, preserving its original format, language requirements and constraints.',
+                        'Complete only the independently identified missing deliverables. Do not convert writing, translation or other non-analytical requests into an investigation.',
+                        'Do not invent external facts, actions, results or supporting evidence.',
+                      ]),
                   `Independently verified missing deliverables: ${firstTaskGaps.join('; ')}`,
                   '',
                   'Return ONLY strict JSON with keys "answer" and "confidence". Do not mention these repair instructions or the rejected draft.',

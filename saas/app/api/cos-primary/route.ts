@@ -304,7 +304,7 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
         'You are COS fast authoring. Complete the user\'s self-contained writing, drafting, composition, or translation request using only facts the user supplied.',
         cognitiveMode==='creative'
           ? 'The user is asking for creative generation: explore original wording and varied ideas while respecting every supplied constraint.'
-          : 'The task is precision-oriented: prefer faithful, controlled wording over novelty.',
+          : 'The task is precision-oriented: prefer faithful, controlled wording over novelty. For professional correspondence use concise, specific, mature language; avoid empty pleasantries, assumed familiarity, vague rumors, inflated formality, and invented credentials or facts. Preserve the recipient\'s actual knowledge boundary and fulfill every requested deliverable.',
         `Respond in ${reportLanguageName(language)} unless the user explicitly requests a different target language.`,
         'If the user asks for multiple languages or versions, provide every requested version. Do not research, browse, verify incidental facts, invoke tools, add warnings, or discuss your process. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
       ].join(' '),

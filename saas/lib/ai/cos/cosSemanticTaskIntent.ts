@@ -101,7 +101,7 @@ export function semanticIntentSuppressesFreshness(intent: CosSemanticTaskIntent 
 export function semanticIntentRequiresFreshness(intent: CosSemanticTaskIntent | null): boolean {
   return Boolean(
     intent
-      && intent.mode === 'external_fact_verification'
+      && (intent.mode === 'external_fact_verification' || intent.mode === 'content_generation')
       && intent.externalFactsRequired
       && intent.confidence >= 0.72,
   )

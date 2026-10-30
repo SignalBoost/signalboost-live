@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosReasoner.ts
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosExecutionEnvelope, cosAnswerProgress } from './cosExecutionEnvelope.ts'
 //
@@ -47,7 +48,36 @@ import { currentReasoningEvaluationContext } from './reasoningEvaluationContext.
 /** The verifier needs a short judge call; below this much turn time it does not start, and the answer is unverified. */
 const ANSWER_OUTCOME_JUDGE_MIN_MS = 30_000
 const ANSWER_OUTCOME_JUDGE_TIMEOUT_MS = 25_000
-const ANSWER_OUTCOME_JUDGE_MAX_TOKENS = 900
+const ANSWER_OUTCOME_JUDGE_MAX_TOKENS = 1000
+
+/**
+ * THE ONE JUDGE CALL behind the answer verifier (answerOutcomeVerifier.ts), used by the reasoner's own answer loop, the
+ * completion-first rescue lane and the verification campaign. It is one direct model call with only the verifier's
+ * instructions: no COS execution contract, no specialist routing, no University graduate, no quality repair. Before
+ * 2026-10-30 the rescue/campaign judge ran as a whole COS writer turn, which appended "complete all numbered
+ * deliverables" to the verifier's instructions, so the judge wrote the answer instead of a verdict, ran into the token
+ * cap (finish_reason length, which the transport rejects) or the deadline, and came back null: "unavailable" (Q16).
+ */
+async function runAnswerOutcomeJudge(
+  request: string,
+  answer: string,
+  inference: ReturnType<typeof localInferenceConfigFromEnv>,
+  usageContext: LocalModelCallArgs['usageContext'],
+  signal?: AbortSignal,
+): Promise<string | null> {
+  return await callLocalModel({
+    writesUserAnswer: false,
+    temperature: 0,
+    disableThinking: true,
+    maxTokens: ANSWER_OUTCOME_JUDGE_MAX_TOKENS,
+    jsonObject: true,
+    timeoutMs: ANSWER_OUTCOME_JUDGE_TIMEOUT_MS,
+    usageContext: { ...(usageContext ?? { feature: 'cos_interactive_answer' }), purpose: 'answer_outcome_verification' },
+    systemPrompt: ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT,
+    prompt: `REQUEST:\n${request}\n\nANSWER:\n${answer}`,
+    ...(signal ? { signal } : {}),
+  }, inference)
+}
 
 export type CosReasonerKind = 'independent-local' | 'managed-open-model'
 
@@ -431,16 +461,7 @@ export async function callRawCosReasoner(
     const outcomes = new Map<string, AnswerOutcome>()
     const outcomeJudge: AnswerOutcomeJudge = async (request, answer) => {
       if (syntheticTurn || remainingMs(budget) < ANSWER_OUTCOME_JUDGE_MIN_MS) return null
-      return await callLocalModel({
-        ...effectiveArgs,
-        writesUserAnswer: false,
-        temperature: 0,
-        disableThinking: true,
-        maxTokens: ANSWER_OUTCOME_JUDGE_MAX_TOKENS,
-        usageContext: { ...(effectiveArgs.usageContext ?? { feature: 'cos_interactive_answer' }), purpose: 'answer_outcome_verification' },
-        systemPrompt: ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT,
-        prompt: `REQUEST:\n${request}\n\nANSWER:\n${answer}`,
-      }, { ...boundedInference(), timeoutMs: Math.min(ANSWER_OUTCOME_JUDGE_TIMEOUT_MS, boundedInference().timeoutMs) })
+      return await runAnswerOutcomeJudge(request, answer, { ...boundedInference(), timeoutMs: Math.min(ANSWER_OUTCOME_JUDGE_TIMEOUT_MS, boundedInference().timeoutMs) }, effectiveArgs.usageContext, effectiveArgs.signal)
     }
     const outcomeOf = async (request: string, answer: string): Promise<AnswerOutcome> => {
       const known = outcomes.get(answer)
@@ -682,20 +703,10 @@ export async function callCosReasoner(
 
 /**
  * The verifier's judge for answers written outside the reasoner's own turn loop (the completion-first rescue lane) and
- * for the verification campaign's grading: the same separate call, through the COS control plane. Inside an isolated
- * fault run there is no independent judge, so it does not run.
+ * for the verification campaign's grading: the same one judge call the turn loop uses. Inside an isolated fault run
+ * there is no independent judge, so it does not run.
  */
 export const cosAnswerOutcomeJudge: AnswerOutcomeJudge = async (request, answer) => {
-  if (currentInferenceTransport() !== null) return null
-  const result = await callCosReasoner({
-    writesUserAnswer: false,
-    temperature: 0,
-    disableThinking: true,
-    maxTokens: ANSWER_OUTCOME_JUDGE_MAX_TOKENS,
-    timeoutMs: ANSWER_OUTCOME_JUDGE_TIMEOUT_MS,
-    usageContext: { feature: 'cos_interactive_answer', purpose: 'answer_outcome_verification' },
-    systemPrompt: ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT,
-    prompt: `REQUEST:\n${request}\n\nANSWER:\n${answer}`,
-  }).catch(() => null)
-  return result?.text ?? null
+  if (currentInferenceTransport() !== null || !localConfigured()) return null
+  return await runAnswerOutcomeJudge(request, answer, localInferenceConfigFromEnv(), { feature: 'cos_interactive_answer' })
 }

@@ -96,3 +96,42 @@ test('COS release and campaign grading use the same verifier; the word rules dec
   // #5104's extra gate is gone with the function it lived in.
   assert.doesNotMatch(contract, /if \(missing\.length\) return false/)
 })
+
+// Q16 (campaign run 2026-10-30 13:11 UTC): every graded answer came back "answer_outcome_judge_unavailable". The
+// rescue/campaign judge ran as a whole COS writer turn, whose execution contract told the model to complete the
+// request's deliverables, so it wrote an answer instead of a verdict, hit the token cap or the deadline, and returned null.
+test('every judge is one direct verifier call, never a COS writer turn', () => {
+  const reasoner = read('lib/ai/cos/cosReasoner.ts')
+  const call = reasoner.slice(reasoner.indexOf('async function runAnswerOutcomeJudge('), reasoner.indexOf('export type CosReasonerKind'))
+  assert.match(call, /callLocalModel\(\{/)
+  assert.match(call, /systemPrompt: ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT,/)
+  assert.match(call, /jsonObject: true,/)
+  assert.match(call, /disableThinking: true,/)
+  assert.match(call, /writesUserAnswer: false,/)
+  assert.doesNotMatch(call, /cosExecutionEnvelope|callCosReasoner|callRawCosReasoner|\.\.\.effectiveArgs|\.\.\.args/)
+
+  const inTurn = reasoner.slice(reasoner.indexOf('const outcomeJudge: AnswerOutcomeJudge = async'), reasoner.indexOf('const outcomeOf = async'))
+  assert.match(inTurn, /return await runAnswerOutcomeJudge\(request, answer,/)
+  assert.doesNotMatch(inTurn, /\.\.\.effectiveArgs/)
+
+  const external = reasoner.slice(reasoner.indexOf('export const cosAnswerOutcomeJudge'))
+  assert.match(external, /return await runAnswerOutcomeJudge\(request, answer, localInferenceConfigFromEnv\(\)/)
+  assert.doesNotMatch(external, /callCosReasoner|callRawCosReasoner|reasonThroughCosControlPlane/)
+})
+
+test('a full verdict on the maximum number of deliverables fits the judge token cap', () => {
+  const reasoner = read('lib/ai/cos/cosReasoner.ts')
+  const cap = Number(/const ANSWER_OUTCOME_JUDGE_MAX_TOKENS = (\d+)/.exec(reasoner)?.[1])
+  // Longest entry the format allows: a 6-word item and an 8-word quote, of 7-letter words.
+  const item = Array.from({ length: 6 }, () => 'request').join(' ')
+  const quote = Array.from({ length: 8 }, () => 'evidence').join(' ')
+  const answer = Array.from({ length: 20 }, () => quote).join('. ')
+  const verdict = JSON.stringify({ deliverables: Array.from({ length: 20 }, () => ({ item, delivered: true, quote })) })
+  // Estimate: one token per 3.5 characters of English JSON (an estimate; the live proof is the campaign run).
+  const estimatedTokens = Math.ceil(verdict.length / 3.5)
+  assert.ok(estimatedTokens <= cap, `verdict ~${estimatedTokens} tokens exceeds the ${cap}-token cap`)
+  assert.equal(parseAnswerOutcome(verdict, answer, '')?.length, 20)
+  const prompt = read('lib/ai/cos/answerOutcomeVerifier.ts')
+  assert.match(prompt, /\(5 to 8 words\)/)
+  assert.match(prompt, /at most 6 words/)
+})

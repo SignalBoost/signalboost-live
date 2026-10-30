@@ -37,6 +37,21 @@ BEGIN
   RETURN NEW;
 END $$;
 
+-- Bring preexisting COS tasks onto the same schema without changing their objective or authority.
+UPDATE public.builder_jobs
+SET task_contract = jsonb_build_object(
+  'immutable_objective', objective,
+  'customer_identity', jsonb_build_object('user_id', user_id::text),
+  'execution_id', id::text,
+  'current_plan_version', plan_version,
+  'authorized_capabilities', '[]'::jsonb,
+  'budget', jsonb_build_object('approved_units', 0),
+  'completed_actions_ledger', '[]'::jsonb,
+  'evidence_store', '{}'::jsonb,
+  'final_verification_result', NULL
+)
+WHERE job_kind = 'cos_turn' AND task_contract = '{}'::jsonb;
+
 DROP TRIGGER IF EXISTS enforce_cos_canonical_task_contract ON public.builder_jobs;
 CREATE TRIGGER enforce_cos_canonical_task_contract
 BEFORE INSERT OR UPDATE ON public.builder_jobs

@@ -44,7 +44,8 @@ export const ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT = [
   'You are an independent verifier. You did not write the answer. You receive a request and the answer given to it.',
   'List every deliverable the request asks for: each question, task, item, constraint and required format. Do not add anything the request did not ask for, and do not judge style.',
   'For each deliverable decide whether the answer actually delivers it with real, specific substance. A heading, a restated question, a promise, a refusal, or a generic paragraph does not deliver it. When the person could not supply some evidence and the answer handles that honestly, the deliverable is still delivered.',
-  'For each delivered deliverable copy, word for word, the passage of the answer (5 to 25 words) that delivers it. Never paraphrase the quote.',
+  'For each delivered deliverable copy, word for word, the passage of the answer (5 to 8 words) that delivers it. Never paraphrase the quote.',
+  'Name each deliverable in at most 6 words. Write nothing but the verdict: no explanation, no answer of your own.',
   'Return ONLY strict JSON: {"deliverables":[{"item":"short description","delivered":true,"quote":"exact words from the answer"},{"item":"short description","delivered":false,"quote":""}]}.',
 ].join(' ')
 

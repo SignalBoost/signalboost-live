@@ -287,7 +287,6 @@ async function executeBrowserTurn(req: NextRequest) {
   const turnIntent = () => cosTurnIntent({ input: prompt, language, previousUserContext: previousUserPrompt || null, previousAssistant: priorAnswer || null })
   const pastedConversationEvidence = /(?:^|\n)\s*(?:YOUR REQUEST\s+\d+|COS response\s+\d+|assistant response\s+\d+)\s*(?:\n|$)/im.test(prompt)
   const fastAuthoringIngress = !pastedConversationEvidence && !directTextHasAttachments
-    && isAuthoringObjectiveWithoutLiveLookup(prompt)
     && !softwareRepairRequest
     && !isCosCodingObjective(prompt, routingContext)
     && !agentToolsRequired

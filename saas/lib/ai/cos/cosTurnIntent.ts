@@ -28,6 +28,11 @@ export function withCosTurnIntent<T>(run: () => Promise<T>): Promise<T> {
   return turnScope.run({ decision: null }, run)
 }
 
+/** Return an already-started judge decision without starting inference for a deterministic turn. */
+export function pendingCosTurnIntent(): Promise<CosSemanticTaskIntent | null> | null {
+  return turnScope.getStore()?.decision ?? null
+}
+
 /** The judge's reading of this turn's request, decided once per turn. Null when the judge was unavailable or unsure. */
 export function cosTurnIntent(args: JudgeArgs, run: Judge = classifyCosSemanticTaskIntent): Promise<CosSemanticTaskIntent | null> {
   const scope = turnScope.getStore()

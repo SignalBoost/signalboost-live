@@ -1,5 +1,5 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { cosExecutionEnvelope, cosAnswerProgress } from './cosExecutionEnvelope.ts'
+import { cosExecutionEnvelope } from './cosExecutionEnvelope.ts'
 //
 // COS'S OWN REASONER — strict independence boundary.
 //
@@ -14,7 +14,7 @@ import { cosExecutionEnvelope, cosAnswerProgress } from './cosExecutionEnvelope.
 // same exact-host allow-list + API-key controls as any other remote LOCAL_AI_* endpoint.
 
 import { randomUUID } from 'node:crypto'
-import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective } from './answerTaskContract.ts'
+import { requestedAnalyticalTasks, analyticalTaskRepairDirective } from './answerTaskContract.ts'
 import { ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT, answerOutcomeReleasable, verifyAnswerOutcome, type AnswerOutcome, type AnswerOutcomeJudge } from './answerOutcomeVerifier.ts'
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { ANSWER_COMPLETION_SYSTEM_PROMPT, runAnswerCompletionLoop } from './answerCompletionLoop.ts'
@@ -336,11 +336,34 @@ export async function callRawCosReasoner(
     }
 
     let text = initialDraft
+    const outcomes = new Map<string, AnswerOutcome>()
+    const outcomeJudge: AnswerOutcomeJudge = async (request, answer) => {
+      if (syntheticTurn || remainingMs(budget) < ANSWER_OUTCOME_JUDGE_MIN_MS) return null
+      return await callLocalModel({
+        ...effectiveArgs,
+        writesUserAnswer: false,
+        temperature: 0,
+        disableThinking: true,
+        maxTokens: ANSWER_OUTCOME_JUDGE_MAX_TOKENS,
+        usageContext: { ...(effectiveArgs.usageContext ?? { feature: 'cos_interactive_answer' }), purpose: 'answer_outcome_verification' },
+        systemPrompt: ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT,
+        prompt: `REQUEST:\n${request}\n\nANSWER:\n${answer}`,
+      }, { ...boundedInference(), timeoutMs: Math.min(ANSWER_OUTCOME_JUDGE_TIMEOUT_MS, boundedInference().timeoutMs) })
+    }
+    const outcomeOf = async (request: string, answer: string): Promise<AnswerOutcome> => {
+      const known = outcomes.get(answer)
+      if (known) return known
+      const outcome = await verifyAnswerOutcome({ request, answer, judge: outcomeJudge })
+      outcomes.set(answer, outcome)
+      return outcome
+    }
+
     const firstParsedForPolicy = parseLocalResult(initialDraft)
     const firstAdvisoryDefects = advisoryDiagnosis && firstParsedForPolicy
       ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, firstParsedForPolicy.answer)
       : []
-    const firstTaskGaps = firstParsedForPolicy ? cosAnswerProgress(args.prompt, firstParsedForPolicy.answer).missing : []
+    const firstOutcome = firstParsedForPolicy ? await outcomeOf(args.prompt, firstParsedForPolicy.answer) : null
+    const firstTaskGaps = firstOutcome?.status === 'incomplete' ? [...firstOutcome.missing] : []
     const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, initialDraft) || firstAdvisoryDefects.length > 0 || firstTaskGaps.length > 0
     const qualityRepairAffordable = hasBudgetFor(budget, localCallEstimateMs())
       || (firstTaskGaps.length > 0 && remainingMs(budget) >= 8_000)
@@ -382,73 +405,51 @@ export async function callRawCosReasoner(
         return null
       })
 
-      // Loop controller compares actual deliverable coverage; a non-progressing
-      // repair cannot silently become a verified completion.
+      // Choose the repaired draft only using independent deliverable evidence and the existing
+      // advisory policy. Missing or unavailable verification is not proof of improvement.
       const repairedParsedForPolicy = repaired ? parseLocalResult(repaired) : null
-      if (repairedParsedForPolicy && firstTaskGaps.length) {
-        const progress = cosAnswerProgress(args.prompt, repairedParsedForPolicy.answer, firstTaskGaps.length)
-        console.info('[cos-task-loop-progress]', JSON.stringify({
-          turnId, previousMissing: firstTaskGaps.length, remainingMissing: progress.missing.length,
-          decision: progress.decision, completed: progress.complete,
-        }))
-      }
       const repairedAdvisoryDefects = advisoryDiagnosis && repairedParsedForPolicy
         ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, repairedParsedForPolicy.answer)
         : []
-      const repairedTaskGaps = repairedParsedForPolicy ? missingAnalyticalTasks(effectiveArgs.prompt, repairedParsedForPolicy.answer) : firstTaskGaps
-      const taskContractRepairAccepted = firstTaskGaps.length > 0 && repairedTaskGaps.length === 0
-      const advisoryPolicyRepairAccepted = firstAdvisoryDefects.length > 0 && repairedAdvisoryDefects.length === 0
-      const generalRepairAccepted = Boolean(repaired && preferRepairedDraft(effectiveArgs.prompt, initialDraft, repaired))
+      const repairedOutcome = repairedParsedForPolicy ? await outcomeOf(args.prompt, repairedParsedForPolicy.answer) : null
+      const firstMissing = firstOutcome?.status === 'incomplete' ? firstOutcome.missing.length : null
+      const repairedMissing = repairedOutcome?.status === 'incomplete' ? repairedOutcome.missing.length
+        : repairedOutcome?.status === 'verified' ? 0 : null
+      const improvedCoverage = repairedOutcome?.status === 'verified' && firstOutcome?.status !== 'verified'
+        || (firstMissing !== null && repairedMissing !== null && repairedMissing < firstMissing)
+      const noCoverageRegression = repairedOutcome?.status === 'verified'
+        || (firstMissing !== null && repairedMissing !== null && repairedMissing <= firstMissing)
+      const advisoryImproved = repairedAdvisoryDefects.length < firstAdvisoryDefects.length
+      const policySafe = repairedAdvisoryDefects.length <= firstAdvisoryDefects.length
+      const accepted = Boolean(repaired && repairedParsedForPolicy && policySafe
+        && (improvedCoverage || (noCoverageRegression && advisoryImproved)
+          || (noCoverageRegression && firstAdvisoryDefects.length === 0
+            && preferRepairedDraft(effectiveArgs.prompt, initialDraft, repaired))))
+      console.info('[cos-local-quality-repair]', JSON.stringify({
+        at: new Date().toISOString(), reasoner: config.label, repaired: accepted,
+        originalOutcome: firstOutcome?.status ?? 'unverified',
+        repairedOutcome: repairedOutcome?.status ?? 'unverified',
+        advisoryDiagnosisDefectsBefore: firstAdvisoryDefects,
+        advisoryDiagnosisDefectsAfter: repairedAdvisoryDefects,
+      }))
+      void recordQualityRepairDecision({
+        repairKind: 'quality_repair', reasonerLabel: config.label, accepted,
+        details: {
+          originalOutcome: firstOutcome?.status ?? 'unverified',
+          repairedOutcome: repairedOutcome?.status ?? 'unverified',
+          originalMissing: firstMissing, repairedMissing,
+          advisoryDiagnosisDefectsBefore: firstAdvisoryDefects,
+          advisoryDiagnosisDefectsAfter: repairedAdvisoryDefects,
+        },
+      })
+      if (accepted) text = repaired!
 
-      if (repaired && repairedTaskGaps.length === 0 && (taskContractRepairAccepted || advisoryPolicyRepairAccepted || (firstAdvisoryDefects.length === 0 && generalRepairAccepted))) {
-        console.info('[cos-local-quality-repair]', JSON.stringify({
-          at: new Date().toISOString(),
-          reasoner: config.label,
-          repaired: true,
-          advisoryDiagnosisDefectsBefore: firstAdvisoryDefects,
-          advisoryDiagnosisDefectsAfter: repairedAdvisoryDefects,
-        }))
-        void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:true, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,initialDraft), repairedDraft:assessReasonerDraft(effectiveArgs.prompt,repaired), advisoryDiagnosisDefectsBefore:firstAdvisoryDefects, advisoryDiagnosisDefectsAfter:repairedAdvisoryDefects } })
-        text = repaired
-      } else {
-        console.warn('[cos-local-quality-repair]', JSON.stringify({
-          at: new Date().toISOString(),
-          reasoner: config.label,
-          repaired: false,
-          advisoryDiagnosisDefectsBefore: firstAdvisoryDefects,
-          advisoryDiagnosisDefectsAfter: repairedAdvisoryDefects,
-        }))
-        void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:false, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,initialDraft), repairedDraft:repaired?assessReasonerDraft(effectiveArgs.prompt,repaired):null, advisoryDiagnosisDefectsBefore:firstAdvisoryDefects, advisoryDiagnosisDefectsAfter:repairedAdvisoryDefects } })
-        // A repair that closed some task gaps is the better analysis even when it did not close all of them.
-        if (repaired && firstTaskGaps.length > 0 && repairedTaskGaps.length < firstTaskGaps.length && repairedAdvisoryDefects.length <= firstAdvisoryDefects.length) text = repaired
-      }
     }
 
     // THE INDEPENDENT VERIFIER (answerOutcomeVerifier.ts): a separate call that reads only the request and the answer
     // and must quote the passage delivering each requested deliverable. It decides completion and release; the word
     // and vocabulary rules no longer do. Inside an isolated fault run (a controlled provider stub is the only provider)
     // there is no independent judge, so the answer stays unverified and the campaign grades it outside the stub.
-    const outcomes = new Map<string, AnswerOutcome>()
-    const outcomeJudge: AnswerOutcomeJudge = async (request, answer) => {
-      if (syntheticTurn || remainingMs(budget) < ANSWER_OUTCOME_JUDGE_MIN_MS) return null
-      return await callLocalModel({
-        ...effectiveArgs,
-        writesUserAnswer: false,
-        temperature: 0,
-        disableThinking: true,
-        maxTokens: ANSWER_OUTCOME_JUDGE_MAX_TOKENS,
-        usageContext: { ...(effectiveArgs.usageContext ?? { feature: 'cos_interactive_answer' }), purpose: 'answer_outcome_verification' },
-        systemPrompt: ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT,
-        prompt: `REQUEST:\n${request}\n\nANSWER:\n${answer}`,
-      }, { ...boundedInference(), timeoutMs: Math.min(ANSWER_OUTCOME_JUDGE_TIMEOUT_MS, boundedInference().timeoutMs) })
-    }
-    const outcomeOf = async (request: string, answer: string): Promise<AnswerOutcome> => {
-      const known = outcomes.get(answer)
-      if (known) return known
-      const outcome = await verifyAnswerOutcome({ request, answer, judge: outcomeJudge })
-      outcomes.set(answer, outcome)
-      return outcome
-    }
 
     // THE ANSWER LOOP: before the answer the person reads is released, check it against the whole request and write
     // only what is still missing, for up to three rounds while the turn has time (answerCompletionLoop.ts).

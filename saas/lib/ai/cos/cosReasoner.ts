@@ -451,7 +451,7 @@ export async function callRawCosReasoner(
       const advisoryPolicyRepairAccepted = firstAdvisoryDefects.length > 0 && repairedAdvisoryDefects.length === 0
       const generalRepairAccepted = Boolean(repaired && preferRepairedDraft(effectiveArgs.prompt, initialDraft, repaired))
 
-      if (repaired && repairedOutcome?.status !== 'incomplete' && (taskContractRepairAccepted || advisoryPolicyRepairAccepted || (firstAdvisoryDefects.length === 0 && generalRepairAccepted))) {
+      if (repaired && repairedOutcome && repairedOutcome.status !== 'incomplete' && (taskContractRepairAccepted || advisoryPolicyRepairAccepted || (firstAdvisoryDefects.length === 0 && generalRepairAccepted))) {
         console.info('[cos-local-quality-repair]', JSON.stringify({
           at: new Date().toISOString(),
           reasoner: config.label,

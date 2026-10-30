@@ -23,7 +23,7 @@ import { isPlatformSelfKnowledgePrompt, isSelfContainedIncidentAnalysis, require
 import { classifyKnowledgeAccess } from '@/lib/ai/cos/knowledgeAccessPolicy'
 import { decodePlannerSearchQueriesHeader, liveSearchQueriesForTurn, PLANNER_SEARCH_QUERIES_HEADER } from '@/lib/ai/cos/plannerSearchQueries'
 import { semanticIntentConfirmsWriting, semanticIntentIsSelfContainedContentGeneration, semanticIntentRequiresFreshness, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
-import { cosTurnIntent, withCosTurnIntent } from '@/lib/ai/cos/cosTurnIntent'
+import { cosTurnIntent, pendingCosTurnIntent, withCosTurnIntent } from '@/lib/ai/cos/cosTurnIntent'
 import { mayBeNonEnglish } from '@/lib/ai/cos/crossLanguageFreshness'
 import {
   classifyAuthoritativeVolatileFact,

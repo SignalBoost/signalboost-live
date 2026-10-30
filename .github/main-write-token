@@ -1,2 +1,2 @@
-base_sha=2b399df51695dfccb9a74240cadde26b0a35b63f
-branch=fix/history-cos-builder-parent-link-20261030
+base_sha=7cd9b877fa593b88c982c3b4b9b7f4140600d0f3
+branch=test/gate1-cos-builder-history-postgres-20261030

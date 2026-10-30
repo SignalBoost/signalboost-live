@@ -131,8 +131,15 @@ export async function GET(req: NextRequest) {
         const meta = execution.metadata
         const parent = meta && typeof meta === 'object' && !Array.isArray(meta)
           ? (meta as Record<string, unknown>).customerTaskId : null
-        const { metadata: _metadata, ...visible } = execution
-        return { ...visible, customerTaskId: typeof parent === 'string' && UUID.test(parent) ? parent : null }
+        return {
+          id: execution.id,
+          conversation_id: execution.conversation_id,
+          history_message_id: execution.history_message_id,
+          status: execution.status,
+          created_at: execution.created_at,
+          updated_at: execution.updated_at,
+          customerTaskId: typeof parent === 'string' && UUID.test(parent) ? parent : null,
+        }
       })
 
       return response({ conversation: conv, messages: messages ?? [], cosTurns, builderExecutions: linkedBuilderExecutions })

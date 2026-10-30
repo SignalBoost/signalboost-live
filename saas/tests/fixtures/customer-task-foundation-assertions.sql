@@ -108,4 +108,49 @@ BEGIN
 END
 $atomic$;
 
+
+-- Exercise the canonical COS task contract against real PostgreSQL, not source matching.
+\\ir ../../supabase/migrations/20261030140000_cos_canonical_task_contract.sql
+DO $canonical_contract$
+DECLARE contract jsonb;
+BEGIN
+  SELECT task_contract INTO contract FROM public.builder_jobs
+    WHERE id='40000000-0000-0000-0000-000000000091';
+  IF contract->>'immutable_objective' <> 'original objective'
+    OR contract->>'execution_id' <> '40000000-0000-0000-0000-000000000091'
+    OR contract->'customer_identity'->>'user_id' <> '20000000-0000-0000-0000-000000000001'
+    OR contract->>'current_plan_version' IS DISTINCT FROM '1'
+    OR contract->'authorized_capabilities' <> '[]'::jsonb
+    OR NOT (contract ?& ARRAY['budget','completed_actions_ledger','evidence_store','final_verification_result']) THEN
+    RAISE EXCEPTION 'Canonical COS contract backfill incorrect';
+  END IF;
+  UPDATE public.builder_jobs SET status='paused'
+    WHERE id='40000000-0000-0000-0000-000000000091';
+  BEGIN
+    UPDATE public.builder_jobs SET task_contract=jsonb_set(task_contract,'{budget,approved_units}','100'::jsonb)
+    WHERE id='40000000-0000-0000-0000-000000000091';
+    RAISE EXCEPTION 'Contract authority escalation was allowed';
+  EXCEPTION WHEN check_violation THEN
+    IF SQLERRM NOT LIKE '%cos_task_contract_unauthorized_mutation%' THEN RAISE; END IF;
+  END;
+  BEGIN
+    UPDATE public.builder_jobs SET plan_version=2
+    WHERE id='40000000-0000-0000-0000-000000000091';
+    RAISE EXCEPTION 'Uncontrolled plan version change was allowed';
+  EXCEPTION WHEN check_violation THEN
+    IF SQLERRM NOT LIKE '%cos_task_contract_unauthorized_mutation%' THEN RAISE; END IF;
+  END;
+END $canonical_contract$;
+
+INSERT INTO public.builder_jobs(id,user_id,status,claim_generation,job_kind,updated_at,objective)
+VALUES ('40000000-0000-0000-0000-000000000094','20000000-0000-0000-0000-000000000001',
+'running',0,'cos_turn',now(),'another customer objective');
+DO $new_contract$
+BEGIN
+ IF (SELECT task_contract->>'immutable_objective' FROM public.builder_jobs
+     WHERE id='40000000-0000-0000-0000-000000000094') <> 'another customer objective' THEN
+   RAISE EXCEPTION 'New COS admission lacks contract';
+ END IF;
+END $new_contract$;
+
 ROLLBACK;

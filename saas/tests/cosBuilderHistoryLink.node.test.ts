@@ -6,7 +6,7 @@ const route = readFileSync(new URL('../app/api/assistant/chats/route.ts', import
 
 test('History returns only owner and conversation scoped Builder child executions', () => {
   assert.match(route, /\.from\('builder_jobs'\)[\s\S]*?\.select\('id,conversation_id,history_message_id,status,created_at,updated_at,metadata'\)[\s\S]*?\.eq\('user_id', userId\)[\s\S]*?\.eq\('conversation_id', id\)/)
-  assert.match(route, /builderExecutions: builderExecutions \?\? \[\]/)
+  assert.match(route, /builderExecutions: linkedBuilderExecutions/)
   assert.doesNotMatch(route, /builderExecutions.*result: 'succeeded'/)
 })
 

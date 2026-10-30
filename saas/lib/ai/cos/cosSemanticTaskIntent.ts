@@ -97,6 +97,21 @@ export function semanticIntentSuppressesFreshness(intent: CosSemanticTaskIntent 
   return semanticIntentIsSuppliedContextReasoning(intent)
 }
 
+/**
+ * The judge found a deliverable to produce (a letter, advice, an analysis) that needs outside-world facts. The live
+ * lookup gathers those facts, and COS then writes the whole deliverable from them; the fact-only answer lane, which
+ * keeps only cited sentences, cannot write a letter. Production 2026-10-30: a letter to the user's CDO about extending
+ * retirement past 65 was refused with "the drafted answer did not meet the verification requirement".
+ */
+export function semanticIntentComposesWithEvidence(intent: CosSemanticTaskIntent | null): boolean {
+  return Boolean(
+    intent
+      && (intent.mode === 'content_generation' || intent.mode === 'general_reasoning')
+      && intent.externalFactsRequired
+      && intent.confidence >= 0.72,
+  )
+}
+
 /** The judge's positive live-fact finding: the turn needs current outside-world facts verified live. */
 export function semanticIntentRequiresFreshness(intent: CosSemanticTaskIntent | null): boolean {
   return Boolean(

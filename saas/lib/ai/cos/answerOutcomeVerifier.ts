@@ -44,27 +44,53 @@ export const ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT = [
   'You are an independent verifier. You did not write the answer. You receive a request and the answer given to it.',
   'List every deliverable the request asks for: each question, task, item, constraint and required format. Do not add anything the request did not ask for, and do not judge style.',
   'For each deliverable decide whether the answer actually delivers it with real, specific substance. A heading, a restated question, a promise, a refusal, or a generic paragraph does not deliver it. When the person could not supply some evidence and the answer handles that honestly, the deliverable is still delivered.',
-  'For each delivered deliverable copy, word for word, the passage of the answer (5 to 25 words) that delivers it. Never paraphrase the quote.',
-  'Return ONLY strict JSON: {"deliverables":[{"item":"short description","delivered":true,"quote":"exact words from the answer"},{"item":"short description","delivered":false,"quote":""}]}.',
+  'Name each deliverable in at most 8 words. For each delivered deliverable copy, word for word, 5 to 12 consecutive words of the answer that deliver it. Never paraphrase the quote. Write nothing else.',
+  'Return ONLY strict JSON: {"deliverables":[{"item":"at most 8 words","delivered":true,"quote":"5 to 12 exact words from the answer"},{"item":"at most 8 words","delivered":false,"quote":""}]}.',
 ].join(' ')
 
 function normalized(text: string): string {
   return String(text || '').toLowerCase().replace(/[*_`#>|]+/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-/** Read the judge's reply. Returns null when it is not a readable verdict on at least one deliverable. */
-export function parseAnswerOutcome(raw: string | null | undefined, answer: string, request = ''): AnswerDeliverableVerdict[] | null {
-  const text = String(raw || '')
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start < 0 || end <= start) return null
-  let parsed: { deliverables?: unknown }
-  try { parsed = JSON.parse(text.slice(start, end + 1)) } catch { return null }
-  if (!Array.isArray(parsed.deliverables)) return null
+/**
+ * The deliverable objects of the judge's reply, in order, and whether the list was closed. A verdict cut off by the
+ * token limit still yields every object written in full before the cut (production 2026-10-30: replies stopped at the
+ * limit and were thrown away whole, so successful judge calls ended as "unavailable").
+ */
+function deliverableObjects(text: string): Readonly<{ objects: unknown[]; closed: boolean }> | null {
+  const key = text.indexOf('"deliverables"')
+  const open = key < 0 ? -1 : text.indexOf('[', key)
+  if (open < 0) return null
+  const objects: unknown[] = []
+  let depth = 0
+  let start = -1
+  let inString = false
+  for (let index = open + 1; index < text.length; index++) {
+    const char = text[index]
+    if (inString) {
+      if (char === '\\') index++
+      else if (char === '"') inString = false
+      continue
+    }
+    if (char === '"') inString = true
+    else if (char === '{') { if (depth++ === 0) start = index }
+    else if (char === '}' && depth > 0) {
+      if (--depth === 0) {
+        try { objects.push(JSON.parse(text.slice(start, index + 1))) } catch { return null }
+      }
+    } else if (char === ']' && depth === 0) return { objects, closed: true }
+  }
+  return { objects, closed: false }
+}
+
+/** Read the judge's reply: the verdicts it gave and whether it judged the whole request (false when it was cut off). */
+export function readAnswerOutcome(raw: string | null | undefined, answer: string, request = ''): Readonly<{ verdicts: AnswerDeliverableVerdict[]; complete: boolean }> | null {
+  const read = deliverableObjects(String(raw || ''))
+  if (!read) return null
   const body = normalized(answer)
   const asked = normalized(request)
   const verdicts: AnswerDeliverableVerdict[] = []
-  for (const entry of parsed.deliverables.slice(0, MAX_DELIVERABLES)) {
+  for (const entry of read.objects.slice(0, MAX_DELIVERABLES)) {
     if (!entry || typeof entry !== 'object') continue
     const item = String((entry as any).item || '').trim().replace(/\s+/g, ' ').slice(0, 300)
     if (!item) continue
@@ -78,7 +104,13 @@ export function parseAnswerOutcome(raw: string | null | undefined, answer: strin
       && !asked.includes(evidence)
     verdicts.push({ deliverable: item, delivered: found, evidence: found ? quote.slice(0, 500) : null })
   }
-  return verdicts.length ? verdicts : null
+  return verdicts.length ? { verdicts, complete: read.closed } : null
+}
+
+/** The verdicts of a reply that judged the whole request; null otherwise. */
+export function parseAnswerOutcome(raw: string | null | undefined, answer: string, request = ''): AnswerDeliverableVerdict[] | null {
+  const read = readAnswerOutcome(raw, answer, request)
+  return read?.complete ? read.verdicts : null
 }
 
 function evidenceRef(request: string, answer: string, index: number): string {
@@ -124,7 +156,13 @@ export async function verifyAnswerOutcome(input: Readonly<{
     return outcomeFrom(request, answer, [{ deliverable: 'an answer to the request', delivered: false, evidence: null }], null)
   }
   const raw = await input.judge(request, answer).catch(() => null)
-  const outcome = outcomeFrom(request, answer, parseAnswerOutcome(raw, answer, request), raw === null ? 'answer_outcome_judge_unavailable' : 'answer_outcome_judge_unreadable')
+  const read = readAnswerOutcome(raw, answer, request)
+  // A cut-off verdict that already found an undelivered deliverable is a finding; one that found none judged only
+  // part of the request and verifies nothing.
+  const cutOffFinding = read && !read.complete && read.verdicts.some(verdict => !verdict.delivered)
+  const outcome = read?.complete || cutOffFinding
+    ? outcomeFrom(request, answer, cutOffFinding ? read!.verdicts.filter(verdict => !verdict.delivered) : read!.verdicts, null)
+    : outcomeFrom(request, answer, null, raw === null ? 'answer_outcome_judge_unavailable' : read ? 'answer_outcome_judge_cut_off' : 'answer_outcome_judge_unreadable')
   console.info('[cos-answer-outcome]', JSON.stringify({
     status: outcome.status,
     deliverables: outcome.deliverables.length,

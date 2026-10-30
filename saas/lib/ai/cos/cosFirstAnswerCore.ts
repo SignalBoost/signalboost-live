@@ -844,6 +844,11 @@ export async function tryCOSFirstAnswer(input: {
   privileged?: boolean
   disableCache?: boolean
   previousAssistant?: string | null
+  /**
+   * The caller already ran this turn's live lookup and put its sources in the prompt for COS to write from
+   * (cos-primary, a letter or advice that needs outside facts). No second lookup runs here.
+   */
+  liveEvidenceSupplied?: boolean
 }): Promise<COSFirstAnswerResult> {
   beginEvidenceSourceUseTurn()
 
@@ -917,11 +922,11 @@ export async function tryCOSFirstAnswer(input: {
     }))
   }
 
-  if (baselineRequiresFreshEvidence && !suppressFreshnessForInterpretation) {
+  if (baselineRequiresFreshEvidence && !suppressFreshnessForInterpretation && input.liveEvidenceSupplied !== true) {
     return learnFromTurn(input, await releasePublic(await tryFreshCurrentFact(input)))
   }
 
-  if (!suppressFreshnessForInterpretation && classifyKnowledgeAccess(input.prompt).mode === 'search_if_thin') {
+  if (!suppressFreshnessForInterpretation && input.liveEvidenceSupplied !== true && classifyKnowledgeAccess(input.prompt).mode === 'search_if_thin') {
     const looked = await releasePublic(await tryFreshCurrentFact(input))
     const reply = 'reply' in looked ? String(looked.reply || '') : ''
     const refused = /could not stand behind|did not release an answer|verification unavailable|live verification/i.test(reply)

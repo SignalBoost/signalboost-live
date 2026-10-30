@@ -70,13 +70,13 @@ test('the judge finding that sends a turn to live verification is one shared rul
   // Read from source: the judge module imports the reasoner through the @/ alias, which the plain-node release
   // gate that runs this file does not resolve.
   const judge = readFileSync(new URL('../lib/ai/cos/cosSemanticTaskIntent.ts', import.meta.url), 'utf8')
-  assert.match(judge, /export function semanticIntentRequiresFreshness\(intent: CosSemanticTaskIntent \| null\): boolean \{\s*return Boolean\(\s*intent\s*&& intent\.mode === 'external_fact_verification'\s*&& intent\.externalFactsRequired\s*&& intent\.confidence >= 0\.72,\s*\)\s*\}/)
+  assert.match(judge, /export function semanticIntentRequiresFreshness\(intent: CosSemanticTaskIntent \| null\): boolean \{\s*return Boolean\(\s*intent\s*&& \(intent\.mode === 'external_fact_verification' \|\| intent\.mode === 'content_generation'\)\s*&& intent\.externalFactsRequired\s*&& intent\.confidence >= 0\.72,\s*\)\s*\}/)
 })
 
 test('the chat route sends unflagged non-English questions to the judge and acts on its live finding', () => {
   const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
   assert.match(route, /const nonEnglishUnflagged=!heuristicRequiresFreshEvidence&&!conversationRecallRequested&&mayBeNonEnglish\(input,language\)/)
-  assert.match(route, /freshConversationContext\.contextUsed \|\| nonEnglishUnflagged\)/)
+  assert.match(route, /freshConversationContext\.contextUsed \|\| nonEnglishUnflagged \|\| isAuthoringObjectiveWithoutLiveLookup\(input\) \|\| Boolean\(pendingCosTurnIntent\(\)\)\)/)
   assert.match(route, /const semanticRequiresFreshEvidence=semanticIntentRequiresFreshness\(semanticTaskIntent\)/)
   assert.match(route, /baselineRequiresFreshEvidence=!suppliedIncidentAnalysis&&\(modelPlannedFreshEvidence\|\|heuristicRequiresFreshEvidence\|\|semanticRequiresFreshEvidence\)/)
 })

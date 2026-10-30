@@ -49,3 +49,17 @@ test('a list of search results is never released as the answer', () => {
   assert.doesNotMatch(primary, /sourceDigestFallback|buildSourceSummaryFallback|cos-fresh-source-digest/)
   assert.equal(existsSync(join(process.cwd(), 'lib/ai/cos/sourceDigestFallback.ts')), false)
 })
+
+// Production 2026-10-30 10:09 (America/Asuncion): with the lookup fixed, the same question entered the
+// contextual-interpretation lane (built for "what did this message mean?"), both providers ran to their 30 s deadline,
+// and a thin rescue answer arrived after about 100 s. Reasoning over supplied facts goes to the full reasoner.
+test('only an interpretation reading enters the interpretation lane; supplied-facts reasoning goes to the reasoner', () => {
+  const shared = read('lib/ai/cos/cosFirstAnswer.ts')
+  const lane = shared.slice(shared.indexOf('async function tryNeuralContextualInterpretation'), shared.indexOf("purpose: 'contextual_interpretation'"))
+  assert.match(lane, /if \(intent\?\.mode !== 'contextual_interpretation' \|\| !semanticIntentSuppressesFreshness\(intent\)\) return null/)
+  const supplied: CosSemanticTaskIntent = { mode: 'general_reasoning', confidence: 0.9, suppliedContextPrimary: true, externalFactsRequired: false }
+  const enters = (intent: CosSemanticTaskIntent | null) => intent?.mode === 'contextual_interpretation' && semanticIntentSuppressesFreshness(intent)
+  assert.equal(enters(supplied), false, 'an incident with numbered tasks is not an interpretation request')
+  assert.equal(enters({ ...supplied, mode: 'contextual_interpretation' }), true)
+  assert.equal(enters(null), false)
+})

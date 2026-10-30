@@ -1,2 +1,2 @@
-base_sha=7cd9b877fa593b88c982c3b4b9b7f4140600d0f3
-branch=fix/pr5132-reintegrate-20261030
+base_sha=25abafe9a6fb04daaefab4046127b5dcb5ddab68
+branch=test/gate1-cos-builder-history-rebased-20261030

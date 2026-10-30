@@ -892,7 +892,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // is adjudicated by the semantic judge, which reads meaning rather than words.
   const nonEnglishUnflagged=!heuristicRequiresFreshEvidence&&!conversationRecallRequested&&mayBeNonEnglish(input,language)
   const semanticTaskIntentNeeded=!requestedAction
-    && (modelPlannedFreshEvidence || heuristicRequiresFreshEvidence || requiresLiveTravelPlanningEvidence(input) || freshConversationContext.contextUsed || nonEnglishUnflagged || isAuthoringObjectiveWithoutLiveLookup(input))
+    && (modelPlannedFreshEvidence || heuristicRequiresFreshEvidence || requiresLiveTravelPlanningEvidence(input) || freshConversationContext.contextUsed || nonEnglishUnflagged || isAuthoringObjectiveWithoutLiveLookup(input) || Boolean(pendingCosTurnIntent()))
   const semanticIntentStartedAt=Date.now()
   const semanticTaskIntent=semanticTaskIntentNeeded
     ? await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})

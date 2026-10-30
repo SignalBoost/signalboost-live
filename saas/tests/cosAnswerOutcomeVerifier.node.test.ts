@@ -161,6 +161,6 @@ test('Q10 repair selection uses the independent verifier rather than word-count 
   assert.match(source, /const firstOutcome = firstParsedForPolicy \? await outcomeOf/)
   assert.match(source, /const repairedOutcome = repairedParsedForPolicy/)
   assert.match(source, /taskContractRepairAccepted = firstOutcome\?\.status === 'incomplete' && repairedOutcome\?\.status === 'verified'/)
-  assert.match(source, /repairedOutcome\?\.status !== 'incomplete'/)
+  assert.match(source, /repairedOutcome && repairedOutcome\.status !== 'incomplete'/)
   assert.doesNotMatch(source, /cosAnswerProgress|missingAnalyticalTasks|analyticalTaskRepairDirective/)
 })

@@ -46,7 +46,7 @@ import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioS
 import { mentionsPlatformConcept } from '@/lib/ai/cos/cosPlatformGlossary'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isSoftwareRepairRequest } from '@/lib/ai/cos/softwareRepairIntent'
-import { semanticIntentConfirmsFile, semanticIntentConfirmsPicture, semanticIntentConfirmsWriting } from '@/lib/ai/cos/cosSemanticTaskIntent'
+import { semanticIntentConfirmsFile, semanticIntentConfirmsPicture, semanticIntentConfirmsWriting, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
 import { cosTurnIntent, withCosTurnIntent } from '@/lib/ai/cos/cosTurnIntent'
 import { startVerificationCampaign } from '@/lib/builder/campaign/start'
 import { namesVerificationCampaign } from '@/lib/builder/campaign/catalog'
@@ -531,7 +531,12 @@ async function executeBrowserTurn(req: NextRequest) {
   // The model gets first semantic choice. Host policy may still require MORE evidence before release.
   // This is a release guard, not a pre-model router: when the model misses a mutable/current-world
   // dependency, force the same turn into live_web orchestration rather than releasing stale memory.
-  if (agentDecision?.mode === 'answer' && (requiresFreshExternalEvidence(prompt) || requiresLiveTravelPlanningEvidence(prompt))) {
+  // The word rules only suggest that dependency; the turn's intent judge decides. A request the judge reads as
+  // reasoning over material the user supplied is never sent to a web lookup. Production 2026-10-30: an incident with
+  // its own facts and three numbered tasks ("this week", "on Monday") was forced to live_web here, and the user got a
+  // list of unrelated search results instead of an analysis.
+  if (agentDecision?.mode === 'answer' && (requiresFreshExternalEvidence(prompt) || requiresLiveTravelPlanningEvidence(prompt))
+    && !semanticIntentSuppressesFreshness(await turnIntent())) {
     console.info('[cos-agent-decision]', JSON.stringify({
       at: new Date().toISOString(),
       mode: 'orchestrate',

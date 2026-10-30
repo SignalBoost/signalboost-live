@@ -1,2 +1,2 @@
-base_sha=20a434b7300f4fa32082308bf7325274f0e6ab1f
-branch=docs/developer-queue-q13-latency-20261029
+base_sha=b45bf99a2e6ec7e15407dbe1c1ad8dc42b4a80cc
+branch=fix/cos-supplied-facts-never-web-lookup-20261030

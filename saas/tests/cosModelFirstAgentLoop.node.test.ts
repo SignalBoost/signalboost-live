@@ -63,17 +63,19 @@ test('the first-turn planner never answers the user; COS answers every request (
   assert.doesNotMatch(decision, /complete user-facing answer/)
 })
 
-test('live_web and conversation_history plans steer COS without a second semantic classifier', () => {
+test('live_web and conversation_history plans steer COS; a planned live lookup is still adjudicated by the turn judge', () => {
   assert.match(primary, /modelPlannedFreshEvidence=agentCapabilities\.has\('live_web'\)/)
   assert.match(primary, /modelPlannedConversationRecall=agentCapabilities\.has\('conversation_history'\)/)
   assert.match(primary, /conversationRecallRequested=Boolean\(userId\)&&\(modelPlannedConversationRecall\|\|detectConversationRecallIntent\(input\)\)/)
 
   const semantic = primary.indexOf('const semanticTaskIntentNeeded=!requestedAction')
-  const skip = primary.indexOf('&& !modelPlannedFreshEvidence', semantic)
-  const baseline = primary.indexOf('const baselineRequiresFreshEvidence=!suppliedIncidentAnalysis&&(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)', skip)
+  const planned = primary.indexOf('&& (modelPlannedFreshEvidence ||', semantic)
+  const baseline = primary.indexOf('const baselineRequiresFreshEvidence=!suppliedIncidentAnalysis&&(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)', planned)
+  const suppressed = primary.indexOf('const requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness(semanticTaskIntent)', baseline)
   assert.ok(semantic > 0)
-  assert.ok(skip > semantic)
-  assert.ok(baseline > skip)
+  assert.ok(planned > semantic)
+  assert.ok(baseline > planned)
+  assert.ok(suppressed > baseline)
 })
 
 test('current platform runtime facts stay host-verified rather than model-guessed', () => {

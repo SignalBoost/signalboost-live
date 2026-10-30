@@ -29,6 +29,8 @@ test('model-first decision occurs before capability orchestration and primary CO
 test('freshness is a post-model release guard, not a pre-model semantic router', () => {
   const decide = browser.indexOf('agentDecision = await decideCosAgentTurn({')
   const freshnessGuard = browser.indexOf("agentDecision?.mode === 'answer' && (requiresFreshExternalEvidence(prompt)", decide)
+  // The word rules only suggest the lookup; the turn intent judge must not read the request as supplied-facts reasoning.
+  assert.match(browser.slice(freshnessGuard, freshnessGuard + 400), /&& !semanticIntentSuppressesFreshness\(await turnIntent\(\)\)\) \{/)
   const directRelease = browser.indexOf("if (agentDecision?.mode === 'answer') {", freshnessGuard)
   assert.ok(freshnessGuard > decide)
   assert.ok(directRelease > freshnessGuard)
@@ -38,9 +40,9 @@ test('freshness is a post-model release guard, not a pre-model semantic router',
   assert.match(guard, /requiresLiveTravelPlanningEvidence\(prompt\)/)
 })
 
-test('a native capability plan suppresses redundant semantic classification downstream', () => {
+test('a planned live lookup is still adjudicated by the turn intent judge downstream', () => {
   assert.match(primary, /const modelPlannedFreshEvidence=agentCapabilities\.has\('live_web'\)/)
-  assert.match(primary, /const semanticTaskIntentNeeded=!requestedAction\s*\n\s*&& !modelPlannedFreshEvidence/)
+  assert.match(primary, /const semanticTaskIntentNeeded=!requestedAction\s*\n\s*&& \(modelPlannedFreshEvidence \|\| heuristicRequiresFreshEvidence/)
   assert.match(primary, /const baselineRequiresFreshEvidence=!suppliedIncidentAnalysis&&\(modelPlannedFreshEvidence\|\|heuristicRequiresFreshEvidence\|\|semanticRequiresFreshEvidence\)/)
 })
 

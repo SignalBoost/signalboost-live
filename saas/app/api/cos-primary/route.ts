@@ -23,7 +23,7 @@ import { isPlatformSelfKnowledgePrompt, isSelfContainedIncidentAnalysis, require
 import { classifyKnowledgeAccess } from '@/lib/ai/cos/knowledgeAccessPolicy'
 import { decodePlannerSearchQueriesHeader, liveSearchQueriesForTurn, PLANNER_SEARCH_QUERIES_HEADER } from '@/lib/ai/cos/plannerSearchQueries'
 import { semanticIntentConfirmsWriting, semanticIntentIsSelfContainedContentGeneration, semanticIntentRequiresFreshness, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
-import { cosTurnIntent, withCosTurnIntent } from '@/lib/ai/cos/cosTurnIntent'
+import { cosTurnIntent, pendingCosTurnIntent, withCosTurnIntent } from '@/lib/ai/cos/cosTurnIntent'
 import { mayBeNonEnglish } from '@/lib/ai/cos/crossLanguageFreshness'
 import {
   classifyAuthoritativeVolatileFact,
@@ -304,7 +304,7 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
         'You are COS fast authoring. Complete the user\'s self-contained writing, drafting, composition, or translation request using only facts the user supplied.',
         cognitiveMode==='creative'
           ? 'The user is asking for creative generation: explore original wording and varied ideas while respecting every supplied constraint.'
-          : 'The task is precision-oriented: prefer faithful, controlled wording over novelty.',
+          : 'The task is precision-oriented: prefer faithful, controlled wording over novelty. For professional correspondence use concise, specific, mature language; avoid empty pleasantries, assumed familiarity, vague rumors, inflated formality, and invented credentials or facts. Preserve the recipient\'s actual knowledge boundary and fulfill every requested deliverable.',
         `Respond in ${reportLanguageName(language)} unless the user explicitly requests a different target language.`,
         'If the user asks for multiple languages or versions, provide every requested version. Do not research, browse, verify incidental facts, invoke tools, add warnings, or discuss your process. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
       ].join(' '),
@@ -777,9 +777,9 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const hasAttachments=Array.isArray(body?.attachments)&&body.attachments.length>0
   const fastAuthoringEligible=!artifactContinuation
     && !hasAttachments
-    && isAuthoringObjectiveWithoutLiveLookup(input)
     && !isCosCodingObjective(input)
     && semanticIntentConfirmsWriting(await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null}))
+    && !(await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null}))?.externalFactsRequired
   // ONE PIPELINE, NO PRE-COS DETOUR (2026-09-27). Production evidence (cos-latency-stage rows, Concierge Polish
   // question 14:06 ET): primary:before_cos_first was 38,749ms. Two fast-authoring detours each ran their full
   // FAST_AUTHORING_TIMEOUT_MS (18s: two 9s attempts), returned nothing, and only then did COS answer in 15.5s.
@@ -892,7 +892,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // is adjudicated by the semantic judge, which reads meaning rather than words.
   const nonEnglishUnflagged=!heuristicRequiresFreshEvidence&&!conversationRecallRequested&&mayBeNonEnglish(input,language)
   const semanticTaskIntentNeeded=!requestedAction
-    && (modelPlannedFreshEvidence || heuristicRequiresFreshEvidence || requiresLiveTravelPlanningEvidence(input) || freshConversationContext.contextUsed || nonEnglishUnflagged)
+    && (modelPlannedFreshEvidence || heuristicRequiresFreshEvidence || requiresLiveTravelPlanningEvidence(input) || freshConversationContext.contextUsed || nonEnglishUnflagged || isAuthoringObjectiveWithoutLiveLookup(input) || Boolean(pendingCosTurnIntent()))
   const semanticIntentStartedAt=Date.now()
   const semanticTaskIntent=semanticTaskIntentNeeded
     ? await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})

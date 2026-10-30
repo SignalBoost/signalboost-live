@@ -101,7 +101,7 @@ export function semanticIntentSuppressesFreshness(intent: CosSemanticTaskIntent 
 export function semanticIntentRequiresFreshness(intent: CosSemanticTaskIntent | null): boolean {
   return Boolean(
     intent
-      && intent.mode === 'external_fact_verification'
+      && (intent.mode === 'external_fact_verification' || intent.mode === 'content_generation')
       && intent.externalFactsRequired
       && intent.confidence >= 0.72,
   )
@@ -162,6 +162,7 @@ export async function classifyCosSemanticTaskIntent(args: {
       'general_reasoning means the user wants analysis, diagnosis, ranking, planning or explanation performed on facts, data or a scenario they supplied (an incident report, a log excerpt, a case, a dataset, a hypothetical). Timestamps, dates, place names or system names inside the supplied material do NOT make it an outside-world fact to verify.',
       'Advice, a recommendation, an opinion or a decision about the user\'s own situation is general_reasoning when it rests on material the user supplied, even when that material contains drafts, emails or a previous answer.',
       'content_generation means the deliverable the user asks COS to produce is new or rewritten text: an email, letter, post, summary, translation or an edit of their own text. Text that merely appears in pasted material is not a request to write.',
+      'When requested writing depends on establishing an outside-world fact, such as whether a legal entitlement or regulation exists, choose content_generation with externalFactsRequired=true. A writing deliverable does not make legal, medical, financial, policy, or eligibility claims self-contained. When the user requests both a draft and advice, preserve both deliverables.',
       'visual_generation means the deliverable the user asks COS to produce is a still picture: an image, drawing, illustration, logo, poster or photo-like render. Visual words inside pasted material, idioms, or a request to explain or write about a visual are not visual_generation.',
       'file_generation means the user asks COS to produce a downloadable file (such as a PDF or a text file) as the deliverable.',
       'For visual_generation and file_generation set externalFactsRequired=false unless the content of that deliverable needs current outside facts.',

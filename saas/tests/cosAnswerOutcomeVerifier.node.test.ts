@@ -96,3 +96,36 @@ test('COS release and campaign grading use the same verifier; the word rules dec
   // #5104's extra gate is gone with the function it lived in.
   assert.doesNotMatch(contract, /if \(missing\.length\) return false/)
 })
+
+// Production 2026-10-30 (campaign 13:11 UTC): the judge's verdicts stopped at the token limit (finish_reason length) and
+// were discarded whole, so successful judge calls ended as "unavailable" and every graded answer went unchecked.
+test('a verdict cut off at the token limit is read up to the cut, never thrown away whole', async () => {
+  const answer = '1. Root cause: the new parser version materialises every file in memory.\n2. Ranking: parser first, noisy neighbour second, input shape third.'
+  const delivered = '{"item":"root cause","delivered":true,"quote":"the new parser version materialises every file in memory"}'
+  const missing = '{"item":"decisive experiment","delivered":false,"quote":""}'
+  const cut = (objects: string[]) => async () => `{"deliverables":[${objects.join(',')},{"item":"ranked hyp`
+  // A finding made before the cut stands.
+  const found = await verifyAnswerOutcome({ request, answer, judge: cut([delivered, missing]) })
+  assert.equal(found.status, 'incomplete')
+  assert.deepEqual(found.missing, ['decisive experiment'])
+  // No finding before the cut: only part of the request was judged, so nothing is verified.
+  const partial = await verifyAnswerOutcome({ request, answer, judge: cut([delivered]) })
+  assert.equal(partial.status, 'unverified')
+  assert.equal(partial.verification.reason, 'answer_outcome_judge_cut_off')
+  // A string containing brackets and braces does not end the list early.
+  const tricky = '{"item":"ranked [a] {b} \\"c\\"","delivered":true,"quote":"parser first, noisy neighbour second, input shape third"}'
+  const whole = await verifyAnswerOutcome({ request, answer, judge: async () => `{"deliverables":[${delivered},${tricky}]}` })
+  assert.equal(whole.status, 'verified')
+  assert.equal(whole.deliverables.length, 2)
+})
+
+test('the judge is asked for a compact verdict and its cut-off reply reaches the reader', () => {
+  const verifier = read('lib/ai/cos/answerOutcomeVerifier.ts')
+  assert.match(verifier, /Name each deliverable in at most 8 words/)
+  assert.match(verifier, /5 to 12 consecutive words of the answer/)
+  const reasoner = read('lib/ai/cos/cosReasoner.ts')
+  assert.equal((reasoner.match(/purpose: 'answer_outcome_verification'/g) || []).length, 2)
+  const loopJudge = reasoner.slice(reasoner.indexOf('const outcomeJudge: AnswerOutcomeJudge'), reasoner.indexOf('const outcomeOf = async'))
+  const sharedJudge = reasoner.slice(reasoner.indexOf('export const cosAnswerOutcomeJudge'))
+  for (const judge of [loopJudge, sharedJudge]) assert.match(judge, /allowTruncatedText: true/)
+})

@@ -437,6 +437,8 @@ export async function callRawCosReasoner(
         temperature: 0,
         disableThinking: true,
         maxTokens: ANSWER_OUTCOME_JUDGE_MAX_TOKENS,
+        // A verdict cut at the token limit is read up to the cut (answerOutcomeVerifier.ts), never thrown away whole.
+        allowTruncatedText: true,
         usageContext: { ...(effectiveArgs.usageContext ?? { feature: 'cos_interactive_answer' }), purpose: 'answer_outcome_verification' },
         systemPrompt: ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT,
         prompt: `REQUEST:\n${request}\n\nANSWER:\n${answer}`,
@@ -693,6 +695,7 @@ export const cosAnswerOutcomeJudge: AnswerOutcomeJudge = async (request, answer)
     disableThinking: true,
     maxTokens: ANSWER_OUTCOME_JUDGE_MAX_TOKENS,
     timeoutMs: ANSWER_OUTCOME_JUDGE_TIMEOUT_MS,
+    allowTruncatedText: true,
     usageContext: { feature: 'cos_interactive_answer', purpose: 'answer_outcome_verification' },
     systemPrompt: ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT,
     prompt: `REQUEST:\n${request}\n\nANSWER:\n${answer}`,

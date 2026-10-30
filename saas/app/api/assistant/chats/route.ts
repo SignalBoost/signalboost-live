@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
       // never promote conversation_id or a Builder status to canonical customer success.
       const { data: builderExecutions, error: builderReadError } = await db
         .from('builder_jobs')
-        .select('id,conversation_id,history_message_id,status,created_at,updated_at')
+        .select('id,conversation_id,history_message_id,status,created_at,updated_at,metadata')
         .eq('user_id', userId)
         .eq('conversation_id', id)
         .eq('job_kind', 'standard')
@@ -125,7 +125,24 @@ export async function GET(req: NextRequest) {
         }]
       })
 
-      return response({ conversation: conv, messages: messages ?? [], cosTurns, builderExecutions: builderExecutions ?? [] })
+      // A Builder child has its own execution id; the canonical customer-task parent
+      // is taken only from the persisted, DB-validated link (never guessed by conversation).
+      const linkedBuilderExecutions = (builderExecutions ?? []).map(execution => {
+        const meta = execution.metadata
+        const parent = meta && typeof meta === 'object' && !Array.isArray(meta)
+          ? (meta as Record<string, unknown>).customerTaskId : null
+        return {
+          id: execution.id,
+          conversation_id: execution.conversation_id,
+          history_message_id: execution.history_message_id,
+          status: execution.status,
+          created_at: execution.created_at,
+          updated_at: execution.updated_at,
+          customerTaskId: typeof parent === 'string' && UUID.test(parent) ? parent : null,
+        }
+      })
+
+      return response({ conversation: conv, messages: messages ?? [], cosTurns, builderExecutions: linkedBuilderExecutions })
     }
 
     const { data: conversations, error } = await db

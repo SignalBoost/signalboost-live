@@ -8,6 +8,6 @@ test('History scopes COS turn identity to authenticated conversation and keeps B
   assert.match(route,/recorded\.schema !== 'signalboost-cos-turn-v1'/)
   assert.match(route,/UUID\.test\(recorded\.turnId\)/)
   assert.match(route,/historyMessageId: message\.id/)
-  assert.match(route,/cosTurns, builderExecutions: builderExecutions/)
+  assert.match(route,/cosTurns, builderExecutions: linkedBuilderExecutions/)
   assert.doesNotMatch(route,/builderExecutions\.map\([^]*turnId/)
 })

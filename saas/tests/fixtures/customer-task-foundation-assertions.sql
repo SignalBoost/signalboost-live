@@ -110,7 +110,7 @@ $atomic$;
 
 
 -- Exercise the canonical COS task contract against real PostgreSQL, not source matching.
-\ir ../../supabase/migrations/20261030140000_cos_canonical_task_contract.sql
+\ir ../../supabase/migrations/20261030190000_cos_canonical_task_contract.sql
 DO $canonical_contract$
 DECLARE contract jsonb;
 BEGIN

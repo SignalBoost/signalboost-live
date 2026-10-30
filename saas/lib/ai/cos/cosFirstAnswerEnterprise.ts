@@ -146,6 +146,8 @@ type CachedCosAnswer = {
   policyVersion?:string|null
   storedAt?:string|null
   origin?:CachedAnswerOrigin
+  /** The independent verifier's verdict on this exact reply. Only 'verified' entries are written or replayed (Q19). */
+  answerOutcome?:'verified'
 }
 
 type RetrievalCounts = { retrieved:number; relevant:number; selected:number }
@@ -1042,7 +1044,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
       const payload = nearest.responsePayload as CachedCosAnswer|null
       const current = cachedAnswerIsCurrent(payload, policyVersion, cacheMaxAgeMs)
       if (payload?.reply && !current.ok) console.warn('cosFirstAnswer: semantic cache entry refused as stale', { reason:current.reason, similarity:nearest.similarityScore })
-      if (payload?.reply && current.ok && payload.confidence >= threshold() && normativeAnswerContractViolations(input.prompt, payload.reply).length === 0 && instructionNarrationSignals(payload.reply).length === 0) {
+      if (payload?.reply && current.ok && payload.answerOutcome === 'verified' && payload.confidence >= threshold() && normativeAnswerContractViolations(input.prompt, payload.reply).length === 0 && instructionNarrationSignals(payload.reply).length === 0) {
         recordAvoidedCost('semantic_similarity', input.prompt.length, payload.reply.length, Date.now() - startedAt)
         // Cache replay must be cleaned too: entries written before answer hygiene existed still
         // carry internal markers, and a cached leak is indistinguishable to the reader from a live
@@ -1062,7 +1064,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   const cached = cacheAllowed ? await readCachedAnswer(cacheKey) : null
   const cachedCurrent = cachedAnswerIsCurrent(cached, policyVersion, cacheMaxAgeMs)
   if (cached?.reply && !cachedCurrent.ok) console.warn('cosFirstAnswer: exact cache entry refused as stale', { reason:cachedCurrent.reason })
-  if (cached?.reply && cachedCurrent.ok && cached.confidence >= threshold() && normativeAnswerContractViolations(input.prompt, cached.reply).length === 0 && instructionNarrationSignals(cached.reply).length === 0) {
+  if (cached?.reply && cachedCurrent.ok && cached.answerOutcome === 'verified' && cached.confidence >= threshold() && normativeAnswerContractViolations(input.prompt, cached.reply).length === 0 && instructionNarrationSignals(cached.reply).length === 0) {
     recordAvoidedCost('exact_cache', input.prompt.length, cached.reply.length, Date.now() - startedAt)
     return { handled:true, reply:cleanAnswerText(cached.reply), confidence:cached.confidence, provenance:cacheHitProvenance(cached, base, 'semantic_cache') }
   }
@@ -1152,6 +1154,9 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     return { handled:false, confidence:0, reason, provenance:{ responseSource:'external_fallback_required', ...reasoningProvenance } }
   }
 
+  // The answer the independent verifier verified, if it did, with the same deterministic arithmetic applied. Any later
+  // model rewrite (release repair, narration strip) makes the released answer a different, unverified text.
+  const verifiedAnswer = reasoned.answerOutcome === 'verified' ? withComputedArithmetic(parseLocalResult(reasoned.text))?.answer ?? null : null
   let parsed = withComputedArithmetic(parseLocalResult(reasoned.text))
   if (!parsed) {
     console.error('cosFirstAnswer: unparseable reasoner output', { characters:reasoned.text.length, raw:reasoned.text })
@@ -1275,6 +1280,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     reasonerLabel:citedProvenance.reasonerLabel,
     policyVersion,
     storedAt:new Date().toISOString(),
+    answerOutcome:'verified',
     origin:{
       knowledgeFactsUsed:context.facts.length,
       learnedItemsUsed:context.learned.length,
@@ -1294,7 +1300,11 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     },
   }
   const cacheWriteBudgetMs = Number(process.env.COS_CACHE_WRITE_BUDGET_MS ?? '8000')
-  if (!input.disableCache) await waitForCacheWritesWithinBudget(
+  // Q19: only an answer the independent verifier verified, unchanged, is stored. An unverified answer may still be
+  // released (an outage is not a finding about the answer), but it is never replayed to anyone.
+  const answerVerified = verifiedAnswer !== null && parsed.answer === verifiedAnswer
+  if (!answerVerified) console.info('[cos-cache-write-skipped]', JSON.stringify({ reason:'answer_not_verified', reasonerOutcome:reasoned.answerOutcome }))
+  if (!input.disableCache && answerVerified) await waitForCacheWritesWithinBudget(
     Promise.allSettled([
       writeCachedAnswer(cacheKey, storedAnswer),
       knowledge ? knowledge.commitToMemory(cacheTaskId, input.prompt, contextWindow, storedAnswer) : Promise.resolve(),

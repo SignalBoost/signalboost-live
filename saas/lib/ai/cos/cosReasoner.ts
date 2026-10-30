@@ -16,7 +16,7 @@ import { cosExecutionEnvelope, cosAnswerProgress } from './cosExecutionEnvelope.
 
 import { randomUUID } from 'node:crypto'
 import { requestedAnalyticalTasks, missingAnalyticalTasks, analyticalTaskRepairDirective } from './answerTaskContract.ts'
-import { ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT, answerOutcomeReleasable, verifyAnswerOutcome, type AnswerOutcome, type AnswerOutcomeJudge } from './answerOutcomeVerifier.ts'
+import { ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT, answerOutcomeReleasable, verifyAnswerOutcome, type AnswerOutcome, type AnswerOutcomeJudge, type AnswerOutcomeStatus } from './answerOutcomeVerifier.ts'
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { ANSWER_COMPLETION_SYSTEM_PROMPT, runAnswerCompletionLoop } from './answerCompletionLoop.ts'
 import { callLocalModel, captureServedInference, localInferenceConfigFromEnv, type LocalModelCallArgs, type ServedInference } from '@/lib/ai/local-inference'
@@ -184,9 +184,16 @@ function primaryCouncilEligible(args: LocalModelCallArgs): boolean {
   return primaryReasonerRequest(args)
 }
 
+/**
+ * A reasoner result. `answerOutcome` is the independent verifier's verdict on exactly this text: 'verified' only when
+ * the verifier verified the answer that is returned, unchanged. Anything else (no verdict, a later rewrite) is
+ * 'unverified', so a caller that stores answers (the semantic cache) can keep only verified ones (gap analysis Q19).
+ */
+export type CosReasonerResult = { text: string; reasoner: CosReasonerConfig; turnId: string; answerOutcome: AnswerOutcomeStatus }
+
 export async function callRawCosReasoner(
   args: LocalModelCallArgs,
-): Promise<{ text: string; reasoner: CosReasonerConfig; turnId: string } | null> {
+): Promise<CosReasonerResult | null> {
   if (!localConfigured()) return null
 
   const config = configuredReasoner()
@@ -621,7 +628,12 @@ export async function callRawCosReasoner(
 
     answered = true
     finalConfidence = finalParsedForTrace?.confidence ?? null
-    return { text, reasoner: config, turnId }
+    // The verdict belongs to the answer it judged: if anything after the check rewrote the answer, it is unverified.
+    const releasedAnswer = parseLocalResult(text)?.answer
+    const answerOutcome: AnswerOutcomeStatus = finalOutcome && releasedAnswer === finalParsedForPolicy?.answer
+      ? finalOutcome.status
+      : 'unverified'
+    return { text, reasoner: config, turnId, answerOutcome }
   } finally {
     const experience = recorder.snapshot({
       turnId,
@@ -664,7 +676,7 @@ export function servedReasonerLabel(workerLabel: string, served: readonly Served
 
 export async function callCosReasoner(
   args: LocalModelCallArgs,
-): Promise<{ text: string; reasoner: CosReasonerConfig; turnId: string } | null> {
+): Promise<CosReasonerResult | null> {
   const { reasonThroughCosControlPlane } = await import('./cosReasoningWorkers.ts')
   const { result: execution, served } = await captureServedInference(() => reasonThroughCosControlPlane(args, {
     requestedRole: 'primary',
@@ -698,6 +710,10 @@ export async function callCosReasoner(
       label: servedReasonerLabel(execution.worker.label, served),
     },
     turnId: execution.result.turnId || randomUUID(),
+    // Only the base COS worker runs the verifier; a worker that reports no verdict gives an unverified answer.
+    answerOutcome: execution.result.metadata?.answerOutcome === 'verified' || execution.result.metadata?.answerOutcome === 'incomplete'
+      ? execution.result.metadata.answerOutcome
+      : 'unverified',
   }
 }
 

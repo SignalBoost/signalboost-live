@@ -1,2 +1,2 @@
-base_sha=25abafe9a6fb04daaefab4046127b5dcb5ddab68
-branch=test/gate1-cos-builder-history-rebased-20261030
+base_sha=bb8ffe5633182b3b1533e8a31a5f4b3dbf79c837
+branch=fix/q19-cache-verified-only-20261030

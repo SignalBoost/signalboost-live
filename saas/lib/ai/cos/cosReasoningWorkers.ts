@@ -199,6 +199,7 @@ function createOpenModelWorker(role: CosSpecialistRole): CosReasoningWorker | nu
           reasonerLabel: reasoned.reasoner.label,
           workerRole: role,
           effectiveMaxTokens: effective.maxTokens ?? null,
+          answerOutcome: reasoned.answerOutcome,
         },
       }
     },

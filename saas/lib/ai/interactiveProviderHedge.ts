@@ -54,3 +54,16 @@ export async function firstUsefulWithHedge<T>(input: {
   if (input.isUseful(other.value)) return { result: other.value, winner: other.who, backupStarted: true }
   return { result: firstDone.value ?? other.value ?? null, winner: 'none', backupStarted: true }
 }
+
+/**
+ * Q13: the semantic judge is a short helper, not a user-facing answer. Let the already-governed
+ * managed backup race a stalled owned model after 1.5s rather than spending the normal 8s
+ * hedge delay before starting an equally short backup. Respect explicit operator overrides.
+ * No new provider, route or paid-call authorization is introduced.
+ */
+export function interactiveHedgeDelayForPurpose(purpose: string | null | undefined, ordinaryDelayMs: number, explicitOverride: boolean): number {
+  if (explicitOverride) return ordinaryDelayMs
+  if (purpose === 'semantic_task_intent') return Math.min(ordinaryDelayMs, 1_500)
+  if (purpose === 'fresh_grounded_answer') return Math.min(ordinaryDelayMs, 8_000)
+  return ordinaryDelayMs
+}

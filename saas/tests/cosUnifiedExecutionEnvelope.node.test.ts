@@ -19,11 +19,11 @@ test('real software build remains executable under the shared contract',()=>{
  assert.equal(cosExecutionEnvelope(input).contract.prohibitsExecution,false)
  assert.equal(isConciergeBuilderObjective(input),true)
 })
-test('reasoner actually consumes the contract; completion is judged only by the verifier loop',()=>{
+test('reasoner actually consumes the contract and evaluates loop progress',()=>{
  const source=readFileSync(new URL('../lib/ai/cos/cosReasoner.ts',import.meta.url),'utf8')
  assert.ok(source.includes('const execution = cosExecutionEnvelope(args.prompt)'))
- assert.ok(!source.includes('cosAnswerProgress'))
- assert.ok(source.includes('runAnswerCompletionLoop('))
+ assert.ok(source.includes('const firstOutcome = firstParsedForPolicy ? await outcomeOf(args.prompt, firstParsedForPolicy.answer)'))
+ assert.ok(source.includes('const repairedOutcome = repairedParsedForPolicy'))
 })
 
 test('shared outcome authority binds advisory requests without substituting unsolicited artifacts',()=>{

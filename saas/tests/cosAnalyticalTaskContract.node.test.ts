@@ -21,11 +21,11 @@ test('unseen database incident follows the same contract', () => {
 
 test('Q10: the word-count completion check is deleted; the verifier alone judges deliverables', () => {
   const contract = readFileSync(new URL('../lib/ai/cos/answerTaskContract.ts', import.meta.url), 'utf8')
+  const envelope = readFileSync(new URL('../lib/ai/cos/cosExecutionEnvelope.ts', import.meta.url), 'utf8')
   const source = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
-  assert.doesNotMatch(contract, /export function missingAnalyticalTasks|export function analyticalTaskRepairDirective|topicWords/)
-  assert.doesNotMatch(source, /ANALYTICAL RECOVERY|firstTaskGaps|repairedTaskGaps|taskContractRepairAccepted/)
-  assert.match(source, /buildDiagnosticRepairPrompt\(effectiveArgs\.prompt, initialDraft\)/)
-  assert.match(source, /const outcome = await outcomeOf\(request, answer\)/)
+  assert.doesNotMatch(contract, /missingAnalyticalTasks|analyticalTaskRepairDirective|topicWords/)
+  assert.doesNotMatch(envelope, /cosAnswerProgress|missingAnalyticalTasks/)
+  assert.match(source, /const firstOutcome = firstParsedForPolicy \? await outcomeOf/)
 })
 
 test('analytical no-draft recovery is bounded and uses original request', () => {
@@ -39,10 +39,4 @@ test('analytical no-draft recovery is bounded and uses original request', () => 
 test('ordinary coding and prose requests do not create an analytical acceptance checklist', () => {
   assert.deepEqual(requestedAnalyticalTasks('Fix src/login.ts and run npm test.'), [])
   assert.deepEqual(requestedAnalyticalTasks('Write a Node.js calculator with two files.'), [])
-})
-
-test('a repair that does not parse never replaces the draft, so the verifier loop still sees a parsed answer', () => {
-  const source = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
-  assert.match(source, /const advisoryPolicyRepairAccepted = firstAdvisoryDefects\.length > 0 && repairedParsedForPolicy !== null && repairedAdvisoryDefects\.length === 0/)
-  assert.match(source, /if \(repaired && parseableDraft\(repaired\) && \(advisoryPolicyRepairAccepted \|\|/)
 })

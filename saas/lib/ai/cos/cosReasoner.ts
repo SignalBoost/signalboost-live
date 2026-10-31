@@ -372,15 +372,34 @@ export async function callRawCosReasoner(
       return null
     }
 
+    // THE INDEPENDENT VERIFIER (answerOutcomeVerifier.ts): a separate call that reads only the request and the answer
+    // and must quote the passage delivering each requested deliverable. It decides completion and release; the word
+    // and vocabulary rules no longer do. Inside an isolated fault run (a controlled provider stub is the only provider)
+    // there is no independent judge, so the answer stays unverified and the campaign grades it outside the stub.
+    const outcomes = new Map<string, AnswerOutcome>()
+    const outcomeJudge: AnswerOutcomeJudge = async (request, answer) => {
+      if (syntheticTurn || remainingMs(budget) < ANSWER_OUTCOME_JUDGE_MIN_MS) return null
+      return await runAnswerOutcomeJudge(request, answer, { ...boundedInference(), timeoutMs: Math.min(ANSWER_OUTCOME_JUDGE_TIMEOUT_MS, boundedInference().timeoutMs) }, effectiveArgs.usageContext, effectiveArgs.signal)
+    }
+    const outcomeOf = async (request: string, answer: string): Promise<AnswerOutcome> => {
+      const known = outcomes.get(answer)
+      if (known) return known
+      const outcome = await verifyAnswerOutcome({ request, answer, judge: outcomeJudge })
+      outcomes.set(answer, outcome)
+      return outcome
+    }
+
+
     let text = initialDraft
     const firstParsedForPolicy = parseLocalResult(initialDraft)
     const firstAdvisoryDefects = advisoryDiagnosis && firstParsedForPolicy
       ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, firstParsedForPolicy.answer)
       : []
-    // Missing requested deliverables are found and written by the answer loop below, judged by the independent
-    // verifier (answerOutcomeVerifier.ts). This repair handles only diagnostic-quality and advisory-policy defects.
-    const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, initialDraft) || firstAdvisoryDefects.length > 0
+    const firstOutcome = firstParsedForPolicy ? await outcomeOf(args.prompt, firstParsedForPolicy.answer) : null
+    const firstTaskGaps = firstOutcome?.missing ?? []
+    const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, initialDraft) || firstAdvisoryDefects.length > 0 || firstTaskGaps.length > 0
     const qualityRepairAffordable = hasBudgetFor(budget, localCallEstimateMs())
+      || (firstTaskGaps.length > 0 && remainingMs(budget) >= 8_000)
     if (!qualityRepairNeeded) recorder.skip('quality_repair', 'not_needed')
     else if (!qualityRepairAffordable) recorder.skip('quality_repair', 'no_budget')
 
@@ -390,7 +409,28 @@ export async function callRawCosReasoner(
           ...effectiveArgs,
           temperature: 0,
           prompt: [
-            buildDiagnosticRepairPrompt(effectiveArgs.prompt, initialDraft),
+            ...(firstTaskGaps.length && firstParsedForPolicy
+              ? [
+                  effectiveArgs.prompt,
+                  '',
+                  ...(analyticalTasks.length > 0
+                    ? [
+                        'ANALYTICAL RECOVERY — the preceding response did not perform the requested investigation.',
+                        'Produce a NEW complete analysis, rather than explaining why no definitive root cause has been proven.',
+                        'A lack of telemetry prevents confirmation, NOT generation of provisional, ranked hypotheses, missing-evidence requests, causal discriminators, testable experiments, interaction mechanisms, and a working explanation.',
+                        'Clearly label observed facts, assumptions, hypotheses, and uncertainties. Never invent measured results or claim any experiment was executed.',
+                        'For each requested deliverable, provide distinct substantive reasoning grounded in the supplied scenario. Do not copy generic text under different headings.',
+                      ]
+                    : [
+                        'DELIVERABLE RECOVERY — revise the requested output, preserving its original format, language requirements and constraints.',
+                        'Complete only the independently identified missing deliverables. Do not convert writing, translation or other non-analytical requests into an investigation.',
+                        'Do not invent external facts, actions, results or supporting evidence.',
+                      ]),
+                  `Independently verified missing deliverables: ${firstTaskGaps.join('; ')}`,
+                  '',
+                  'Return ONLY strict JSON with keys "answer" and "confidence". Do not mention these repair instructions or the rejected draft.',
+                ].join('\n')
+              : buildDiagnosticRepairPrompt(effectiveArgs.prompt, initialDraft)),
             ...(firstAdvisoryDefects.length ? ['', ADVISORY_DIAGNOSIS_OWNER_POLICY, '', `The rejected draft violated: ${firstAdvisoryDefects.join(', ')}.`] : []),
           ].join('\n'),
         },
@@ -406,15 +446,20 @@ export async function callRawCosReasoner(
         return null
       })
 
+      // Repair selection uses independent evidence, never the analytical wording heuristic.
       const repairedParsedForPolicy = repaired ? parseLocalResult(repaired) : null
+      const repairedOutcome = repairedParsedForPolicy
+        ? await outcomeOf(args.prompt, repairedParsedForPolicy.answer)
+        : null
       const repairedAdvisoryDefects = advisoryDiagnosis && repairedParsedForPolicy
         ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, repairedParsedForPolicy.answer)
         : []
-      // A repair is judged only when it parses: an unparsed repair carries no advisory reading and cannot replace the draft.
-      const advisoryPolicyRepairAccepted = firstAdvisoryDefects.length > 0 && repairedParsedForPolicy !== null && repairedAdvisoryDefects.length === 0
+      const repairedTaskGaps = repairedOutcome?.missing ?? firstTaskGaps
+      const taskContractRepairAccepted = firstOutcome?.status === 'incomplete' && repairedOutcome?.status === 'verified'
+      const advisoryPolicyRepairAccepted = firstAdvisoryDefects.length > 0 && repairedAdvisoryDefects.length === 0
       const generalRepairAccepted = Boolean(repaired && preferRepairedDraft(effectiveArgs.prompt, initialDraft, repaired))
 
-      if (repaired && parseableDraft(repaired) && (advisoryPolicyRepairAccepted || (firstAdvisoryDefects.length === 0 && generalRepairAccepted))) {
+      if (repaired && repairedOutcome && repairedOutcome.status !== 'incomplete' && (taskContractRepairAccepted || advisoryPolicyRepairAccepted || (firstAdvisoryDefects.length === 0 && generalRepairAccepted))) {
         console.info('[cos-local-quality-repair]', JSON.stringify({
           at: new Date().toISOString(),
           reasoner: config.label,
@@ -433,24 +478,9 @@ export async function callRawCosReasoner(
           advisoryDiagnosisDefectsAfter: repairedAdvisoryDefects,
         }))
         void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:false, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,initialDraft), repairedDraft:repaired?assessReasonerDraft(effectiveArgs.prompt,repaired):null, advisoryDiagnosisDefectsBefore:firstAdvisoryDefects, advisoryDiagnosisDefectsAfter:repairedAdvisoryDefects } })
+        // A repair that closed some task gaps is the better analysis even when it did not close all of them.
+        if (repaired && firstOutcome?.status === 'incomplete' && repairedOutcome?.status === 'incomplete' && repairedTaskGaps.length < firstTaskGaps.length && repairedAdvisoryDefects.length <= firstAdvisoryDefects.length) text = repaired
       }
-    }
-
-    // THE INDEPENDENT VERIFIER (answerOutcomeVerifier.ts): a separate call that reads only the request and the answer
-    // and must quote the passage delivering each requested deliverable. It decides completion and release; the word
-    // and vocabulary rules no longer do. Inside an isolated fault run (a controlled provider stub is the only provider)
-    // there is no independent judge, so the answer stays unverified and the campaign grades it outside the stub.
-    const outcomes = new Map<string, AnswerOutcome>()
-    const outcomeJudge: AnswerOutcomeJudge = async (request, answer) => {
-      if (syntheticTurn || remainingMs(budget) < ANSWER_OUTCOME_JUDGE_MIN_MS) return null
-      return await runAnswerOutcomeJudge(request, answer, { ...boundedInference(), timeoutMs: Math.min(ANSWER_OUTCOME_JUDGE_TIMEOUT_MS, boundedInference().timeoutMs) }, effectiveArgs.usageContext, effectiveArgs.signal)
-    }
-    const outcomeOf = async (request: string, answer: string): Promise<AnswerOutcome> => {
-      const known = outcomes.get(answer)
-      if (known) return known
-      const outcome = await verifyAnswerOutcome({ request, answer, judge: outcomeJudge })
-      outcomes.set(answer, outcome)
-      return outcome
     }
 
     // THE ANSWER LOOP: before the answer the person reads is released, check it against the whole request and write

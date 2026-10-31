@@ -208,6 +208,7 @@ function interactiveTravelPlan(args: LocalModelCallArgs): boolean {
 function interactiveUserResponse(args: LocalModelCallArgs): boolean {
   const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
   return feature === 'cos_interactive_answer'
+    || feature === 'cos_fast_authoring'
     || feature === 'cos_interactive_authoring'
     || feature === 'direct_text_transformation'
     || feature === 'cos_simple_knowledge'

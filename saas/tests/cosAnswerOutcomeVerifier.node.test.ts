@@ -174,3 +174,12 @@ test('Q10 verifier-guided recovery preserves non-analytical writing and translat
   assert.match(source, /Do not convert writing, translation or other non-analytical requests into an investigation/)
   assert.match(source, /Independently verified missing deliverables:/)
 })
+
+test('the independent COS outcome judge reserves paid-provider budget before verification', () => {
+  const reasoner = read('lib/ai/cos/cosReasoner.ts')
+  const judge = reasoner.match(/async function runAnswerOutcomeJudge\([\s\S]*?\n}\n/)
+  assert.ok(judge, 'the existing independent judge must remain present')
+  assert.match(judge[0], /maxEstimatedCostUsd:\s*deepInfraMaxCallUsd\('builder'\)/)
+  assert.match(judge[0], /purpose:\s*'answer_outcome_verification'/)
+  assert.match(judge[0], /ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT/)
+})

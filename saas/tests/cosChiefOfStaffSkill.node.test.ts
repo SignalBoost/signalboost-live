@@ -47,6 +47,7 @@ test('the mature reasoner injects the skill through the privileged option only',
 })
 
 test('chief of staff does not turn retirement age or unverified rumors into eligibility facts', () => {
-  assert.match(COS_CHIEF_OF_STAFF_SKILL, /Do not turn a stated upcoming birthday, retirement age, or reported rumor into an assertion about full retirement benefits/)
+  assert.match(COS_CHIEF_OF_STAFF_SKILL, /When the owner has explicitly confirmed eligibility for standard retirement benefits at age 65, retain that as an owner-supplied fact/)
+  assert.match(COS_CHIEF_OF_STAFF_SKILL, /Treat the rumored additional five-year service extension as a separate unverified question/)
   assert.match(COS_CHIEF_OF_STAFF_SKILL, /Avoid formulaic greetings and declarations of commitment unless the owner asked/)
 })

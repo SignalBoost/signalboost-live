@@ -380,7 +380,13 @@ export function decodeFreshEvidenceWritingReply(raw: string): string | null {
   const clean = String(raw || '').replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim()
     .replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
   if (!clean) return null
-  if (clean.startsWith('{')) return extractGroundedJsonAnswer(clean)?.trim() || null
+  if (clean.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(clean)
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) && typeof parsed.answer === 'string'
+        ? parsed.answer.trim() || null : null
+    } catch { return null }
+  }
   return clean
 }
 

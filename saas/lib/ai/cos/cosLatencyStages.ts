@@ -6,6 +6,7 @@
 // single SQL query shows where a turn's time went. Fire-and-forget: a timing write never delays or
 // fails a user turn.
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { currentTraceId } from '@/lib/observability/tracing'
 
 export const COS_LATENCY_STAGE_TASK_ID = 'cos-latency-stage'
 
@@ -13,6 +14,17 @@ export function recordCosLatencyStage(stage: string, latencyMs: number): void {
   const source = String(stage || '').trim().slice(0, 120)
   const ms = Math.max(0, Math.floor(Number(latencyMs) || 0))
   if (!source) return
+  // Q13: match each non-model stage with provider_inference_usage.correlation_id via the
+  // active OpenTelemetry trace. Persist only stage metadata and timing; never request content.
+  // Existing cos_ai_roi_metrics schema and dashboard queries remain unchanged.
+  const endedAt = Date.now()
+  console.info('[cos-latency-stage-trace]', JSON.stringify({
+    traceId: currentTraceId(),
+    stage: source,
+    startAt: new Date(endedAt - ms).toISOString(),
+    endAt: new Date(endedAt).toISOString(),
+    latencyMs: ms,
+  }))
   try {
     const db = cosServiceDb()
     if (!db) return

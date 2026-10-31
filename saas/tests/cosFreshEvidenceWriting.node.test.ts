@@ -162,3 +162,11 @@ test('Q13/Q15: evidence-dependent writing bypasses the generic multi-step agent 
   assert.match(primary.slice(synthesis,synthesis+300), /deliverable:groundedDeliverable/)
   assert.match(primary, /primary:fresh_grounded_synthesis/)
 })
+
+test('Q15: quality repair checks the actual requested deliverables rather than the evidence dossier',()=>{
+ const reasoner=read('lib/ai/cos/cosReasoner.ts')
+ assert.match(reasoner,/await outcomeOf\(verificationRequest, repairedParsedForPolicy\.answer\)/)
+ assert.match(reasoner,/const known = outcomes\.get\(/)
+ assert.match(reasoner,/outcomes\.set\(/)
+ assert.doesNotMatch(reasoner,/await outcomeOf\(args\.prompt, repairedParsedForPolicy\.answer\)/)
+})

@@ -124,3 +124,16 @@ test('missed semantic writing intent gets a bounded correspondence-only recovery
   assert.match(recovery, /await runFastAuthoring\(input,language\)/)
   assert.match(recovery, /!requestedAction&&\(!requiresFreshEvidence\|\|freshMissUseLocal\)&&!hasAttachments/)
 })
+
+test('professional inquiry correspondence preserves uncertain policy facts and the author\'s agency identity', () => {
+  const start = primary.indexOf('async function runFastAuthoring(')
+  const end = primary.indexOf("// The agent loop's share", start)
+  assert.ok(start > 0 && end > start)
+  const instructions = primary.slice(start, end)
+  assert.match(instructions, /Preserve the author\\'s exact department, position and institutional identity/)
+  assert.match(instructions, /frame it solely as an unverified question to the recipient/)
+  assert.match(instructions, /never present an age, eligibility threshold, classification, right, approval process or policy as established/)
+  assert.match(instructions, /Do not reinterpret turning an age as a claim that full retirement benefits begin then/)
+  assert.match(instructions, /without unrequested commitments or formulaic pleasantries/)
+  assert.match(instructions, /Ask the recipient whether the rule exists/)
+})

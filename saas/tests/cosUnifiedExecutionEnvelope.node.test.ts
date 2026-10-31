@@ -22,7 +22,8 @@ test('real software build remains executable under the shared contract',()=>{
 test('reasoner actually consumes the contract and evaluates loop progress',()=>{
  const source=readFileSync(new URL('../lib/ai/cos/cosReasoner.ts',import.meta.url),'utf8')
  assert.ok(source.includes('const execution = cosExecutionEnvelope(args.prompt)'))
- assert.ok(source.includes('const firstOutcome = firstParsedForPolicy ? await outcomeOf(args.prompt, firstParsedForPolicy.answer)'))
+ assert.ok(source.includes('const verificationRequest = String(args.verificationRequest || args.prompt)'))
+ assert.ok(source.includes('const firstOutcome = firstParsedForPolicy ? await outcomeOf(verificationRequest, firstParsedForPolicy.answer)'))
  assert.ok(source.includes('const repairedOutcome = repairedParsedForPolicy'))
 })
 

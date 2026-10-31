@@ -76,6 +76,8 @@ export interface LocalModelCallArgs {
    * whatever the request looks like, so the model, not a guess from the wording, decides how long the answer is.
    */
   writesUserAnswer?: boolean
+  /** Original user objective for independent deliverable verification when the generator prompt embeds retrieved evidence. Never sent as provider text by inference adapters. */
+  verificationRequest?: string
   /** Disable configured-model fallback after an owned-primary failure for latency-critical calls. */
   allowConfiguredFallback?: boolean
   /** Return non-empty text on finish_reason=length so a caller with a dedicated salvage parser can recover it. */

@@ -94,7 +94,7 @@ test('a writing turn on live evidence is written by the full COS answer turn, ch
   const writing = synthesis.slice(synthesis.indexOf('async function writtenDeliverableOnEvidence('), synthesis.indexOf('export async function synthesizeFreshEvidenceLocally('))
   // writesUserAnswer: the reasoner's verifier and completion loop run, and the turn gets the answer window.
   assert.match(writing, /writesUserAnswer: true,/)
-  assert.match(writing, /acceptFreshEvidenceWrittenDeliverable\(\{ text: parsed\.answer, input: args\.input, sources: args\.sources \}\)/)
+  assert.match(writing, /acceptFreshEvidenceWrittenDeliverable\(\{ text: writingText, input: args\.input, sources: args\.sources \}\)/)
   assert.doesNotMatch(writing, /acceptFreshEvidenceGroundedAnswer\(/)
   const primary = read('app/api/cos-primary/route.ts')
   assert.match(primary, /const freshDeliverable=async\(\):Promise<'answer'\|'writing'>=>\(\(semanticTaskIntent\?\?await pendingCosTurnIntent\(\)\)\?\.mode==='content_generation'\?'writing':'answer'\)/)

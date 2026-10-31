@@ -82,6 +82,10 @@ export type BuilderBrowserCliFailureCode =
   | 'network_policy_failed'
   | 'config_invalid'
   | 'sandbox_execution_failed'
+  | 'browser_locator_ambiguous'
+  | 'browser_locator_timeout'
+  | 'browser_locator_invalid'
+  | 'browser_element_not_interactable'
   | 'cli_exit_nonzero'
 
 export interface BuilderBrowserCliPort {

@@ -1095,6 +1095,12 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     }
 
     if(!requestedAction){
+      const groundedDeliverable=await freshDeliverable()
+      // Q13 + Q15: once the semantic judge confirms evidence-dependent writing, the already
+      // retrieved evidence goes directly to the canonical grounded-writing/verifier lane.
+      // A generic agent tool loop can spend several sequential model turns and release a
+      // partial draft before the correspondence-and-advice contract is checked.
+      if(groundedDeliverable!=='writing'){
       // Live facts run in the same agent loop as charts and data: the search COS already ran is the
       // loop's first observation, and the model searches again for any part of the question it does
       // not cover (production 2026-10-16: "capital of Australia and its population" answered only the
@@ -1115,9 +1121,10 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
           freshSources=[...merged.values()].map((source,index)=>({...source,id:`LIVE${index+1}`}))
         }
       }
+      } // Completed evidence gathering for non-writing tasks.
       freshLocalAttempted=true
       freshLocalModel=localReasonerLabel()
-      let localSynthesis=await synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language,deliverable:await freshDeliverable()})
+      let localSynthesis=await timeCosStage('primary:fresh_grounded_synthesis',()=>synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language,deliverable:groundedDeliverable}))
       if(localSynthesis.kind === 'accepted'){
         freshLocalModel=localSynthesis.reasonerLabel
         const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:localSynthesis.reasonerLabel,confidence:1,accepted:true})

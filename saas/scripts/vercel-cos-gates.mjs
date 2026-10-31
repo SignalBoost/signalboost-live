@@ -508,6 +508,7 @@ const tests = [
   'tests/assistantTransportClient.node.test.ts',
 
   'tests/cosDurableTurnHistory.node.test.ts',
+  'tests/cosDurableReplayAdmission.node.test.ts',
 
   'tests/cosInteractiveGraduateLatency.node.test.ts',
 

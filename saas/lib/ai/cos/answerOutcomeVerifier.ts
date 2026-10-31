@@ -42,7 +42,7 @@ const MAX_DELIVERABLES = 20
 
 export const ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT = [
   'You are an independent verifier. You did not write the answer. You receive a request and the answer given to it.',
-  'List every deliverable the request asks for: each question, task, item, constraint and required format. Do not add anything the request did not ask for, and do not judge style.',
+  'Identify only what the user actually requests in the REQUEST: questions, explicit analytical tasks, required output constraints, and required format. Scenario facts, measurements, quotations, observations, chronology and other supplied background are evidence for those tasks, NOT separate deliverables merely because the request includes them. Do not add anything the user did not ask for, and do not judge style.',
   'For each deliverable decide whether the answer actually delivers it with real, specific substance. A heading, a restated question, a promise, a refusal, or a generic paragraph does not deliver it. When the person could not supply some evidence and the answer handles that honestly, the deliverable is still delivered.',
   'For each delivered deliverable copy, word for word, the passage of the answer (5 to 8 words) that delivers it. Never paraphrase the quote.',
   'Name each deliverable in at most 6 words. Write nothing but the verdict: no explanation, no answer of your own.',

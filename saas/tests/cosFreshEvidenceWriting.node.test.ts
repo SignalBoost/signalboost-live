@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import {
   acceptFreshEvidenceGroundedAnswer,
   acceptFreshEvidenceWrittenDeliverable,
+  decodeFreshEvidenceWritingReply,
   freshEvidenceWritingPrompt,
 } from '../lib/ai/cos/freshEvidenceGroundedAnswer.ts'
 
@@ -100,4 +101,26 @@ test('a writing turn on live evidence is written by the full COS answer turn, ch
   assert.match(primary, /synthesizeFreshEvidenceLocally\(\{input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language,deliverable:await freshDeliverable\(\)\}\)/)
   assert.match(primary, /synthesizeFreshEvidenceExternally\(\{ input: lookupInput, sources:freshSources,retrievedAt:freshRetrievedAt,language,deliverable:await freshDeliverable\(\)\}\)/)
   assert.match(read('lib/ai/cos/freshEvidenceExternalSynthesis.ts'), /const local = await synthesizeFreshEvidenceLocally\(args\)/)
+})
+
+test('grounded correspondence decodes source-cited JSON without a confidence field', () => {
+  const envelope = JSON.stringify({ answer: letter })
+  const decoded = decodeFreshEvidenceWritingReply(envelope)
+  assert.equal(decoded, letter)
+  assert.equal(acceptFreshEvidenceWrittenDeliverable({ text: decoded!, input: request, sources }).ok, true)
+})
+
+test('grounded correspondence accepts plain cited prose but not malformed JSON or uncited output', () => {
+  const decoded = decodeFreshEvidenceWritingReply(letter)
+  assert.equal(decoded, letter)
+  assert.equal(acceptFreshEvidenceWrittenDeliverable({ text: decoded!, input: request, sources }).ok, true)
+  assert.equal(decodeFreshEvidenceWritingReply('{"answer":"unfinished'), null)
+  const uncited = decodeFreshEvidenceWritingReply('Dear CDO, please confirm my options. Sincerely, DTO rover.')
+  assert.equal(acceptFreshEvidenceWrittenDeliverable({ text: uncited!, input: request, sources }).ok, false)
+})
+
+test('fresh-writing transport uses source-validated decoded prose when confidence is absent', () => {
+  const synthesis = read('lib/ai/cos/freshEvidenceLocalSynthesis.ts')
+  assert.match(synthesis, /decodeFreshEvidenceWritingReply\(result\?\.text \|\| ''\)/)
+  assert.match(synthesis, /acceptFreshEvidenceWrittenDeliverable\(\{ text: writingText, input: args\.input, sources: args\.sources \}\)/)
 })

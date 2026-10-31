@@ -97,3 +97,17 @@ test('last-chance analytical rescue checks every numbered deliverable and repair
   assert.match(rescue, /if\(!answerOutcomeReleasable\(await verifyAnswerOutcome\(\{request:input,answer:candidateReply,judge:cosAnswerOutcomeJudge\}\)\)\)return null/)
   assert.doesNotMatch(rescue, /missingAnalyticalTasks/)
 })
+
+
+test('writing recovery uses owned RunPod first and one governed managed fallback instead of managed-only retries', () => {
+  const inference = readFileSync(new URL('../lib/ai/local-inference.ts', import.meta.url), 'utf8')
+  const eligible = inference.slice(inference.indexOf('function interactiveUserResponse('), inference.indexOf('function freshGroundedTask('))
+  assert.match(eligible, /feature === 'cos_fast_authoring'/)
+  const rescue = primary.slice(primary.indexOf('async function runFastAuthoring('), primary.indexOf('// The agent loop\\'s share'))
+  assert.match(rescue, /const turn=await callLocalModelTurn\(\{/)
+  assert.match(rescue, /maxEstimatedCostUsd:deepInfraMaxCallUsd\('builder'\)/)
+  assert.match(rescue, /fallbackFromOwned:false/)
+  assert.doesNotMatch(rescue, /fallbackFromOwned:true/)
+  assert.match(rescue, /const servedModel=String\(turn.model\|\|model\)/)
+  assert.match(rescue, /model===preferredModel\?FAST_AUTHORING_TIMEOUT_MS:FAST_AUTHORING_ATTEMPT_MS/)
+})

@@ -378,7 +378,7 @@ export function freshEvidenceWritingPrompt(args: {
  * Never publish a malformed JSON envelope as if it were a letter. */
 export function decodeFreshEvidenceWritingReply(raw: string): string | null {
   const clean = String(raw || '').replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim()
-    .replace(/^\`\`\`(?:json)?\s*/i, '').replace(/\s*\`\`\`$/i, '').trim()
+    .replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
   if (!clean) return null
   if (clean.startsWith('{')) return extractGroundedJsonAnswer(clean)?.trim() || null
   return clean

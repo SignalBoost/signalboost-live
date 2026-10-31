@@ -125,7 +125,10 @@ async function writtenDeliverableOnEvidence(args: {
   // a confidence number. The general confidence parser rejects both, even though
   // writing acceptance independently verifies citations and public-output safety.
   const parsed = result?.text ? parseLocalResult(result.text) : null
-  const writingText = parsed?.truncated ? null : (parsed?.answer || decodeFreshEvidenceWritingReply(result?.text || ''))
+  // A complete confidence-free JSON envelope must be decoded before the generic
+  // parser's truncation salvage can misclassify it as incomplete.
+  const decodedWriting = decodeFreshEvidenceWritingReply(result?.text || '')
+  const writingText = decodedWriting ?? (parsed?.truncated ? null : parsed?.answer || null)
   if (!writingText) {
     console.warn('[cos-fresh-grounded-writing]', JSON.stringify({ accepted: false, reason: result ? 'unparseable_or_cut_off' : 'no_answer', latencyMs: Date.now() - startedAt }))
     return { kind: 'local_synthesis_unparseable' }

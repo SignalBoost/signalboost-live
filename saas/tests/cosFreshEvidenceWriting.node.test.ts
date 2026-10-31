@@ -98,7 +98,7 @@ test('a writing turn on live evidence is written by the full COS answer turn, ch
   assert.doesNotMatch(writing, /acceptFreshEvidenceGroundedAnswer\(/)
   const primary = read('app/api/cos-primary/route.ts')
   assert.match(primary, /const freshDeliverable=async\(\):Promise<'answer'\|'writing'>=>\(\(semanticTaskIntent\?\?await pendingCosTurnIntent\(\)\)\?\.mode==='content_generation'\?'writing':'answer'\)/)
-  assert.match(primary, /synthesizeFreshEvidenceLocally\(\{input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language,deliverable:await freshDeliverable\(\)\}\)/)
+  assert.match(primary, /synthesizeFreshEvidenceLocally\(\{input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language,deliverable:groundedDeliverable\}\)/)
   assert.match(primary, /synthesizeFreshEvidenceExternally\(\{ input: lookupInput, sources:freshSources,retrievedAt:freshRetrievedAt,language,deliverable:await freshDeliverable\(\)\}\)/)
   assert.match(read('lib/ai/cos/freshEvidenceExternalSynthesis.ts'), /const local = await synthesizeFreshEvidenceLocally\(args\)/)
 })
@@ -149,4 +149,16 @@ test('Q15: grounded writing verifies the original letter-and-advice request rath
   const writingPrompt = freshEvidenceWritingPrompt({ input: request, sources, retrievedAt: '2026-10-31T00:00:00Z', language: 'en' }).systemPrompt
   assert.match(writingPrompt, /Mandatory retirement, benefit eligibility, and discretionary retention are different concepts/)
   assert.match(writingPrompt, /a separate practical next-steps section outside the letter/)
+})
+
+test('Q13/Q15: evidence-dependent writing bypasses the generic multi-step agent loop and reaches the verified writing path',()=>{
+  const primary=read('app/api/cos-primary/route.ts')
+  const start=primary.indexOf('const groundedDeliverable=await freshDeliverable()')
+  const loop=primary.indexOf('const agentAnswered=await agentComputeResponse(',start)
+  const synthesis=primary.indexOf("timeCosStage('primary:fresh_grounded_synthesis'",loop)
+  assert.ok(start>0 && loop>start && synthesis>loop)
+  assert.match(primary.slice(start,loop), /if\(groundedDeliverable!=='writing'\)/)
+  assert.match(primary.slice(loop,synthesis), /Completed evidence gathering for non-writing tasks/)
+  assert.match(primary.slice(synthesis,synthesis+300), /deliverable:groundedDeliverable/)
+  assert.match(primary, /primary:fresh_grounded_synthesis/)
 })

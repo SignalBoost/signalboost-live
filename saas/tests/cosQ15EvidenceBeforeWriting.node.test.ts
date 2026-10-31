@@ -63,6 +63,8 @@ test('Q15 repeated correspondence must distinguish sendable inquiry from user-fa
   const primary = read('app/api/cos-primary/route.ts')
   assert.match(primary, /Preserve the user\\'s exact role, title, acronym/)
   assert.match(primary, /A draft that asks the recipient for guidance does NOT answer a separate user request for advice/)
+  assert.match(primary, /verifyAnswerOutcome\(\{request:input,answer:reply,judge:cosAnswerOutcomeJudge\}\)/)
+  assert.match(primary, /if\(outcome\.status==='incomplete'\)/)
   // The fast lane is only allowed when the semantic judge positively finds NO outside facts are needed.
   const browser = read('app/api/cos-browser/route.ts')
   assert.ok(browser.includes('semanticIntentConfirmsWriting(await turnIntent())'))

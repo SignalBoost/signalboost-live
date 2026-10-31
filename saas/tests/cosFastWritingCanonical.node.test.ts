@@ -106,6 +106,7 @@ test('writing recovery uses owned RunPod first and one governed managed fallback
   const rescue = primary.slice(primary.indexOf('async function runFastAuthoring('), primary.indexOf("// The agent loop's share"))
   assert.match(rescue, /const turn=await callLocalModelTurn\(\{/)
   assert.match(rescue, /maxEstimatedCostUsd:deepInfraMaxCallUsd\('builder'\)/)
+  assert.match(rescue, /const signal=AbortSignal.timeout/)
   assert.match(rescue, /fallbackFromOwned:false/)
   assert.doesNotMatch(rescue, /fallbackFromOwned:true/)
   assert.match(rescue, /const servedModel=String\(turn.model\|\|model\)/)

@@ -1,2 +1,2 @@
-base_sha=98ab6cb1fb98e420c738eb6572567085f0ec9769
-branch=fix/cos-preserve-researched-evidence-after-loop-timeout-20261030
+base_sha=b839c776196795fb58ad57288fa667f05f9f7b8c
+branch=fix/cos-verifier-harness-reservation-20261030

@@ -24,6 +24,7 @@ import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import {
   acceptFreshEvidenceGroundedAnswer,
   acceptFreshEvidenceWrittenDeliverable,
+  decodeFreshEvidenceWritingReply,
   freshEvidenceGroundedAnswerPrompt,
   freshEvidenceWritingPrompt,
   FRESH_GROUNDED_ANSWER_MAX_TOKENS,
@@ -120,12 +121,16 @@ async function writtenDeliverableOnEvidence(args: {
   } catch (error) {
     return { kind: 'local_synthesis_failed', error: errorText(error) }
   }
+  // The answer model may return a complete cited letter as prose, or JSON without
+  // a confidence number. The general confidence parser rejects both, even though
+  // writing acceptance independently verifies citations and public-output safety.
   const parsed = result?.text ? parseLocalResult(result.text) : null
-  if (!parsed || parsed.truncated) {
+  const writingText = parsed?.truncated ? null : (parsed?.answer || decodeFreshEvidenceWritingReply(result?.text || ''))
+  if (!writingText) {
     console.warn('[cos-fresh-grounded-writing]', JSON.stringify({ accepted: false, reason: result ? 'unparseable_or_cut_off' : 'no_answer', latencyMs: Date.now() - startedAt }))
     return { kind: 'local_synthesis_unparseable' }
   }
-  const accepted = acceptFreshEvidenceWrittenDeliverable({ text: parsed.answer, input: args.input, sources: args.sources })
+  const accepted = acceptFreshEvidenceWrittenDeliverable({ text: writingText, input: args.input, sources: args.sources })
   console.info('[cos-fresh-grounded-writing]', JSON.stringify({
     accepted: accepted.ok,
     reason: accepted.reason,
@@ -135,7 +140,7 @@ async function writtenDeliverableOnEvidence(args: {
     latencyMs: Date.now() - startedAt,
   }))
   if (!accepted.ok) {
-    const rejectedDraftHead = accepted.reason === 'unsafe_public_output' ? undefined : parsed.answer.replace(/\s+/g, ' ').trim().slice(0, 300)
+    const rejectedDraftHead = accepted.reason === 'unsafe_public_output' ? undefined : writingText.replace(/\s+/g, ' ').trim().slice(0, 300)
     return { kind: 'citation_grounding_rejected', reason: accepted.reason ?? 'empty_answer', rejectedDraftHead }
   }
   return {

@@ -20,7 +20,6 @@ const tests = [
   'tests/cosBrowserTimeoutHistoryRecovery.node.test.ts',
   'tests/cosStaleBuilderStatus.node.test.ts',
   'tests/cosInvestigationBuilderRouting.node.test.ts',
-  'tests/cosLiveAcceptanceHarness.node.test.ts',
   'tests/cosInteractiveRunpodTokenBudget.node.test.ts',
   'tests/cosAnalyticalRepairBudget.node.test.ts',
   'tests/cosLowConfidenceReleaseContract.node.test.ts',

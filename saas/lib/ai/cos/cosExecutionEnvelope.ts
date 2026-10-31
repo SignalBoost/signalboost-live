@@ -1,6 +1,5 @@
-import { compileCosInstructionContract, decideCosLoopContinuation, USER_OUTCOME_AUTHORITY } from './instructionContract.ts'
-import { missingAnalyticalTasks, requestedAnalyticalTasks } from './answerTaskContract.ts'
-import { beginAgenticTask, outstandingAgenticRequirements } from '../../agentic/taskLifecycle.ts'
+// saas/lib/ai/cos/cosExecutionEnvelope.ts
+import { compileCosInstructionContract, USER_OUTCOME_AUTHORITY } from './instructionContract.ts'
 
 /** Shared across the reasoning, prompt, context and continuation boundaries. */
 export function cosExecutionEnvelope(prompt: string) {
@@ -23,21 +22,4 @@ export function cosExecutionEnvelope(prompt: string) {
     'Complete the user task rather than narrating the processing workflow.',
   ].join('\n')
   return { contract, originalObjective: userObjective, instructionBlock }
-}
-
-/** Evaluate concrete missing work, never model self-assessed completion. */
-export function cosAnswerProgress(prompt: string, answer: string, previousMissing: number | null = null) {
-  const missing = missingAnalyticalTasks(prompt, answer)
-  const addedEvidence = previousMissing === null || missing.length < previousMissing
-  const decision = decideCosLoopContinuation({
-    repeatedUnproductiveSteps: previousMissing !== null && missing.length >= previousMissing ? 2 : 0,
-    latestStepChangedArtifact: false,
-    latestStepAddedEvidence: addedEvidence,
-    budgetRemaining: true,
-  })
-  const task = beginAgenticTask(prompt, ['requested_analytical_outcome'])
-  // Draft content is not an independently verified outcome receipt.
-  // A host verifier must advance the task lifecycle before it becomes complete.
-  const readyForVerification = requestedAnalyticalTasks(prompt).length > 0 && missing.length === 0 && answer.trim().length > 0
-  return { missing, decision, complete: false, readyForVerification, outstanding: outstandingAgenticRequirements(task) }
 }

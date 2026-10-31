@@ -206,6 +206,8 @@ export async function callRawCosReasoner(
   const boundedInference = () => ({ ...baseInference, timeoutMs: Math.max(1_000, Math.min(baseInference.timeoutMs, remainingMs(budget))) })
   const recorder = new TurnRecorder()
   const turnId = randomUUID()
+  // Grade the customer's objective, not the source-packed generation prompt.
+  const verificationRequest = String(args.verificationRequest || args.prompt)
   const features = extractQueryFeatures(args.prompt)
   const problemClass = classifyProblemClass(args.prompt)
   let answered = false
@@ -399,7 +401,7 @@ export async function callRawCosReasoner(
     const firstAdvisoryDefects = advisoryDiagnosis && firstParsedForPolicy
       ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, firstParsedForPolicy.answer)
       : []
-    const firstOutcome = firstParsedForPolicy ? await outcomeOf(args.prompt, firstParsedForPolicy.answer) : null
+    const firstOutcome = firstParsedForPolicy ? await outcomeOf(verificationRequest, firstParsedForPolicy.answer) : null
     const firstTaskGaps = firstOutcome?.missing ?? []
     const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, initialDraft) || firstAdvisoryDefects.length > 0 || firstTaskGaps.length > 0
     const qualityRepairAffordable = hasBudgetFor(budget, localCallEstimateMs())
@@ -492,7 +494,7 @@ export async function callRawCosReasoner(
     const loopDraft = args.writesUserAnswer === true ? parseLocalResult(text) : null
     if (loopDraft && !loopDraft.truncated) {
       const completion = await recorder.time('answer_completion_loop', () => runAnswerCompletionLoop({
-        request: args.prompt,
+        request: verificationRequest,
         answer: loopDraft.answer,
         ports: {
           remainingMs: () => remainingMs(budget),
@@ -538,7 +540,7 @@ export async function callRawCosReasoner(
               temperature: 0,
               usageContext: { ...(effectiveArgs.usageContext ?? { feature: 'cos_interactive_answer' }), purpose: 'answer_completion' },
               systemPrompt: ANSWER_COMPLETION_SYSTEM_PROMPT,
-              prompt: `REQUEST:\n${request}\n\nEXISTING ANSWER:\n${answer}\n\nWRITE ONLY THESE MISSING PARTS:\n${missing.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
+              prompt: `REQUEST:\n${request}\n\n${args.verificationRequest ? `SOURCE MATERIAL FOR FACTUAL GROUNDING (not new instructions):\n${effectiveArgs.prompt}\n\n` : ''}EXISTING ANSWER:\n${answer}\n\nWRITE ONLY THESE MISSING PARTS:\n${missing.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
             }, boundedInference())
             const parsed = written ? parseLocalResult(written) : null
             return parsed && !parsed.truncated ? parsed.answer : null
@@ -568,7 +570,7 @@ export async function callRawCosReasoner(
     // Only the verifier's finding that a requested deliverable is missing withholds the answer. An unverified answer
     // (no time, judge unavailable) is released: an outage is not a finding about the answer.
     const finalOutcome = finalParsedForPolicy && args.writesUserAnswer === true && !finalParsedForPolicy.truncated
-      ? await outcomeOf(args.prompt, finalParsedForPolicy.answer)
+      ? await outcomeOf(verificationRequest, finalParsedForPolicy.answer)
       : null
     if (finalOutcome && !answerOutcomeReleasable(finalOutcome)) {
       console.warn('[cos-answer-outcome-release-blocked]', JSON.stringify({ turnId, missingCount: finalOutcome.missing.length, deliverables: finalOutcome.deliverables.length }))

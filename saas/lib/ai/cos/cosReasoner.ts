@@ -388,10 +388,10 @@ export async function callRawCosReasoner(
       return await runAnswerOutcomeJudge(request, answer, { ...boundedInference(), timeoutMs: Math.min(ANSWER_OUTCOME_JUDGE_TIMEOUT_MS, boundedInference().timeoutMs) }, effectiveArgs.usageContext, effectiveArgs.signal)
     }
     const outcomeOf = async (request: string, answer: string): Promise<AnswerOutcome> => {
-      const known = outcomes.get(answer)
+      const known = outcomes.get(`${request}\u0000${answer}`)
       if (known) return known
       const outcome = await verifyAnswerOutcome({ request, answer, judge: outcomeJudge })
-      outcomes.set(answer, outcome)
+      outcomes.set(`${request}\u0000${answer}`, outcome)
       return outcome
     }
 
@@ -455,7 +455,7 @@ export async function callRawCosReasoner(
       // Repair selection uses independent evidence, never the analytical wording heuristic.
       const repairedParsedForPolicy = repaired ? parseLocalResult(repaired) : null
       const repairedOutcome = repairedParsedForPolicy
-        ? await outcomeOf(args.prompt, repairedParsedForPolicy.answer)
+        ? await outcomeOf(verificationRequest, repairedParsedForPolicy.answer)
         : null
       const repairedAdvisoryDefects = advisoryDiagnosis && repairedParsedForPolicy
         ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, repairedParsedForPolicy.answer)
@@ -670,7 +670,7 @@ export async function callRawCosReasoner(
     if (!syntheticTurn) recordTurnExperience(experience)
     // TURN TIMING (2026-09-30): the reasoner's own phases (draft, quality repair, council…) join the per-stage
     // timings shown in the provenance reply, so time spent around the model call is visible, not only the call.
-    for (const phase of experience.phases) recordCosLatencyStage(`reasoner:${phase.phase}`, phase.ms)
+    for (const phase of experience.phases) recordCosLatencyStage(`reasoner:${phase.phase}`, phase.ms, { startedAt: phase.startedAt, endedAt: phase.endedAt })
   }
 }
 

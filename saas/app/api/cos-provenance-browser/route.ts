@@ -251,10 +251,14 @@ export async function POST(req: NextRequest): Promise<Response> {
     // Durability is storage/transport authority only. A signed-in public Concierge turn keeps its
     // original public surface header in downstreamRequest(), so it cannot inherit owner privileges.
     if (access?.userId) {
-      const turnId = crypto.randomUUID()
+      // One stable client-provided UUID per send. A replay with the same UUID can
+      // reattach to the original task but must never dispatch a second worker.
+      const submittedTurnId = body?.context?.clientTurnId
+      const turnId = typeof submittedTurnId === 'string' && UUID.test(submittedTurnId)
+        ? submittedTurnId : crypto.randomUUID()
       const runningReply = assistanceCopy(COS_TURN_ACCEPTED, languageFrom(body))
       try {
-        const { historyMessageId } = await enqueueDurableCosTurn({
+        const { historyMessageId, admittedNew } = await enqueueDurableCosTurn({
           turnId,
           userId: access.userId,
           conversationId,
@@ -263,7 +267,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         })
 
         const workerUserId = access.userId
-        after(async () => {
+        if (admittedNew) after(async () => {
           const watchdogTimer: { handle: ReturnType<typeof setTimeout> | null } = { handle: null }
           try {
             const watchdog = new Promise<never>((_, reject) => {

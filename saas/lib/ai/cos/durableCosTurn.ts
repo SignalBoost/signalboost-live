@@ -1,4 +1,6 @@
+// saas/lib/ai/cos/durableCosTurn.ts
 import { createClient } from '@supabase/supabase-js'
+import { provenanceWithDeliveredVisual } from '../../concierge/deliveredVisual.ts'
 
 export const COS_TURN_SCHEMA = 'signalboost-cos-turn-v1'
 export const COS_TURN_STALE_AFTER_MS = 6 * 60 * 1000
@@ -18,7 +20,7 @@ export async function enqueueDurableCosTurn(input: {
   conversationId: string
   prompt: string
   runningReply: string
-}): Promise<{ historyMessageId: string }> {
+}): Promise<{ historyMessageId: string; admittedNew: boolean }> {
   if (![input.turnId, input.userId, input.conversationId].every(value => UUID.test(value))) {
     throw new Error('cos_turn_invalid_identity')
   }
@@ -30,7 +32,7 @@ export async function enqueueDurableCosTurn(input: {
   // A single database transaction creates the canonical task and both History rows.
   // The browser-provided task ID is stable across retries; the RPC rejects owner or
   // objective changes and returns the existing receipt without replaying execution.
-  const { data: admitted, error } = await db.rpc('admit_cos_customer_task', {
+  const { data: admitted, error } = await db.rpc('admit_cos_customer_task_once', {
     p_task_id: input.turnId,
     p_user_id: input.userId,
     p_conversation_id: input.conversationId,
@@ -38,9 +40,10 @@ export async function enqueueDurableCosTurn(input: {
     p_running_reply: input.runningReply,
   })
   if (error) throw new Error(`cos_task_admission: ${error.message}`)
-  const historyMessageId = String(admitted || '')
+  const historyMessageId = String(admitted?.historyMessageId || '')
   if (!UUID.test(historyMessageId)) throw new Error('cos_task_admission_receipt_missing')
-  return { historyMessageId }
+  if (typeof admitted?.admittedNew !== 'boolean') throw new Error('cos_task_admission_kind_missing')
+  return { historyMessageId, admittedNew: admitted.admittedNew }
 }
 
 export async function finishDurableCosTurn(input: {
@@ -52,6 +55,8 @@ export async function finishDurableCosTurn(input: {
   source?: string | null
   executionProvenance?: unknown
   answerProvenance?: unknown
+  /** A chart or image delivered with the answer; History shows it with the stored reply. */
+  deliveredVisual?: unknown
   error?: string | null
 }): Promise<void> {
   if (![input.turnId, input.historyMessageId, input.userId].every(value => UUID.test(value))) {
@@ -59,16 +64,7 @@ export async function finishDurableCosTurn(input: {
   }
   const db = serviceClient()
   if (!db) throw new Error('cos_turn_storage_unavailable')
-  const provenance = {
-    schema: COS_TURN_SCHEMA,
-    turnId: input.turnId,
-    status: input.status,
-    finishedAt: new Date().toISOString(),
-    source: input.source || null,
-    error: input.error || null,
-    execution_provenance: input.executionProvenance ?? null,
-    answer_provenance: input.answerProvenance ?? null,
-  }
+  const provenance = cosTurnHistoryProvenance(input)
   // One PostgreSQL transaction owns both terminal writes. Never allow History
   // to claim completion while the canonical customer task remains running.
   const { data: committed, error } = await db.rpc('finish_cos_customer_task', {
@@ -160,4 +156,106 @@ export async function expireStaleDurableCosTurnsSystemWide(): Promise<number> {
     expired += await expireStaleDurableCosTurns({ userId })
   }
   return expired
+}
+
+function plainRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
+}
+
+/**
+ * The stored History provenance of a finished customer task. The execution provenance stays at the top level, where
+ * every History reader looks for it (delivered charts, explain-your-answer, feedback, owner outcomes). The task's own
+ * fields win: `turnId` is the customer task id (the builder_jobs row); the reasoner's turn id, which keys
+ * cos_turn_experience and cos_turn_outcomes, is kept as `cosTurnId`.
+ */
+export function cosTurnHistoryProvenance(input: {
+  turnId: string
+  status: 'succeeded' | 'failed'
+  source?: string | null
+  executionProvenance?: unknown
+  answerProvenance?: unknown
+  deliveredVisual?: unknown
+  error?: string | null
+}): Record<string, unknown> {
+  const execution = plainRecord(input.executionProvenance) ?? {}
+  const { schema: _schema, turnId: reasonerTurnId, status: _status, ...executionFields } = execution
+  const withVisual = plainRecord(provenanceWithDeliveredVisual(executionFields, input.deliveredVisual)) ?? executionFields
+  const cosTurnId = typeof reasonerTurnId === 'string' && reasonerTurnId.trim() ? reasonerTurnId.trim() : null
+  return {
+    ...withVisual,
+    ...(cosTurnId ? { cosTurnId } : {}),
+    schema: COS_TURN_SCHEMA,
+    turnId: input.turnId,
+    status: input.status,
+    finishedAt: new Date().toISOString(),
+    source: input.source || null,
+    error: input.error || null,
+    answer_provenance: input.answerProvenance ?? null,
+  }
+}
+
+/** The reasoner turn id of a stored assistant message: `cosTurnId` on a customer-task row, otherwise `turnId`. */
+export function historyCosTurnId(provenance: unknown): string {
+  const recorded = plainRecord(provenance)
+  if (!recorded) return ''
+  const value = recorded.schema === COS_TURN_SCHEMA ? recorded.cosTurnId : recorded.turnId
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+export type AdmittedCosTurnOutcome = Readonly<{
+  status: 'succeeded' | 'failed'
+  reply: string
+  source: string | null
+  executionProvenance: unknown
+  answerProvenance: unknown
+  deliveredVisual: unknown
+  error: string | null
+}>
+
+/**
+ * Runs one request-path COS turn as a customer task. The task record (builder_jobs `cos_turn` + its History rows) is
+ * admitted before the turn runs, so the request exists even if the process dies mid-turn; it is then finished with the
+ * delivered answer, or failed when the turn throws or delivers nothing. Admission failure never withholds the answer
+ * (a read-only turn is safe to answer): the exchange is stored without a task record and the failure is logged.
+ */
+export async function runAdmittedCosTurn<T>(ports: {
+  admit: () => Promise<{ historyMessageId: string }>
+  run: () => Promise<T>
+  outcome: (result: T) => Promise<AdmittedCosTurnOutcome | null>
+  finish: (input: AdmittedCosTurnOutcome & { historyMessageId: string }) => Promise<void>
+  storeWithoutTask: (outcome: AdmittedCosTurnOutcome) => Promise<void>
+  afterStored?: () => Promise<void>
+  failedReply: string
+}): Promise<T> {
+  let historyMessageId: string | null = null
+  try {
+    historyMessageId = (await ports.admit()).historyMessageId
+  } catch (error) {
+    console.error('[cos_task_admission_failed]', JSON.stringify({ message: error instanceof Error ? error.message : 'unknown' }))
+  }
+  const failed = (error: string): AdmittedCosTurnOutcome => ({
+    status: 'failed', reply: ports.failedReply, source: 'cos-turn-failed', executionProvenance: null,
+    answerProvenance: null, deliveredVisual: null, error,
+  })
+  const record = async (outcome: AdmittedCosTurnOutcome | null) => {
+    try {
+      if (historyMessageId) await ports.finish({ ...(outcome ?? failed('cos_turn_no_reply')), historyMessageId })
+      else if (outcome) await ports.storeWithoutTask(outcome)
+      else return
+      await ports.afterStored?.()
+    } catch (error) {
+      // The answer is already produced; a storage fault (or a replay whose task another attempt finished) is logged,
+      // never shown as a failed answer.
+      console.error('[cos_task_finish_failed]', JSON.stringify({ message: error instanceof Error ? error.message : 'unknown' }))
+    }
+  }
+  let result: T
+  try {
+    result = await ports.run()
+  } catch (error) {
+    await record(historyMessageId ? failed(error instanceof Error ? error.message : 'cos_turn_failed') : null)
+    throw error
+  }
+  await record(await ports.outcome(result))
+  return result
 }

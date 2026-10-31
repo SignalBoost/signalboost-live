@@ -29,7 +29,9 @@ test('gate 1 foundation: admission and terminal History use the canonical builde
  assert.match(admission,/v_existing\.user_id <> p_user_id/)
  assert.match(finish,/select id into v_task_id from public\.builder_jobs[\s\S]*for update;/)
  assert.match(finish,/update public\.assistant_messages[\s\S]*update public\.builder_jobs/)
- assert.match(durable,/db\.rpc\('admit_cos_customer_task'/)
+ // Admission goes through the replay-safe wrapper, which reuses the transactional admission above.
+ assert.match(durable,/db\.rpc\('admit_cos_customer_task_once'/)
+ assert.match(source('supabase/migrations/20261030233000_cos_task_single_dispatch_admission.sql'),/v_history := public\.admit_cos_customer_task\(/)
  assert.match(durable,/db\.rpc\('finish_cos_customer_task'/)
 })
 

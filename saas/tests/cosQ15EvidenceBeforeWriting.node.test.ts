@@ -51,7 +51,7 @@ test('inquiry drafting keeps the recipient responsible for confirmation; explici
   const verifier = read('lib/ai/cos/answerOutcomeVerifier.ts')
   const authoring = read('lib/ai/cos/cosFirstAnswerEnterprise.ts')
   const primary = read('app/api/cos-primary/route.ts')
-  assert.match(judge, /a separate user-facing question/)
+  assert.match(judge, /COS for its own factual determination or advice SEPARATELY/)
   assert.match(verifier, /Do not invent a second deliverable or reject the draft/)
   assert.match(verifier, /user unmistakably asks COS itself to verify/)
   assert.match(authoring, /put those questions in the sendable letter/)

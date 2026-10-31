@@ -1186,7 +1186,16 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // something warm” or “come up with a greeting” without hard-coding those phrasings into routing.
   if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&!hasAttachments&&!isCosCodingObjective(input)){
     const rescueIntent=semanticTaskIntent??await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
-    if(semanticIntentIsSelfContainedContentGeneration(rescueIntent)){
+    // A neural judge may return general_reasoning or no verdict for a clearly requested letter
+    // with a question directed at the recipient. Keep this as a post-COS, no-live, no-action
+    // recovery hint only: it must never override a positive external-facts finding or
+    // clarification requirement, and the authoring model must preserve all uncertainties.
+    const correspondenceDraft=/(?:^|\\W)(?:draft|write|compose)(?:\\W|$)/i.test(input)
+      && /(?:^|\\W)(?:letter|email|e-mail|message|memo)(?:\\W|$)/i.test(input)
+    const correspondenceRescue=correspondenceDraft
+      && rescueIntent?.externalFactsRequired!==true
+      && rescueIntent?.mode!=='clarification_required'
+    if(semanticIntentIsSelfContainedContentGeneration(rescueIntent)||correspondenceRescue){
       const semanticFast=await runFastAuthoring(input,language)
       if(semanticFast)return fastAuthoringResponse(startedAt,input,semanticFast,'cos-fast-authoring-semantic-rescue')
     }

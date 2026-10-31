@@ -38,7 +38,8 @@ export const UI = Object.freeze({
   homeCopyResponse: 'Copy response',
   loginEmail: "getByPlaceholder('Email address')",
   loginPassword: "getByPlaceholder('Password')",
-  loginSubmit: "getByRole('button', { name: 'Log in' })",
+  // The navbar also has a Log in button; only the modal submit actually authenticates.
+  loginSubmit: "getByTestId('auth-modal-submit')",
   loginEmailText: 'Email address',
   assistantInput: "getByPlaceholder('Ask the concierge…')",
   assistantSend: "getByRole('button', { name: 'Send' })",

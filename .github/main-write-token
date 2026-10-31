@@ -1,2 +1,2 @@
-base_sha=e54e9c3e86a4b3ecc1df16a74a826aa4b1c3e7a8
-branch=fix/cos-grounded-writing-reply-decoding-rebased-20261030
+base_sha=6a6aa7b927a89c8d8f4aec0dc20d5c23f104f559
+branch=fix/cos-verifier-separate-scenario-facts-20261031

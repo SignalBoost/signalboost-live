@@ -112,3 +112,15 @@ test('writing recovery uses owned RunPod first and one governed managed fallback
   assert.match(rescue, /const servedModel=String\(turn.model\|\|model\)/)
   assert.match(rescue, /model===preferredModel\?FAST_AUTHORING_TIMEOUT_MS:FAST_AUTHORING_ATTEMPT_MS/)
 })
+
+test('missed semantic writing intent gets a bounded correspondence-only recovery with factual gates intact', () => {
+  const recovery = primary.slice(primary.indexOf('// If ordinary COS could not complete a non-live'), primary.indexOf('// Last ordinary-task rescue'))
+  assert.match(recovery, /const correspondenceDraft=/)
+  assert.match(recovery, /draft\|write\|compose/)
+  assert.match(recovery, /letter\|email\|e-mail\|message\|memo/)
+  assert.match(recovery, /rescueIntent\?\.externalFactsRequired!==true/)
+  assert.match(recovery, /rescueIntent\?\.mode!=='clarification_required'/)
+  assert.match(recovery, /semanticIntentIsSelfContainedContentGeneration\(rescueIntent\)\|\|correspondenceRescue/)
+  assert.match(recovery, /await runFastAuthoring\(input,language\)/)
+  assert.match(recovery, /!requestedAction&&\(!requiresFreshEvidence\|\|freshMissUseLocal\)&&!hasAttachments/)
+})

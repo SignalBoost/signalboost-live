@@ -132,7 +132,7 @@ test('fresh-writing transport uses source-validated decoded prose when confidenc
   assert.match(synthesis, /acceptFreshEvidenceWrittenDeliverable\(\{ text: writingText, input: args\.input, sources: args\.sources \}\)/)
 })
 
-test('Q15: grounded writing verifies the original letter-and-advice request rather than the evidence-packed generation prompt', () => {
+test('Q15: fact-dependent writing verifies the original request rather than the evidence-packed generation prompt', () => {
   const synthesis = read('lib/ai/cos/freshEvidenceLocalSynthesis.ts')
   assert.match(synthesis, /verificationRequest: args\.input/)
   const control = read('lib/ai/cos/cosReasoningControlPlane.ts')
@@ -145,7 +145,7 @@ test('Q15: grounded writing verifies the original letter-and-advice request rath
   assert.match(reasoner, /await outcomeOf\(verificationRequest, finalParsedForPolicy\.answer\)/)
   assert.match(reasoner, /SOURCE MATERIAL FOR FACTUAL GROUNDING/)
   const judge = read('lib/ai/cos/cosSemanticTaskIntent.ts')
-  assert.match(judge, /Conditional advice on eligibility, policy, deadlines or legal procedures/)
+  assert.match(judge, /Only mark content_generation with externalFactsRequired=true when producing the requested document itself requires COS to assert/)
   assert.match(judge, /externalFactsRequired=true/)
   const writingPrompt = freshEvidenceWritingPrompt({ input: request, sources, retrievedAt: '2026-10-31T00:00:00Z', language: 'en' }).systemPrompt
   assert.match(writingPrompt, /Mandatory retirement, benefit eligibility, and discretionary retention are different concepts/)

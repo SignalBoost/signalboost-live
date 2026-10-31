@@ -144,7 +144,7 @@ test('browser Concierge and owner Assistant use one COS brain with public scope 
   const browser = read('../app/api/cos-browser/route.ts')
   assert.match(client, /const endpoint = builderRequest\?\.endpoint \?\? '\/api\/cos-browser'/)
   assert.doesNotMatch(client, /args\.target === 'cos' \? '\/api\/cos-browser' : '\/api\/concierge'/)
-  assert.match(browser, /const access = await getAccess\(\)\.catch/)
+  assert.match(browser, /const access = await timeCosStage\('browser:authorization',\(\)=>getAccess\(\)\.catch/)
   assert.match(browser, /const executeCosRequest = \(\) => cosPrimaryPost\(routedRequest\)/)
   assert.match(browser, /withPublicDeliveryScope\(\(\) => executeCosRequest\(\)\)/)
   assert.doesNotMatch(browser, /publicConciergePost/)

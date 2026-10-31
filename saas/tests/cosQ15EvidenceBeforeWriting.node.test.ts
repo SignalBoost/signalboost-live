@@ -35,7 +35,8 @@ test('the judge explicitly distinguishes a drafting deliverable from its factual
 test('an inquiry-only draft preserves uncertainty without first establishing entitlement', () => {
   const judge = read('lib/ai/cos/cosSemanticTaskIntent.ts')
   assert.match(judge, /drafting an inquiry that explicitly asks the recipient whether a rumored entitlement exists/)
-  assert.match(judge, /unless the user separately asks COS to determine whether it is true/)
+  assert.match(judge, /ONLY for an inquiry-only draft with no separate user-facing question/)
+  assert.match(judge, /A separate request for personal policy guidance always requires evidence/)
 })
 
 test('the writing rescue is not bypassed just because COS previously identified a writing intent', () => {

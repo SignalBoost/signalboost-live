@@ -1190,8 +1190,8 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     // with a question directed at the recipient. Keep this as a post-COS, no-live, no-action
     // recovery hint only: it must never override a positive external-facts finding or
     // clarification requirement, and the authoring model must preserve all uncertainties.
-    const correspondenceDraft=/(?:^|\\W)(?:draft|write|compose)(?:\\W|$)/i.test(input)
-      && /(?:^|\\W)(?:letter|email|e-mail|message|memo)(?:\\W|$)/i.test(input)
+    const correspondenceDraft=/(?:^|\W)(?:draft|write|compose)(?:\W|$)/i.test(input)
+      && /(?:^|\W)(?:letter|email|e-mail|message|memo)(?:\W|$)/i.test(input)
     const correspondenceRescue=correspondenceDraft
       && rescueIntent?.externalFactsRequired!==true
       && rescueIntent?.mode!=='clarification_required'

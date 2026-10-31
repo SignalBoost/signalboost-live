@@ -792,18 +792,15 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   }
 
   const hasAttachments=Array.isArray(body?.attachments)&&body.attachments.length>0
-  const fastAuthoringEligible=!artifactContinuation
-    && !hasAttachments
-    && !isCosCodingObjective(input)
-    && semanticIntentConfirmsWriting(await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null}))
-    && !(await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null}))?.externalFactsRequired
+  // Q13: do not perform a semantic model call merely to compute an unused authoring flag.
+  // The shared intent judge still runs at actual routing/evidence decisions below.
   // ONE PIPELINE, NO PRE-COS DETOUR (2026-09-27). Production evidence (cos-latency-stage rows, Concierge Polish
   // question 14:06 ET): primary:before_cos_first was 38,749ms. Two fast-authoring detours each ran their full
   // FAST_AUTHORING_TIMEOUT_MS (18s: two 9s attempts), returned nothing, and only then did COS answer in 15.5s.
   // Writing requests now go straight to COS, which already has an authoring lane with hidden thinking off.
   // runFastAuthoring remains only as the post-COS rescue below, never in front of COS.
 
-  const access=await getAccess().catch(()=>null),userId=access?.userId||null,isPrivileged=Boolean(access?.isOwner||access?.isAdmin)
+  const access=await timeCosStage('primary:authorization',()=>getAccess().catch(()=>null)),userId=access?.userId||null,isPrivileged=Boolean(access?.isOwner||access?.isAdmin)
 
   // OWNER SELF-KNOWLEDGE FAST PATH: authorization is host-verified before this branch and the
   // current user message is classified before conversation augmentation or any neural router.
@@ -831,7 +828,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   }
 
   if(access?.isOwner){
-    const domainLookup=await tryDomainAvailabilityLookup({input,context:precedingAssistant})
+    const domainLookup=await timeCosStage('primary:owner_domain_lookup',()=>tryDomainAvailabilityLookup({input,context:precedingAssistant}))
     if(domainLookup){
       const executionProvenance=authoritativeProvenance(null,{invoked:false})
       ;(executionProvenance as any).domain_availability={provider:'IANA_RDAP_bootstrap_and_registry_RDAP',checked_at:domainLookup.results[0]?.checkedAt??null,results:domainLookup.results.map(result=>({domain:result.domain,status:result.status,registry_endpoint:result.registryEndpoint}))}
@@ -839,7 +836,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       await writeCosPrimaryProvenance(userId,domainLookup.reply,executionProvenance,'cos-domain-rdap',{prompt:input,answered:true,confidence:domainLookup.results.every(result=>result.status!=='unknown')?1:0,branch:'domain_rdap'})
       return NextResponse.json({ok:true,reply:domainLookup.reply,source:'cos-domain-rdap',confidence_score:domainLookup.results.every(result=>result.status!=='unknown')?1:0,external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,domain_results:domainLookup.results,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
-    const brainstorm=await runOwnerDomainBrainstorm({input,context:precedingAssistant})
+    const brainstorm=await timeCosStage('primary:owner_domain_brainstorm',()=>runOwnerDomainBrainstorm({input,context:precedingAssistant}))
     if(brainstorm){
       const executionProvenance=authoritativeProvenance(null,{invoked:brainstorm.modelInvoked})
       ;(executionProvenance as any).domain_brainstorm={provider:'COS_reasoner_plus_IANA_RDAP',requested:brainstorm.requested,returned:brainstorm.suggestions.length,results:brainstorm.results.map(result=>({domain:result.domain,status:result.status,checked_at:result.checkedAt,registry_endpoint:result.registryEndpoint}))}

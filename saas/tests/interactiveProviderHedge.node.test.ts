@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { firstUsefulWithHedge } from '../lib/ai/interactiveProviderHedge.ts'
+import { firstUsefulWithHedge, interactiveHedgeDelayForPurpose } from '../lib/ai/interactiveProviderHedge.ts'
 
 const later = <T>(ms: number, value: T) => new Promise<T>(resolve => setTimeout(() => resolve(value), ms))
 const useful = (value: string | null) => Boolean(value && value.trim())
@@ -79,7 +79,7 @@ test('production provider race emits per-attempt timing without changing hedge p
   assert.match(lane, /primary: \(\) => observed\('primary'/)
   assert.match(lane, /backup: \(\) => observed\('backup'/)
   assert.match(lane, /firstUsefulWithHedge/)
-  assert.match(lane, /8_000 : interactiveManagedBackupAfterMs\(\)/)
+  assert.match(lane, /interactiveHedgeDelayForPurpose\(/)
 })
 
 test('default interactive chat hedge starts earlier, while the owner override stays in force', () => {
@@ -97,4 +97,29 @@ test('customer text transformations bypass slow RunPod-first hedge', () => {
   assert.match(eligible, /if \(directTextTransformation\(args\)\) return false/)
   assert.match(source, /if \(interactiveRunpodFirstEligible\(args, effectiveConfig\)\) return runpodFirstInteractiveTurn/)
   assert.match(source, /return callConfiguredModelTurn\(args, effectiveConfig\)/)
+})
+
+test('Q13: the semantic judge hedges early while an owner override and ordinary answers keep their delay', async () => {
+  assert.equal(interactiveHedgeDelayForPurpose('semantic_task_intent', 8_000, false), 1_500)
+  assert.equal(interactiveHedgeDelayForPurpose('semantic_task_intent', 8_000, true), 8_000)
+  assert.equal(interactiveHedgeDelayForPurpose('fresh_grounded_answer', 20_000, false), 8_000)
+  assert.equal(interactiveHedgeDelayForPurpose('ordinary_answer', 8_000, false), 8_000)
+  const startedAt = Date.now()
+  const outcome = await firstUsefulWithHedge<string>({
+    primary: () => later(250, null),
+    backup: () => later(20, 'semantic intent classified'),
+    hedgeAfterMs: 15,
+    isUseful: useful,
+  })
+  assert.equal(outcome.winner, 'backup')
+  assert.equal(outcome.result, 'semantic intent classified')
+  assert.ok(Date.now() - startedAt < 180, 'stall should not hold the judge until its 250ms limit')
+})
+
+test('Q13: a request no longer triggers a dead classifier flag before COS', () => {
+  const primary = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(primary, /const fastAuthoringEligible=/)
+  assert.match(primary, /const semanticTaskIntentNeeded=/)
+  assert.match(primary, /timeCosStage\('primary:authorization'/)
+  assert.match(primary, /timeCosStage\('primary:owner_domain_lookup'/)
 })

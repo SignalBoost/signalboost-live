@@ -868,7 +868,7 @@ function usefulTurn(turn: LocalModelTurnResult | null): boolean {
 }
 
 async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: LocalInferenceConfig): Promise<LocalModelTurnResult | null> {
-  const { firstUsefulWithHedge } = await import('./interactiveProviderHedge.ts')
+  const { firstUsefulWithHedge, interactiveHedgeDelayForPurpose } = await import('./interactiveProviderHedge.ts')
   let managedError: unknown = null
   const hedgeStartedAt = Date.now()
   const providerTiming: Record<'primary' | 'backup', { startedAfterMs: number; finishedAfterMs: number | null; useful: boolean | null }> = {
@@ -954,13 +954,13 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
       }
     }),
     backup: () => observed('backup', () => callConfiguredModelTurn(args, { ...config, fallbackFromOwned: true }).catch(error => { managedError = error; return null })),
-    // Fresh grounded answers are latency-sensitive: the 20s generic hedge plus
-    // managed prefill was producing >35s answer calls. Start the governed backup
-    // after 8s, without cancelling a useful owned-model answer. Explicit owner
-    // configuration still takes precedence.
-    hedgeAfterMs: String(args.usageContext?.purpose || '') === 'fresh_grounded_answer'
-      && !process.env.COS_INTERACTIVE_MANAGED_BACKUP_AFTER_MS
-      ? 8_000 : interactiveManagedBackupAfterMs(),
+    // Q13: a stalled semantic judge must not consume the user-answer window. The same
+    // owned-first governed provider race remains authoritative, with the operator override intact.
+    hedgeAfterMs: interactiveHedgeDelayForPurpose(
+      args.usageContext?.purpose,
+      interactiveManagedBackupAfterMs(),
+      Boolean(process.env.COS_INTERACTIVE_MANAGED_BACKUP_AFTER_MS),
+    ),
     isUseful: usefulTurn,
   })
   console.info('[cos-interactive-provider-order]', JSON.stringify({

@@ -21,7 +21,8 @@ test('browser and primary fast-authoring lanes exclude factual writing', () => {
   assert.match(browser, /&& !\(await turnIntent\(\)\)\?\.externalFactsRequired/)
   assert.doesNotMatch(browser, /isAuthoringObjectiveWithoutLiveLookup/)
   assert.match(browser, /semanticIntentConfirmsWriting\(await turnIntent\(\)\)/)
-  assert.match(primary, /&& !\(await cosTurnIntent\(/)
+  assert.doesNotMatch(primary, /const fastAuthoringEligible=/)
+  assert.match(primary, /semanticIntentRequiresFreshness\(semanticTaskIntent\)/)
   assert.match(primary, /const semanticTaskIntentNeeded=!requestedAction[\s\S]{0,240}isAuthoringObjectiveWithoutLiveLookup\(input\)/)
 })
 

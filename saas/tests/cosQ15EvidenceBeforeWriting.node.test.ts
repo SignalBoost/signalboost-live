@@ -19,6 +19,8 @@ test('browser and primary fast-authoring lanes exclude factual writing', () => {
   const browser = read('app/api/cos-browser/route.ts')
   const primary = read('app/api/cos-primary/route.ts')
   assert.match(browser, /&& !\(await turnIntent\(\)\)\?\.externalFactsRequired/)
+  assert.doesNotMatch(browser, /isAuthoringObjectiveWithoutLiveLookup/)
+  assert.match(browser, /semanticIntentConfirmsWriting\(await turnIntent\(\)\)/)
   assert.match(primary, /&& !\(await cosTurnIntent\(/)
   assert.match(primary, /const semanticTaskIntentNeeded=!requestedAction[\s\S]{0,240}isAuthoringObjectiveWithoutLiveLookup\(input\)/)
 })
@@ -28,7 +30,6 @@ test('the judge explicitly distinguishes a drafting deliverable from its factual
   assert.match(judge, /When requested writing depends on establishing an outside-world fact/)
   assert.match(judge, /When the user requests both a draft and advice, preserve both deliverables/)
 })
-
 
 test('an inquiry-only draft preserves uncertainty without first establishing entitlement', () => {
   const judge = read('lib/ai/cos/cosSemanticTaskIntent.ts')

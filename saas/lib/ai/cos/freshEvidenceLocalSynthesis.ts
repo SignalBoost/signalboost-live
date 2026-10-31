@@ -27,6 +27,7 @@ import {
   decodeFreshEvidenceWritingReply,
   freshEvidenceGroundedAnswerPrompt,
   freshEvidenceWritingPrompt,
+  freshEvidenceWritingRepairPrompt,
   FRESH_GROUNDED_ANSWER_MAX_TOKENS,
   FRESH_GROUNDED_ANSWER_TIMEOUT_MS,
   type FreshEvidenceGroundedPrompt,
@@ -104,12 +105,14 @@ async function writtenDeliverableOnEvidence(args: {
   sources: FreshEvidenceSource[]
   retrievedAt: string
   language: string
+  attempt?: number
+  repairPrompt?: FreshEvidenceGroundedPrompt
 }): Promise<FreshEvidenceLocalSynthesisOutcome> {
   const startedAt = Date.now()
   let result: Awaited<ReturnType<typeof callCosReasoner>> = null
   try {
     result = await callCosReasoner({
-      ...freshEvidenceWritingPrompt(args),
+      ...(args.repairPrompt ?? freshEvidenceWritingPrompt(args)),
       temperature: FRESH_GROUNDED_ANSWER_TEMPERATURE,
       disableThinking: true,
       // The deliverable the person reads: it gets the answer window and room, and the reasoner's verifier.
@@ -133,6 +136,7 @@ async function writtenDeliverableOnEvidence(args: {
   const writingText = decodedWriting ?? (parsed?.truncated ? null : parsed?.answer || null)
   if (!writingText) {
     console.warn('[cos-fresh-grounded-writing]', JSON.stringify({ accepted: false, reason: result ? 'unparseable_or_cut_off' : 'no_answer', latencyMs: Date.now() - startedAt }))
+    if (!args.attempt) return writtenDeliverableOnEvidence({ ...args, attempt: 1, repairPrompt: freshEvidenceWritingRepairPrompt({ ...args, reason: result ? 'unparseable_or_cut_off' : 'independent_outcome_verifier_withheld_draft' }) })
     return { kind: 'local_synthesis_unparseable' }
   }
   const accepted = acceptFreshEvidenceWrittenDeliverable({ text: writingText, input: args.input, sources: args.sources })
@@ -146,6 +150,7 @@ async function writtenDeliverableOnEvidence(args: {
   }))
   if (!accepted.ok) {
     const rejectedDraftHead = accepted.reason === 'unsafe_public_output' ? undefined : writingText.replace(/\s+/g, ' ').trim().slice(0, 300)
+    if (!args.attempt && accepted.reason !== 'unsafe_public_output') return writtenDeliverableOnEvidence({ ...args, attempt: 1, repairPrompt: freshEvidenceWritingRepairPrompt({ ...args, reason: accepted.reason || 'citation_requirement_unmet', draft: writingText }) })
     return { kind: 'citation_grounding_rejected', reason: accepted.reason ?? 'empty_answer', rejectedDraftHead }
   }
   return {

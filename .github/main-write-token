@@ -1,2 +1,2 @@
-base_sha=2117499e2982432792b3565f14a688c85421fe52
-branch=fix/q10-independent-repair-selection-20261030
+base_sha=6c4cac1325f2435d8611cfb2c1ae9129d47c2347
+branch=fix/cos-durable-replay-admission-20261030

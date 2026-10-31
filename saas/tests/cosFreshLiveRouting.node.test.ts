@@ -13,7 +13,7 @@ const groundedAnswer = () => read('../lib/ai/cos/freshEvidenceGroundedAnswer.ts'
 test('fresh/current facts retrieve live evidence before local synthesis and any hosted fallback', () => {
   const source = route()
   const liveSearch = source.indexOf('getExternalInfo(query,8,{bypassCache:true})')
-  const localSynthesis = source.indexOf('await synthesizeFreshEvidenceLocally(')
+  const localSynthesis = source.indexOf("synthesizeFreshEvidenceLocally({input:lookupInput")
   const isolationGate = source.indexOf('if(!externalFallbackEnabled())')
   const hostedFallback = source.indexOf('await synthesizeFreshEvidenceExternally(')
   assert.ok(liveSearch >= 0, 'fresh route must perform live retrieval')

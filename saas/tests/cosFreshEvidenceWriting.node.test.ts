@@ -14,6 +14,7 @@ import {
   acceptFreshEvidenceWrittenDeliverable,
   decodeFreshEvidenceWritingReply,
   freshEvidenceWritingPrompt,
+  freshEvidenceWritingRepairPrompt,
 } from '../lib/ai/cos/freshEvidenceGroundedAnswer.ts'
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
@@ -169,4 +170,34 @@ test('Q15: quality repair checks the actual requested deliverables rather than t
  assert.match(reasoner,/const known = outcomes\.get\(/)
  assert.match(reasoner,/outcomes\.set\(/)
  assert.doesNotMatch(reasoner,/await outcomeOf\(args\.prompt, repairedParsedForPolicy\.answer\)/)
+})
+
+test('Q15: a rejected sourced letter gets exactly one bounded repair with original objective and verified evidence', () => {
+  const repaired = freshEvidenceWritingRepairPrompt({
+    input: request,
+    sources,
+    retrievedAt: '2026-10-31T22:00:00Z',
+    language: 'en',
+    reason: 'no_evidence_cited',
+    draft: 'Dear CDO, please clarify the policy. Sincerely, DTO Rover.',
+  })
+  assert.match(repaired.prompt, /PREVIOUS ATTEMPT DID NOT PASS RELEASE VERIFICATION/)
+  assert.match(repaired.prompt, /REJECTION REASON: no_evidence_cited/)
+  assert.match(repaired.prompt, /PREVIOUS DRAFT \(untrusted/)
+  assert.match(repaired.prompt, /Dear CDO/)
+  assert.match(repaired.prompt, /What to do|practical next steps/i)
+  assert.match(repaired.prompt, /LIVE1/)
+  assert.match(repaired.systemPrompt, /live sources are the ONLY authority/)
+  assert.match(repaired.systemPrompt, /OUTSIDE a sendable letter/)
+  const source = read('lib/ai/cos/freshEvidenceLocalSynthesis.ts')
+  const writing = source.slice(source.indexOf('async function writtenDeliverableOnEvidence('), source.indexOf('export async function synthesizeFreshEvidenceLocally('))
+  assert.match(writing, /verificationRequest: args\.input/)
+  assert.match(writing, /if \(!args\.attempt\) return writtenDeliverableOnEvidence/)
+  assert.match(writing, /if \(!args\.attempt && accepted\.reason !== 'unsafe_public_output'\)/)
+  assert.match(writing, /attempt: 1, repairPrompt: freshEvidenceWritingRepairPrompt/)
+  assert.match(writing, /acceptFreshEvidenceWrittenDeliverable/)
+  assert.doesNotMatch(writing, /attempt: 2/)
+  // Neither original nor repair may replace the answer with unverified wording.
+  const uncited = acceptFreshEvidenceWrittenDeliverable({ text: 'Dear CDO, I would like to inquire. Sincerely, DTO Rover.', input: request, sources })
+  assert.equal(uncited.ok, false)
 })

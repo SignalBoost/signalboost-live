@@ -197,3 +197,15 @@ test('model review can repair ambiguous timeline wording without inserting the q
   })
   assert.deepEqual(result, {verdict:'repaired', answer:improved})
 })
+
+
+test('COS correspondence contract preserves the actual employing institution and checks uncertain policy claims', () => {
+  const ownerSkill = readFileSync(join(process.cwd(), 'lib/ai/cos/cosChiefOfStaff.skill.ts'), 'utf8')
+  assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /Never expand a public employer or agency acronym by guessing/)
+  assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /For a NEW draft/)
+  assert.match(FAST_EDIT_AUTHOR_INSTRUCTIONS, /rumored law, policy, eligibility or extension/)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /similarly abbreviated but different organization/)
+  assert.match(FAST_EDIT_REVIEW_INSTRUCTIONS, /keeps that claim conditional/)
+  assert.match(ownerSkill, /never guess an acronym's expansion/)
+  assert.match(ownerSkill, /keep its existence and applicability explicitly unverified/)
+})

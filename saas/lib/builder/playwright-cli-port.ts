@@ -54,6 +54,13 @@ export function classifyBuilderPlaywrightCliFailure(value: unknown): BuilderBrow
   if (/origin.+(?:not allowed|rejected|blocked)|network.+(?:denied|blocked)|econnrefused|enotfound/.test(message)) {
     return 'network_policy_failed'
   }
+  // Playwright CLI returns exit=1 for several distinct locator failures. Keep
+  // error telemetry and campaign receipts categorical: never log stderr,
+  // snapshots, entered credentials or selector text from an authenticated page.
+  if (/strict mode violation|resolved to \d+ elements|multiple elements match/.test(message)) return 'browser_locator_ambiguous'
+  if (/timeout(?:error)?|timed out|waiting for locator/.test(message)) return 'browser_locator_timeout'
+  if (/invalid selector|unexpected token.*selector|failed to parse selector/.test(message)) return 'browser_locator_invalid'
+  if (/element is not visible|element is disabled|not enabled|not stable|intercepts pointer events/.test(message)) return 'browser_element_not_interactable'
   if (/unknown (?:command|option)|unexpected argument|config.+(?:invalid|parse|json)|json.+(?:parse|invalid)/.test(message)) {
     return 'config_invalid'
   }

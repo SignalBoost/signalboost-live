@@ -70,7 +70,9 @@ test('a reopened conversation shows the chart again; text-only turns are unchang
 test('the server saves the visual with the turn and the client shows recovered visuals', () => {
   const browserRoute = readFileSync(new URL('../app/api/cos-provenance-browser/route.ts', import.meta.url), 'utf8')
   const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
-  assert.match(browserRoute, /provenance: provenanceWithDeliveredVisual\(payload\?\.execution_provenance \?\? null, payload\?\.visual\)/)
+  // The delivered visual travels with the customer-task finish (or the task-less fallback store).
+  assert.match(browserRoute, /deliveredVisual: payload\?\.visual \?\? null/)
+  assert.match(browserRoute, /provenance: provenanceWithDeliveredVisual\(outcome\.executionProvenance, outcome\.deliveredVisual\)/)
   assert.match(client, /\.\.\.\(turn\.visual \? \{ visual: turn\.visual \} : \{\}\)/)
   assert.doesNotMatch(client, /data: \{ reply: (?:saved|outcome\.reply), source: 'cos-transport-history-recovery' \}/)
 })

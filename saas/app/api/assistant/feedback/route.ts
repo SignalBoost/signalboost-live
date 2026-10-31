@@ -1,3 +1,4 @@
+// saas/app/api/assistant/feedback/route.ts
 import { after, NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
@@ -8,6 +9,7 @@ import {
 import { generalizeFeedbackIntoCognitiveSkill } from '@/lib/ai/cos/cognitiveFeedbackGeneralization'
 import { attachTurnOutcome, hashPrompt } from '@/lib/ai/cos/turnExperienceStore'
 import { normalizeAssistantContent } from '@/lib/ai/cos/supportTurnProvenance'
+import { historyCosTurnId } from '@/lib/ai/cos/durableCosTurn'
 import { assessFreshnessMiss, recordFreshnessMissGap } from '@/lib/ai/cos/feedbackFreshnessMiss'
 
 export const runtime = 'nodejs'
@@ -94,7 +96,8 @@ async function targetFromConversation(params: {
 
   const assistantIndex = matchingAssistantIndexes[0]
   const assistantMessage = messages[assistantIndex]
-  const turnId = clean(asRecord(assistantMessage?.provenance).turnId, 80)
+  // A customer-task History row carries the task id as `turnId`; the reasoner turn that learning keys on is `cosTurnId`.
+  const turnId = clean(historyCosTurnId(assistantMessage?.provenance), 80)
   let prompt = ''
   for (let index = assistantIndex - 1; index >= 0; index -= 1) {
     if (messages[index]?.role === 'user' && typeof messages[index]?.content === 'string') {

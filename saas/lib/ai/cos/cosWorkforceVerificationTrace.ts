@@ -312,7 +312,11 @@ export async function readWorkforceVerificationTrace(input: { db: Db; now?: Date
   for (let i = 0; i < turnIds.length; i += ID_CHUNK) {
     const chunk = turnIds.slice(i, i + ID_CHUNK)
     if (!unavailable.chatHistory) {
-      try { chatTurns.push(...await rows(db.from('assistant_messages').select('user_id,turn_id:provenance->>turnId').in('provenance->>turnId', chunk).limit(PAGE))) }
+      // A customer-task History row keeps the reasoner turn id as `cosTurnId` (its `turnId` is the task id).
+      try {
+        chatTurns.push(...await rows(db.from('assistant_messages').select('user_id,turn_id:provenance->>turnId').in('provenance->>turnId', chunk).limit(PAGE)))
+        chatTurns.push(...await rows(db.from('assistant_messages').select('user_id,turn_id:provenance->>cosTurnId').in('provenance->>cosTurnId', chunk).limit(PAGE)))
+      }
       catch (error) { unavailable.chatHistory = text(error instanceof Error ? error.message : (error as any)?.message || String(error), 200) }
     }
     if (!unavailable.turnOutcomes) {

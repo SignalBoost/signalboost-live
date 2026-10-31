@@ -52,5 +52,7 @@ test('direct (non-durable) turns run under the same clock and always record the 
   assert.match(route, /const syncWorker = runWithTurnDeadline\(\s*requestStartedAt \+ DURABLE_TURN_MODEL_DEADLINE_MS,/)
   assert.match(route, /response = await Promise\.race\(\[syncWorker, syncWatchdog\]\)/)
   assert.match(route, /source: 'cos-turn-deadline'/)
-  assert.match(route, /if \(successful \|\| \(deadlineElapsed && reply\)\)/)
+  // A deadline reply is still stored (as a failed task), so History always holds the question.
+  assert.match(route, /const succeeded = delivered\.ok && payload\?\.ok !== false && !deadlineElapsed/)
+  assert.match(route, /if \(!reply\) return null/)
 })

@@ -223,7 +223,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: { onClose:
           </div>
         )}
 
-        <button onClick={handleSubmit} disabled={loading}
+        <button data-testid="auth-modal-submit" onClick={handleSubmit} disabled={loading}
           style={{
             width: '100%', padding: '12px 0', borderRadius: 10, fontSize: 14, fontWeight: 800,
             background: '#ffc300', color: '#000', border: 'none',

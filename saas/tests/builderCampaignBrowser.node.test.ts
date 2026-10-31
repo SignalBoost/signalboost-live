@@ -4,6 +4,7 @@
 // carrying the browser session between slices. The driver is a fake page; the real one is the Builder's sandbox port.
 
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import { stubOutcomeJudge } from './helpers/answerOutcomeJudgeStub.ts'
 import assert from 'node:assert/strict'
 import {
@@ -197,4 +198,11 @@ test('runner: a pending browser check ends the slice with its session checkpoint
   assert.notEqual(calls[2].session?.token, calls[1].session?.token, 'each browser item gets its own request token')
   assert.equal(calls[2].session?.testId, 'PAC-14')
   assert.deepEqual(calls.map(call => call.last), [false, false, false, true])
+})
+
+
+test('PAC sign-in targets the real auth modal submit instead of the navbar login', () => {
+  const modal = readFileSync(new URL('../components/AuthModal.tsx', import.meta.url), 'utf8')
+  assert.equal(UI.loginSubmit, "getByTestId('auth-modal-submit')")
+  assert.match(modal, /data-testid="auth-modal-submit" onClick=\{handleSubmit\}/)
 })

@@ -189,6 +189,14 @@ test('Playwright CLI failure classifier emits bounded machine codes only', () =>
   assert.equal(classifyBuilderPlaywrightCliFailure(
     "Element is not visible",
   ), 'browser_element_not_interactable')
+  // Real Playwright actionability timeout includes both the generic deadline
+  // and the decisive call-log evidence; do not collapse these into a timeout.
+  assert.equal(classifyBuilderPlaywrightCliFailure(
+    "TimeoutError: locator.click: Timeout 5000ms exceeded. Call log:\n  - waiting for getByRole('button', { name: 'Log in' })\n  - locator resolved to <button disabled>Log in</button>\n  - element is disabled",
+  ), 'browser_element_not_interactable')
+  assert.equal(classifyBuilderPlaywrightCliFailure(
+    "TimeoutError: locator.click: Timeout 5000ms exceeded. Call log:\n  - waiting for getByRole('button', { name: 'Log in' })\n  - element intercepts pointer events",
+  ), 'browser_element_not_interactable')
   assert.equal(classifyBuilderPlaywrightCliFailure('unclassified failure'), 'cli_exit_nonzero')
 })
 

@@ -38,13 +38,12 @@ test('production routing has a semantic authoring rescue and does not branch on 
 test('writing requests go straight to COS: fast authoring is never a detour in front of COS', () => {
   // Production 2026-09-27 14:06 ET: two pre-COS fast-authoring detours each burned their full 18s budget and
   // returned nothing before COS answered in 15.5s. runFastAuthoring survives only as the post-COS rescue.
-  const eligible = primary.indexOf('const fastAuthoringEligible=')
-  const auth = primary.indexOf('const access=await getAccess()', eligible)
-  const enterprise = primary.indexOf('tryCOSFirstAnswer({prompt:reasoningPrompt', eligible)
-  assert.ok(eligible > 0)
-  assert.ok(auth > eligible)
+  const auth = primary.indexOf("const access=await timeCosStage('primary:authorization'")
+  const enterprise = primary.indexOf('tryCOSFirstAnswer({prompt:reasoningPrompt', auth)
+  assert.ok(auth > 0)
   assert.ok(enterprise > auth)
-  const beforeCos = primary.slice(eligible, enterprise)
+  assert.doesNotMatch(primary, /const fastAuthoringEligible=/, 'dead authoring flag must not force a classifier call on every request')
+  const beforeCos = primary.slice(auth, enterprise)
   assert.doesNotMatch(beforeCos, /await runFastAuthoring\(/)
   assert.match(primary.slice(enterprise), /const semanticFast=await runFastAuthoring\(input,language\)/)
   assert.match(primary, /deepseek-ai\/DeepSeek-V4-Flash/)

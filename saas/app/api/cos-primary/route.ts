@@ -288,6 +288,8 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
   const preferredModel=process.env.COS_FAST_AUTHORING_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
   const models=[...new Set([preferredModel,config.model].filter(Boolean))]
   const startedAt=Date.now()
+  // Both hedged providers and any retry share one actual wall-clock deadline.
+  const signal=AbortSignal.timeout(FAST_AUTHORING_TIMEOUT_MS)
   const cognitiveMode=fastAuthoringCognitiveMode(input)
   for(const model of models){
     const remaining=Math.max(0,FAST_AUTHORING_TIMEOUT_MS-(Date.now()-startedAt))
@@ -297,6 +299,7 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
     // leaves the 8s hedge only ~1s to answer. Remaining retries keep the 9s cap.
     const attemptMs=Math.min(model===preferredModel?FAST_AUTHORING_TIMEOUT_MS:FAST_AUTHORING_ATTEMPT_MS,remaining)
     const turn=await callLocalModelTurn({
+      signal,
       temperature:cognitiveMode==='creative'?.75:.35,
       maxTokens:900,
       disableThinking:true,

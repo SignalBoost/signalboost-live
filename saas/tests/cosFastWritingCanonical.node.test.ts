@@ -103,7 +103,7 @@ test('writing recovery uses owned RunPod first and one governed managed fallback
   const inference = readFileSync(new URL('../lib/ai/local-inference.ts', import.meta.url), 'utf8')
   const eligible = inference.slice(inference.indexOf('function interactiveUserResponse('), inference.indexOf('function freshGroundedTask('))
   assert.match(eligible, /feature === 'cos_fast_authoring'/)
-  const rescue = primary.slice(primary.indexOf('async function runFastAuthoring('), primary.indexOf('// The agent loop\\'s share'))
+  const rescue = primary.slice(primary.indexOf('async function runFastAuthoring('), primary.indexOf("// The agent loop's share"))
   assert.match(rescue, /const turn=await callLocalModelTurn\(\{/)
   assert.match(rescue, /maxEstimatedCostUsd:deepInfraMaxCallUsd\('builder'\)/)
   assert.match(rescue, /fallbackFromOwned:false/)

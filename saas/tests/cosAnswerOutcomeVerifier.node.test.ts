@@ -212,3 +212,28 @@ test('PAC-05 verifier treats provided business metrics as evidence, not requeste
   assert.equal(outcome.status, 'verified')
   assert.equal(outcome.deliverables.length, 5)
 })
+
+test('correspondence verifier checks source fidelity and separate practical advice for any letter', async () => {
+ const prompt = read('lib/ai/cos/answerOutcomeVerifier.ts')
+ assert.match(prompt, /invented acronym expansion, misidentified position, or changed legal meaning/)
+ assert.match(prompt, /NOT the separately requested advice/)
+ assert.match(prompt, /do not treat the letter.s questions as providing the answer/)
+ const input = 'Please write a letter as an NDE coordinator to my manager asking about a rumored policy and tell me what steps to take if it exists.'
+ const bad = 'Dear Manager, As your National Data Engineer, I ask if this rumor is true. Sincerely, NDE.'
+ const result = await verifyAnswerOutcome({request:input,answer:bad,judge:judgeSays([
+  {item:'accurate requested letter',delivered:false,quote:''},
+  {item:'practical advice for next steps',delivered:false,quote:''},
+ ])})
+ assert.equal(result.status,'incomplete')
+ assert.deepEqual(result.missing,['accurate requested letter','practical advice for next steps'])
+})
+
+test('the letter-and-advice contract is general, not a static retirement answer',()=>{
+ const primary=read('app/api/cos-primary/route.ts')
+ const model=read('lib/ai/cos/cosFirstAnswerEnterprise.ts')
+ const judge=read('lib/ai/cos/cosSemanticTaskIntent.ts')
+ assert.match(model,/Retain an unfamiliar abbreviation literally/)
+ assert.match(model,/provide that advice separately from the sendable correspondence/)
+ assert.match(judge,/a draft PLUS the user.s question about the truth, eligibility, rights, procedures, effects or next steps/)
+ assert.doesNotMatch(primary,/Data Transfer Officer|full retirement benefits under my current classification/)
+})

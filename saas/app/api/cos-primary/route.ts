@@ -61,6 +61,7 @@ import { callCosReasoner, callRawCosReasoner, cosAnswerOutcomeJudge, resolveCosR
 import { companyKnowledgeBlock, cosAudience, cosIdentityPreamble, userAnswerMaxTokens, type CosAudience } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { callLocalModel, callLocalModelTurn, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
+import { deepInfraMaxCallUsd } from '@/lib/ai/cos/deepInfraSpendPolicy'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { readPublicPages } from '@/lib/ai/tools/publicWebAgent'
 import { constructDatedRoster, deepenClaimResearch } from '@/lib/ai/cos/cosClaimResearch'
@@ -291,13 +292,18 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
   for(const model of models){
     const remaining=Math.max(0,FAST_AUTHORING_TIMEOUT_MS-(Date.now()-startedAt))
     if(remaining<1_000)break
-    const attemptMs=Math.min(FAST_AUTHORING_ATTEMPT_MS,remaining)
-    const text=await callLocalModel({
+    // The owned model and managed backup already hedge inside this existing transport.
+    // Give the first owned attempt a meaningful bounded window, not a 9s slot that
+    // leaves the 8s hedge only ~1s to answer. Remaining retries keep the 9s cap.
+    const attemptMs=Math.min(model===preferredModel?FAST_AUTHORING_TIMEOUT_MS:FAST_AUTHORING_ATTEMPT_MS,remaining)
+    const turn=await callLocalModelTurn({
       temperature:cognitiveMode==='creative'?.75:.35,
       maxTokens:900,
       disableThinking:true,
       timeoutMs:attemptMs,
       allowConfiguredFallback:false,
+      // A paid managed fallback inside the production Harness needs a real per-call reservation.
+      maxEstimatedCostUsd:deepInfraMaxCallUsd('builder'),
       persistUsage:false,
       jsonObject:true,
       usageContext:{feature:'cos_fast_authoring',purpose:cognitiveMode==='creative'?'creative_authoring':model===preferredModel?'fast_authoring_primary':'fast_authoring_retry'},
@@ -310,15 +316,16 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
         'If the user asks for multiple languages or versions, provide every requested version. Do not research, browse, verify incidental facts, invoke tools, add warnings, or discuss your process. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
       ].join(' '),
       prompt:input,
-    },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true}).catch(()=>null)
-    if(!text)continue
-    const parsed=parseLocalResult(text)
+    },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:false}).catch(()=>null)
+    if(!turn?.content)continue
+    const parsed=parseLocalResult(turn.content)
     const reply=parsed?.answer?.trim()
     if(reply){
-      const provider=String(config.provider||'').trim()
-      const reasonerLabel=provider&&provider!=='self_hosted'
-        ? `managed-open-model:${provider}:${model}`
-        : `independent-local:${model}`
+      const provider=String(turn.provider||'').trim()
+      const servedModel=String(turn.model||model)
+      const reasonerLabel=provider&&provider!=='self_hosted'&&provider!=='runpod'
+        ? `managed-open-model:${provider}:${servedModel}`
+        : `independent-local:${servedModel}`
       return{reply,reasonerLabel,cognitiveMode}
     }
   }

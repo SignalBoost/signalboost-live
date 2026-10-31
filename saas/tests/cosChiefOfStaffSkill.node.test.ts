@@ -45,3 +45,8 @@ test('the mature reasoner injects the skill through the privileged option only',
   const source = await readFile(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
   assert.match(source, /chiefOfStaffSkillForOwner\(options\?\.privileged === true\)/)
 })
+
+test('chief of staff does not turn retirement age or unverified rumors into eligibility facts', () => {
+  assert.match(COS_CHIEF_OF_STAFF_SKILL, /Do not turn a stated upcoming birthday, retirement age, or reported rumor into an assertion about full retirement benefits/)
+  assert.match(COS_CHIEF_OF_STAFF_SKILL, /Avoid formulaic greetings and declarations of commitment unless the owner asked/)
+})

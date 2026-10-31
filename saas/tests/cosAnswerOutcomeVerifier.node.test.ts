@@ -183,3 +183,32 @@ test('the independent COS outcome judge reserves paid-provider budget before ver
   assert.match(judge[0], /purpose:\s*'answer_outcome_verification'/)
   assert.match(judge[0], /ANSWER_OUTCOME_VERIFIER_SYSTEM_PROMPT/)
 })
+
+
+test('PAC-05 verifier treats provided business metrics as evidence, not requested deliverables', async () => {
+  const source = read('lib/ai/cos/answerOutcomeVerifier.ts')
+  assert.match(source, /Scenario facts, measurements, quotations, observations, chronology and other supplied background/)
+  assert.match(source, /NOT separate deliverables/)
+  const incident = [
+    'Q3 trial-to-paid conversion fell from 11.2% to 7.9% while trial sign-ups rose 38%.',
+    'Paid churn stayed flat, and support tickets doubled.',
+    'Analyze: 1. Rank competing explanations. 2. Distinguish correlation from causation.',
+    '3. Identify decisive measurements. 4. Design experiments. 5. State decision criteria.',
+  ].join('\\n')
+  const answer = [
+    'Onboarding friction ranks first because time-to-value rose alongside support tickets.',
+    'The concurrent changes are correlations, not proof of causal impact.',
+    'Compare matched acquisition cohorts and onboarding completion rates.',
+    'Randomize onboarding flow by cohort and measure conversions and support burden.',
+    'Revert onboarding only if the experiment shows a material causal loss.',
+  ].join('\\n')
+  const outcome = await verifyAnswerOutcome({ request: incident, answer, judge: judgeSays([
+    { item: 'rank competing explanations', delivered: true, quote: 'Onboarding friction ranks first because time-to-value rose alongside support tickets' },
+    { item: 'distinguish correlation causation', delivered: true, quote: 'concurrent changes are correlations, not proof of causal impact' },
+    { item: 'decisive measurements', delivered: true, quote: 'Compare matched acquisition cohorts and onboarding completion rates' },
+    { item: 'design experiments', delivered: true, quote: 'Randomize onboarding flow by cohort and measure conversions and support burden' },
+    { item: 'decision criteria', delivered: true, quote: 'Revert onboarding only if the experiment shows a material causal loss' },
+  ]) })
+  assert.equal(outcome.status, 'verified')
+  assert.equal(outcome.deliverables.length, 5)
+})

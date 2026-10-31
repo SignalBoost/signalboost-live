@@ -30,3 +30,20 @@ test('the judge explicitly distinguishes a drafting deliverable from its factual
   assert.match(judge, /When requested writing depends on establishing an outside-world fact/)
   assert.match(judge, /When the user requests both a draft and advice, preserve both deliverables/)
 })
+
+test('an inquiry-only draft preserves uncertainty without first establishing entitlement', () => {
+  const judge = read('lib/ai/cos/cosSemanticTaskIntent.ts')
+  assert.match(judge, /drafting an inquiry that explicitly asks the recipient whether a rumored entitlement exists/)
+  assert.match(judge, /unless the user separately asks COS to determine whether it is true/)
+})
+
+test('the writing rescue is not bypassed just because COS previously identified a writing intent', () => {
+  const primary = read('app/api/cos-primary/route.ts')
+  const start = primary.indexOf('// If ordinary COS could not complete a non-live')
+  const end = primary.indexOf('// Last ordinary-task rescue', start)
+  assert.ok(start >= 0 && end > start)
+  const rescue = primary.slice(start, end)
+  assert.doesNotMatch(rescue, /&&!fastAuthoringEligible/)
+  assert.match(rescue, /semanticIntentIsSelfContainedContentGeneration\(rescueIntent\)/)
+  assert.match(rescue, /await runFastAuthoring\(input,language\)/)
+})

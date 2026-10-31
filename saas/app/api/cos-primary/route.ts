@@ -1174,7 +1174,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // If ordinary COS could not complete a non-live, non-action turn, use neural semantic intent
   // before the generic failed-closed reply. This catches natural human requests such as “help me say
   // something warm” or “come up with a greeting” without hard-coding those phrasings into routing.
-  if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&!hasAttachments&&!isCosCodingObjective(input)&&!fastAuthoringEligible){
+  if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&!hasAttachments&&!isCosCodingObjective(input)){
     const rescueIntent=semanticTaskIntent??await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
     if(semanticIntentIsSelfContainedContentGeneration(rescueIntent)){
       const semanticFast=await runFastAuthoring(input,language)

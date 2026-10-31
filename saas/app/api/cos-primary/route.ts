@@ -324,6 +324,15 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
     const parsed=parseLocalResult(turn.content)
     const reply=parsed?.answer?.trim()
     if(reply){
+      // Unlike the main COS reasoner, this lightweight authoring transport does not run an
+      // outcome check automatically. Reuse the SAME independent verdict as the main answer
+      // and completion lanes: a sendable draft alone cannot satisfy separate advice, and
+      // unsupported factual/identity alterations must not be marked as delivered.
+      const outcome=await verifyAnswerOutcome({request:input,answer:reply,judge:cosAnswerOutcomeJudge})
+      if(outcome.status==='incomplete'){
+        console.warn('[cos-fast-authoring-incomplete]',JSON.stringify({missing:outcome.missing,model}))
+        continue
+      }
       const provider=String(turn.provider||'').trim()
       const servedModel=String(turn.model||model)
       const reasonerLabel=provider&&provider!=='self_hosted'&&provider!=='runpod'

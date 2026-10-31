@@ -18,7 +18,7 @@ export async function enqueueDurableCosTurn(input: {
   conversationId: string
   prompt: string
   runningReply: string
-}): Promise<{ historyMessageId: string }> {
+}): Promise<{ historyMessageId: string; admittedNew: boolean }> {
   if (![input.turnId, input.userId, input.conversationId].every(value => UUID.test(value))) {
     throw new Error('cos_turn_invalid_identity')
   }
@@ -30,7 +30,7 @@ export async function enqueueDurableCosTurn(input: {
   // A single database transaction creates the canonical task and both History rows.
   // The browser-provided task ID is stable across retries; the RPC rejects owner or
   // objective changes and returns the existing receipt without replaying execution.
-  const { data: admitted, error } = await db.rpc('admit_cos_customer_task', {
+  const { data: admitted, error } = await db.rpc('admit_cos_customer_task_once', {
     p_task_id: input.turnId,
     p_user_id: input.userId,
     p_conversation_id: input.conversationId,
@@ -38,9 +38,10 @@ export async function enqueueDurableCosTurn(input: {
     p_running_reply: input.runningReply,
   })
   if (error) throw new Error(`cos_task_admission: ${error.message}`)
-  const historyMessageId = String(admitted || '')
+  const historyMessageId = String(admitted?.historyMessageId || '')
   if (!UUID.test(historyMessageId)) throw new Error('cos_task_admission_receipt_missing')
-  return { historyMessageId }
+  if (typeof admitted?.admittedNew !== 'boolean') throw new Error('cos_task_admission_kind_missing')
+  return { historyMessageId, admittedNew: admitted.admittedNew }
 }
 
 export async function finishDurableCosTurn(input: {

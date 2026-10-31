@@ -217,7 +217,7 @@ test('cos-primary records each step between ingress and the COS answer', () => {
   assert.match(primary, /recordCosLatencyStage\('primary:before_cos_first',Date\.now\(\)-startedAt\)/)
   const stages = readFileSync(new URL('../lib/ai/cos/cosLatencyStages.ts', import.meta.url), 'utf8')
   assert.match(stages, /export async function timeCosStage<T>\(stage: string, work: \(\) => Promise<T>\): Promise<T> \{/)
-  assert.match(stages, /\} finally \{\n    recordCosLatencyStage\(stage, Date\.now\(\) - startedAt\)/)
+  assert.match(stages, /\} finally \{\n    const endedAt = Date\.now\(\)\n    recordCosLatencyStage\(stage, endedAt - startedAt, \{ startedAt, endedAt \}\)/)
 })
 
 test('no fast-authoring detour runs in front of COS', () => {

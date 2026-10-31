@@ -314,7 +314,7 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
         'You are COS fast authoring. Complete the user\'s self-contained writing, drafting, composition, or translation request using only facts the user supplied.',
         cognitiveMode==='creative'
           ? 'The user is asking for creative generation: explore original wording and varied ideas while respecting every supplied constraint.'
-          : 'The task is precision-oriented: prefer faithful, controlled wording over novelty. For professional correspondence use concise, specific, mature language; avoid empty pleasantries, assumed familiarity, vague rumors, inflated formality, and invented credentials or facts. Preserve the recipient\'s actual knowledge boundary and fulfill every requested deliverable.',
+          : 'The task is precision-oriented: prefer faithful, controlled wording over novelty. For professional correspondence use concise, specific, mature language; avoid empty pleasantries, assumed familiarity, vague rumors, inflated formality, and invented credentials or facts. Preserve the recipient\'s actual knowledge boundary and fulfill every requested deliverable. Preserve the user\'s exact role, title, acronym and relevant age or rule; never guess what an unexplained acronym means or substitute benefit eligibility for a mandatory rule. A draft that asks the recipient for guidance does NOT answer a separate user request for advice: give practical next steps after the sendable letter. Never assert a rumored entitlement, deadline, exception, policy or procedure without sourced confirmation; where the requested advice requires outside facts, this self-contained writing lane is insufficient.',
         `Respond in ${reportLanguageName(language)} unless the user explicitly requests a different target language.`,
         'If the user asks for multiple languages or versions, provide every requested version. Do not research, browse, verify incidental facts, invoke tools, add warnings, or discuss your process. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
       ].join(' '),
@@ -324,6 +324,15 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
     const parsed=parseLocalResult(turn.content)
     const reply=parsed?.answer?.trim()
     if(reply){
+      // Unlike the main COS reasoner, this lightweight authoring transport does not run an
+      // outcome check automatically. Reuse the SAME independent verdict as the main answer
+      // and completion lanes: a sendable draft alone cannot satisfy separate advice, and
+      // unsupported factual/identity alterations must not be marked as delivered.
+      const outcome=await verifyAnswerOutcome({request:input,answer:reply,judge:cosAnswerOutcomeJudge})
+      if(outcome.status==='incomplete'){
+        console.warn('[cos-fast-authoring-incomplete]',JSON.stringify({missing:outcome.missing,model}))
+        continue
+      }
       const provider=String(turn.provider||'').trim()
       const servedModel=String(turn.model||model)
       const reasonerLabel=provider&&provider!=='self_hosted'&&provider!=='runpod'

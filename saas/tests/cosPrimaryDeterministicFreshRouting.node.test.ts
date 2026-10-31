@@ -50,3 +50,15 @@ test('completed evidence-policy refusals are HTTP 200 while transport synthesis 
 test('compound page extraction is delegated to shared claim research', () => {
   assert.match(source, /from '@\/lib\/ai\/cos\/cosClaimResearch'/)
 })
+
+
+test('a timed-out COS tool round retains authorized research for the existing grounded fallback', () => {
+  assert.match(source, /const basePorts=createCosAgentPorts\(policy\)/)
+  assert.match(source, /onLiveSearchResults\?\.\(results\)/)
+  assert.match(source, /additionalSearchResults\.push\(\[\.\.\.results\]\)/)
+  assert.match(source, /prepareFreshEvidenceAcrossQueries\(additionalSearchResults,8,lookupInput\)/)
+  assert.match(source, /if\(!merged\.has\(source\.url\)\)merged\.set\(source\.url,source\)/)
+  assert.ok(source.indexOf('if(agentAnswered)return agentAnswered') < source.indexOf('prepareFreshEvidenceAcrossQueries(additionalSearchResults,8,lookupInput)'))
+  assert.ok(source.indexOf('prepareFreshEvidenceAcrossQueries(additionalSearchResults,8,lookupInput)') < source.indexOf('synthesizeFreshEvidenceLocally({input:lookupInput'))
+  assert.match(source, /acceptFreshEvidenceGroundedAnswer|synthesizeFreshEvidenceLocally/)
+})

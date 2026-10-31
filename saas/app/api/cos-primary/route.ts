@@ -61,6 +61,7 @@ import { callCosReasoner, callRawCosReasoner, cosAnswerOutcomeJudge, resolveCosR
 import { companyKnowledgeBlock, cosAudience, cosIdentityPreamble, userAnswerMaxTokens, type CosAudience } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { callLocalModel, callLocalModelTurn, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
+import { deepInfraMaxCallUsd } from '@/lib/ai/cos/deepInfraSpendPolicy'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { readPublicPages } from '@/lib/ai/tools/publicWebAgent'
 import { constructDatedRoster, deepenClaimResearch } from '@/lib/ai/cos/cosClaimResearch'
@@ -287,17 +288,25 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
   const preferredModel=process.env.COS_FAST_AUTHORING_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
   const models=[...new Set([preferredModel,config.model].filter(Boolean))]
   const startedAt=Date.now()
+  // Both hedged providers and any retry share one actual wall-clock deadline.
+  const signal=AbortSignal.timeout(FAST_AUTHORING_TIMEOUT_MS)
   const cognitiveMode=fastAuthoringCognitiveMode(input)
   for(const model of models){
     const remaining=Math.max(0,FAST_AUTHORING_TIMEOUT_MS-(Date.now()-startedAt))
     if(remaining<1_000)break
-    const attemptMs=Math.min(FAST_AUTHORING_ATTEMPT_MS,remaining)
-    const text=await callLocalModel({
+    // The owned model and managed backup already hedge inside this existing transport.
+    // Give the first owned attempt a meaningful bounded window, not a 9s slot that
+    // leaves the 8s hedge only ~1s to answer. Remaining retries keep the 9s cap.
+    const attemptMs=Math.min(model===preferredModel?FAST_AUTHORING_TIMEOUT_MS:FAST_AUTHORING_ATTEMPT_MS,remaining)
+    const turn=await callLocalModelTurn({
+      signal,
       temperature:cognitiveMode==='creative'?.75:.35,
       maxTokens:900,
       disableThinking:true,
       timeoutMs:attemptMs,
       allowConfiguredFallback:false,
+      // A paid managed fallback inside the production Harness needs a real per-call reservation.
+      maxEstimatedCostUsd:deepInfraMaxCallUsd('builder'),
       persistUsage:false,
       jsonObject:true,
       usageContext:{feature:'cos_fast_authoring',purpose:cognitiveMode==='creative'?'creative_authoring':model===preferredModel?'fast_authoring_primary':'fast_authoring_retry'},
@@ -310,15 +319,16 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
         'If the user asks for multiple languages or versions, provide every requested version. Do not research, browse, verify incidental facts, invoke tools, add warnings, or discuss your process. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
       ].join(' '),
       prompt:input,
-    },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true}).catch(()=>null)
-    if(!text)continue
-    const parsed=parseLocalResult(text)
+    },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:false}).catch(()=>null)
+    if(!turn?.content)continue
+    const parsed=parseLocalResult(turn.content)
     const reply=parsed?.answer?.trim()
     if(reply){
-      const provider=String(config.provider||'').trim()
-      const reasonerLabel=provider&&provider!=='self_hosted'
-        ? `managed-open-model:${provider}:${model}`
-        : `independent-local:${model}`
+      const provider=String(turn.provider||'').trim()
+      const servedModel=String(turn.model||model)
+      const reasonerLabel=provider&&provider!=='self_hosted'&&provider!=='runpod'
+        ? `managed-open-model:${provider}:${servedModel}`
+        : `independent-local:${servedModel}`
       return{reply,reasonerLabel,cognitiveMode}
     }
   }
@@ -1176,7 +1186,16 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // something warm” or “come up with a greeting” without hard-coding those phrasings into routing.
   if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&!hasAttachments&&!isCosCodingObjective(input)){
     const rescueIntent=semanticTaskIntent??await cosTurnIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
-    if(semanticIntentIsSelfContainedContentGeneration(rescueIntent)){
+    // A neural judge may return general_reasoning or no verdict for a clearly requested letter
+    // with a question directed at the recipient. Keep this as a post-COS, no-live, no-action
+    // recovery hint only: it must never override a positive external-facts finding or
+    // clarification requirement, and the authoring model must preserve all uncertainties.
+    const correspondenceDraft=/(?:^|\W)(?:draft|write|compose)(?:\W|$)/i.test(input)
+      && /(?:^|\W)(?:letter|email|e-mail|message|memo)(?:\W|$)/i.test(input)
+    const correspondenceRescue=correspondenceDraft
+      && rescueIntent?.externalFactsRequired!==true
+      && rescueIntent?.mode!=='clarification_required'
+    if(semanticIntentIsSelfContainedContentGeneration(rescueIntent)||correspondenceRescue){
       const semanticFast=await runFastAuthoring(input,language)
       if(semanticFast)return fastAuthoringResponse(startedAt,input,semanticFast,'cos-fast-authoring-semantic-rescue')
     }

@@ -26,17 +26,13 @@ test('browser and primary fast-authoring lanes exclude factual writing', () => {
   assert.match(primary, /const semanticTaskIntentNeeded=!requestedAction[\s\S]{0,240}isAuthoringObjectiveWithoutLiveLookup\(input\)/)
 })
 
-test('the judge explicitly distinguishes a drafting deliverable from its factual dependencies', () => {
+test('an inquiry-only draft does not need external policy verification', () => {
   const judge = read('lib/ai/cos/cosSemanticTaskIntent.ts')
-  assert.match(judge, /When requested writing depends on establishing an outside-world fact/)
-  assert.match(judge, /When the user requests both a draft and advice, preserve both deliverables/)
-})
-
-test('an inquiry-only draft preserves uncertainty without first establishing entitlement', () => {
-  const judge = read('lib/ai/cos/cosSemanticTaskIntent.ts')
-  assert.match(judge, /drafting an inquiry that explicitly asks the recipient whether a rumored entitlement exists/)
-  assert.match(judge, /ONLY for an inquiry-only draft with no separate user-facing question/)
-  assert.match(judge, /A separate request for personal policy guidance always requires evidence/)
+  assert.match(judge, /classify the OUTPUT the user wants/)
+  assert.match(judge, /Questions such as whether it is true, whether it applies, and what process to follow belong INSIDE the correspondence/)
+  assert.match(judge, /content_generation with externalFactsRequired=false/)
+  assert.match(judge, /Only mark content_generation with externalFactsRequired=true when producing the requested document itself requires COS to assert/)
+  assert.match(judge, /Resolve this by meaning and addressee/)
 })
 
 test('the writing rescue is not bypassed just because COS previously identified a writing intent', () => {
@@ -50,23 +46,18 @@ test('the writing rescue is not bypassed just because COS previously identified 
   assert.match(rescue, /await runFastAuthoring\(input,language\)/)
 })
 
-test('Q15 repeated correspondence must distinguish sendable inquiry from user-facing conditional policy guidance', () => {
-  const intentJudge = read('lib/ai/cos/cosSemanticTaskIntent.ts')
-  assert.match(intentJudge, /when the user requests writing AND personally asks what course of action/)
-  assert.match(intentJudge, /content_generation with externalFactsRequired=true even when the requested letter itself merely asks/)
+test('inquiry drafting keeps the recipient responsible for confirmation; explicit outside research remains distinct', () => {
+  const judge = read('lib/ai/cos/cosSemanticTaskIntent.ts')
   const verifier = read('lib/ai/cos/answerOutcomeVerifier.ts')
-  assert.match(verifier, /A letter asking its recipient for advice does not itself provide advice to the user/)
-  assert.match(verifier, /preserve user-supplied titles, roles, acronyms, dates, thresholds/)
   const authoring = read('lib/ai/cos/cosFirstAnswerEnterprise.ts')
-  assert.match(authoring, /GENERAL CORRESPONDENCE AND FACT-FIDELITY/)
-  assert.match(authoring, /Do not expand unexplained abbreviations by guessing/)
-  assert.match(authoring, /give actionable advice separately after the sendable correspondence|answer that question directly OUTSIDE the sendable draft/)
   const primary = read('app/api/cos-primary/route.ts')
-  assert.match(primary, /Preserve the user\\'s exact role, title, acronym/)
-  assert.match(primary, /A draft that asks the recipient for guidance does NOT answer a separate user request for advice/)
+  assert.match(judge, /a separate user-facing question/)
+  assert.match(verifier, /Do not invent a second deliverable or reject the draft/)
+  assert.match(verifier, /user unmistakably asks COS itself to verify/)
+  assert.match(authoring, /put those questions in the sendable letter/)
+  assert.match(primary, /IS a complete drafting task/)
   assert.match(primary, /verifyAnswerOutcome\(\{request:input,answer:reply,judge:cosAnswerOutcomeJudge\}\)/)
-  assert.match(primary, /if\(outcome\.status==='incomplete'\)/)
-  // The fast lane is only allowed when the semantic judge positively finds NO outside facts are needed.
   const browser = read('app/api/cos-browser/route.ts')
-  assert.ok(browser.includes('semanticIntentConfirmsWriting(await turnIntent())'))
+  assert.match(browser, /semanticIntentConfirmsWriting\(await turnIntent\(\)\)/)
+  assert.match(browser, /externalFactsRequired/)
 })

@@ -130,3 +130,23 @@ test('fresh-writing transport uses source-validated decoded prose when confidenc
   assert.equal(decodeFreshEvidenceWritingReply('{"answer":"unfinished'), null)
   assert.match(synthesis, /acceptFreshEvidenceWrittenDeliverable\(\{ text: writingText, input: args\.input, sources: args\.sources \}\)/)
 })
+
+test('Q15: grounded writing verifies the original letter-and-advice request rather than the evidence-packed generation prompt', () => {
+  const synthesis = read('lib/ai/cos/freshEvidenceLocalSynthesis.ts')
+  assert.match(synthesis, /verificationRequest: args\.input/)
+  const control = read('lib/ai/cos/cosReasoningControlPlane.ts')
+  const workers = read('lib/ai/cos/cosReasoningWorkers.ts')
+  const reasoner = read('lib/ai/cos/cosReasoner.ts')
+  assert.match(control, /verificationRequest\?: string/)
+  assert.match(workers, /verificationRequest: request\.verificationRequest/)
+  assert.match(reasoner, /const verificationRequest = String\(args\.verificationRequest \|\| args\.prompt\)/)
+  assert.match(reasoner, /request: verificationRequest/)
+  assert.match(reasoner, /await outcomeOf\(verificationRequest, finalParsedForPolicy\.answer\)/)
+  assert.match(reasoner, /SOURCE MATERIAL FOR FACTUAL GROUNDING/)
+  const judge = read('lib/ai/cos/cosSemanticTaskIntent.ts')
+  assert.match(judge, /Conditional advice on eligibility, policy, deadlines or legal procedures/)
+  assert.match(judge, /externalFactsRequired=true/)
+  const writingPrompt = freshEvidenceWritingPrompt({ input: request, sources, retrievedAt: '2026-10-31T00:00:00Z', language: 'en' }).systemPrompt
+  assert.match(writingPrompt, /Mandatory retirement, benefit eligibility, and discretionary retention are different concepts/)
+  assert.match(writingPrompt, /a separate practical next-steps section outside the letter/)
+})

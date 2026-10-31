@@ -48,3 +48,22 @@ test('the writing rescue is not bypassed just because COS previously identified 
   assert.match(rescue, /semanticIntentIsSelfContainedContentGeneration\(rescueIntent\)/)
   assert.match(rescue, /await runFastAuthoring\(input,language\)/)
 })
+
+test('Q15 repeated correspondence must distinguish sendable inquiry from user-facing conditional policy guidance', () => {
+  const intentJudge = read('lib/ai/cos/cosSemanticTaskIntent.ts')
+  assert.match(intentJudge, /when the user requests writing AND personally asks what course of action/)
+  assert.match(intentJudge, /content_generation with externalFactsRequired=true even when the requested letter itself merely asks/)
+  const verifier = read('lib/ai/cos/answerOutcomeVerifier.ts')
+  assert.match(verifier, /A letter asking its recipient for advice does not itself provide advice to the user/)
+  assert.match(verifier, /preserve user-supplied titles, roles, acronyms, dates, thresholds/)
+  const authoring = read('lib/ai/cos/cosFirstAnswerEnterprise.ts')
+  assert.match(authoring, /GENERAL CORRESPONDENCE AND FACT-FIDELITY/)
+  assert.match(authoring, /Do not expand unexplained abbreviations by guessing/)
+  assert.match(authoring, /give actionable advice separately after the sendable correspondence|answer that question directly OUTSIDE the sendable draft/)
+  const primary = read('app/api/cos-primary/route.ts')
+  assert.match(primary, /Preserve the user\\'s exact role, title, acronym/)
+  assert.match(primary, /A draft that asks the recipient for guidance does NOT answer a separate user request for advice/)
+  // The fast lane is only allowed when the semantic judge positively finds NO outside facts are needed.
+  const browser = read('app/api/cos-browser/route.ts')
+  assert.match(browser, /semanticIntentConfirmsWriting\\(await turnIntent\\(\\)\\)[\\s\\S]{0,90}externalFactsRequired/)
+})

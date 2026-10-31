@@ -170,3 +170,11 @@ test('Q15: quality repair checks the actual requested deliverables rather than t
  assert.match(reasoner,/outcomes\.set\(/)
  assert.doesNotMatch(reasoner,/await outcomeOf\(args\.prompt, repairedParsedForPolicy\.answer\)/)
 })
+
+test('Q15: fact-dependent drafting plus eligibility guidance is a source-dependent single objective',()=>{
+ const judge=read('lib/ai/cos/cosSemanticTaskIntent.ts')
+ assert.match(judge,/draft PLUS the user.s question about the truth/)
+ assert.match(judge,/externalFactsRequired=true/)
+ const contract=read('lib/ai/cos/answerOutcomeVerifier.ts')
+ assert.match(contract,/changed legal meaning makes the corresponding writing deliverable NOT delivered/)
+})

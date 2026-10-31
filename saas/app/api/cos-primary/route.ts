@@ -332,7 +332,7 @@ const AGENT_LOOP_BUDGET_MS=110_000
 
 type AgentComputeTurn={startedAt:number;input:string;language:string;body:any;userId:string|null;ownerAuthenticated:boolean;precedingAssistant:string|null;seedSearch?:{query:string;results:readonly{title:string;url:string;snippet:string}[]}
   /** A live-fact question: the answer must cite retrieved evidence meeting the citation requirement, and the loop leaves time for the one-pass fallback. */
-  liveFact?:{sources:FreshEvidenceSource[]}}
+  liveFact?:{sources:FreshEvidenceSource[]};onLiveSearchResults?:(results:readonly {title:string;url:string;snippet:string}[])=>void}
 // Live facts run inside the interactive turn: the loop is bounded and always leaves the one-pass
 // fallback time to answer (Codex #4564). Chart/compute turns keep the full loop budget.
 const LIVE_FACT_LOOP_BUDGET_MS=30_000
@@ -376,6 +376,12 @@ async function agentComputeResponse(turn:AgentComputeTurn):Promise<NextResponse|
     .slice(0,-1)
     .map((message:any)=>({role:message.role as 'user'|'assistant',content:String(message.content)}))
   const trace=newAgentLoopTrace()
+  const basePorts=createCosAgentPorts(policy)
+  // Preserve newly retrieved evidence for the existing one-pass grounded fallback if a model round times out.
+  // This observes only host-authorized searches; it does not grant tools or bypass source verification.
+  const ports=turn.liveFact&&turn.onLiveSearchResults
+    ? {...basePorts,search:async(query:string)=>{const results=await basePorts.search(query);turn.onLiveSearchResults?.(results);return results}}
+    : basePorts
   const result=await runCosAgentLoop({
     trace,
     request:turn.input,
@@ -383,7 +389,7 @@ async function agentComputeResponse(turn:AgentComputeTurn):Promise<NextResponse|
     language:turn.language,
     model:runCosAgentToolTurn,
     critic:runCosAgentToolTurn,
-    ports:createCosAgentPorts(policy),
+    ports,
     policy,
     deadlineAt:loopStartedAt+loopBudgetMs,
     seedSearch:turn.seedSearch,
@@ -1086,8 +1092,22 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       // loop's first observation, and the model searches again for any part of the question it does
       // not cover (production 2026-10-16: "capital of Australia and its population" answered only the
       // capital from one search pass). The one-pass synthesis below remains the fallback.
-      const agentAnswered=await agentComputeResponse({startedAt,input,language,body,userId,ownerAuthenticated:access?.isOwner===true&&Boolean(userId),precedingAssistant:precedingAssistant||null,seedSearch:{query:lookupInput,results:freshSources},liveFact:{sources:freshSources}})
+      const additionalSearchResults:Array<Array<{title:string;url:string;snippet:string}>>=[]
+      const agentAnswered=await agentComputeResponse({startedAt,input,language,body,userId,ownerAuthenticated:access?.isOwner===true&&Boolean(userId),precedingAssistant:precedingAssistant||null,seedSearch:{query:lookupInput,results:freshSources},liveFact:{sources:freshSources},onLiveSearchResults:results=>{if(results.length)additionalSearchResults.push([...results])}})
       if(agentAnswered)return agentAnswered
+      if(additionalSearchResults.length){
+        // A timed-out tool loop must not discard the legitimate sources it already retrieved.
+        // The existing relevancy selector and later citation verifier remain authoritative.
+        const researched=prepareFreshEvidenceAcrossQueries(additionalSearchResults,8,lookupInput)
+        if(researched.length){
+          const merged=new Map<string,FreshEvidenceSource>()
+          for(const source of [...freshSources.slice(0,4),...researched,...freshSources.slice(4)]){
+            if(!merged.has(source.url))merged.set(source.url,source)
+            if(merged.size>=8)break
+          }
+          freshSources=[...merged.values()].map((source,index)=>({...source,id:`LIVE${index+1}`}))
+        }
+      }
       freshLocalAttempted=true
       freshLocalModel=localReasonerLabel()
       let localSynthesis=await synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language,deliverable:await freshDeliverable()})

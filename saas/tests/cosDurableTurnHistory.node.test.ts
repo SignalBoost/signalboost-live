@@ -9,9 +9,9 @@ test('read-only COS questions stay synchronous while non-replayable actions keep
   const route = readFileSync(join(process.cwd(), 'app/api/cos-provenance-browser/route.ts'), 'utf8')
   assert.match(route, /requestsExternalAction/)
   assert.match(route, /const durableConversationTurn = ordinaryConversationTurn && externalActionRequested/)
-  assert.match(route, /const synchronousReadOnlyTurn = ordinaryConversationTurn && !externalActionRequested/)
-  assert.match(route, /if \(synchronousReadOnlyTurn\)/)
-  assert.match(route, /await persistTurn\(/)
+  // Read-only turns stay on the request path and are admitted as customer tasks (cosCustomerTaskAdmission test).
+  assert.match(route, /return runAdmittedCosTurn\(\{/)
+  assert.match(route, /storeWithoutTask: outcome => persistTurn\(/)
 
   assert.equal(isExternalActionCommand('what is the capital of Germany?'), false)
   assert.equal(isExternalActionCommand('Mam 9 godzin do zabicia w Amsterdamie w sobotę. Przygotuj mi ekonomiczny plan zwiedzania między 9 a 18.'), false)

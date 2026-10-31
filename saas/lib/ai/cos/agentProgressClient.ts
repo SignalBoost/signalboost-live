@@ -325,7 +325,13 @@ export async function postWithAgentProgress(args: {
   }
 
   const builderRequest = conciergeBuilderRequest(args.body)
-  const requestBody = builderRequest?.body ?? args.body
+  // The identifier is generated once for this logical send, before the POST.
+  // It is not a privilege claim. The server verifies user, conversation and
+  // objective when the same ID is supplied again.
+  const originalBody = bodyRecord(args.body)
+  const requestBody = builderRequest?.body ?? (originalBody
+    ? { ...originalBody, context: { ...(bodyRecord(originalBody.context) || {}), clientTurnId: crypto.randomUUID() } }
+    : args.body)
   const repairRequest = isOperatorRepairRequest(requestBody)
   const progressTarget = args.target
   const builderActive = Boolean(builderRequest)

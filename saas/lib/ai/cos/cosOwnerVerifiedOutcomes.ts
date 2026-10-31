@@ -1,5 +1,7 @@
+// saas/lib/ai/cos/cosOwnerVerifiedOutcomes.ts
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { historyCosTurnId } from '@/lib/ai/cos/durableCosTurn'
 import { recordVerifiedCosProductionOutcome } from '@/lib/ai/cos/cognitiveVerifiedOutcome'
 import {
   COS_OWNER_VERIFIED_OUTCOME_MAX_AGE_DAYS,
@@ -36,7 +38,7 @@ async function ownerTurns(userId: string, now: Date): Promise<OwnerTurn[]> {
     const conversation = String(row.conversation_id || '')
     if (row.role === 'user') { lastPrompt.set(conversation, String(row.content || '')); continue }
     if (row.role !== 'assistant') continue
-    const turnId = clean(row?.provenance?.turnId, 80)
+    const turnId = clean(historyCosTurnId(row?.provenance), 80)
     const userPrompt = lastPrompt.get(conversation) || ''
     if (!turnId || !userPrompt.trim()) continue
     turns.push({ turnId, answeredAt: String(row.created_at || ''), userPrompt, reply: String(row.content || '') })

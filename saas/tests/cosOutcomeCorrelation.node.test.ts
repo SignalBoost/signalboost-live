@@ -70,7 +70,8 @@ test('authoritative provenance preserves the reasoner turn id for server-owned m
 test('assistant feedback derives turn id from server-owned records and never the client body', () => {
   const source = file('../app/api/assistant/feedback/route.ts')
   assert.match(source, /select\('role,content,created_at,provenance'\)/)
-  assert.match(source, /asRecord\(assistantMessage\?\.provenance\)\.turnId/)
+  // The stored message's reasoner turn id (cosTurnId on a customer-task row), never a client-supplied id.
+  assert.match(source, /historyCosTurnId\(assistantMessage\?\.provenance\)/)
   assert.match(source, /from\('cos_latest_turn_provenance'\)/)
   assert.match(source, /\.eq\('assistant_content', normalizeAssistantContent\(assistantContent\)\)/)
   assert.match(source, /hashPrompt\(userPrompt\) !== storedPromptHash/)

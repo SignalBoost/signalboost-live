@@ -12,11 +12,11 @@ import {
 } from '@/lib/ai/cos/publicAnswerProvenanceCapsule.ts'
 import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProvenance.ts'
 import { recordLatestUserTurnProvenance } from '@/lib/ai/cos/supportTurnProvenance.ts'
-import { enqueueDurableCosTurn, finishDurableCosTurn } from '@/lib/ai/cos/durableCosTurn.ts'
+import { enqueueDurableCosTurn, finishDurableCosTurn, runAdmittedCosTurn } from '@/lib/ai/cos/durableCosTurn.ts'
 import { namesVerificationCampaign } from '@/lib/builder/campaign/catalog'
 import { runWithTurnDeadline, USER_ANSWER_WINDOW_MS } from '@/lib/ai/cos/cosTurnBudget.ts'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy.ts'
-import { persistTurn } from '@/lib/ai/tools/conversationHistory.ts'
+import { persistTurn, refreshSummaryAtCadence } from '@/lib/ai/tools/conversationHistory.ts'
 import { provenanceWithDeliveredVisual } from '@/lib/concierge/deliveredVisual.ts'
 import { assistanceCopy, COS_TURN_ACCEPTED } from '@/lib/ai/cos/assistanceMode'
 
@@ -232,6 +232,10 @@ export async function POST(req: NextRequest): Promise<Response> {
   // Completed read-only turns are still persisted below before the response is returned, so History
   // remains authoritative without exposing a running receipt as the user-visible answer.
   const conversationId = String(body?.context?.conversationId || body?.conversationId || '').trim()
+  // One stable client-generated UUID per send (agentProgressClient). It is not a privilege claim: admission checks
+  // owner, conversation and objective, so a replay can only re-attach to its own task.
+  const submittedTurnId = body?.context?.clientTurnId
+  const clientTurnId = typeof submittedTurnId === 'string' && UUID.test(submittedTurnId) ? submittedTurnId : null
   const attachments = Array.isArray(body?.attachments) ? body.attachments : []
   const ordinaryConversationTurn = Boolean(prompt)
     && UUID.test(conversationId)
@@ -244,17 +248,16 @@ export async function POST(req: NextRequest): Promise<Response> {
   const ownerCampaignRequest = Boolean(prompt) && namesVerificationCampaign(prompt)
     && (await getAccess().catch(() => null))?.isOwner === true
   const durableConversationTurn = ordinaryConversationTurn && externalActionRequested && !ownerCampaignRequest
-  const synchronousReadOnlyTurn = ordinaryConversationTurn && !externalActionRequested
 
   if (durableConversationTurn) {
     const access = await getAccess().catch(() => null)
     // Durability is storage/transport authority only. A signed-in public Concierge turn keeps its
     // original public surface header in downstreamRequest(), so it cannot inherit owner privileges.
     if (access?.userId) {
-      const turnId = crypto.randomUUID()
+      const turnId = clientTurnId ?? crypto.randomUUID()
       const runningReply = assistanceCopy(COS_TURN_ACCEPTED, languageFrom(body))
       try {
-        const { historyMessageId } = await enqueueDurableCosTurn({
+        const { historyMessageId, admittedNew } = await enqueueDurableCosTurn({
           turnId,
           userId: access.userId,
           conversationId,
@@ -263,7 +266,8 @@ export async function POST(req: NextRequest): Promise<Response> {
         })
 
         const workerUserId = access.userId
-        after(async () => {
+        // A replay of the same send re-attaches to its task; only the first admission dispatches the worker.
+        if (admittedNew) after(async () => {
           const watchdogTimer: { handle: ReturnType<typeof setTimeout> | null } = { handle: null }
           try {
             const watchdog = new Promise<never>((_, reject) => {
@@ -352,60 +356,85 @@ export async function POST(req: NextRequest): Promise<Response> {
   // Direct (non-durable) turns run inside the same single whole-turn clock as durable ones. Without
   // it, every stage started its own budget, the request outlived the browser's wait, and because this
   // path saves History only after completion, the question vanished from History entirely.
-  const syncWatchdogTimer: { handle: ReturnType<typeof setTimeout> | null } = { handle: null }
   let deadlineElapsed = false
-  let response!: Response
-  try {
-    const syncWatchdog = new Promise<never>((_, reject) => {
-      syncWatchdogTimer.handle = setTimeout(
-        () => reject(new DurableTurnWatchdogElapsed('cos_turn_deadline')),
-        Math.max(1_000, requestStartedAt + DURABLE_TURN_WATCHDOG_MS - Date.now()),
+  const executeTurn = async (): Promise<Response> => {
+    const syncWatchdogTimer: { handle: ReturnType<typeof setTimeout> | null } = { handle: null }
+    let response!: Response
+    try {
+      const syncWatchdog = new Promise<never>((_, reject) => {
+        syncWatchdogTimer.handle = setTimeout(
+          () => reject(new DurableTurnWatchdogElapsed('cos_turn_deadline')),
+          Math.max(1_000, requestStartedAt + DURABLE_TURN_WATCHDOG_MS - Date.now()),
+        )
+      })
+      const syncWorker = runWithTurnDeadline(
+        requestStartedAt + DURABLE_TURN_MODEL_DEADLINE_MS,
+        () => cosBrowserPost(downstreamRequest(req, body)),
+        { answerReserveMs: USER_ANSWER_WINDOW_MS },
       )
-    })
-    const syncWorker = runWithTurnDeadline(
-      requestStartedAt + DURABLE_TURN_MODEL_DEADLINE_MS,
-      () => cosBrowserPost(downstreamRequest(req, body)),
-      { answerReserveMs: USER_ANSWER_WINDOW_MS },
-    )
-    syncWorker.catch(() => undefined)
-    response = await Promise.race([syncWorker, syncWatchdog])
-  } catch (error) {
-    if (!(error instanceof DurableTurnWatchdogElapsed)) throw error
-    deadlineElapsed = true
-    console.error('[cos_turn_deadline]', JSON.stringify({ elapsedMs: Date.now() - requestStartedAt }))
-    response = NextResponse.json({
-      ok: false,
-      reply: DURABLE_TURN_DEADLINE_REPLY,
-      error: 'cos_turn_deadline',
-      source: 'cos-turn-deadline',
-      execution_allowed: false,
-      external_action_taken: false,
-    }, { status: 200 })
-  } finally {
-    if (syncWatchdogTimer.handle) clearTimeout(syncWatchdogTimer.handle)
+      syncWorker.catch(() => undefined)
+      response = await Promise.race([syncWorker, syncWatchdog])
+    } catch (error) {
+      if (!(error instanceof DurableTurnWatchdogElapsed)) throw error
+      deadlineElapsed = true
+      console.error('[cos_turn_deadline]', JSON.stringify({ elapsedMs: Date.now() - requestStartedAt }))
+      response = NextResponse.json({
+        ok: false,
+        reply: DURABLE_TURN_DEADLINE_REPLY,
+        error: 'cos_turn_deadline',
+        source: 'cos-turn-deadline',
+        execution_allowed: false,
+        external_action_taken: false,
+      }, { status: 200 })
+    } finally {
+      if (syncWatchdogTimer.handle) clearTimeout(syncWatchdogTimer.handle)
+    }
+    return finalizeAnswer(response, req, body)
   }
-  const delivered = await finalizeAnswer(response, req, body)
 
-  if (synchronousReadOnlyTurn) {
-    const access = await getAccess().catch(() => null)
-    const userId = access?.userId || null
-    if (userId) {
+  // GATE 1 — ONE CUSTOMER TASK PER REQUEST. Every signed-in conversation turn answered on the request path (read-only
+  // questions and the owner's campaign request) is admitted as a customer task before it runs, exactly like a durable
+  // turn: one builder_jobs `cos_turn` row plus its History rows, finished in one transaction with the delivered answer.
+  const access = ordinaryConversationTurn ? await getAccess().catch(() => null) : null
+  const userId = access?.userId || null
+  if (!userId) return executeTurn()
+
+  const taskId = clientTurnId ?? crypto.randomUUID()
+  return runAdmittedCosTurn({
+    admit: () => enqueueDurableCosTurn({
+      turnId: taskId,
+      userId,
+      conversationId,
+      prompt,
+      runningReply: assistanceCopy(COS_TURN_ACCEPTED, languageFrom(body)),
+    }),
+    run: executeTurn,
+    outcome: async delivered => {
       const payload: any = await delivered.clone().json().catch(() => null)
       const reply = typeof payload?.reply === 'string' ? payload.reply.trim() : ''
-      const successful = delivered.ok && payload?.ok !== false && Boolean(reply)
-      // A turn that ran out of time is still recorded, so History always holds the question.
-      if (successful || (deadlineElapsed && reply)) {
-        await persistTurn({
-          conversationId,
-          userId,
-          userMessage: prompt,
-          assistantReply: reply,
-          // A chart/image delivered with the answer is saved with it, so History shows it too.
-          provenance: provenanceWithDeliveredVisual(payload?.execution_provenance ?? null, payload?.visual),
-        })
+      if (!reply) return null
+      const succeeded = delivered.ok && payload?.ok !== false && !deadlineElapsed
+      return {
+        status: succeeded ? 'succeeded' : 'failed',
+        reply,
+        source: typeof payload?.source === 'string' ? payload.source : null,
+        executionProvenance: payload?.execution_provenance ?? null,
+        answerProvenance: payload?.answer_provenance ?? null,
+        deliveredVisual: payload?.visual ?? null,
+        error: succeeded ? null : String(payload?.error || `http_${delivered.status}`),
       }
-    }
-  }
-
-  return delivered
+    },
+    finish: outcome => finishDurableCosTurn({ turnId: taskId, userId, ...outcome }),
+    // Admission unavailable: still answer, and store the exchange (a deadline reply too) so History holds the question.
+    storeWithoutTask: outcome => persistTurn({
+      conversationId,
+      userId,
+      userMessage: prompt,
+      assistantReply: outcome.reply,
+      // A chart/image delivered with the answer is saved with it, so History shows it too.
+      provenance: provenanceWithDeliveredVisual(outcome.executionProvenance, outcome.deliveredVisual),
+    }),
+    afterStored: () => refreshSummaryAtCadence(conversationId, userId),
+    failedReply: 'COS could not finish this turn. The request was not replayed.',
+  })
 }

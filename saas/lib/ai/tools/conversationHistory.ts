@@ -295,6 +295,20 @@ export async function lastAssistantProvenance(conversationId: string, userId: st
   }
 }
 
+// ── Rolling summary at the persistence cadence, for turns stored outside persistTurn ──
+/** A customer-task turn is written by its own database transaction; this keeps persistTurn's summary cadence. */
+export async function refreshSummaryAtCadence(conversationId: string, userId: string): Promise<void> {
+  try {
+    if (!isUuid(conversationId) || !userId) return
+    const existing = await getConversationHistoryStore().getConversation(conversationId)
+    if (!existing || existing.user_id !== userId) return
+    const count = existing.message_count ?? 0
+    if (count > 0 && count % SUMMARY_EVERY_N_MESSAGES === 0) await refreshSummary(conversationId, userId)
+  } catch (err) {
+    console.error('conversationHistory: refreshSummaryAtCadence exception (non-blocking)', err)
+  }
+}
+
 // ── Rolling summary via the injected summarizer ────────────────────────────────
 async function refreshSummary(conversationId: string, userId: string): Promise<void> {
   try {

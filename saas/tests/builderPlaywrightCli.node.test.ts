@@ -177,6 +177,18 @@ test('Playwright CLI failure classifier emits bounded machine codes only', () =>
     classifyBuilderPlaywrightCliFailure('error: unknown option --bad'),
     'config_invalid',
   )
+  assert.equal(classifyBuilderPlaywrightCliFailure(
+    "Error: strict mode violation: getByRole('button', { name: 'Log in' }) resolved to 2 elements; password=PRIVATE",
+  ), 'browser_locator_ambiguous')
+  assert.equal(classifyBuilderPlaywrightCliFailure(
+    "TimeoutError: locator.click: Timeout 5000ms exceeded while waiting for locator",
+  ), 'browser_locator_timeout')
+  assert.equal(classifyBuilderPlaywrightCliFailure(
+    "Error: invalid selector used by locator",
+  ), 'browser_locator_invalid')
+  assert.equal(classifyBuilderPlaywrightCliFailure(
+    "Element is not visible",
+  ), 'browser_element_not_interactable')
   assert.equal(classifyBuilderPlaywrightCliFailure('unclassified failure'), 'cli_exit_nonzero')
 })
 

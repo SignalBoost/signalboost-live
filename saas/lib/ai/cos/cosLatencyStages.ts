@@ -17,8 +17,8 @@ export function recordCosLatencyStage(stage: string, latencyMs: number, span?: {
   // Q13: match each non-model stage with provider_inference_usage.correlation_id via the
   // active OpenTelemetry trace. Persist only stage metadata and timing; never request content.
   // Existing cos_ai_roi_metrics schema and dashboard queries remain unchanged.
-  const endedAt = Number.isFinite(span?.endedAt) ? Number(span!.endedAt) : Date.now()
-  const startedAt = Number.isFinite(span?.startedAt) ? Number(span!.startedAt) : endedAt - ms
+  const endedAt = typeof span?.endedAt === 'number' && Number.isFinite(span.endedAt) ? span.endedAt : Date.now()
+  const startedAt = typeof span?.startedAt === 'number' && Number.isFinite(span.startedAt) ? span.startedAt : endedAt - ms
   console.info('[cos-latency-stage-trace]', JSON.stringify({
     traceId: currentTraceId(),
     stage: source,

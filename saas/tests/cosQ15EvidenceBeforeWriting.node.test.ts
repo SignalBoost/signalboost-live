@@ -30,3 +30,24 @@ test('the judge explicitly distinguishes a drafting deliverable from its factual
   assert.match(judge, /When requested writing depends on establishing an outside-world fact/)
   assert.match(judge, /When the user requests both a draft and advice, preserve both deliverables/)
 })
+
+
+test('uncertain-policy inquiries are drafted without turning the rumor into a verified benefit', () => {
+  const judge = read('lib/ai/cos/cosSemanticTaskIntent.ts')
+  assert.match(judge, /simply a letter asking a recipient whether a rumored policy or benefit exists/)
+  assert.match(judge, /questions intended for the letter's recipient as separate requests/)
+  assert.match(judge, /user separately asks COS for factual legal, medical, financial, policy, or eligibility advice/)
+})
+
+test('self-contained writing reaches the existing authoring rescue after the first COS attempt returns no draft', () => {
+  const primary = read('app/api/cos-primary/route.ts')
+  const start = primary.indexOf('// If ordinary COS could not complete a non-live')
+  const stop = primary.indexOf('// Last ordinary-task rescue', start)
+  assert.ok(start >= 0 && stop > start)
+  const rescue = primary.slice(start, stop)
+  assert.match(rescue, /semanticIntentIsSelfContainedContentGeneration\(rescueIntent\)/)
+  assert.match(rescue, /await runFastAuthoring\(input,language\)/)
+  assert.doesNotMatch(rescue, /&&!fastAuthoringEligible/)
+  assert.ok(primary.indexOf('tryCOSFirstAnswer({prompt:reasoningPrompt') < start)
+  assert.ok(stop < primary.indexOf('buildHonestRefusalReply({prompt:input'))
+})

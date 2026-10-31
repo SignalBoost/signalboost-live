@@ -21,6 +21,7 @@ import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { ANSWER_COMPLETION_SYSTEM_PROMPT, runAnswerCompletionLoop } from './answerCompletionLoop.ts'
 import { callLocalModel, captureServedInference, localInferenceConfigFromEnv, type LocalModelCallArgs, type ServedInference } from '@/lib/ai/local-inference'
 import { currentInferenceTransport } from '@/lib/ai/inferenceTransport'
+import { deepInfraMaxCallUsd } from './deepInfraSpendPolicy.ts'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRepair, recordQualityRepairDecision, assessReasonerDraft } from '@/lib/ai/cos/reasonerQuality'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
@@ -70,6 +71,9 @@ async function runAnswerOutcomeJudge(
     temperature: 0,
     disableThinking: true,
     maxTokens: ANSWER_OUTCOME_JUDGE_MAX_TOKENS,
+    // The existing Harness reserves a paid-provider ceiling before any judge call.
+    // Without this, DeepInfra refuses the independent verifier before it can grade the answer.
+    maxEstimatedCostUsd: deepInfraMaxCallUsd('builder'),
     jsonObject: true,
     timeoutMs: ANSWER_OUTCOME_JUDGE_TIMEOUT_MS,
     usageContext: { ...(usageContext ?? { feature: 'cos_interactive_answer' }), purpose: 'answer_outcome_verification' },

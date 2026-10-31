@@ -121,6 +121,12 @@ test('grounded correspondence accepts plain cited prose but not malformed JSON o
 
 test('fresh-writing transport uses source-validated decoded prose when confidence is absent', () => {
   const synthesis = read('lib/ai/cos/freshEvidenceLocalSynthesis.ts')
-  assert.match(synthesis, /decodeFreshEvidenceWritingReply\(result\?\.text \|\| ''\)/)
+  assert.match(synthesis, /const decodedWriting = decodeFreshEvidenceWritingReply\\(result\\?\\.text \\|\\| ''\\)/)
+  assert.match(synthesis, /const writingText = decodedWriting \\?\\? \\(parsed\\?\\.truncated \\? null : parsed\\?\\.answer \\|\\| null\\)/)
+  // The generic parser may mark a complete confidence-free envelope as truncated.
+  // The transport must prefer the strictly decoded complete answer in that case.
+  const complete = JSON.stringify({ answer: letter })
+  assert.equal(decodeFreshEvidenceWritingReply(complete), letter)
+  assert.equal(decodeFreshEvidenceWritingReply('{"answer":"unfinished'), null)
   assert.match(synthesis, /acceptFreshEvidenceWrittenDeliverable\(\{ text: writingText, input: args\.input, sources: args\.sources \}\)/)
 })

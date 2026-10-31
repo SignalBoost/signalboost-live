@@ -24,6 +24,9 @@ export type TurnPhase = {
   kind: TurnPhaseKind
   ms: number
   ok: boolean
+  /** Captured at actual phase execution, not at final telemetry flush. */
+  startedAt?: number
+  endedAt?: number
 }
 
 export type TurnSkip = {
@@ -113,11 +116,14 @@ export class TurnRecorder {
       ok = value !== null && value !== undefined && value !== false
       return value
     } finally {
+      const endedAt = this.now()
       this.phaseRows.push({
         phase: String(phase || 'unknown'),
         kind,
-        ms: Math.max(0, this.now() - startedAt),
+        ms: Math.max(0, endedAt - startedAt),
         ok,
+        startedAt,
+        endedAt,
       })
     }
   }

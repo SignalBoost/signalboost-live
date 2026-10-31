@@ -201,7 +201,7 @@ function builderRoutingContextFromBody(body: any) {
 }
 
 async function executeBrowserTurn(req: NextRequest) {
-  const body = await req.clone().json().catch(() => ({}))
+  const body = await timeCosStage('browser:request_decode',()=>req.clone().json().catch(() => ({})))
   const messages = Array.isArray(body?.messages) ? body.messages : []
   const userMessages = messages.filter((message: any) => message?.role === 'user' && typeof message?.content === 'string')
   const latestUser = userMessages.at(-1)
@@ -260,7 +260,7 @@ async function executeBrowserTurn(req: NextRequest) {
       : response
   }
 
-  const access = await getAccess().catch(() => null)
+  const access = await timeCosStage('browser:authorization',()=>getAccess().catch(() => null))
   const auditUserId = access?.userId ?? null
   const authenticatedOwner = access?.isOwner === true && Boolean(access.userId)
   const routingContext = builderRoutingContextFromBody(body)
@@ -325,7 +325,7 @@ async function executeBrowserTurn(req: NextRequest) {
   if (browserSurface === 'concierge' && !softwareRepairRequest && !isConciergeBuilderObjective(prompt, routingContext)) {
     const semanticIdentityEligible = shouldResolveSemanticPublicIdentity(prompt)
     semanticIdentityInvoked = semanticIdentityEligible
-    const semanticIdentity = semanticIdentityEligible ? await resolveSemanticPublicIdentity(prompt) : null
+    const semanticIdentity = semanticIdentityEligible ? await timeCosStage('browser:semantic_identity',()=>resolveSemanticPublicIdentity(prompt)) : null
     const identity = semanticIdentity
       ? publicConciergeIdentityReplyForIntent(semanticIdentity.intent, semanticIdentity.language)
       : null

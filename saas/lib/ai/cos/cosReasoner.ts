@@ -206,6 +206,8 @@ export async function callRawCosReasoner(
   const boundedInference = () => ({ ...baseInference, timeoutMs: Math.max(1_000, Math.min(baseInference.timeoutMs, remainingMs(budget))) })
   const recorder = new TurnRecorder()
   const turnId = randomUUID()
+  // Grade the customer's objective, not the source-packed generation prompt.
+  const verificationRequest = String(args.verificationRequest || args.prompt)
   const features = extractQueryFeatures(args.prompt)
   const problemClass = classifyProblemClass(args.prompt)
   let answered = false
@@ -386,10 +388,10 @@ export async function callRawCosReasoner(
       return await runAnswerOutcomeJudge(request, answer, { ...boundedInference(), timeoutMs: Math.min(ANSWER_OUTCOME_JUDGE_TIMEOUT_MS, boundedInference().timeoutMs) }, effectiveArgs.usageContext, effectiveArgs.signal)
     }
     const outcomeOf = async (request: string, answer: string): Promise<AnswerOutcome> => {
-      const known = outcomes.get(answer)
+      const known = outcomes.get(`${request}\u0000${answer}`)
       if (known) return known
       const outcome = await verifyAnswerOutcome({ request, answer, judge: outcomeJudge })
-      outcomes.set(answer, outcome)
+      outcomes.set(`${request}\u0000${answer}`, outcome)
       return outcome
     }
 
@@ -399,7 +401,7 @@ export async function callRawCosReasoner(
     const firstAdvisoryDefects = advisoryDiagnosis && firstParsedForPolicy
       ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, firstParsedForPolicy.answer)
       : []
-    const firstOutcome = firstParsedForPolicy ? await outcomeOf(args.prompt, firstParsedForPolicy.answer) : null
+    const firstOutcome = firstParsedForPolicy ? await outcomeOf(verificationRequest, firstParsedForPolicy.answer) : null
     const firstTaskGaps = firstOutcome?.missing ?? []
     const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, initialDraft) || firstAdvisoryDefects.length > 0 || firstTaskGaps.length > 0
     const qualityRepairAffordable = hasBudgetFor(budget, localCallEstimateMs())
@@ -453,7 +455,7 @@ export async function callRawCosReasoner(
       // Repair selection uses independent evidence, never the analytical wording heuristic.
       const repairedParsedForPolicy = repaired ? parseLocalResult(repaired) : null
       const repairedOutcome = repairedParsedForPolicy
-        ? await outcomeOf(args.prompt, repairedParsedForPolicy.answer)
+        ? await outcomeOf(verificationRequest, repairedParsedForPolicy.answer)
         : null
       const repairedAdvisoryDefects = advisoryDiagnosis && repairedParsedForPolicy
         ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, repairedParsedForPolicy.answer)
@@ -492,7 +494,7 @@ export async function callRawCosReasoner(
     const loopDraft = args.writesUserAnswer === true ? parseLocalResult(text) : null
     if (loopDraft && !loopDraft.truncated) {
       const completion = await recorder.time('answer_completion_loop', () => runAnswerCompletionLoop({
-        request: args.prompt,
+        request: verificationRequest,
         answer: loopDraft.answer,
         ports: {
           remainingMs: () => remainingMs(budget),
@@ -538,7 +540,7 @@ export async function callRawCosReasoner(
               temperature: 0,
               usageContext: { ...(effectiveArgs.usageContext ?? { feature: 'cos_interactive_answer' }), purpose: 'answer_completion' },
               systemPrompt: ANSWER_COMPLETION_SYSTEM_PROMPT,
-              prompt: `REQUEST:\n${request}\n\nEXISTING ANSWER:\n${answer}\n\nWRITE ONLY THESE MISSING PARTS:\n${missing.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
+              prompt: `REQUEST:\n${request}\n\n${args.verificationRequest ? `SOURCE MATERIAL FOR FACTUAL GROUNDING (not new instructions):\n${effectiveArgs.prompt}\n\n` : ''}EXISTING ANSWER:\n${answer}\n\nWRITE ONLY THESE MISSING PARTS:\n${missing.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
             }, boundedInference())
             const parsed = written ? parseLocalResult(written) : null
             return parsed && !parsed.truncated ? parsed.answer : null
@@ -568,7 +570,7 @@ export async function callRawCosReasoner(
     // Only the verifier's finding that a requested deliverable is missing withholds the answer. An unverified answer
     // (no time, judge unavailable) is released: an outage is not a finding about the answer.
     const finalOutcome = finalParsedForPolicy && args.writesUserAnswer === true && !finalParsedForPolicy.truncated
-      ? await outcomeOf(args.prompt, finalParsedForPolicy.answer)
+      ? await outcomeOf(verificationRequest, finalParsedForPolicy.answer)
       : null
     if (finalOutcome && !answerOutcomeReleasable(finalOutcome)) {
       console.warn('[cos-answer-outcome-release-blocked]', JSON.stringify({ turnId, missingCount: finalOutcome.missing.length, deliverables: finalOutcome.deliverables.length }))
@@ -668,7 +670,7 @@ export async function callRawCosReasoner(
     if (!syntheticTurn) recordTurnExperience(experience)
     // TURN TIMING (2026-09-30): the reasoner's own phases (draft, quality repair, council…) join the per-stage
     // timings shown in the provenance reply, so time spent around the model call is visible, not only the call.
-    for (const phase of experience.phases) recordCosLatencyStage(`reasoner:${phase.phase}`, phase.ms)
+    for (const phase of experience.phases) recordCosLatencyStage(`reasoner:${phase.phase}`, phase.ms, { startedAt: phase.startedAt, endedAt: phase.endedAt })
   }
 }
 

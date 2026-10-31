@@ -114,6 +114,8 @@ async function writtenDeliverableOnEvidence(args: {
       disableThinking: true,
       // The deliverable the person reads: it gets the answer window and room, and the reasoner's verifier.
       writesUserAnswer: true,
+      // Check the user's real deliverables, not the generation prompt containing the sourced dossier.
+      verificationRequest: args.input,
       maxTokens: FRESH_WRITTEN_DELIVERABLE_MAX_TOKENS,
       allowConfiguredFallback: true,
       usageContext: { feature: 'cos_interactive_answer', purpose: 'fresh_grounded_writing' },

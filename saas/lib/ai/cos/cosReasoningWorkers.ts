@@ -127,6 +127,7 @@ export function toLocalModelCallArgs(request: CosReasoningRequest, role: CosSpec
     ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
     // Codex on #4879: without this the answer window never reached inference.
     ...(request.writesUserAnswer === undefined ? {} : { writesUserAnswer: request.writesUserAnswer }),
+    ...(request.verificationRequest === undefined ? {} : { verificationRequest: request.verificationRequest }),
     ...(request.allowConfiguredFallback === undefined ? {} : { allowConfiguredFallback: request.allowConfiguredFallback }),
     ...(request.allowTruncatedText === undefined ? {} : { allowTruncatedText: request.allowTruncatedText }),
     ...(request.persistUsage === undefined ? {} : { persistUsage: request.persistUsage }),

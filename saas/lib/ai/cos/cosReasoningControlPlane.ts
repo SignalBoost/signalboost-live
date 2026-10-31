@@ -19,6 +19,7 @@ export type CosReasoningRequest = {
   timeoutMs?: number
   /** The call writing the user's answer keeps its full answer window through worker selection. */
   writesUserAnswer?: boolean
+  verificationRequest?: string
   allowConfiguredFallback?: boolean
   allowTruncatedText?: boolean
   persistUsage?: boolean

@@ -95,6 +95,8 @@ function setup(owner: boolean, specialistResponse?: any, forceClassifierFalse = 
     },
     '@/lib/builder/source-files': { extractBuilderSourceFiles: () => [] },
     '@/lib/ai/cos/cosTurnBudget': { turnDeadlineRemainingMs: () => 100_000 },
+    // Keep the real ingress's timed stages observable without replacing their work with the generic false stub.
+    '@/lib/ai/cos/cosLatencyStages': { timeCosStage: async (_stage: string, work: () => Promise<unknown>) => work(), recordCosLatencyStage: () => {} },
     '@/lib/i18n/responseLanguage': { resolveResponseLanguage: () => 'en' },
     '@/lib/ai/cos/pastedOperationalLog': { analyzeOperationalLog: () => ({}), isOperationalLogEvidence: () => false },
     '@/lib/ai/cos/publicConciergeIdentity': { publicConciergeIdentityReply: () => null },

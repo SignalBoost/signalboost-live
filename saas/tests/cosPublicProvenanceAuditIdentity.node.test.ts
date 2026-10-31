@@ -26,11 +26,11 @@ test('authorization source still forces every public-delivery request to guest a
 
 test('browser ingress captures authenticated context and audit identity before entering public delivery scope', () => {
   const source = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
-  assert.match(source, /const access = await getAccess\(\)/)
+  assert.match(source, /const access = await timeCosStage\('browser:authorization',\(\)=>getAccess\(\)\.catch\(\(\) => null\)\)/)
   assert.match(source, /const auditUserId = access\?\.userId \?\? null/)
   assert.match(source, /withPublicAuditIdentity\(auditUserId/)
   assert.match(source, /withPublicDeliveryScope/)
-  assert.ok(source.indexOf('const access = await getAccess()') < source.indexOf('withPublicAuditIdentity(auditUserId'), 'identity must be captured before public scope')
+  assert.ok(source.indexOf("const access = await timeCosStage('browser:authorization'") < source.indexOf('withPublicAuditIdentity(auditUserId'), 'identity must be captured before public scope')
 })
 
 test('COS primary provenance falls back to audit identity and blocks cross-scope reads', () => {

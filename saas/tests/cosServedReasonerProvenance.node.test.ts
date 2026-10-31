@@ -33,7 +33,7 @@ test('served-provider capture is scoped to one reasoning call', async () => {
 
 test('provider trail timing covers the reasoner phases and the RunPod readiness and slot steps', () => {
   const reasoner = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
-  assert.match(reasoner, /for \(const phase of experience\.phases\) recordCosLatencyStage\(`reasoner:\$\{phase\.phase\}`, phase\.ms\)/)
+  assert.match(reasoner, /for \(const phase of experience\.phases\) recordCosLatencyStage\(`reasoner:\$\{phase\.phase\}`, phase\.ms, \{ startedAt: phase\.startedAt, endedAt: phase\.endedAt \}\)/)
   const source = readFileSync(new URL('../lib/ai/local-inference.ts', import.meta.url), 'utf8')
   assert.match(source, /recordCosLatencyStage\('runpod:ready_check', Date\.now\(\) - readyStartedAt\)/)
   assert.match(source, /recordCosLatencyStage\('runpod:slot', Date\.now\(\) - slotStartedAt\)/)

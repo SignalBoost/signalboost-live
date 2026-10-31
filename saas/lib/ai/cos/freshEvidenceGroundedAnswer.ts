@@ -373,6 +373,23 @@ export function freshEvidenceWritingPrompt(args: {
   return { systemPrompt, prompt }
 }
 
+/** Decode a grounded writing turn without requiring the optional confidence field.
+ * The evidence acceptance gate still validates the resulting text and citations.
+ * Never publish a malformed JSON envelope as if it were a letter. */
+export function decodeFreshEvidenceWritingReply(raw: string): string | null {
+  const clean = String(raw || '').replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim()
+    .replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  if (!clean) return null
+  if (clean.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(clean)
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) && typeof parsed.answer === 'string'
+        ? parsed.answer.trim() || null : null
+    } catch { return null }
+  }
+  return clean
+}
+
 export function acceptFreshEvidenceWrittenDeliverable(args: {
   text: string
   input: string

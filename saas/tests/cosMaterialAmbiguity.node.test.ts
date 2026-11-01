@@ -122,7 +122,7 @@ test('letter plus separately requested retirement-policy research retains live e
   assert.equal(semanticIntentIsSelfContainedContentGeneration(intent), false)
   assert.equal(semanticIntentSuppressesFreshness(intent), false)
   assert.match(source, /recipientInquiryOnly=true ONLY for content_generation/)
-  assert.match(source, /no standalone COS research or legal\\/policy advice was requested/)
+  assert.ok(source.includes('no standalone COS research or legal/policy advice was requested'))
 })
 
 test('recipient inquiry flag cannot suppress research or rescue an uncertain classification', () => {

@@ -197,3 +197,19 @@ export function mentionsVerificationCampaign(request: string): boolean {
   const text = String(request || '')
   return new RegExp(`(?<![A-Za-z0-9-])(?:${PAC_CAMPAIGN_ID}|PAC-\\d{2})(?![A-Za-z0-9-])`, 'i').test(text)
 }
+
+/**
+ * The immediate answer when the owner shares the campaign (or asks about running it) without asking to run it now:
+ * nothing is executed, and the reply says so and how to run all or some checks. No model call, so it is instant.
+ */
+export function campaignOfferReply(checks: readonly unknown[] | null = null): string {
+  const catalog = selectCampaignChecks(checks)
+  const named = isTargetedRun(catalog) ? catalog.map(item => item.id).join(', ') : null
+  return [
+    `This is the production acceptance campaign ${PAC_CAMPAIGN_ID}: ${PAC_CATALOG.length} checks against the live site. Nothing has been run.`,
+    named
+      ? `To retest ${named}, say "run ${named}". To run all ${PAC_CATALOG.length} checks, say "run the campaign".`
+      : `To run it, say "run the campaign": it runs in the background and every result appears as soon as it is recorded. To retest specific checks, name them, for example "run PAC-03 and PAC-20".`,
+    'To discuss the plan or a past result instead, ask your question.',
+  ].join('\n')
+}

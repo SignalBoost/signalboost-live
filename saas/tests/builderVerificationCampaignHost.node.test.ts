@@ -80,8 +80,8 @@ test('the signed-in owner starts the campaign on either surface through the plan
   assert.equal(mentionsVerificationCampaign('Investigate why the payment service returned 5xx errors'), false)
   const decision = read('lib/ai/cos/cosAgentDecision.ts')
   assert.match(decision, /'verification_campaign',/)
-  assert.match(decision, /verification_campaign: 'Run the production acceptance campaign COS-PAC-001, or some of its checks/)
-  assert.match(decision, /A pasted campaign report or result, a question about why a check failed, or a request to fix, explain or review a failure is NOT a request to run anything/)
+  assert.match(decision, /verification_campaign: 'The production acceptance campaign COS-PAC-001 and its checks \(PAC-01 to PAC-20\)/)
+  assert.match(decision, /Do NOT call it for a question about a past result, why a check failed, or a request to fix, explain or review a failure: COS answers that in writing\./)
   // Concierge offers the campaign to the signed-in owner only; the public list is unchanged.
   assert.match(decision, /input\.ownerAuthenticated \? \['live_web', 'compute', 'software_specialist', 'verification_campaign'\] : \['live_web', 'compute', 'software_specialist'\]/)
   const route = read('app/api/cos-browser/route.ts')
@@ -93,11 +93,11 @@ test('the signed-in owner starts the campaign on either surface through the plan
   const earlyBlock = route.slice(early, route.indexOf('// AGENT TOOL LOOP:', early))
   assert.match(earlyBlock, /campaignPlan = await decideCosAgentTurn\(/)
   // Only the planner's verification_campaign request starts it, with the checks it read.
-  assert.match(earlyBlock, /if \(campaignPlan\?\.mode === 'orchestrate' && campaignPlan\.capabilities\.includes\('verification_campaign'\)\) \{\n\s+const started = await startVerificationCampaignResponse\(\{ userId: access\.userId, body, prompt, language, checks: campaignPlan\.campaignChecks \}\)/)
+  assert.match(earlyBlock, /if \(campaignPlan\?\.mode === 'orchestrate' && campaignPlan\.capabilities\.includes\('verification_campaign'\)\) \{\n\s+const started = await verificationCampaignResponse\(\{ userId: access\.userId, body, prompt, language, plan: campaignPlan \}\)/)
   // Otherwise the same decision is reused: one planner call per turn.
   assert.match(route, /if \(campaignPlan\) \{\n\s+agentDecision = campaignPlan\n/)
   assert.match(route, /agentDecision\.capabilities\.includes\('verification_campaign'\) && authenticatedOwner && access\?\.userId\)/)
-  assert.match(route, /checks: agentDecision\.campaignChecks/)
+  assert.match(route, /verificationCampaignResponse\(\{ userId: access\.userId, body, prompt, language, plan: agentDecision \}\)/)
   assert.match(route, /source: 'cos-verification-campaign'/)
   const starter = read('lib/builder/campaign/start.ts')
   assert.match(starter, /metadata: \{ builderEngine: CAMPAIGN_ENGINE, campaignId: PAC_CAMPAIGN_ID, \.\.\.\(checks\.length \? \{ campaignChecks: checks \} : \{\}\)/)

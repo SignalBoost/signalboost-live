@@ -49,7 +49,7 @@ import { isSoftwareRepairRequest } from '@/lib/ai/cos/softwareRepairIntent'
 import { semanticIntentConfirmsFile, semanticIntentConfirmsPicture, semanticIntentConfirmsWriting, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
 import { cosTurnIntent, withCosTurnIntent } from '@/lib/ai/cos/cosTurnIntent'
 import { startVerificationCampaign } from '@/lib/builder/campaign/start'
-import { mentionsVerificationCampaign } from '@/lib/builder/campaign/catalog'
+import { campaignOfferReply, mentionsVerificationCampaign } from '@/lib/builder/campaign/catalog'
 import { recordCosLatencyStage, timeCosStage } from '@/lib/ai/cos/cosLatencyStages'
 import { runWithTurnDeadline, turnDeadlineRemainingMs, USER_ANSWER_WINDOW_MS } from '@/lib/ai/cos/cosTurnBudget'
 
@@ -170,6 +170,18 @@ function inlineVisualResponse(response: Response): Promise<NextResponse> {
   }).catch(() => new NextResponse(response.body, { status: response.status, headers: response.headers }))
 }
 
+/** The planner asked about the campaign: offer it at once (nothing runs), or start it in the background. */
+async function verificationCampaignResponse(input: { userId: string; body: any; prompt: string; language: string; plan: CosAgentDecision }): Promise<NextResponse> {
+  const checks = input.plan.mode === 'orchestrate' ? input.plan.campaignChecks ?? [] : []
+  if (input.plan.mode === 'orchestrate' && input.plan.campaignAction === 'offer') {
+    return NextResponse.json({
+      reply: campaignOfferReply(checks), source: 'cos-verification-campaign-offer',
+      execution_allowed: false, external_action_taken: false, external_ai_invoked: false, local_model_invoked: true,
+    })
+  }
+  return startVerificationCampaignResponse({ userId: input.userId, body: input.body, prompt: input.prompt, language: input.language, checks })
+}
+
 async function startVerificationCampaignResponse(input: { userId: string; body: any; prompt: string; language: string; checks?: readonly string[] }): Promise<NextResponse> {
   try {
     const started = await startVerificationCampaign({
@@ -272,14 +284,16 @@ async function executeBrowserTurn(req: NextRequest) {
   // VERIFICATION CAMPAIGN (2026-11-01): the planner decides by meaning whether the owner asks to RUN checks. A request
   // that names the campaign or a check is planned here, before any other lane can take it; the decision is reused below
   // so the turn pays for one planner call. Naming the campaign is never admission by itself: production 2026-10-31,
-  // a pasted PAC report started the whole twenty-check run instead of being answered.
+  // a pasted PAC report started the whole twenty-check run instead of being answered. A pasted campaign document is
+  // offered back at once (nothing runs) unless the owner asks to run it (2026-11-01: it went to the writing pipeline and
+  // came back as "could not finish a reliable answer").
   let campaignPlan: CosAgentDecision | null = null
   if (authenticatedOwner && access?.userId && mentionsVerificationCampaign(prompt)) {
     const plannerStartedAt = Date.now()
     campaignPlan = await decideCosAgentTurn({ prompt, previousAssistant: priorAnswer || null, surface: browserSurface, ownerAuthenticated: true, language })
     recordCosLatencyStage(`${browserSurface}:planner`, Date.now() - plannerStartedAt)
     if (campaignPlan?.mode === 'orchestrate' && campaignPlan.capabilities.includes('verification_campaign')) {
-      const started = await startVerificationCampaignResponse({ userId: access.userId, body, prompt, language, checks: campaignPlan.campaignChecks })
+      const started = await verificationCampaignResponse({ userId: access.userId, body, prompt, language, plan: campaignPlan })
       return browserSurface === 'concierge' ? publicConciergePresentation(started) : started
     }
   }
@@ -619,7 +633,7 @@ async function executeBrowserTurn(req: NextRequest) {
     // VERIFICATION CAMPAIGN (2026-10-27): the planner asked for the production acceptance campaign to be executed.
     // Only the signed-in owner may start it, on either surface; for anyone else the request is answered by COS.
     if (agentDecision.capabilities.includes('verification_campaign') && authenticatedOwner && access?.userId) {
-      const started = await startVerificationCampaignResponse({ userId: access.userId, body, prompt, language, checks: agentDecision.campaignChecks })
+      const started = await verificationCampaignResponse({ userId: access.userId, body, prompt, language, plan: agentDecision })
       return browserSurface === 'concierge' ? publicConciergePresentation(started) : started
     }
 

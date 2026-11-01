@@ -122,7 +122,15 @@ export function judgeFixture(outcome: FixtureOutcome): PortResult {
   if (!outcome.ok) failures.push(`the Builder stopped without a passing run: ${outcome.reason}`)
   if (!firstFailure) failures.push(`the failure was not reproduced with "${FIXTURE_COMMAND}"`)
   if (!finalPass) failures.push(`no passing run of "${FIXTURE_COMMAND}" after the change`)
+  // A passing receipt only proves recovery when an actual source change occurred after
+  // the reproduced failure and before that passing run. Final file contents alone
+  // cannot establish the sequence (e.g. fail → pass → edit).
+  const repairBetweenFailureAndPass = Boolean(firstFailure && finalPass && outcome.receipts.some((receipt, index) =>
+    index > firstFailure.index && index < finalPass.index && receipt.ok && receipt.changed
+      && (receipt.tool === 'edit_file' || receipt.tool === 'write_file') && receiptPath(receipt) === 'app.js'
+  ))
   if (firstFailure && finalPass && finalPass.index < firstFailure.index) failures.push('the passing run precedes the reproduced failure')
+  if (firstFailure && finalPass && !repairBetweenFailureAndPass) failures.push('no verified app.js repair between the failing and passing test runs')
   if (!inspected) failures.push('app.js was neither read nor edited')
   if (!moduleChanged) failures.push('app.js is unchanged')
   if (!testUnchanged) failures.push('app.test.js was modified')

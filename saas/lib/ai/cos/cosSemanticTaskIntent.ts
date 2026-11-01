@@ -23,6 +23,8 @@ export type CosSemanticTaskIntent = Readonly<{
   confidence: number
   suppliedContextPrimary: boolean
   externalFactsRequired: boolean
+  /** Recipient, not COS, is being asked to verify an unconfirmed claim; no separate factual answer requested. */
+  recipientInquiryOnly?: boolean
 }>
 
 const VALID_MODES = new Set<CosSemanticTaskMode>([
@@ -47,6 +49,7 @@ export function parseCosSemanticTaskIntent(raw: string): CosSemanticTaskIntent |
     const mode = String(parsed.mode || '') as CosSemanticTaskMode
     if (!VALID_MODES.has(mode)) return null
     if (typeof parsed.suppliedContextPrimary !== 'boolean' || typeof parsed.externalFactsRequired !== 'boolean') return null
+    if (parsed.recipientInquiryOnly !== undefined && typeof parsed.recipientInquiryOnly !== 'boolean') return null
     const value = Number(parsed.confidence)
     if (!Number.isFinite(value)) return null
     return {
@@ -54,6 +57,7 @@ export function parseCosSemanticTaskIntent(raw: string): CosSemanticTaskIntent |
       confidence: Math.max(0, Math.min(1, value)),
       suppliedContextPrimary: parsed.suppliedContextPrimary,
       externalFactsRequired: parsed.externalFactsRequired,
+      recipientInquiryOnly: parsed.recipientInquiryOnly === true,
     }
   } catch {
     return null
@@ -68,7 +72,7 @@ export function semanticIntentIsSelfContainedContentGeneration(intent: CosSemant
   return Boolean(
     intent
       && intent.mode === 'content_generation'
-      && !intent.externalFactsRequired
+      && (!intent.externalFactsRequired || intent.recipientInquiryOnly === true)
       && intent.confidence >= 0.72,
   )
 }
@@ -103,6 +107,7 @@ export function semanticIntentRequiresFreshness(intent: CosSemanticTaskIntent | 
     intent
       && (intent.mode === 'external_fact_verification' || intent.mode === 'content_generation')
       && intent.externalFactsRequired
+      && !(intent.mode === 'content_generation' && intent.recipientInquiryOnly === true)
       && intent.confidence >= 0.72,
   )
 }
@@ -150,7 +155,8 @@ export async function classifyCosSemanticTaskIntent(args: {
     systemPrompt: [
       'You are the COS semantic task-intent judge. Classify what help the user is actually asking for before any evidence workflow is selected.',
       'Use neural semantic understanding of the whole request and conversation context. Do not classify by keywords, regex patterns, named entities, dates, or isolated topical words.',
-      'Return ONLY strict JSON: {"mode":"contextual_interpretation|clarification_required|external_fact_verification|general_reasoning|content_generation|visual_generation|file_generation|external_action|other","confidence":0.0,"suppliedContextPrimary":true|false,"externalFactsRequired":true|false}.',
+      'Return ONLY strict JSON: {"mode":"contextual_interpretation|clarification_required|external_fact_verification|general_reasoning|content_generation|visual_generation|file_generation|external_action|other","confidence":0.0,"suppliedContextPrimary":true|false,"externalFactsRequired":true|false,"recipientInquiryOnly":true|false}.',
+      'Set recipientInquiryOnly=true ONLY for content_generation where the user asks for a message whose recipient, rather than COS, should confirm an unproven policy, entitlement, exception or factual claim, and no standalone COS research or legal/policy advice was requested. The draft must present the claim as uncertain and ask the recipient for verification. Set false for any request asking COS to verify facts separately, to assert the claim as established, or to give independently sourced advice outside the correspondence. Never use this flag for other modes.',
       'clarification_required means an essential scope, referent, target, baseline, location, time window, object, or other piece of context is genuinely missing; at least two plausible interpretations remain; and choosing between them would materially change the correct answer or action.',
       'Before choosing clarification_required, use the supplied conversation context. Do not ask the user for information that the conversation already resolves, that can be safely inferred, that has an obvious low-risk default, or that a permitted retrieval can establish without guessing.',
       'A broad request is not automatically ambiguous. If a useful broad answer is possible, if the user clearly asked for an overview, or if a reasonable assumption would not materially change correctness, do not choose clarification_required.',

@@ -241,17 +241,20 @@ export async function runCampaignSlice(input: Readonly<{
     if (input.remainingMs() < CAMPAIGN_ITEM_RESERVE_MS) return 'budget'
     const base = ledger
     const context = { browser, fixture, remainingMs: input.remainingMs, lastBrowserItem: false, now }
+    // Complete the five independent checks concurrently, but publish each receipt as it arrives.
+    // Serialize the database writes: a slower previous status write must not overwrite newer progress.
+    let progressWrite = Promise.resolve()
     const results = await Promise.all(group.map(async item => {
       const executedAt = new Date(now()).toISOString()
-      return { item, executedAt, executed: await executeItem(item, input.ports, base, input.signal, context) }
+      const executed = await executeItem(item, input.ports, base, input.signal, context)
+      if (!executed.interrupted && !input.signal?.aborted) {
+        ledger = { ...ledger, rows: [...ledger.rows, row(item, ledger, executedAt, now, executed.result, executed.scenario)] }
+        progressWrite = progressWrite.then(() => report())
+      }
+      return { item, executedAt, executed }
     }))
-    for (const { item, executedAt, executed } of results) {
-      // An interrupted check is not a result; it runs again in the next slice.
-      if (executed.interrupted) continue
-      ledger = { ...ledger, rows: [...ledger.rows, row(item, ledger, executedAt, now, executed.result, executed.scenario)] }
-    }
-    await report()
-    return results.some(result => result.executed.interrupted) ? 'aborted' : 'ok'
+    await progressWrite
+    return results.some(result => result.executed.interrupted) || input.signal?.aborted ? 'aborted' : 'ok'
   }
   for (;;) {
     const grouped = await runParallelGroup()

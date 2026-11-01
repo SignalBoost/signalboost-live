@@ -172,10 +172,5 @@ export function namesVerificationCampaign(request: string): boolean {
   if (!text) return false
   // Explicit standalone commands only; accompanying debugging material is not an execution command.
   if (/^(?:please\s+)?(?:run|start|execute|launch)\s+(?:the\s+)?(?:full\s+)?(?:production\s+acceptance\s+campaign\s+)?COS-PAC-001(?:\s+(?:now|again))?[.!\s]*$/i.test(text)) return true
-  // The original, complete manifest is an execution request only while pending.
-  const firstLine = text.split(/\r?\n/, 1)[0]
-  return /^#\s+iTMounts\s*\/\s*COS\s*[—-]\s*Production Acceptance Campaign\s*$/i.test(firstLine)
-    && /^\*\*Campaign ID:\*\*\s*COS-PAC-001\s*$/im.test(text)
-    && /^\*\*Status:\*\*\s*PENDING EXECUTION\s*$/im.test(text)
-    && /^##\s*1\.\s*Mandatory Execution Rules\s*$/im.test(text)
+  return false
 }

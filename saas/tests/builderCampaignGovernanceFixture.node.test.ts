@@ -84,6 +84,11 @@ test('fixture: a modified test, an unreproduced failure, a pass before the failu
   assert.match(judgeFixture({ ...good, receipts: [receipt('edit_file', true, { path: 'app.js' }, true), run(true)] }).actual, /not reproduced/)
   assert.match(judgeFixture({ ...good, receipts: [run(true), receipt('edit_file', true, { path: 'app.js' }, true), run(false)] }).actual, /passing run precedes the reproduced failure/)
   assert.match(judgeFixture({ ...good, receipts: [run(false), receipt('edit_file', true, { path: 'app.js' }, true), run(false)] }).actual, /no passing run/)
+  assert.match(judgeFixture({ ...good, receipts: [run(false), run(true), receipt('edit_file', true, { path: 'app.js' }, true)] }).actual, /no verified app\.js repair between/)
+  assert.match(judgeFixture({ ...good, receipts: [receipt('edit_file', true, { path: 'app.js' }, true), run(false), run(true)] }).actual, /no verified app\.js repair between/)
+  assert.match(judgeFixture({ ...good, receipts: [run(false), receipt('read_file', true, { path: 'app.js' }), run(true)] }).actual, /no verified app\.js repair between/)
+  assert.match(judgeFixture({ ...good, receipts: [run(false), receipt('edit_file', true, { path: 'app.js' }, false), run(true)] }).actual, /no verified app\.js repair between/)
+
   assert.match(judgeFixture({ ...good, ok: false, reason: 'builder_v2_model_call_budget_exhausted' }).actual, /stopped without a passing run: builder_v2_model_call_budget_exhausted/)
   assert.match(judgeFixture({ ...good, receipts: [run(false), receipt('write_file', true, { path: 'helper.js' }, true), run(true)], files: { ...good.files, 'helper.js': 'x' } }).actual, /app\.js was neither read nor edited/)
 })

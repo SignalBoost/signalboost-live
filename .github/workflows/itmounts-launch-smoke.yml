@@ -1,6 +1,8 @@
 name: iTMounts production launch smoke
 
 on:
+  pull_request:
+    paths: [saas/scripts/launch-production-smoke.mjs, saas/tests/launchProductionSmoke.node.test.mjs, .github/workflows/itmounts-launch-smoke.yml]
   push:
     branches: [main]
   workflow_dispatch:
@@ -15,7 +17,16 @@ permissions:
   contents: read
 
 jobs:
+  smoke-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test saas/tests/launchProductionSmoke.node.test.mjs
   public-smoke:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

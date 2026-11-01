@@ -21,6 +21,7 @@
 
 import type { PortResult } from './ports.ts'
 import type { CampaignEvidence } from './ledger.ts'
+import { PAC_01_PROMPT } from './catalog.ts'
 
 export const SITE_URL = 'https://itmounts.com'
 /** How long a submitted request may take on the page before the check fails: the production path's own window plus margin. */
@@ -114,6 +115,9 @@ export function newBrowserSession(testId: string, now: number, sandboxName: stri
 /** The request each check types: short, analytical, and carrying the session token so the page can be searched for it. */
 export function checkRequest(testId: string, token: string): string {
   switch (testId) {
+    case 'PAC-13':
+      // The acceptance contract requires the original forensic prompt, unmodified.
+      return PAC_01_PROMPT
     case 'PAC-15':
       return `${token}: A payment service shows 18% 5xx errors while Kafka consumer lag climbs to minutes and CPU stays flat. 1. Identify plausible root causes. 2. Describe the decisive measurements. 3. State the most likely explanation with its uncertainty.`
     default:
@@ -263,8 +267,8 @@ export async function runBrowserCheck(input: BrowserCheckInput): Promise<Browser
       const status = productionRequestStatus(requests.stdout)
       log.push(`production request status as the browser saw it: ${status ?? 'not listed'}`)
       await driver.close()
-      if (status !== null && status >= 400) return failed(save({}), `the production request returned HTTP ${status}`)
-      return passed(save({}), 'The request typed into the public Concierge received its answer on the page.')
+      if (status !== 200) return failed(save({}), `the production request did not have a verified HTTP 200 response (observed ${status ?? 'no status'})`)
+      return passed(save({}), 'The original eight-part forensic prompt was submitted in the public Concierge, an answer appeared on the page, and the request returned HTTP 200. Substantive completeness must also be verified under PAC-01.')
     }
     const reloaded = await driver.reload()
     log.push(`reload: ${reloaded.detail}`)

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { namesVerificationCampaign } from '../lib/builder/campaign/catalog.ts'
+import { namesVerificationCampaign, isVerificationCampaignDocument } from '../lib/builder/campaign/catalog.ts'
 import { isExternalActionCommand } from '../lib/ai/cos/externalActionCommandIntent.ts'
 import { isProvenanceIntrospection } from '../lib/ai/cos/provenanceIntrospection.ts'
 import { isContentGenerationRequest } from '../lib/ai/cos/contentGenerationIntent.ts'
@@ -16,6 +16,7 @@ const campaignDocument = read('tests/fixtures/cos-production-acceptance-campaign
 
 test('a pasted campaign document is not authorization to start twenty production tests', () => {
   assert.equal(namesVerificationCampaign(campaignDocument), false)
+  assert.equal(isVerificationCampaignDocument(campaignDocument), true)
   assert.equal(isProvenanceIntrospection(campaignDocument), false)
   assert.equal(isContentGenerationRequest(campaignDocument), false)
   assert.equal(isExternalActionCommand(campaignDocument), true)
@@ -31,4 +32,12 @@ test("the signed-in owner's campaign request is never queued as a background COS
   assert.ok(admission > 0)
   assert.ok(browser.indexOf('startVerificationCampaignResponse({ userId: access.userId, body, prompt, language })', admission) > admission)
   assert.equal(browser.slice(browser.indexOf('async function executeBrowserTurn'), admission).includes('cosPrimaryPost(req)'), true, 'only the explicit text-edit lane precedes admission')
+})
+
+test('pasted PAC specification stays out of action queue and returns honest no-execution status', () => {
+  const provenance = read('app/api/cos-provenance-browser/route.ts')
+  assert.match(provenance, /!isVerificationCampaignDocument\(prompt\) && requestsExternalAction\(prompt\)/)
+  const browser = read('app/api/cos-browser/route.ts')
+  assert.match(browser, /if \(isVerificationCampaignDocument\(prompt\)\)/)
+  assert.match(browser, /No campaign was started/)
 })

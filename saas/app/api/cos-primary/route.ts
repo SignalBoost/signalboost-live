@@ -282,7 +282,12 @@ function fastAuthoringCognitiveMode(input:string):FastAuthoringCognitiveMode{
     : 'deterministic'
 }
 
-async function runFastAuthoring(input:string,language:string):Promise<{reply:string;reasonerLabel:string;cognitiveMode:FastAuthoringCognitiveMode}|null>{
+// Authoring is not fact verification. When a writing request depends on an outside rule that could not be verified
+// this turn, the user still gets the document: the unverified rule is asked about or left to confirm, never asserted.
+// This overrides the "insufficient lane" and "no warnings" lines above for that one case only.
+const UNVERIFIED_FACTS_AUTHORING_RULE='OVERRIDE FOR THIS TURN: the outside facts this request depends on (a rule, policy, entitlement, deadline or procedure) could not be verified from authoritative sources. Deliver everything requested anyway. Write the complete document; phrase every such fact as something the user has heard and is asking the recipient to confirm, or as a [to confirm] placeholder, never as established fact. If the user also asks what to do, give practical next steps that do not depend on the unverified fact (who to ask, what to request in writing, what to prepare). End with exactly one short line, outside the document, stating that the rule itself was not verified.'
+
+async function runFastAuthoring(input:string,language:string,unverifiedFacts=false):Promise<{reply:string;reasonerLabel:string;cognitiveMode:FastAuthoringCognitiveMode}|null>{
   const config=localInferenceConfigFromEnv()
   const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\.com/i.test(config.baseUrl)
   const preferredModel=process.env.COS_FAST_AUTHORING_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
@@ -315,9 +320,10 @@ async function runFastAuthoring(input:string,language:string):Promise<{reply:str
         cognitiveMode==='creative'
           ? 'The user is asking for creative generation: explore original wording and varied ideas while respecting every supplied constraint.'
           : 'The task is precision-oriented: prefer faithful, controlled wording over novelty. For professional correspondence use concise, specific, mature language; avoid empty pleasantries, assumed familiarity, vague rumors, inflated formality, and invented credentials or facts. Preserve the recipient\'s actual knowledge boundary and fulfill every requested deliverable. Preserve the user\'s exact role, title, acronym and relevant age or rule; never guess what an unexplained acronym means or substitute benefit eligibility for a mandatory rule. A letter asking its recipient whether a rumored rule exists and what steps the recipient recommends IS a complete drafting task; put those questions in the letter without researching the rumor. Only provide a separate COS answer when the user clearly requests COS itself to research or advise outside the letter. Never assert a rumored entitlement, deadline, exception, policy or procedure without sourced confirmation; where the requested advice requires outside facts, this self-contained writing lane is insufficient.',
+        unverifiedFacts?UNVERIFIED_FACTS_AUTHORING_RULE:'',
         `Respond in ${reportLanguageName(language)} unless the user explicitly requests a different target language.`,
         'If the user asks for multiple languages or versions, provide every requested version. Do not research, browse, verify incidental facts, invoke tools, add warnings, or discuss your process. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
-      ].join(' '),
+      ].filter(Boolean).join(' '),
       prompt:input,
     },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:false}).catch(()=>null)
     if(!turn?.content)continue
@@ -925,6 +931,16 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // Q15: a writing request that needs outside facts is written as the deliverable (letter + advice) on the evidence,
   // not squeezed through the factual-answer filter. The intent judge decides, never the wording.
   const freshDeliverable=async():Promise<'answer'|'writing'>=>((semanticTaskIntent??await pendingCosTurnIntent())?.mode==='content_generation'?'writing':'answer')
+  // AUTHORING IS NOT FACT VERIFICATION (COS-PAC acceptance 2026-10-31): a confirmed writing request whose outside rule
+  // could not be verified is still written, with that rule asked about or left to confirm. failed_closed is kept for
+  // turns where no safe useful response exists, never for a draft that can be written without asserting the rule.
+  const unverifiedFactsDraft=async()=>{
+    if(requestedAction||hasAttachments)return null
+    if(!semanticIntentConfirmsWriting(semanticTaskIntent??await pendingCosTurnIntent()))return null
+    const fast=await timeCosStage('primary:unverified_facts_authoring',()=>runFastAuthoring(input,language,true))
+    logEscalation({event:'unverified_facts_authoring',released:Boolean(fast),external_ai_invoked:false,local_model_invoked:true})
+    return fast?fastAuthoringResponse(startedAt,input,fast,'cos-fast-authoring-unverified-facts'):null
+  }
   // A bounded, supplied-facts incident exercise must not become a live-world lookup
   // merely because a planner requested web or the semantic judge timed out.
   const baselineRequiresFreshEvidence=!suppliedIncidentAnalysis&&(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested
@@ -1021,6 +1037,8 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
           &&liveFactsIntent.externalFactsRequired===false&&liveFactsIntent.confidence>=0.72)){
         freshMissUseLocal=true
       } else {
+      const unverifiedDraft=await unverifiedFactsDraft()
+      if(unverifiedDraft)return unverifiedDraft
       const detail=freshError||'Live search did not return authoritative evidence required for this current fact.'
       const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:freshSources,retrievedAt:freshRetrievedAt,error:detail,synthesisAccepted:false})
       ;Object.assign(executionProvenance as any, {policy:'fresh_live_data_local_first', assistant_text_used_for_resolution:false})
@@ -1244,6 +1262,10 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       return NextResponse.json({ok:true,reply:travelRescue.reply,source:'cos-travel-plan-rescue',confidence_score:travelRescue.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:Boolean(freshSources.length),live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
     logEscalation({event:'travel_plan_rescue_declined',documents_acquired:freshSources.length,strict_failure_code:freshFailureCode,external_ai_invoked:false,local_model_invoked:true})
+  }
+  if(freshHardFail){
+    const unverifiedDraft=await unverifiedFactsDraft()
+    if(unverifiedDraft)return unverifiedDraft
   }
   const reason=freshHardFail?{code:freshFailureCode!,detail:freshFailureCode === 'local_synthesis_failed'
     ? 'Authoritative live evidence was retrieved, but bounded local synthesis failed after transport retries.'

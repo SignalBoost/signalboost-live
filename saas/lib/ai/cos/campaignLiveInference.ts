@@ -36,3 +36,23 @@ export function campaignLiveInferenceRequested(headerValue: string | null | unde
   const given = Buffer.from(match[2], 'hex')
   return expected.length === given.length && timingSafeEqual(expected, given)
 }
+
+
+/**
+ * Verification-only read-back of an existing reasoner turn ID.
+ * The public answer capsule deliberately excludes internal identifiers. Never
+ * manufacture a correlation ID: an absent real turn remains untraceable.
+ */
+export function signedCampaignTurnId(
+  provenance: unknown,
+  headerValue: string | null | undefined,
+  now = Date.now(),
+  secret = provenanceBoundarySecret(),
+): string | null {
+  if (!campaignLiveInferenceRequested(headerValue, now, secret)) return null
+  if (!provenance || typeof provenance !== 'object' || Array.isArray(provenance)) return null
+  const value = (provenance as Record<string, unknown>).turnId
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim())
+    ? value.trim()
+    : null
+}

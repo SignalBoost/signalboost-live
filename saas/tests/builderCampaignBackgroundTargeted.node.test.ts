@@ -176,3 +176,28 @@ test('a pasted campaign document is answered at once: nothing runs, and the repl
   assert.match(offer, /campaignAction === 'offer'\) \{\n\s+return NextResponse\.json\(\{\n\s+reply: campaignOfferReply\(checks\), source: 'cos-verification-campaign-offer',\n\s+execution_allowed: false/)
   assert.doesNotMatch(offer.slice(0, offer.indexOf('return startVerificationCampaignResponse')), /startVerificationCampaign\(/)
 })
+
+
+test('independent PAC checks publish each finished result before slower peers, preserving ordered snapshots', async () => {
+  const statuses: string[][] = []
+  const ports: CampaignPorts = {
+    deployment: async () => ({ mainCommit: 'c0ffee', productionCommit: 'c0ffee' }),
+    fault: async fault => {
+      await sleep(fault === 'model_timeout' ? 80 : 5)
+      return pass(fault)
+    },
+  }
+  const catalog = PAC_CATALOG.filter(item => item.id === 'PAC-07' || item.id === 'PAC-08')
+  const result = await runCampaignSlice({
+    catalog,
+    state: { ledger: emptyCampaignLedger('COS-PAC-001'), reliability: null },
+    ports, remainingMs: () => 240_000,
+    progress: async ({ ledger }) => {
+      statuses.push(ledger.rows.map(row => row.testId))
+      await sleep(10)
+    },
+  })
+  assert.equal(result.stopped, 'complete')
+  assert.deepEqual(statuses, [['PAC-07'], ['PAC-07', 'PAC-08']])
+  assert.equal(result.ledger.rows.length, 2)
+})

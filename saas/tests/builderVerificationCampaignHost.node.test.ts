@@ -73,7 +73,7 @@ test('the job runner routes engine "campaign" to the campaign slice, checkpoints
 
 test('the signed-in owner starts the campaign on either surface: by its identifier directly, or through the planner; nobody else can', async () => {
   const { namesVerificationCampaign, PAC_CAMPAIGN_ID } = await import('../lib/builder/campaign/catalog.ts')
-  assert.equal(namesVerificationCampaign('# iTMounts / COS — Production Acceptance Campaign\n\n**Campaign ID:** COS-PAC-001'), true)
+  assert.equal(namesVerificationCampaign('# iTMounts / COS — Production Acceptance Campaign\n\n**Campaign ID:** COS-PAC-001'), false, 'an incomplete excerpt cannot authorize a full campaign')
   assert.equal(namesVerificationCampaign(`run ${PAC_CAMPAIGN_ID} now`), true)
   assert.equal(namesVerificationCampaign('COS-PAC-0010 is something else'), false)
   assert.equal(namesVerificationCampaign('Investigate why the payment service returned 5xx errors'), false)

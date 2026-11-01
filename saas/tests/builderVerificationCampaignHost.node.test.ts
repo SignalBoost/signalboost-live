@@ -149,3 +149,20 @@ test('the host ports execute against the live production path and read facts bac
   assert.equal((await host.isolatedFault('runpod_busy', 'deadbeef', undefined, null)).verdict, 'BLOCKED', 'unknown worker revision blocks')
 })
 
+
+
+test('mentioning PAC in a debugging report never auto-launches the full Builder campaign', async () => {
+  const { namesVerificationCampaign } = await import('../lib/builder/campaign/catalog.ts')
+  const reports = [
+    'COS-PAC-001 certified FAIL: 9/20 passed; diagnose PAC-01 and give me the first failure.',
+    'Please debug Builder. The COS-PAC-001 campaign lasted ten minutes. Run only the smallest relevant check.',
+    'The report says COS-PAC-001 failed. What should we repair?',
+    'The owner wrote "run COS-PAC-001 now" in a quoted chat transcript, but this is a retrospective analysis.',
+    '# iTMounts / COS — Production Acceptance Campaign\n**Campaign ID:** COS-PAC-001\n**Status:** FAIL\n## 1. Mandatory Execution Rules',
+  ]
+  for (const report of reports) assert.equal(namesVerificationCampaign(report), false, report)
+  assert.equal(namesVerificationCampaign('run COS-PAC-001 now'), true)
+  assert.equal(namesVerificationCampaign('Please execute COS-PAC-001.'), true)
+  const fixture = read('tests/fixtures/cos-production-acceptance-campaign.txt')
+  assert.equal(namesVerificationCampaign(fixture), true, 'the complete pending-execution manifest still starts the campaign')
+})

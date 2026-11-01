@@ -128,17 +128,26 @@ export async function productionRouting(prompt: string, signal?: AbortSignal, fe
  * #4973: a campaign started from a preview would attribute production evidence to the preview); it is what the live
  * site reports serving each request.
  */
-export async function deploymentFacts(fetchImpl: typeof fetch = fetch): Promise<Readonly<{ mainCommit: string | null }>> {
+export async function deploymentFacts(fetchImpl: typeof fetch = fetch): Promise<Readonly<{ mainCommit: string | null; productionCommit: string | null }>> {
   const headers = githubHeaders()
-  let mainCommit: string | null = null
-  if (headers) {
+  const main = (async () => {
+    if (!headers) return null
     try {
       const response = await fetchImpl(`${GITHUB_API}/commits/main`, { headers, signal: AbortSignal.timeout(15_000) })
       const payload = await response.json().catch(() => ({})) as Record<string, any>
-      mainCommit = response.ok && typeof payload?.sha === 'string' ? payload.sha : null
-    } catch { mainCommit = null }
-  }
-  return { mainCommit }
+      return response.ok && typeof payload?.sha === 'string' ? payload.sha : null
+    } catch { return null }
+  })()
+  // The revision the live ingress reports serving, read with a GET that runs no model: the checks that need it (release
+  // checks, isolated faults) can then run before the first model request instead of after it.
+  const production = (async () => {
+    try {
+      const response = await fetchImpl(`${PUBLIC_BRAND.siteUrl}/api/cos-browser`, { method: 'GET', headers: { accept: 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(15_000) })
+      return response.headers.get(SERVING_REVISION_HEADER)?.trim() || null
+    } catch { return null }
+  })()
+  const [mainCommit, productionCommit] = await Promise.all([main, production])
+  return { mainCommit, productionCommit }
 }
 
 /** GitHub check runs for the deployed commit: PASS only when checks exist and none failed or is pending. */

@@ -11,6 +11,7 @@
 // Pure: no I/O of its own, every effect goes through a port.
 
 import type { CampaignItem } from './catalog.ts'
+import { PAC_PARALLEL_PORTS } from './catalog.ts'
 import type { CampaignEvidence, CampaignLedger, CampaignLedgerRow, CampaignVerdict } from './ledger.ts'
 import { pendingItems } from './ledger.ts'
 import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
@@ -196,6 +197,11 @@ export async function runCampaignSlice(input: Readonly<{
   now?: () => number
   /** Prompts rotated through the reliability loop so the 20 requests cover different subjects and formats. */
   reliabilityPrompts?: readonly string[]
+  /**
+   * Called after every recorded check and every reliability request, so the owner sees results as they happen. A
+   * failed progress write never fails the campaign: the checkpoint at the end of the slice still records everything.
+   */
+  progress?: (snapshot: Readonly<{ ledger: CampaignLedger; reliability: ReliabilityProgress | null }>) => Promise<void>
 }>): Promise<CampaignState & { stopped: 'complete' | 'budget' | 'aborted' }> {
   const now = input.now ?? (() => Date.now())
   let ledger = input.state.ledger
@@ -214,11 +220,45 @@ export async function runCampaignSlice(input: Readonly<{
   const reserveFor = (testId: string) => itemReserveMs({ shortestRequestMs, longestRequestMs }, interruptedItem === testId)
   const state = (stopped: 'complete' | 'budget' | 'aborted', progress: ReliabilityProgress | null = reliability, interrupted: string | null = null) =>
     ({ ledger, reliability: progress, shortestRequestMs, longestRequestMs, interruptedItem: interrupted, browser, fixture, stopped })
-  if (!ledger.mainCommit) {
-    const facts = await input.ports.deployment()
-    ledger = { ...ledger, mainCommit: facts.mainCommit }
+  const report = async (progress: ReliabilityProgress | null = reliability) => {
+    if (!input.progress) return
+    try { await input.progress({ ledger, reliability: progress }) } catch { /* the slice checkpoint still records it */ }
   }
-  for (const item of pendingItems(ledger, input.catalog)) {
+  if (!ledger.mainCommit || !ledger.productionCommit) {
+    const facts = await input.ports.deployment()
+    ledger = {
+      ...ledger,
+      mainCommit: ledger.mainCommit ?? facts.mainCommit,
+      // The revision the live site reports serving, read without a model call, so the checks that need it can run first.
+      productionCommit: ledger.productionCommit ?? facts.productionCommit ?? null,
+    }
+  }
+  // Checks that never call the production model run first and side by side; they need the production revision.
+  const parallelReady = () => Boolean(ledger.productionCommit)
+  const runParallelGroup = async (): Promise<'ok' | 'budget' | 'aborted'> => {
+    const group = parallelReady() ? pendingItems(ledger, input.catalog).filter(item => PAC_PARALLEL_PORTS.has(item.port)) : []
+    if (!group.length) return 'ok'
+    if (input.remainingMs() < CAMPAIGN_ITEM_RESERVE_MS) return 'budget'
+    const base = ledger
+    const context = { browser, fixture, remainingMs: input.remainingMs, lastBrowserItem: false, now }
+    const results = await Promise.all(group.map(async item => {
+      const executedAt = new Date(now()).toISOString()
+      return { item, executedAt, executed: await executeItem(item, input.ports, base, input.signal, context) }
+    }))
+    for (const { item, executedAt, executed } of results) {
+      // An interrupted check is not a result; it runs again in the next slice.
+      if (executed.interrupted) continue
+      ledger = { ...ledger, rows: [...ledger.rows, row(item, ledger, executedAt, now, executed.result, executed.scenario)] }
+    }
+    await report()
+    return results.some(result => result.executed.interrupted) ? 'aborted' : 'ok'
+  }
+  for (;;) {
+    const grouped = await runParallelGroup()
+    if (grouped === 'aborted') return state('aborted', reliability)
+    if (grouped === 'budget') return state('budget')
+    const item = pendingItems(ledger, input.catalog).find(candidate => !(parallelReady() && PAC_PARALLEL_PORTS.has(candidate.port)))
+    if (!item) break
     if (input.signal?.aborted) return state('aborted', reliability, item.id)
     if (input.remainingMs() < reserveFor(item.id)) return state('budget')
     const executedAt = new Date(now()).toISOString()
@@ -247,6 +287,7 @@ export async function runCampaignSlice(input: Readonly<{
           break
         }
         progress = { ...progress, completed: progress.completed + 1, correlationIds: [...progress.correlationIds, ...(outcome.correlationId ? [outcome.correlationId] : [])] }
+        await report(progress)
       }
       const result: PortResult = failure
         ? failure.verdict === 'BLOCKED'
@@ -255,6 +296,7 @@ export async function runCampaignSlice(input: Readonly<{
         : { verdict: 'PASS', actual: `${required} of ${required} consecutive analytical requests completed with every deliverable delivered.`, correlationId: progress.correlationIds.at(-1) ?? null, evidence: [{ kind: 'record', label: 'Consecutive completions', detail: `${required} of ${required}; correlation ids: ${progress.correlationIds.join(', ') || 'none recorded'}` }] }
       ledger = { ...ledger, rows: [...ledger.rows, row(item, ledger, executedAt, now, result, `reliability loop: ${required} requests over ${prompts.length} prompt(s)`)] }
       reliability = null
+      await report()
       continue
     }
     const executed = await executeItem(item, input.ports, ledger, input.signal, { browser, fixture, remainingMs: input.remainingMs, lastBrowserItem: browserItems.at(-1) === item.id, now })
@@ -267,6 +309,7 @@ export async function runCampaignSlice(input: Readonly<{
     noteRequest(executed.requestMs)
     ledger = noteServedRevision(ledger, executed.servedCommit ?? null)
     ledger = { ...ledger, rows: [...ledger.rows, row(item, ledger, executedAt, now, executed.result, executed.scenario)] }
+    await report()
   }
   return state('complete')
 }

@@ -43,6 +43,8 @@ export type CosAgentDecision =
       capabilities: CosAgentCapability[]
       /** Self-contained web searches the planner wrote for live_web; empty when it wrote none. */
       searchQueries: string[]
+      /** For verification_campaign: the check ids the owner asked to run; empty or absent runs the whole campaign. */
+      campaignChecks?: string[]
       reason: string
       reasonerLabel: string
     }>
@@ -64,8 +66,38 @@ const CAPABILITY_DESCRIPTIONS: Record<CosAgentCapability, string> = {
   repository_read: 'Inspect the authorized repository or codebase before answering.',
   software_specialist: 'Hand off work that must build, change, run, test, debug or deploy actual software, code, files or a website to the governed Software Specialist. Not for analysis, investigation, explanation, review or planning that is answered in writing, even when its subject is software.',
   external_action: 'Request an authorized action in an external system; host policy decides whether execution is allowed.',
-  verification_campaign: 'Run the production acceptance campaign: a durable background job that executes the numbered acceptance checks against the live site itself (real requests, deployment facts, release checks, traces) and reports a per-check PASS/FAIL/BLOCKED evidence package. Request it only when the owner asks for the campaign, acceptance checks or certification to be EXECUTED against production, not analysed or reviewed in writing.',
+  verification_campaign: 'Run the production acceptance campaign COS-PAC-001, or some of its checks (PAC-01 to PAC-20), now: a background job that executes the checks against the live site itself (real requests, deployment facts, release checks, traces) and reports PASS/FAIL/BLOCKED per check with evidence. Request it only when the owner asks for checks to be EXECUTED. A pasted campaign report or result, a question about why a check failed, or a request to fix, explain or review a failure is NOT a request to run anything: COS answers that in writing. When the owner names specific checks to run, pass their ids in checks (for example ["PAC-03"]); leave checks empty to run the whole campaign.',
 }
+
+const CAMPAIGN_CHECK_ID = /^PAC-\d{2}$/
+
+/** The check ids a verification_campaign request carries: well-formed ids only, upper-cased, de-duplicated. */
+export function sanitizeCampaignChecks(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : []
+  return [...new Set(values.map(item => String(item || '').trim().toUpperCase()).filter(item => CAMPAIGN_CHECK_ID.test(item)))].slice(0, 20)
+}
+
+function campaignChecksFromToolArguments(raw: unknown): string[] {
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw
+    return sanitizeCampaignChecks((parsed as Record<string, unknown> | null)?.checks)
+  } catch {
+    return []
+  }
+}
+
+const VERIFICATION_CAMPAIGN_PARAMETERS = Object.freeze({
+  type: 'object',
+  properties: Object.freeze({
+    checks: Object.freeze({
+      type: 'array',
+      maxItems: 20,
+      items: Object.freeze({ type: 'string' }),
+      description: 'Ids of the checks to run (PAC-01 to PAC-20) when the owner names specific checks; empty for the whole campaign.',
+    }),
+  }),
+  additionalProperties: false,
+})
 
 const LIVE_WEB_PARAMETERS = Object.freeze({
   type: 'object',
@@ -94,8 +126,9 @@ const LIVE_WEB_PLANNING_RULES = [
 function toolCatalog(input: { surface: 'assistant' | 'concierge'; ownerAuthenticated: boolean }): readonly LocalModelToolDefinition[] {
   // Every surface can hand software work to the Software Specialist: wording no longer does it (2026-10-26), and the
   // Specialist itself keeps public work in its isolated workspace and repository authority with the signed-in owner.
+  // The signed-in owner may run the verification campaign from either surface; the host re-checks ownership.
   const allowed: readonly CosAgentCapability[] = input.surface === 'concierge'
-    ? ['live_web', 'compute', 'software_specialist']
+    ? input.ownerAuthenticated ? ['live_web', 'compute', 'software_specialist', 'verification_campaign'] : ['live_web', 'compute', 'software_specialist']
     : input.ownerAuthenticated
       ? COS_AGENT_CAPABILITIES
       : ['live_web', 'compute', 'software_specialist']
@@ -104,7 +137,9 @@ function toolCatalog(input: { surface: 'assistant' | 'concierge'; ownerAuthentic
     function: Object.freeze({
       name,
       description: CAPABILITY_DESCRIPTIONS[name],
-      parameters: name === 'live_web' ? LIVE_WEB_PARAMETERS : Object.freeze({ type: 'object', properties: Object.freeze({}), additionalProperties: false }),
+      parameters: name === 'live_web' ? LIVE_WEB_PARAMETERS
+        : name === 'verification_campaign' ? VERIFICATION_CAMPAIGN_PARAMETERS
+        : Object.freeze({ type: 'object', properties: Object.freeze({}), additionalProperties: false }),
     }),
   })))
 }
@@ -144,7 +179,8 @@ export function parseCosAgentDecision(raw: string, reasonerLabel = 'unknown'): C
       )] as CosAgentCapability[]
       if (!capabilities.length) return null
       const searchQueries = capabilities.includes('live_web') ? sanitizePlannerSearchQueries(parsed.queries) : []
-      return { mode: 'orchestrate', answer: '', confidence: score, capabilities, searchQueries, reason, reasonerLabel }
+      const campaign = capabilities.includes('verification_campaign') ? { campaignChecks: sanitizeCampaignChecks(parsed.checks) } : {}
+      return { mode: 'orchestrate', answer: '', confidence: score, capabilities, searchQueries, ...campaign, reason, reasonerLabel }
     }
     return null
   } catch {
@@ -260,12 +296,14 @@ export async function decideCosAgentTurn(input: {
     )
     if (capabilities.length) {
       const liveWebCall = nativeTurn.toolCalls.find(call => String(call.function.name || '').trim() === 'live_web')
+      const campaignCall = nativeTurn.toolCalls.find(call => String(call.function.name || '').trim() === 'verification_campaign')
       return {
         mode: 'orchestrate',
         answer: '',
         confidence: 1,
         capabilities,
         searchQueries: liveWebCall ? plannerSearchQueriesFromToolArguments(liveWebCall.function.arguments) : [],
+        ...(campaignCall ? { campaignChecks: campaignChecksFromToolArguments(campaignCall.function.arguments) } : {}),
         reason: 'native_tool_request',
         reasonerLabel: turnReasonerLabel(nativeTurn),
       }
@@ -299,6 +337,9 @@ export async function decideCosAgentTurn(input: {
       'Return ONLY strict JSON using exactly one of these shapes (never write an answer to the user):',
       '{"mode":"answer","answer":"COS","confidence":1,"capabilities":[],"reason":"cos_answers"}',
       '{"mode":"orchestrate","answer":"","confidence":0.0,"capabilities":["live_web"],"queries":["self-contained web search"],"reason":"brief reason"}',
+      tools.some(tool => tool.function.name === 'verification_campaign')
+        ? `verification_campaign: ${CAPABILITY_DESCRIPTIONS.verification_campaign} In this JSON shape pass the ids as "checks":["PAC-03"].`
+        : '',
       LIVE_WEB_PLANNING_RULES,
       'Return the no-tool JSON when the request is reliably answerable from the request itself, conversation context supplied here, and stable model knowledge. Do not request capabilities merely to improve wording or because the topic sounds sophisticated.',
       'Use mode=orchestrate whenever correctness materially depends on information or action unavailable inside the model.',

@@ -49,7 +49,7 @@ import { isSoftwareRepairRequest } from '@/lib/ai/cos/softwareRepairIntent'
 import { semanticIntentConfirmsFile, semanticIntentConfirmsPicture, semanticIntentConfirmsWriting, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
 import { cosTurnIntent, withCosTurnIntent } from '@/lib/ai/cos/cosTurnIntent'
 import { startVerificationCampaign } from '@/lib/builder/campaign/start'
-import { namesVerificationCampaign } from '@/lib/builder/campaign/catalog'
+import { mentionsVerificationCampaign } from '@/lib/builder/campaign/catalog'
 import { recordCosLatencyStage, timeCosStage } from '@/lib/ai/cos/cosLatencyStages'
 import { runWithTurnDeadline, turnDeadlineRemainingMs, USER_ANSWER_WINDOW_MS } from '@/lib/ai/cos/cosTurnBudget'
 
@@ -170,16 +170,20 @@ function inlineVisualResponse(response: Response): Promise<NextResponse> {
   }).catch(() => new NextResponse(response.body, { status: response.status, headers: response.headers }))
 }
 
-async function startVerificationCampaignResponse(input: { userId: string; body: any; prompt: string; language: string }): Promise<NextResponse> {
+async function startVerificationCampaignResponse(input: { userId: string; body: any; prompt: string; language: string; checks?: readonly string[] }): Promise<NextResponse> {
   try {
     const started = await startVerificationCampaign({
       userId: input.userId,
       conversationId: String(input.body?.context?.conversationId || '') || null,
       objective: input.prompt,
       responseLanguage: input.language,
+      checks: input.checks ?? [],
     })
+    // The chat turn ends with this receipt: the campaign runs in the background and its status is shown live beside
+    // the conversation (agentProgressClient: campaignInBackground), never by holding the turn open until it finishes.
     return NextResponse.json({
       reply: started.reply, source: 'cos-verification-campaign', jobId: started.jobId, conversationId: started.conversationId,
+      campaignChecks: started.checks,
       status: 'queued', execution_allowed: true, external_action_taken: false, external_ai_invoked: false, local_model_invoked: false,
     }, { status: 202 })
   } catch (error) {
@@ -265,13 +269,19 @@ async function executeBrowserTurn(req: NextRequest) {
   const authenticatedOwner = access?.isOwner === true && Boolean(access.userId)
   const routingContext = builderRoutingContextFromBody(body)
 
-  // VERIFICATION CAMPAIGN BY IDENTIFIER (2026-10-27): the signed-in owner, on either surface, sending a request that
-  // carries the campaign's own identifier starts the campaign job directly; no model decision stands in the way.
-  // Production 2026-10-27 23:55 UTC: the owner pasted the campaign document into the Concierge dock and got a written
-  // review, because admission was planner-decided and Assistant-only.
-  if (authenticatedOwner && access?.userId && namesVerificationCampaign(prompt)) {
-    const started = await startVerificationCampaignResponse({ userId: access.userId, body, prompt, language })
-    return browserSurface === 'concierge' ? publicConciergePresentation(started) : started
+  // VERIFICATION CAMPAIGN (2026-11-01): the planner decides by meaning whether the owner asks to RUN checks. A request
+  // that names the campaign or a check is planned here, before any other lane can take it; the decision is reused below
+  // so the turn pays for one planner call. Naming the campaign is never admission by itself: production 2026-10-31,
+  // a pasted PAC report started the whole twenty-check run instead of being answered.
+  let campaignPlan: CosAgentDecision | null = null
+  if (authenticatedOwner && access?.userId && mentionsVerificationCampaign(prompt)) {
+    const plannerStartedAt = Date.now()
+    campaignPlan = await decideCosAgentTurn({ prompt, previousAssistant: priorAnswer || null, surface: browserSurface, ownerAuthenticated: true, language })
+    recordCosLatencyStage(`${browserSurface}:planner`, Date.now() - plannerStartedAt)
+    if (campaignPlan?.mode === 'orchestrate' && campaignPlan.capabilities.includes('verification_campaign')) {
+      const started = await startVerificationCampaignResponse({ userId: access.userId, body, prompt, language, checks: campaignPlan.campaignChecks })
+      return browserSurface === 'concierge' ? publicConciergePresentation(started) : started
+    }
   }
 
   // AGENT TOOL LOOP: a request to chart or compute real data is a COS compute turn. It must not be
@@ -527,15 +537,19 @@ async function executeBrowserTurn(req: NextRequest) {
   if (agentToolsRequired && !operationalEvidence) {
     agentDecision = { mode: 'orchestrate', answer: '', confidence: 1, capabilities: ['compute'], searchQueries: [], reason: 'host_compute_guard', reasonerLabel: 'host' }
   } else if (!operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !stableKnowledgeQuestionNeedsNoPlanner(prompt, priorAnswer)) {
-    const plannerStartedAt = Date.now()
-    agentDecision = await decideCosAgentTurn({
-      prompt,
-      previousAssistant: priorAnswer || null,
-      surface: browserSurface,
-      ownerAuthenticated: authenticatedOwner,
-      language,
-    })
-    recordCosLatencyStage(`${browserSurface}:planner`, Date.now() - plannerStartedAt)
+    if (campaignPlan) {
+      agentDecision = campaignPlan
+    } else {
+      const plannerStartedAt = Date.now()
+      agentDecision = await decideCosAgentTurn({
+        prompt,
+        previousAssistant: priorAnswer || null,
+        surface: browserSurface,
+        ownerAuthenticated: authenticatedOwner,
+        language,
+      })
+      recordCosLatencyStage(`${browserSurface}:planner`, Date.now() - plannerStartedAt)
+    }
     // A request about this service is still answered by COS from its owner-approved identity, never from a web
     // lookup; the planner is consulted only so that real software work on it ("fix the Builder page") reaches the
     // Software Specialist now that wording no longer does.
@@ -605,7 +619,7 @@ async function executeBrowserTurn(req: NextRequest) {
     // VERIFICATION CAMPAIGN (2026-10-27): the planner asked for the production acceptance campaign to be executed.
     // Only the signed-in owner may start it, on either surface; for anyone else the request is answered by COS.
     if (agentDecision.capabilities.includes('verification_campaign') && authenticatedOwner && access?.userId) {
-      const started = await startVerificationCampaignResponse({ userId: access.userId, body, prompt, language })
+      const started = await startVerificationCampaignResponse({ userId: access.userId, body, prompt, language, checks: agentDecision.campaignChecks })
       return browserSurface === 'concierge' ? publicConciergePresentation(started) : started
     }
 
@@ -768,6 +782,14 @@ function withServingRevision(response: Response): Response {
 
 export async function POST(req: NextRequest) {
   return withServingRevision(await postBrowserTurn(req))
+}
+
+/**
+ * The revision this ingress serves, without running a turn: the verification campaign reads it before its first model
+ * request (lib/builder/campaign/hostPorts.ts). It carries only what every POST response already carries in its header.
+ */
+export async function GET() {
+  return withServingRevision(NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store' } }))
 }
 
 async function postBrowserTurn(req: NextRequest) {

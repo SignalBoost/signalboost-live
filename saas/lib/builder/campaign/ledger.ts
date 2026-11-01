@@ -93,7 +93,35 @@ function line(label: string, value: string | null | undefined): string {
 }
 
 /** The Section 13 evidence package, one block per item, then the Section 14 decision. Plain text, no internals. */
-export function renderCampaignReport(ledger: CampaignLedger, catalog: readonly CampaignItem[]): string {
+/** How a run is scoped: a targeted run covers some of the campaign's checks and is never a certification. */
+export type CampaignRunScope = Readonly<{ targeted: boolean; campaignSize: number }>
+
+const FULL_RUN = (catalog: readonly CampaignItem[]): CampaignRunScope => ({ targeted: false, campaignSize: catalog.length })
+
+function runLabel(ledger: CampaignLedger, catalog: readonly CampaignItem[], scope: CampaignRunScope): string {
+  return scope.targeted
+    ? `Targeted run of ${catalog.map(item => item.id).join(', ')} (${catalog.length} of ${scope.campaignSize} checks of ${ledger.campaignId})`
+    : `Verification campaign ${ledger.campaignId}`
+}
+
+/**
+ * The live status a running campaign shows after every finished check: how many are done, and every failure so far
+ * with its cause, so the first failure is visible the moment it is recorded instead of at the end of the run.
+ */
+export function renderCampaignProgress(ledger: CampaignLedger, catalog: readonly CampaignItem[], scope: CampaignRunScope = FULL_RUN(catalog), reliability: Readonly<{ completed: number; required: number }> | null = null): string {
+  const certification = certifyCampaign(ledger, catalog)
+  const inCatalog = new Set(catalog.map(item => item.id))
+  const problems = ledger.rows.filter(row => inCatalog.has(row.testId) && effectiveVerdict(row) !== 'PASS')
+  const done = certification.total - certification.pending
+  return [
+    `${runLabel(ledger, catalog, scope)} in progress: ${done} of ${certification.total} checks done (${certification.passed} PASS, ${certification.failed} FAIL, ${certification.blocked} BLOCKED).`,
+    ...(reliability ? [`Reliability loop: ${reliability.completed} of ${reliability.required} requests completed.`] : []),
+    ...(problems.length ? ['Not passing so far:', ...problems.map(row => `- ${row.testId} ${row.title}: ${effectiveVerdict(row)}, ${(row.failureCause || row.actual).slice(0, 240)}`)] : []),
+    'It continues in the background; the full evidence package will appear here when it finishes.',
+  ].join('\n')
+}
+
+export function renderCampaignReport(ledger: CampaignLedger, catalog: readonly CampaignItem[], scope: CampaignRunScope = FULL_RUN(catalog)): string {
   const certification = certifyCampaign(ledger, catalog)
   const byId = new Map(ledger.rows.map(row => [row.testId, row]))
   const blocks = catalog.map(item => {
@@ -116,13 +144,15 @@ export function renderCampaignReport(ledger: CampaignLedger, catalog: readonly C
     ].join('\n')
   })
   const decision = [
-    `Campaign ${ledger.campaignId}`,
+    scope.targeted ? runLabel(ledger, catalog, scope) : `Campaign ${ledger.campaignId}`,
     line('Production commit', ledger.productionCommit),
     line('main commit', ledger.mainCommit),
     line('Production matches main', certification.deployedMatchesMain === null ? 'unknown' : certification.deployedMatchesMain ? 'yes' : 'no'),
     line('Production changed during the campaign', certification.productionChanged ? `yes (${ledger.revisionChanges.map(sha => sha.slice(0, 7)).join(', ')})` : 'no'),
     `Results: ${certification.passed} PASS, ${certification.failed} FAIL, ${certification.blocked} BLOCKED, ${certification.pending} not run, of ${certification.total}`,
-    `Final certification outcome: ${certification.outcome}`,
+    ...(scope.targeted
+      ? [`${runLabel(ledger, catalog, scope)}: ${certification.outcome}`, 'A targeted run retests the named checks only; it is not a certification of the campaign.']
+      : [`Final certification outcome: ${certification.outcome}`]),
   ].join('\n')
   return [...blocks, decision].join('\n\n')
 }

@@ -11,6 +11,7 @@ import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy
 import { assistanceCopy, BUILDER_RUNNING } from '@/lib/ai/cos/assistanceMode'
 import { hasExplicitOperationalLogRepairIntent, isOperationalLogEvidence, isPastedOperationalLog } from '@/lib/ai/cos/pastedOperationalLog'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
+import { LIVE_BUILDER_EVENT, LIVE_BUILDER_KEY, announceLiveBuilder, type LiveBuilder } from '@/lib/builder/liveJob'
 
 type AssistantRequestBody = {
   messages?: Array<{ role?: unknown; content?: unknown }>
@@ -21,13 +22,6 @@ type AssistantRequestBody = {
 
 const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
 
-const LIVE_BUILDER_KEY = 'cos-builder-live-conversation-job-v1'
-const LIVE_BUILDER_EVENT = 'cos-builder-live-job'
-type LiveBuilder = { jobId: string; conversationId: string; status: string; reply: string }
-function announceLiveBuilder(job: LiveBuilder): void {
-  try { window.localStorage.setItem(LIVE_BUILDER_KEY, JSON.stringify(job)) } catch { /* storage optional */ }
-  window.dispatchEvent(new CustomEvent<LiveBuilder>(LIVE_BUILDER_EVENT, { detail: job }))
-}
 
 const BUILDER_JOB_POLL_ATTEMPTS = 240
 const BUILDER_JOB_POLL_DELAY_MS = 2_000

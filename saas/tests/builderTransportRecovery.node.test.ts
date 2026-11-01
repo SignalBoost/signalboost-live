@@ -119,7 +119,9 @@ test('COS Builder results remain visible without navigating to History', () => {
   assert.match(transport, /announceLiveBuilder\(\{ jobId, conversationId, status: 'running'/)
   assert.match(transport, /setInterval\(\(\) => \{ void check\(\) \}, 3000\)/)
   assert.match(transport, /role="status" aria-live="polite"/)
-  assert.match(transport, /window\.localStorage\.setItem\(LIVE_BUILDER_KEY/)
+  // The announcement lives in one shared module so every client that starts a background job uses the same panel.
+  assert.match(fs.readFileSync(path.join(process.cwd(), 'lib/builder/liveJob.ts'), 'utf8'), /window\.localStorage\.setItem\(LIVE_BUILDER_KEY/)
+  assert.match(transport, /import \{ LIVE_BUILDER_EVENT, LIVE_BUILDER_KEY, announceLiveBuilder, type LiveBuilder \} from '@\/lib\/builder\/liveJob'/)
   assert.match(transport, /window\.localStorage\.getItem\(LIVE_BUILDER_KEY/)
 })
 

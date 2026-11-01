@@ -478,9 +478,19 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       sliceTimer.unref?.()
       let outcome: CampaignSliceOutcome
       try {
+        const runningJob = job
         outcome = await runCampaignJobSlice({
           checkpoint: job.checkpoint, workspaceId: job.workspaceId, ports: createCampaignHostPorts(), signal: sliceController.signal,
           remainingMs: () => Math.max(0, sliceStartedAt + BUILDER_SLICE_HARD_DEADLINE_MS - Date.now()),
+          checks: Array.isArray(job.metadata.campaignChecks) ? job.metadata.campaignChecks : null,
+          // Live status after every finished check, written only while this exact claim still runs the job, so a late
+          // write can never replace the paused or final reply.
+          progress: async update => {
+            const { error } = await db.from('builder_jobs').update({
+              result: { jobId: runningJob.id, workspaceId: runningJob.workspaceId, status: 'running', reply: update.reply, files: [], engine: CAMPAIGN_ENGINE, campaignProgress: { done: update.done, total: update.total } },
+            }).eq('id', runningJob.id).eq('user_id', runningJob.userId).eq('claim_generation', runningJob.claimGeneration).eq('status', 'running')
+            if (error) console.warn('[builder-campaign-progress] write failed', error.message)
+          },
         })
       } catch (error) {
         clearTimeout(sliceTimer)

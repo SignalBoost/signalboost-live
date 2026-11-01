@@ -101,3 +101,42 @@ test('reasoning over supplied facts overrides incidental freshness words, like i
   ]) assert.equal(semanticIntentSuppressesFreshness(parseCosSemanticTaskIntent(JSON.stringify(variant))), false, JSON.stringify(variant))
   assert.match(source, /general_reasoning means the user wants analysis, diagnosis, ranking, planning or explanation performed on facts, data or a scenario they supplied/)
 })
+
+test('recipient-directed CDO inquiry is a writing deliverable even when fact flag conflicts', () => {
+  // Reproduces the failed-closed class: questions in the letter are addressed to the CDO, not COS.
+  const intent = parseCosSemanticTaskIntent(JSON.stringify({
+    mode: 'content_generation', confidence: 0.97, suppliedContextPrimary: true,
+    externalFactsRequired: true, recipientInquiryOnly: true,
+  }))
+  assert.ok(intent)
+  assert.equal(semanticIntentIsSelfContainedContentGeneration(intent), true)
+  assert.equal(semanticIntentSuppressesFreshness(intent), true)
+})
+
+test('letter plus separately requested retirement-policy research retains live evidence gate', () => {
+  const intent = parseCosSemanticTaskIntent(JSON.stringify({
+    mode: 'content_generation', confidence: 0.97, suppliedContextPrimary: true,
+    externalFactsRequired: true, recipientInquiryOnly: false,
+  }))
+  assert.ok(intent)
+  assert.equal(semanticIntentIsSelfContainedContentGeneration(intent), false)
+  assert.equal(semanticIntentSuppressesFreshness(intent), false)
+  assert.match(source, /recipientInquiryOnly=true ONLY for content_generation/)
+  assert.match(source, /no standalone COS research or legal\\/policy advice was requested/)
+})
+
+test('recipient inquiry flag cannot suppress research or rescue an uncertain classification', () => {
+  for (const variant of [
+    { mode: 'external_fact_verification', confidence: 0.98 },
+    { mode: 'content_generation', confidence: 0.61 },
+  ]) {
+    const intent = parseCosSemanticTaskIntent(JSON.stringify({
+      ...variant, suppliedContextPrimary: true, externalFactsRequired: true, recipientInquiryOnly: true,
+    }))
+    assert.equal(semanticIntentSuppressesFreshness(intent), false)
+  }
+  assert.equal(parseCosSemanticTaskIntent(JSON.stringify({
+    mode: 'content_generation', confidence: 0.98, suppliedContextPrimary: true,
+    externalFactsRequired: true, recipientInquiryOnly: 'true',
+  })), null)
+})

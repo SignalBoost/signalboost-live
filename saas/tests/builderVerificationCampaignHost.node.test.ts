@@ -164,5 +164,5 @@ test('mentioning PAC in a debugging report never auto-launches the full Builder 
   assert.equal(namesVerificationCampaign('run COS-PAC-001 now'), true)
   assert.equal(namesVerificationCampaign('Please execute COS-PAC-001.'), true)
   const fixture = read('tests/fixtures/cos-production-acceptance-campaign.txt')
-  assert.equal(namesVerificationCampaign(fixture), true, 'the complete pending-execution manifest still starts the campaign')
+  assert.equal(namesVerificationCampaign(fixture), false, 'pasting the pending manifest is not campaign authorization')
 })

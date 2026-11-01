@@ -212,7 +212,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: { onClose:
         )}
 
         {error && (
-          <div style={{ fontSize: 13, color: '#f87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
+          <div role="alert" data-testid="auth-modal-error" style={{ fontSize: 13, color: '#f87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
             {error}
           </div>
         )}

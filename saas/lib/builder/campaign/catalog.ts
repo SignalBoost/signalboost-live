@@ -174,6 +174,12 @@ export const PAC_CHECK_IDS: readonly string[] = Object.freeze(PAC_CATALOG.map(it
 export const PAC_PARALLEL_PORTS: ReadonlySet<CampaignPort> = new Set<CampaignPort>(['release', 'fault'])
 
 /**
+ * Checks whose work is one production model request each (analytical and routing checks). They run several at a time
+ * (runner.ts CAMPAIGN_MODEL_CONCURRENCY); browser, Builder fixture, trace and budget checks keep their order.
+ */
+export const PAC_MODEL_LANE_PORTS: ReadonlySet<CampaignPort> = new Set<CampaignPort>(['analysis', 'routing'])
+
+/**
  * The checks a run executes. The planner passes the ids the owner asked for; anything that is not a catalog id is
  * dropped, the catalog order is kept, and no valid id (or every id) means the whole campaign.
  */

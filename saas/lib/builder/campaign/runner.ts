@@ -11,7 +11,7 @@
 // Pure: no I/O of its own, every effect goes through a port.
 
 import type { CampaignItem } from './catalog.ts'
-import { PAC_PARALLEL_PORTS } from './catalog.ts'
+import { PAC_MODEL_LANE_PORTS, PAC_PARALLEL_PORTS } from './catalog.ts'
 import type { CampaignEvidence, CampaignLedger, CampaignLedgerRow, CampaignVerdict } from './ledger.ts'
 import { pendingItems } from './ledger.ts'
 import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
@@ -38,6 +38,14 @@ export function itemReserveMs(timings: Readonly<{ shortestRequestMs: number; lon
   const basis = afterInterruption ? timings.longestRequestMs : timings.shortestRequestMs
   return Math.max(CAMPAIGN_ITEM_RESERVE_MS, basis)
 }
+
+/**
+ * How many production model requests the campaign keeps in flight at once. The live path is served by a hosted provider
+ * (the 2026-11-01 run recorded every interactive call on DeepInfra), so the analytical checks and the reliability loop no
+ * longer wait in line; the cap keeps a campaign from crowding out real users of the same path. A fixed constant, not a
+ * setting.
+ */
+export const CAMPAIGN_MODEL_CONCURRENCY = 3
 
 export type CampaignSliceResult = Readonly<{
   ledger: CampaignLedger
@@ -257,10 +265,47 @@ export async function runCampaignSlice(input: Readonly<{
     await progressWrite
     return results.some(result => result.executed.interrupted) || input.signal?.aborted ? 'aborted' : 'ok'
   }
+  // Analytical and routing checks: CAMPAIGN_MODEL_CONCURRENCY requests in flight; a new one starts as soon as one ends,
+  // and only while the slice still has an item's reserve. Each result is recorded and published the moment it arrives.
+  // The model check a slice cut, so the next slice starts it only when its longest-request reserve fits.
+  let cutItem: string | null = null
+  const runModelLane = async (): Promise<'ok' | 'budget' | 'aborted'> => {
+    const queue = pendingItems(ledger, input.catalog).filter(item => PAC_MODEL_LANE_PORTS.has(item.port))
+    if (!queue.length) return 'ok'
+    let stop = null as 'budget' | 'aborted' | null
+    let progressWrite = Promise.resolve()
+    const context = { browser, fixture, remainingMs: input.remainingMs, lastBrowserItem: false, now }
+    const worker = async () => {
+      for (;;) {
+        if (stop) return
+        if (input.signal?.aborted) { stop = 'aborted'; return }
+        const item = queue[0]
+        if (!item) return
+        if (input.remainingMs() < reserveFor(item.id)) { stop = stop ?? 'budget'; return }
+        queue.shift()
+        const executedAt = new Date(now()).toISOString()
+        const executed = await executeItem(item, input.ports, ledger, input.signal, context)
+        // Cut by the slice deadline: not a production result; it runs again in the next slice.
+        if (executed.interrupted || input.signal?.aborted) { stop = 'aborted'; cutItem = cutItem ?? item.id; return }
+        if (interruptedItem === item.id) interruptedItem = null
+        noteRequest(executed.requestMs)
+        ledger = noteServedRevision(ledger, executed.servedCommit ?? null)
+        ledger = { ...ledger, rows: [...ledger.rows, row(item, ledger, executedAt, now, executed.result, executed.scenario)] }
+        const snapshot = ledger
+        progressWrite = progressWrite.then(() => report(reliability, snapshot))
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(CAMPAIGN_MODEL_CONCURRENCY, queue.length) }, () => worker()))
+    await progressWrite
+    return stop ?? 'ok'
+  }
   for (;;) {
     const grouped = await runParallelGroup()
     if (grouped === 'aborted') return state('aborted', reliability)
     if (grouped === 'budget') return state('budget')
+    const modelLane = await runModelLane()
+    if (modelLane === 'aborted') return state('aborted', reliability, cutItem)
+    if (modelLane === 'budget') return state('budget')
     const item = pendingItems(ledger, input.catalog).find(candidate => !(parallelReady() && PAC_PARALLEL_PORTS.has(candidate.port)))
     if (!item) break
     if (input.signal?.aborted) return state('aborted', reliability, item.id)
@@ -274,25 +319,48 @@ export async function runCampaignSlice(input: Readonly<{
       const required = item.count ?? 20
       const prompts = input.reliabilityPrompts?.length ? input.reliabilityPrompts : [item.prompt || '']
       let progress: ReliabilityProgress = reliability?.testId === item.id ? reliability : { testId: item.id, completed: 0, correlationIds: [] }
-      let failure: Readonly<{ at: number; verdict: CampaignVerdict; cause: string; evidence: CampaignEvidence[]; correlationId: string | null }> | null = null
-      while (progress.completed < required) {
-        if (input.signal?.aborted) return state('aborted', progress, item.id)
-        if (input.remainingMs() < reserveFor(item.id)) return state('budget', progress)
-        const prompt = prompts[progress.completed % prompts.length]
-        const outcome = await input.ports.analysis(prompt, input.signal)
-        // Cut by the slice deadline: not a production result. The same request runs again in the next slice.
-        if (input.signal?.aborted) return state('aborted', progress, item.id)
-        interruptedItem = null
-        noteRequest(outcome.latencyMs)
-        ledger = noteServedRevision(ledger, outcome.servedCommit)
-        const judged = await judgeAnalysis(prompt, outcome, input.ports.outcomeJudge)
-        if (judged.verdict !== 'PASS') {
-          failure = { at: progress.completed + 1, verdict: judged.verdict, cause: judged.failureCause || judged.actual, evidence: analysisEvidence(outcome), correlationId: outcome.correlationId }
-          break
+      // Assigned inside the request workers below, so its declared type is kept (no narrowing to the initial null).
+      let failure = null as Readonly<{ at: number; verdict: CampaignVerdict; cause: string; evidence: CampaignEvidence[]; correlationId: string | null }> | null
+      // The requests run CAMPAIGN_MODEL_CONCURRENCY at a time, but they count in order: progress is the run of verified
+      // completions from the first request, and the first one that is not verified ends the qualification. Results past
+      // that point, or past a slice cut, are not counted; an unfinished request runs again in the next slice.
+      const results = new Map<number, Readonly<{ outcome: AnalysisOutcome; judged: Awaited<ReturnType<typeof judgeAnalysis>> }>>()
+      let nextIndex = progress.completed
+      let stop = null as 'budget' | 'aborted' | null
+      let progressWrite = Promise.resolve()
+      const advance = () => {
+        while (!failure && results.has(progress.completed)) {
+          const { outcome, judged } = results.get(progress.completed)!
+          results.delete(progress.completed)
+          if (judged.verdict !== 'PASS') {
+            failure = { at: progress.completed + 1, verdict: judged.verdict, cause: judged.failureCause || judged.actual, evidence: analysisEvidence(outcome), correlationId: outcome.correlationId }
+            return
+          }
+          progress = { ...progress, completed: progress.completed + 1, correlationIds: [...progress.correlationIds, ...(outcome.correlationId ? [outcome.correlationId] : [])] }
+          const snapshot = progress
+          progressWrite = progressWrite.then(() => report(snapshot))
         }
-        progress = { ...progress, completed: progress.completed + 1, correlationIds: [...progress.correlationIds, ...(outcome.correlationId ? [outcome.correlationId] : [])] }
-        await report(progress)
       }
+      const worker = async () => {
+        for (;;) {
+          if (stop || failure || nextIndex >= required) return
+          if (input.signal?.aborted) { stop = 'aborted'; return }
+          if (input.remainingMs() < reserveFor(item.id)) { stop = stop ?? 'budget'; return }
+          const index = nextIndex++
+          const prompt = prompts[index % prompts.length]
+          const outcome = await input.ports.analysis!(prompt, input.signal)
+          if (input.signal?.aborted) { stop = 'aborted'; return }
+          if (interruptedItem === item.id) interruptedItem = null
+          noteRequest(outcome.latencyMs)
+          ledger = noteServedRevision(ledger, outcome.servedCommit)
+          const judged = await judgeAnalysis(prompt, outcome, input.ports.outcomeJudge)
+          results.set(index, { outcome, judged })
+          advance()
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(CAMPAIGN_MODEL_CONCURRENCY, required - progress.completed) }, () => worker()))
+      await progressWrite
+      if (!failure && progress.completed < required) return state(stop === 'aborted' ? 'aborted' : 'budget', progress, stop === 'aborted' ? item.id : null)
       const result: PortResult = failure
         ? failure.verdict === 'BLOCKED'
           ? { verdict: 'BLOCKED', actual: `Request ${failure.at} of ${required} could not be graded (${failure.cause}); ${failure.at - 1} consecutive verified completions before it.`, correlationId: failure.correlationId, evidence: [{ kind: 'record', label: 'Consecutive completions', detail: `${failure.at - 1} of ${required}` }, ...failure.evidence], failureCause: failure.cause }

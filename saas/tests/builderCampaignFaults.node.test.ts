@@ -6,7 +6,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  createFaultStub, judgeFault, truncatedAnswerText,
+  createFaultStub, judgeFault, faultReleasedAnswer, truncatedAnswerText,
   FAULT_PROMPT, FAULT_COMPLETE_ANSWER, FAULT_MAX_PROVIDER_CALLS, FAULT_TURN_DEADLINE_MS, FAULT_DEADLINE_GRACE_MS,
   type FaultObservation, type ProviderCall,
 } from '../lib/builder/campaign/faults.ts'
@@ -181,4 +181,31 @@ test('seam: inside the Builder job harness a real DeepInfra call without a reser
   } finally {
     globalThis.fetch = realFetch
   }
+})
+
+
+test('fault harness applies the same answer-release boundary before grading recovery', async () => {
+  const incomplete = await verifyAnswerOutcome({
+    request: FAULT_PROMPT,
+    answer: 'Only an unranked hypothesis, without measurements or uncertainty.',
+    judge: stubOutcomeJudge,
+  })
+  assert.equal(incomplete.status, 'incomplete')
+  const candidate = JSON.stringify({ answer: 'Only an unranked hypothesis, without measurements or uncertainty.', confidence: 0.7 })
+  assert.equal(faultReleasedAnswer(candidate, incomplete), null)
+  const safeFailure = judgeFault(observe({
+    fault: 'runpod_busy',
+    calls: [call(1, '503'), call(2, '200')],
+    released: faultReleasedAnswer(candidate, incomplete),
+  }))
+  assert.equal(safeFailure.verdict, 'PASS', 'the verified incomplete draft is withheld: bounded failure is allowed')
+  assert.equal(faultReleasedAnswer(completeText, completeOutcome), completeText)
+  assert.equal(faultReleasedAnswer(truncatedAnswerText(), completeOutcome), null)
+  const unverified = await verifyAnswerOutcome({ request: FAULT_PROMPT, answer: FAULT_COMPLETE_ANSWER, judge: unavailableOutcomeJudge })
+  assert.equal(unverified.status, 'unverified')
+  assert.equal(faultReleasedAnswer(completeText, unverified), completeText)
+  assert.equal(judgeFault(observe({
+    fault: 'runpod_busy', calls: [call(1, '503'), call(2, '200')],
+    released: faultReleasedAnswer(completeText, unverified), releasedOutcome: unverified,
+  })).verdict, 'BLOCKED', 'unavailable judge cannot establish PASS')
 })

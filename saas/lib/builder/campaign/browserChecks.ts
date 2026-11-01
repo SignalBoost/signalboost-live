@@ -196,30 +196,21 @@ export async function runBrowserCheck(input: BrowserCheckInput): Promise<Browser
   const save = (patch: Partial<BrowserSession>): BrowserSession => (session = { ...session, ...patch, log: [...log] })
 
   if (session.phase === 'start') {
-    if (testId === 'PAC-13') {
-      const opened = await driver.open(`${SITE_URL}/`)
-      log.push(`open home page: ${opened.detail}`)
-      if (!opened.ok) return failed(save({}), 'could not open the home page')
-      const filled = await driver.fill(UI.homeInput, request)
-      const sent = await driver.click(UI.homeSend)
-      log.push(`type request (${request.length} chars): ${filled.detail}; press "Ask COS": ${sent.detail}`)
-      if (!filled.ok || !sent.ok) return failed(save({}), 'could not submit the request in the Concierge')
-    } else {
-      const cause = await signIn(input, log)
-      if (cause) {
-        save({})
-        return cause === 'no test account configured'
-          ? { status: 'done', session, result: { verdict: 'BLOCKED', actual: `Not executed: ${cause}.`, evidence: evidence(session), failureCause: cause } }
-          : failed(session, cause)
-      }
-      const assistant = await driver.goto(`${SITE_URL}/dashboard/assistant`)
-      log.push(`open /dashboard/assistant: ${assistant.detail}`)
-      if (!assistant.ok) return failed(save({}), 'could not open the Assistant page')
-      const filled = await driver.fill(UI.assistantInput, request)
-      const sent = await driver.click(UI.assistantSend)
-      log.push(`type request (${request.length} chars): ${filled.detail}; press "Send": ${sent.detail}`)
-      if (!filled.ok || !sent.ok) return failed(save({}), 'could not submit the request on the Assistant page')
+    // PAC-13 through PAC-15 must all exercise authenticated COS, not the public Concierge.
+    const cause = await signIn(input, log)
+    if (cause) {
+      save({})
+      return cause === 'no test account configured'
+        ? { status: 'done', session, result: { verdict: 'BLOCKED', actual: `Not executed: ${cause}.`, evidence: evidence(session), failureCause: cause } }
+        : failed(session, cause)
     }
+    const assistant = await driver.goto(`${SITE_URL}/dashboard/assistant`)
+    log.push(`open /dashboard/assistant: ${assistant.detail}`)
+    if (!assistant.ok) return failed(save({}), 'could not open the Assistant page')
+    const filled = await driver.fill(UI.assistantInput, request)
+    const sent = await driver.click(UI.assistantSend)
+    log.push(`type request (${request.length} chars): ${filled.detail}; press "Send": ${sent.detail}`)
+    if (!filled.ok || !sent.ok) return failed(save({}), 'could not submit the request on the authenticated Assistant page')
     save({ phase: 'submitted', submittedAt: input.now() })
   }
 
@@ -246,7 +237,7 @@ export async function runBrowserCheck(input: BrowserCheckInput): Promise<Browser
         const failure = FAILURE_TEXTS.find(text => snapshot.stdout.includes(text))
         if (failure) return failed(save({}), `the page shows a failure message: "${failure}"`, [`page excerpt: ${snapshot.stdout.slice(0, 400)}`])
         const stillWorking = snapshot.stdout.includes(UI.homeThinking) || occurrences(snapshot.stdout, UI.assistantStopText) > 0
-        const answered = testId === 'PAC-13' ? snapshot.stdout.includes(UI.homeCopyResponse) : !stillWorking && snapshot.stdout.includes(UI.assistantAnswerText)
+        const answered = !stillWorking && snapshot.stdout.includes(UI.assistantAnswerText)
         if (answered && !stillWorking) {
           log.push(`answer on the page ${input.now() - submittedAt} ms after submit`)
           save({ phase: 'answered' })
@@ -264,7 +255,7 @@ export async function runBrowserCheck(input: BrowserCheckInput): Promise<Browser
       log.push(`production request status as the browser saw it: ${status ?? 'not listed'}`)
       await driver.close()
       if (status !== null && status >= 400) return failed(save({}), `the production request returned HTTP ${status}`)
-      return passed(save({}), 'The request typed into the public Concierge received its answer on the page.')
+      return passed(save({}), 'The request submitted in authenticated COS received its answer on the Assistant page.')
     }
     const reloaded = await driver.reload()
     log.push(`reload: ${reloaded.detail}`)

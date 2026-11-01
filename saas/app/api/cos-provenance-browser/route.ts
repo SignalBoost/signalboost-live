@@ -19,6 +19,8 @@ import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy
 import { persistTurn, refreshSummaryAtCadence } from '@/lib/ai/tools/conversationHistory.ts'
 import { provenanceWithDeliveredVisual } from '@/lib/concierge/deliveredVisual.ts'
 import { assistanceCopy, COS_TURN_ACCEPTED } from '@/lib/ai/cos/assistanceMode'
+import { CAMPAIGN_LIVE_INFERENCE_HEADER, campaignLiveInferenceRequested } from '@/lib/ai/cos/campaignLiveInference'
+import { requestTurnIds, withRequestTurnCorrelation } from '@/lib/ai/cos/requestTurnCorrelation'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -180,7 +182,29 @@ async function finalizeAnswer(response: Response, req: NextRequest, body: any): 
   return delivered
 }
 
+/**
+ * Every request runs with its own turn-id record (requestTurnCorrelation.ts). A verification-campaign request, proven by
+ * its signed header, gets back the turn ids its answer produced, so the campaign can read the turn records (PAC-16,
+ * PAC-17) and show which stage ended a request. Other callers never receive internal turn ids.
+ */
 export async function POST(req: NextRequest): Promise<Response> {
+  const campaignRequest = campaignLiveInferenceRequested(req.headers.get(CAMPAIGN_LIVE_INFERENCE_HEADER))
+  return withRequestTurnCorrelation(async () => {
+    const response = await handleBrowserTurn(req)
+    if (!campaignRequest) return response
+    return withCampaignTurnIds(response, requestTurnIds())
+  })
+}
+
+/** The campaign's copy of the response: the same payload plus the turn ids that carry its records. */
+async function withCampaignTurnIds(response: Response, turnIds: readonly string[]): Promise<Response> {
+  let payload: any
+  try { payload = await response.clone().json() } catch { return response }
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return response
+  return withJsonPayload(response, { ...payload, campaign_turn_ids: [...turnIds], campaign_turn_id: turnIds.at(-1) ?? null })
+}
+
+async function handleBrowserTurn(req: NextRequest): Promise<Response> {
   const requestStartedAt = Date.now()
   // This route is an internal network boundary, not a second public assistant endpoint. The proxy
   // injects a server-only secret after applying spend/routing policy. A direct request fails closed.

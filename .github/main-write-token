@@ -1,2 +1,2 @@
-base_sha=0c4abe805d5108946e74e73fed2436cc645ce932
-branch=fix/pac-model-checks-concurrent-20261101
+base_sha=c4f9fcbedb5b42195d8589447143ea16f43cf0f0
+branch=fix/pac-fixture-overlap-and-trace-ids-20261101

@@ -10,6 +10,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { hashPrompt } from './turnExperienceStore.ts'
 import { buildOutOfPipelineExperienceRow, ensureProvenanceTurnId, type OutOfPipelineTurn } from './outOfPipelineTurn.ts'
 import { persistTurn } from '../tools/conversationHistory.ts'
+import { noteRequestTurnId } from './requestTurnCorrelation.ts'
 
 function effectiveProvenanceUserId(userId: string | null): string | null {
   return userId || publicAuditUserId()
@@ -85,6 +86,7 @@ async function recordOutOfPipelineTurnExperience(turnId: string, turn: OutOfPipe
       { onConflict: 'turn_id', ignoreDuplicates: true },
     )
     if (result.error) throw result.error
+    noteRequestTurnId(turnId)
   } catch (error) {
     console.warn('[cos-primary-turn-experience] record failed (non-fatal):', error instanceof Error ? error.message : String(error))
   }

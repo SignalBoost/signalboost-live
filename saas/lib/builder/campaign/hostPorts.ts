@@ -56,6 +56,16 @@ function campaignRequestHeaders(): Record<string, string> {
   }
 }
 
+/**
+ * The request's turn id: the last turn record the request produced (campaign_turn_id, returned only to a signed campaign
+ * request), or the turn id in its provenance when the path recorded one there.
+ */
+function campaignTurnId(payload: any, provenance: any): string | null {
+  const returned = typeof payload?.campaign_turn_id === 'string' ? payload.campaign_turn_id.trim() : ''
+  if (returned) return returned
+  return typeof provenance?.turnId === 'string' && provenance.turnId.trim() ? provenance.turnId.trim() : null
+}
+
 /** One real request on the production path: the public Concierge ingress of the live site. */
 export async function productionAnalysis(prompt: string, signal?: AbortSignal, fetchImpl: typeof fetch = fetch): Promise<AnalysisOutcome> {
   const startedAt = Date.now()
@@ -81,7 +91,8 @@ export async function productionAnalysis(prompt: string, signal?: AbortSignal, f
     ok,
     reply,
     source,
-    correlationId: typeof provenance?.turnId === 'string' ? provenance.turnId : null,
+    // The turn id the production path returns to a signed campaign request; its turn record carries the trace.
+    correlationId: campaignTurnId(payload, provenance),
     latencyMs: Date.now() - startedAt,
     servedCommit: response.headers.get(SERVING_REVISION_HEADER)?.trim() || null,
     model: typeof provenance?.local_reasoning?.model === 'string' ? provenance.local_reasoning.model : typeof provenance?.reasonerLabel === 'string' ? provenance.reasonerLabel : null,
@@ -113,7 +124,8 @@ export async function productionRouting(prompt: string, signal?: AbortSignal, fe
     status: response.status,
     ok: typeof payload?.ok === 'boolean' ? payload.ok : response.ok && Boolean(reply.trim()) && !payload?.error,
     reply, source,
-    correlationId: typeof provenance?.turnId === 'string' ? provenance.turnId : null,
+    // The turn id the production path returns to a signed campaign request; its turn record carries the trace.
+    correlationId: campaignTurnId(payload, provenance),
     latencyMs: Date.now() - startedAt,
     servedCommit: response.headers.get(SERVING_REVISION_HEADER)?.trim() || null,
     model: typeof provenance?.local_reasoning?.model === 'string' ? provenance.local_reasoning.model : null,

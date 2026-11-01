@@ -41,6 +41,7 @@ export const UI = Object.freeze({
   // The navbar also has a Log in button; only the modal submit actually authenticates.
   loginSubmit: "getByTestId('auth-modal-submit')",
   loginEmailText: 'Email address',
+  loginErrorText: 'alert',
   assistantInput: "getByPlaceholder('Ask the concierge…')",
   assistantSend: "getByRole('button', { name: 'Send' })",
   assistantStop: "getByRole('button', { name: 'Stop' })",
@@ -183,8 +184,25 @@ async function signIn(input: BrowserCheckInput, log: string[]): Promise<string |
       log.push('signed in: the sign-in form is gone')
       return null
     }
+    // The modal exposes auth errors as an accessible alert. Report the failure category,
+    // never the raw server message, email, password or authorization response.
+    const authError = await driver.find(UI.loginErrorText)
+    if (found(authError, UI.loginErrorText)) {
+      log.push('sign-in rejected: authentication error alert visible')
+      return 'sign-in rejected by authentication service'
+    }
   }
-  return 'sign-in did not complete within 30 s'
+  const requests = await driver.requests()
+  const tokenLine = requests.ok
+    ? requests.stdout.split(/\r?\n/).find(line => /\/auth\/v1\/token(?:\?|\s|$)/i.test(line))
+    : undefined
+  const tokenStatus = tokenLine?.match(/\b(\d{3})\b(?!.*\b\d{3}\b)/)?.[1]
+  if (tokenStatus) log.push(`sign-in auth token HTTP status: ${tokenStatus}`)
+  return tokenStatus === '200'
+    ? 'authentication returned HTTP 200 but sign-in did not finish'
+    : tokenStatus
+      ? `authentication token request returned HTTP ${tokenStatus}`
+      : 'sign-in did not complete within 30 s (no token response status available)'
 }
 
 /** Run or continue one browser check inside this slice's remaining time. */

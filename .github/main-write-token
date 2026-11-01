@@ -1,2 +1,2 @@
-base_sha=790e0e14f3bb30deb63f71be84a00fe4d833319e
-branch=fix/pac-live-progress-ci-20261101
+base_sha=0c4abe805d5108946e74e73fed2436cc645ce932
+branch=fix/pac-model-checks-concurrent-20261101

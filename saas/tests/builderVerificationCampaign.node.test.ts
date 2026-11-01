@@ -169,12 +169,12 @@ test('a request cut by the slice deadline is an interruption: not recorded, run 
   assert.equal(first.ledger.rows.length, 0, 'the cut request left no FAIL row')
   assert.equal(first.longestRequestMs, 0, 'an interrupted request is not a completed one')
   assert.equal(first.interruptedItem, 'PAC-01')
-  // Next slice: PAC-01 runs again. With 90 s requests the reserve is 90 s, so two fit a 240 s slice; the rest wait
-  // for the slice after; nothing is skipped and nothing is recorded as FAIL.
+  // Next slice: PAC-01 runs again. Model checks run three at a time (CAMPAIGN_MODEL_CONCURRENCY): three requests start
+  // while the slice still holds a reserve, the fourth waits for the slice after; nothing is skipped or recorded as FAIL.
   const start2 = clock
   const second = await runCampaignSlice({ catalog: only, state: first, ports, remainingMs: () => 240_000 - (clock - start2) })
   assert.equal(second.stopped, 'budget')
-  assert.deepEqual(second.ledger.rows.map(r => r.testId), ['PAC-01', 'PAC-02'])
+  assert.deepEqual(second.ledger.rows.map(r => r.testId), ['PAC-01', 'PAC-02', 'PAC-03'])
   assert.equal(second.longestRequestMs, 90_000)
   assert.equal(second.interruptedItem, null)
   const start3 = clock

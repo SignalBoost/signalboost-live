@@ -10,7 +10,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { stubOutcomeJudge } from './helpers/answerOutcomeJudgeStub.ts'
 import { runCampaignJobSlice } from '../lib/builder/campaign/job.ts'
-import { runCampaignSlice } from '../lib/builder/campaign/runner.ts'
+import { runCampaignSlice, CAMPAIGN_MODEL_CONCURRENCY } from '../lib/builder/campaign/runner.ts'
 import { emptyCampaignLedger } from '../lib/builder/campaign/runner.ts'
 import { PAC_CATALOG, PAC_PARALLEL_PORTS, selectCampaignChecks, isTargetedRun } from '../lib/builder/campaign/catalog.ts'
 import { requestedAnalyticalTasks } from '../lib/ai/cos/answerTaskContract.ts'
@@ -32,13 +32,17 @@ function recordingPorts(options: { productionCommit: string | null; failFirstAna
   const calls: Array<{ kind: string; at: number; end?: number }> = []
   let active = 0
   let maxActive = 0
+  let activeAnalyses = 0
+  let maxAnalyses = 0
   let analysisCount = 0
   const timed = async <T>(kind: string, ms: number, work: () => T): Promise<T> => {
     const entry: { kind: string; at: number; end?: number } = { kind, at: Date.now() }
     calls.push(entry)
     active++; maxActive = Math.max(maxActive, active)
+    if (kind === 'analysis') { activeAnalyses++; maxAnalyses = Math.max(maxAnalyses, activeAnalyses) }
     await sleep(ms)
     active--; entry.end = Date.now()
+    if (kind === 'analysis') activeAnalyses--
     return work()
   }
   const ports: CampaignPorts = {
@@ -52,11 +56,11 @@ function recordingPorts(options: { productionCommit: string | null; failFirstAna
     fault: fault => timed(`fault:${fault}`, 60, () => pass(fault)),
     release: () => timed('release', 60, () => pass('release')),
   }
-  return { ports, calls, maxActive: () => maxActive }
+  return { ports, calls, maxActive: () => maxActive, maxAnalyses: () => maxAnalyses }
 }
 
 test('checks that never call the model run first, side by side, before the first model request', async () => {
-  const { ports, calls, maxActive } = recordingPorts({ productionCommit: 'c0ffee' })
+  const { ports, calls, maxActive, maxAnalyses } = recordingPorts({ productionCommit: 'c0ffee' })
   const slice = await runCampaignSlice({ catalog: PAC_CATALOG, state: { ledger: emptyCampaignLedger('COS-PAC-001'), reliability: null }, ports, remainingMs: () => 240_000 })
   const parallel = PAC_CATALOG.filter(item => PAC_PARALLEL_PORTS.has(item.port)).map(item => item.id)
   assert.deepEqual(parallel, ['PAC-07', 'PAC-08', 'PAC-09', 'PAC-10', 'PAC-19'])
@@ -67,9 +71,12 @@ test('checks that never call the model run first, side by side, before the first
   // Their rows are the first five recorded, and the production revision came from the deployment read.
   assert.deepEqual(slice.ledger.rows.slice(0, 5).map(row => row.testId).sort(), parallel)
   assert.equal(slice.ledger.productionCommit, 'c0ffee')
-  // Model checks never overlap one another.
-  const analyses = calls.filter(call => call.kind === 'analysis')
-  for (let i = 1; i < analyses.length; i++) assert.ok(analyses[i].at >= analyses[i - 1].end!, 'model requests run one at a time')
+  // Model checks (the eight analytical/routing checks, then the twenty reliability requests) run three at a time, never more.
+  assert.equal(CAMPAIGN_MODEL_CONCURRENCY, 3)
+  assert.equal(maxAnalyses(), 3)
+  // Seven analytical checks plus twenty reliability requests (PAC-12 has no routing port on this stub host: BLOCKED).
+  assert.equal(calls.filter(call => call.kind === 'analysis').length, 7 + 20)
+  assert.ok(slice.ledger.rows.some(row => row.testId === 'PAC-20' && row.verdict === 'PASS'))
 })
 
 test('without a readable production revision the checks keep their original order and still run', async () => {
@@ -112,8 +119,9 @@ test('a failure is shown in the live status the moment it is recorded, before th
   assert.match(updates[0].reply, /1 of 4 checks done \(1 PASS, 0 FAIL, 0 BLOCKED\)/)
   assert.equal(updates[1].analysesSoFar, 0)
   assert.match(updates[1].reply, /2 of 4 checks done \(2 PASS, 0 FAIL, 0 BLOCKED\)/)
-  // PAC-01 fails next, with its real cause before PAC-02 is called.
-  assert.equal(updates[2].analysesSoFar, 1)
+  // PAC-01 and PAC-02 run side by side; PAC-01's failure is published with its cause the moment it is recorded,
+  // before PAC-02's result exists.
+  assert.equal(updates[2].analysesSoFar, 2)
   assert.match(updates[2].reply, /3 of 4 checks done \(2 PASS, 1 FAIL, 0 BLOCKED\)/)
   assert.match(updates[2].reply, /Not passing so far:\n- PAC-01 Eight-part forensic investigation: FAIL, production path did not release an answer/)
   assert.equal(updates.at(-1)!.done, 4)
@@ -203,4 +211,31 @@ test('independent PAC checks publish each finished result before slower peers, p
   assert.equal(result.stopped, 'complete')
   assert.deepEqual(statuses, [['PAC-07'], ['PAC-07', 'PAC-08']])
   assert.equal(result.ledger.rows.length, 2)
+})
+
+test('reliability requests run three at a time but count in order: the first unverified one ends the run', async () => {
+  let n = 0
+  let active = 0
+  let peak = 0
+  const ports: CampaignPorts = {
+    outcomeJudge: stubOutcomeJudge,
+    deployment: async () => ({ mainCommit: 'c0ffee', productionCommit: 'c0ffee' }),
+    // Request 5 fails; requests that finish after it (6, 7) are not counted. Later ones finish first to test ordering.
+    analysis: async prompt => {
+      const index = ++n
+      active++; peak = Math.max(peak, active)
+      await sleep(index % 2 ? 15 : 5)
+      active--
+      const failed = index === 5
+      return { status: 200, ok: !failed, reply: failed ? '' : fullAnswer(prompt), source: failed ? 'failed_closed' : 'cos-local-primary', correlationId: `r-${index}`, latencyMs: 10, servedCommit: 'c0ffee', model: 'owned', localModelInvoked: true, executionAllowed: false }
+    },
+  }
+  const only = PAC_CATALOG.filter(item => item.id === 'PAC-20')
+  const slice = await runCampaignSlice({ catalog: only, state: { ledger: emptyCampaignLedger('COS-PAC-001'), reliability: null }, ports, remainingMs: () => 240_000, reliabilityPrompts: [PAC_CATALOG[0].prompt!] })
+  assert.equal(peak, 3)
+  const result = slice.ledger.rows.find(row => row.testId === 'PAC-20')!
+  assert.equal(result.verdict, 'FAIL')
+  assert.equal(result.actual, 'Request 5 of 20 did not produce a complete analysis; 4 consecutive completions before it.')
+  // The run stops once the failure is known: only requests already in flight finish, the rest never start.
+  assert.ok(n < 20, `the qualification stopped early (${n} of 20 started)`)
 })

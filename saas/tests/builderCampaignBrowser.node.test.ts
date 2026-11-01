@@ -75,26 +75,36 @@ function fakePage(options: Readonly<{
 
 const credentials = { email: 'campaign@example.com', password: 'not-a-real-password' }
 
-test('PAC-13: the request typed into the public Concierge receives its answer on the page', async () => {
+test('PAC-13: the authenticated COS Assistant receives the request and responds on the page', async () => {
   const site = fakePage({ answerAfterMs: 12_000 })
   const session = newBrowserSession('PAC-13', site.now(), 'sbx-1')
-  const outcome = await runBrowserCheck({ testId: 'PAC-13', session, driver: site.driver, credentials: null, records: async () => null, now: site.now, remainingMs: () => 200_000, sleep: site.sleep })
+  const outcome = await runBrowserCheck({ testId: 'PAC-13', session, driver: site.driver, credentials, records: async () => null, now: site.now, remainingMs: () => 200_000, sleep: site.sleep })
   assert.equal(outcome.status, 'done')
   if (outcome.status !== 'done') return
   assert.equal(outcome.result.verdict, 'PASS', outcome.result.actual)
   assert.equal(site.request(), checkRequest('PAC-13', session.token))
-  assert.ok(site.actions.includes(`fill ${UI.homeInput}`) && site.actions.includes(`click ${UI.homeSend}`))
+  assert.ok(site.actions.includes(`click ${UI.loginSubmit}`))
+  assert.ok(site.actions.includes(`fill ${UI.assistantInput}`) && site.actions.includes(`click ${UI.assistantSend}`))
+  assert.ok(!site.actions.includes(`click ${UI.assistantSend}`), 'a public Concierge request cannot certify authenticated COS')
   assert.ok(site.actions.includes('close'), 'the browser is closed after the check')
   assert.ok(outcome.result.evidence.some(item => /answer on the page \d+ ms after submit/.test(item.detail)))
 })
 
+test('PAC-13 cannot PASS without an authenticated COS test account', async () => {
+  const site = fakePage({ answerAfterMs: 0 })
+  const outcome = await runBrowserCheck({ testId: 'PAC-13', session: newBrowserSession('PAC-13', site.now(), 'sbx'), driver: site.driver, credentials: null, records: async () => null, now: site.now, remainingMs: () => 200_000, sleep: site.sleep })
+  assert.equal(outcome.status, 'done')
+  assert.equal(outcome.status === 'done' && outcome.result.verdict, 'BLOCKED')
+  assert.ok(!site.actions.includes(`click ${UI.homeSend}`))
+})
+
 test('PAC-13: a failure message on the page is FAIL; no answer within the window is FAIL', async () => {
   const failing = fakePage({ answerAfterMs: 5_000, failureText: 'I could not finish a reliable answer to this request just now' })
-  const failed = await runBrowserCheck({ testId: 'PAC-13', session: newBrowserSession('PAC-13', failing.now(), 'sbx'), driver: failing.driver, credentials: null, records: async () => null, now: failing.now, remainingMs: () => 200_000, sleep: failing.sleep })
+  const failed = await runBrowserCheck({ testId: 'PAC-13', session: newBrowserSession('PAC-13', failing.now(), 'sbx'), driver: failing.driver, credentials, records: async () => null, now: failing.now, remainingMs: () => 200_000, sleep: failing.sleep })
   assert.equal(failed.status === 'done' && failed.result.verdict, 'FAIL')
   assert.match(failed.status === 'done' ? failed.result.actual : '', /failure message/)
   const silent = fakePage({ answerAfterMs: BROWSER_ANSWER_WAIT_MS + 60_000 })
-  const timedOut = await runBrowserCheck({ testId: 'PAC-13', session: newBrowserSession('PAC-13', silent.now(), 'sbx'), driver: silent.driver, credentials: null, records: async () => null, now: silent.now, remainingMs: () => 10 * 60_000, sleep: silent.sleep })
+  const timedOut = await runBrowserCheck({ testId: 'PAC-13', session: newBrowserSession('PAC-13', silent.now(), 'sbx'), driver: silent.driver, credentials, records: async () => null, now: silent.now, remainingMs: () => 10 * 60_000, sleep: silent.sleep })
   assert.equal(timedOut.status === 'done' && timedOut.result.verdict, 'FAIL')
   assert.match(timedOut.status === 'done' ? timedOut.result.actual : '', /no answer on the page/)
 })
@@ -102,20 +112,20 @@ test('PAC-13: a failure message on the page is FAIL; no answer within the window
 test('a check waiting for the page hands the slice back and continues from the same session in the next slice', async () => {
   const site = fakePage({ answerAfterMs: 90_000 })
   let remaining = 60_000
-  const first = await runBrowserCheck({ testId: 'PAC-13', session: newBrowserSession('PAC-13', site.now(), 'sbx-7'), driver: site.driver, credentials: null, records: async () => null, now: site.now, remainingMs: () => { remaining -= 5_000; return remaining }, sleep: site.sleep })
+  const first = await runBrowserCheck({ testId: 'PAC-13', session: newBrowserSession('PAC-13', site.now(), 'sbx-7'), driver: site.driver, credentials, records: async () => null, now: site.now, remainingMs: () => { remaining -= 5_000; return remaining }, sleep: site.sleep })
   assert.equal(first.status, 'pending')
   assert.equal(first.session.phase, 'submitted')
   assert.equal(first.session.sandboxName, 'sbx-7')
-  const submitsBefore = site.actions.filter(action => action === `click ${UI.homeSend}`).length
-  const second = await runBrowserCheck({ testId: 'PAC-13', session: first.session, driver: site.driver, credentials: null, records: async () => null, now: site.now, remainingMs: () => 200_000, sleep: site.sleep })
+  const submitsBefore = site.actions.filter(action => action === `click ${UI.assistantSend}`).length
+  const second = await runBrowserCheck({ testId: 'PAC-13', session: first.session, driver: site.driver, credentials, records: async () => null, now: site.now, remainingMs: () => 200_000, sleep: site.sleep })
   assert.equal(second.status, 'done')
   assert.equal(second.status === 'done' && second.result.verdict, 'PASS')
-  assert.equal(site.actions.filter(action => action === `click ${UI.homeSend}`).length, submitsBefore, 'the request is not submitted a second time')
+  assert.equal(site.actions.filter(action => action === `click ${UI.assistantSend}`).length, submitsBefore, 'the request is not submitted a second time')
 })
 
 test('PAC-14 and PAC-15 are BLOCKED without a test account, and sign in with one', async () => {
   const site = fakePage()
-  const blocked = await runBrowserCheck({ testId: 'PAC-14', session: newBrowserSession('PAC-14', site.now(), 'sbx'), driver: site.driver, credentials: null, records: async () => null, now: site.now, remainingMs: () => 200_000, sleep: site.sleep })
+  const blocked = await runBrowserCheck({ testId: 'PAC-14', session: newBrowserSession('PAC-14', site.now(), 'sbx'), driver: site.driver, credentials, records: async () => null, now: site.now, remainingMs: () => 200_000, sleep: site.sleep })
   assert.equal(blocked.status === 'done' && blocked.result.verdict, 'BLOCKED')
   assert.equal(blocked.status === 'done' && blocked.result.failureCause, 'no test account configured')
 

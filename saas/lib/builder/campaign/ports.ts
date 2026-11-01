@@ -34,8 +34,11 @@ export type AnalysisOutcome = Readonly<{
 }>
 
 export type CampaignPorts = Readonly<{
-  /** The repository's current main commit. The production commit is what the live site reports serving each request. */
-  deployment: () => Promise<Readonly<{ mainCommit: string | null }>>
+  /**
+   * The repository's current main commit, and the revision the live site reports serving when it can be read without
+   * a model call. Every request's own served revision is still recorded; a change under the campaign is reported.
+   */
+  deployment: () => Promise<Readonly<{ mainCommit: string | null; productionCommit?: string | null }>>
   /**
    * The independent outcome verifier's judge (answerOutcomeVerifier.ts), the same one COS releases answers with. Without
    * it an analysis item is BLOCKED: whether an answer delivered what was asked is never decided by a word rule.

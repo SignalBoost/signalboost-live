@@ -30,7 +30,7 @@ jobs:
       - name: Builder V2 inference cap and deadline regression
         run: node --experimental-transform-types --test tests/builderInferenceBudget.node.test.ts
       - name: Verification campaign runner, ledger, host ports and admission
-        run: node --experimental-transform-types --import ./scripts/test-alias-loader.mjs --test tests/builderVerificationCampaign.node.test.ts tests/builderVerificationCampaignHost.node.test.ts tests/builderCampaignFaults.node.test.ts tests/builderCampaignBrowser.node.test.ts tests/builderCampaignGovernanceFixture.node.test.ts
+        run: node --experimental-transform-types --import ./scripts/test-alias-loader.mjs --test tests/builderVerificationCampaign.node.test.ts tests/builderVerificationCampaignHost.node.test.ts tests/builderCampaignFaults.node.test.ts tests/builderCampaignBrowser.node.test.ts tests/builderCampaignGovernanceFixture.node.test.ts tests/builderCampaignBackgroundTargeted.node.test.ts
       - name: Builder V2 isolated publication boundary
         run: node --experimental-transform-types --test tests/builderV2IsolatedPublication.node.test.ts
 

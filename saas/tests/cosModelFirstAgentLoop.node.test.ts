@@ -100,7 +100,8 @@ test('first semantic decision prefers native function tools and keeps JSON plann
 test('public Concierge receives only the public-safe live_web, compute and Software Specialist capabilities', () => {
   // compute runs the governed agent tool loop (search, fetch, sandboxed Python); the Software Specialist keeps public
   // work in its isolated workspace. No private capability.
-  assert.match(decision, /input\.surface === 'concierge'\s*\? \['live_web', 'compute', 'software_specialist'\]/)
+  // Only the signed-in owner additionally gets the verification campaign on Concierge.
+  assert.match(decision, /input\.surface === 'concierge'\s*\? input\.ownerAuthenticated \? \['live_web', 'compute', 'software_specialist', 'verification_campaign'\] : \['live_web', 'compute', 'software_specialist'\]/)
   assert.match(decision, /input\.ownerAuthenticated\s*\? COS_AGENT_CAPABILITIES/)
 })
 

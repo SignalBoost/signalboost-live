@@ -32,7 +32,7 @@ test('a campaign job slice pauses with its ledger in the checkpoint and resumes 
       // The pause RPC persists only a checkpoint with version '1' and the job's workspaceId (Codex on #4973).
       assert.equal(outcome.checkpoint.version, '1')
       assert.equal(outcome.checkpoint.workspaceId, 'ws-1')
-      assert.match(outcome.reply, /in progress: \d+ of 20 checks executed/)
+      assert.match(outcome.reply, /in progress: \d+ of 20 checks done \(\d+ PASS, \d+ FAIL, \d+ BLOCKED\)/)
       clock = start + 240_000
       continue
     }
@@ -71,28 +71,36 @@ test('the job runner routes engine "campaign" to the campaign slice, checkpoints
   assert.ok(start < runner.indexOf("job.metadata.builderEngine === 'v2'"))
 })
 
-test('the signed-in owner starts the campaign on either surface: by its identifier directly, or through the planner; nobody else can', async () => {
-  const { namesVerificationCampaign, PAC_CAMPAIGN_ID } = await import('../lib/builder/campaign/catalog.ts')
-  assert.equal(namesVerificationCampaign('# iTMounts / COS — Production Acceptance Campaign\n\n**Campaign ID:** COS-PAC-001'), true)
-  assert.equal(namesVerificationCampaign(`run ${PAC_CAMPAIGN_ID} now`), true)
-  assert.equal(namesVerificationCampaign('COS-PAC-0010 is something else'), false)
-  assert.equal(namesVerificationCampaign('Investigate why the payment service returned 5xx errors'), false)
+test('the signed-in owner starts the campaign on either surface through the planner; naming it is a routing hint, never admission', async () => {
+  const { mentionsVerificationCampaign, PAC_CAMPAIGN_ID } = await import('../lib/builder/campaign/catalog.ts')
+  assert.equal(mentionsVerificationCampaign('# iTMounts / COS — Production Acceptance Campaign\n\n**Campaign ID:** COS-PAC-001'), true)
+  assert.equal(mentionsVerificationCampaign(`run ${PAC_CAMPAIGN_ID} now`), true)
+  assert.equal(mentionsVerificationCampaign('rerun PAC-03'), true)
+  assert.equal(mentionsVerificationCampaign('COS-PAC-0010 is something else'), false)
+  assert.equal(mentionsVerificationCampaign('Investigate why the payment service returned 5xx errors'), false)
   const decision = read('lib/ai/cos/cosAgentDecision.ts')
   assert.match(decision, /'verification_campaign',/)
-  assert.match(decision, /verification_campaign: 'Run the production acceptance campaign/)
-  // The public Concierge catalog stays the fixed public-safe list; the owner reaches the campaign on that surface by identifier.
-  assert.match(decision, /input\.surface === 'concierge'\n\s+\? \['live_web', 'compute', 'software_specialist'\]/)
+  assert.match(decision, /verification_campaign: 'Run the production acceptance campaign COS-PAC-001, or some of its checks/)
+  assert.match(decision, /A pasted campaign report or result, a question about why a check failed, or a request to fix, explain or review a failure is NOT a request to run anything/)
+  // Concierge offers the campaign to the signed-in owner only; the public list is unchanged.
+  assert.match(decision, /input\.ownerAuthenticated \? \['live_web', 'compute', 'software_specialist', 'verification_campaign'\] : \['live_web', 'compute', 'software_specialist'\]/)
   const route = read('app/api/cos-browser/route.ts')
-  // Direct admission by identifier comes right after the owner's identity is known, before any router or planner.
-  const direct = route.indexOf("if (authenticatedOwner && access?.userId && namesVerificationCampaign(prompt))")
-  assert.ok(direct > 0)
-  assert.ok(direct < route.indexOf('const fastAuthoringIngress'))
-  assert.ok(direct < route.indexOf('agentDecision = await decideCosAgentTurn('))
+  assert.doesNotMatch(route, /namesVerificationCampaign/)
+  // A request naming the campaign is planned right after the owner's identity is known, before any other lane.
+  const early = route.indexOf('if (authenticatedOwner && access?.userId && mentionsVerificationCampaign(prompt)) {')
+  assert.ok(early > 0)
+  assert.ok(early < route.indexOf('const fastAuthoringIngress'))
+  const earlyBlock = route.slice(early, route.indexOf('// AGENT TOOL LOOP:', early))
+  assert.match(earlyBlock, /campaignPlan = await decideCosAgentTurn\(/)
+  // Only the planner's verification_campaign request starts it, with the checks it read.
+  assert.match(earlyBlock, /if \(campaignPlan\?\.mode === 'orchestrate' && campaignPlan\.capabilities\.includes\('verification_campaign'\)\) \{\n\s+const started = await startVerificationCampaignResponse\(\{ userId: access\.userId, body, prompt, language, checks: campaignPlan\.campaignChecks \}\)/)
+  // Otherwise the same decision is reused: one planner call per turn.
+  assert.match(route, /if \(campaignPlan\) \{\n\s+agentDecision = campaignPlan\n/)
   assert.match(route, /agentDecision\.capabilities\.includes\('verification_campaign'\) && authenticatedOwner && access\?\.userId\)/)
-  assert.doesNotMatch(route, /verification_campaign'\) && authenticatedOwner && browserSurface === 'assistant'/)
+  assert.match(route, /checks: agentDecision\.campaignChecks/)
   assert.match(route, /source: 'cos-verification-campaign'/)
   const starter = read('lib/builder/campaign/start.ts')
-  assert.match(starter, /metadata: \{ builderEngine: CAMPAIGN_ENGINE, campaignId: PAC_CAMPAIGN_ID/)
+  assert.match(starter, /metadata: \{ builderEngine: CAMPAIGN_ENGINE, campaignId: PAC_CAMPAIGN_ID, \.\.\.\(checks\.length \? \{ campaignChecks: checks \} : \{\}\)/)
   assert.match(starter, /ownerAuthorized: true/)
   assert.match(starter, /jobKind: 'standard'/)
 })
@@ -126,7 +134,12 @@ test('the host ports execute against the live production path and read facts bac
   assert.equal((await host.productionRouting(PAC_01_PROMPT, undefined, builderFetch)).enteredBuilder, true)
   process.env.GITHUB_TOKEN = 'test-token'
   process.env.VERCEL_GIT_COMMIT_SHA = 'preview-worker-sha'
-  assert.deepEqual(await host.deploymentFacts(fetchImpl), { mainCommit: 'deadbeef' }, 'the worker\'s own environment is never the production commit')
+  const before = calls.length
+  assert.deepEqual(await host.deploymentFacts(fetchImpl), { mainCommit: 'deadbeef', productionCommit: 'deadbeef' }, 'the production revision is the live site\'s header, never the worker\'s own environment')
+  // The revision is read with a GET that runs no turn: no prompt is sent.
+  const probe = calls.slice(before).find(call => call.url.endsWith('/api/cos-browser'))!
+  assert.equal(probe.init.method, 'GET')
+  assert.equal(probe.init.body, undefined)
   const release = await host.releaseChecks('deadbeef', undefined, fetchImpl)
   assert.equal(release.verdict, 'PASS')
   const failing = (async () => new Response(JSON.stringify({ check_runs: [{ name: 'Unit tests', status: 'completed', conclusion: 'failure' }] }), { status: 200 })) as typeof fetch

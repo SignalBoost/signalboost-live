@@ -162,11 +162,38 @@ export const PAC_CATALOG: readonly CampaignItem[] = Object.freeze([
 
 export const PAC_CAMPAIGN_ID = 'COS-PAC-001'
 
+/** Every check id, in catalog order. */
+export const PAC_CHECK_IDS: readonly string[] = Object.freeze(PAC_CATALOG.map(item => item.id))
+
 /**
- * Whether a request carries the campaign's own identifier. This is a lookup against the identifier the catalog
- * owns, as exact as a command, not a reading of the request's wording: the owner pasting the campaign document
- * (which names COS-PAC-001) is asking for that campaign.
+ * Checks that never call the production model: release checks read GitHub, fault checks run the reasoner against a
+ * controlled stub. They run first and side by side, so their results arrive within seconds; every check that uses the
+ * live model still runs one at a time, because concurrent requests on the single serving GPU would fail in ways real
+ * users never see.
  */
-export function namesVerificationCampaign(request: string): boolean {
-  return new RegExp(`(?<![A-Za-z0-9-])${PAC_CAMPAIGN_ID}(?![A-Za-z0-9-])`).test(String(request || ''))
+export const PAC_PARALLEL_PORTS: ReadonlySet<CampaignPort> = new Set<CampaignPort>(['release', 'fault'])
+
+/**
+ * The checks a run executes. The planner passes the ids the owner asked for; anything that is not a catalog id is
+ * dropped, the catalog order is kept, and no valid id (or every id) means the whole campaign.
+ */
+export function selectCampaignChecks(requested: readonly unknown[] | null | undefined): readonly CampaignItem[] {
+  const wanted = new Set((Array.isArray(requested) ? requested : []).map(value => String(value || '').trim().toUpperCase()))
+  const selected = PAC_CATALOG.filter(item => wanted.has(item.id))
+  return selected.length ? selected : PAC_CATALOG
+}
+
+/** Whether a run covers fewer than all checks: its result is a targeted retest, never a campaign certification. */
+export function isTargetedRun(catalog: readonly CampaignItem[]): boolean {
+  return catalog.length < PAC_CATALOG.length
+}
+
+/**
+ * Whether a request names the campaign or one of its checks. This is a ROUTING HINT only, never admission: it keeps
+ * the request on the request path, where the planner decides by meaning whether the owner asks to run checks or to
+ * discuss a result (cos-browser). A pasted report naming COS-PAC-001 is answered, not executed.
+ */
+export function mentionsVerificationCampaign(request: string): boolean {
+  const text = String(request || '')
+  return new RegExp(`(?<![A-Za-z0-9-])(?:${PAC_CAMPAIGN_ID}|PAC-\\d{2})(?![A-Za-z0-9-])`, 'i').test(text)
 }

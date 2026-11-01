@@ -48,8 +48,10 @@ test('a planned live lookup is still adjudicated by the turn intent judge downst
 
 test('public Concierge cannot request owner-private capabilities', () => {
   const catalog = decision.slice(decision.indexOf('function toolCatalog'), decision.indexOf('function turnReasonerLabel'))
-  assert.match(catalog, /input\.surface === 'concierge'\s*\n\s*\? \['live_web', 'compute', 'software_specialist'\]/)
-  assert.doesNotMatch(catalog.slice(catalog.indexOf("input.surface === 'concierge'"), catalog.indexOf('input.ownerAuthenticated')), /repository_read|platform_runtime|internal_context|external_action/)
+  // Public Concierge keeps the public-safe list; only the signed-in owner also gets the verification campaign there.
+  assert.match(catalog, /input\.surface === 'concierge'\s*\n\s*\? input\.ownerAuthenticated \? \['live_web', 'compute', 'software_specialist', 'verification_campaign'\] : \['live_web', 'compute', 'software_specialist'\]/)
+  const conciergeLine = catalog.slice(catalog.indexOf("input.surface === 'concierge'"), catalog.indexOf('\n', catalog.indexOf("? input.ownerAuthenticated ?")))
+  assert.doesNotMatch(conciergeLine, /repository_read|platform_runtime|internal_context|external_action/)
   assert.match(catalog, /input\.ownerAuthenticated\s*\n\s*\? COS_AGENT_CAPABILITIES/)
 })
 

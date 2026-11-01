@@ -4,6 +4,12 @@ import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMes
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, COS_DURABLE_PENDING_COPY, findDurableCosTurnReply, findRecoveredAssistantTurn, type RecoveredAssistantTurn } from './assistantTransportRecovery.ts'
 import { planResearchTask } from './researchBudget.ts'
 import { BUILDER_JOB_FOLLOW_WINDOW_MS, BUILDER_JOB_POLL_DELAY_MS, BUILDER_JOB_SLOW_POLL_DELAY_MS } from '../../builder/job-poll.ts'
+import { announceLiveBuilder } from '../../builder/liveJob.ts'
+
+/** Whether a response is a started verification campaign, which is never followed inside the chat turn. */
+export function campaignInBackground(data: unknown): boolean {
+  return Boolean(data && typeof data === 'object' && (data as Record<string, unknown>).source === 'cos-verification-campaign')
+}
 
 export type AgentProgressEvent = {
   phase: 'accepted' | 'running' | 'complete'
@@ -569,6 +575,15 @@ export async function postWithAgentProgress(args: {
       ? operatorProgressMessage({ stage: response.ok ? 'complete' : 'blocked', target: progressTarget, builder: builderActive })
       : say(response.ok ? PROGRESS_DONE : PROGRESS_UNCONFIRMED))
     return { ok: response.ok, status: response.status, data }
+  }
+
+  // A verification campaign runs in the background for minutes. The chat turn ends with its receipt now; the live job
+  // panel beside the conversation shows its status and every failure as soon as it is recorded. Production 2026-10-31:
+  // following the campaign here held the owner's message open for about ten minutes.
+  if (campaignInBackground(data)) {
+    announceLiveBuilder({ jobId, conversationId: String(data?.conversationId || conversationIdForTurn || ''), status: 'running', reply: String(data?.reply || '') })
+    report('complete', say(PROGRESS_DONE))
+    return { ok: true, status: response.status, data }
   }
 
   // Once a POST has returned a durable job id, every later request is read-only status checking.

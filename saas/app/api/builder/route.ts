@@ -1,3 +1,4 @@
+import { CAMPAIGN_ENGINE } from '@/lib/builder/campaign/job'
 import { compileCosInstructionContract } from '@/lib/ai/cos/instructionContract'
 import { builderAcceptanceReport } from '@/lib/builder/acceptance-report'
 import type { BuilderV2Receipt } from '@/lib/builder/agent-v2-dispatcher'
@@ -154,6 +155,10 @@ export async function GET(request: Request) {
         // A paused job waiting for the user (Work with me: merge held) answers with its own reply and approval marker,
         // so chat stops following it and shows the approval card instead of "will continue automatically".
         const approval = job.status === 'paused' && readPendingApproval(job.result) ? job.result : null
+        // A verification campaign writes its live status (checks done, every failure so far) into its result.
+        const campaignStatus = job.metadata.builderEngine === CAMPAIGN_ENGINE && typeof job.result?.reply === 'string' && job.result.reply
+          ? job.result.reply
+          : null
         return noStore({
           jobId: job.id,
           workspaceId: job.workspaceId,
@@ -163,6 +168,7 @@ export async function GET(request: Request) {
           progress: builderProgressSnapshot(job),
           ...(approval ? { awaitingApproval: approval.awaitingApproval } : {}),
           reply: approval && typeof approval.reply === 'string' && approval.reply ? approval.reply
+            : campaignStatus ? campaignStatus
             : job.status === 'queued' && job.metadata.builderCapacityDeferredReason === 'builder_runpod_primary_busy'
             ? 'Queued — waiting for model capacity. Builder will resume this saved job automatically.'
             : job.status === 'paused' && job.checkpoint?.verificationPending === true

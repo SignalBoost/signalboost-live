@@ -5,8 +5,8 @@
 // paused slice resumes exactly where it stopped through the ordinary continuation cron; the final History reply is
 // the Section 13/14 evidence package. A campaign never touches a workspace or a repository.
 
-import { PAC_CATALOG, PAC_CAMPAIGN_ID } from './catalog.ts'
-import { renderCampaignReport, certifyCampaign } from './ledger.ts'
+import { PAC_CATALOG, PAC_CAMPAIGN_ID, isTargetedRun, selectCampaignChecks } from './catalog.ts'
+import { renderCampaignReport, renderCampaignProgress, certifyCampaign } from './ledger.ts'
 import { emptyCampaignLedger, runCampaignSlice, type CampaignState } from './runner.ts'
 import type { CampaignPorts } from './ports.ts'
 
@@ -50,32 +50,45 @@ export async function runCampaignJobSlice(input: Readonly<{
   ports: CampaignPorts
   remainingMs: () => number
   signal?: AbortSignal
+  /** The check ids this job runs (job metadata `campaignChecks`); absent or empty means the whole campaign. */
+  checks?: readonly unknown[] | null
+  /** Live status for the owner, written after every finished check while the slice runs. */
+  progress?: (update: Readonly<{ reply: string; done: number; total: number }>) => Promise<void>
 }>): Promise<CampaignSliceOutcome> {
+  const catalog = selectCampaignChecks(input.checks)
+  const scope = { targeted: isTargetedRun(catalog), campaignSize: PAC_CATALOG.length }
   const state = campaignStateFromCheckpoint(input.checkpoint)
   const reliabilityPrompts = PAC_CATALOG.filter(item => item.port === 'analysis' && item.prompt).map(item => item.prompt as string)
-  const slice = await runCampaignSlice({ catalog: PAC_CATALOG, state, ports: input.ports, remainingMs: input.remainingMs, signal: input.signal, reliabilityPrompts })
+  const reliabilityRequired = (testId: string) => catalog.find(item => item.id === testId)?.count ?? 20
+  const statusLine = (ledger: CampaignState['ledger'], reliability: CampaignState['reliability']) => renderCampaignProgress(
+    ledger, catalog, scope, reliability ? { completed: reliability.completed, required: reliabilityRequired(reliability.testId) } : null,
+  )
+  const doneCount = (ledger: CampaignState['ledger']) => certifyCampaign(ledger, catalog).total - certifyCampaign(ledger, catalog).pending
+  const slice = await runCampaignSlice({
+    catalog, state, ports: input.ports, remainingMs: input.remainingMs, signal: input.signal, reliabilityPrompts,
+    progress: input.progress
+      ? snapshot => input.progress!({ reply: statusLine(snapshot.ledger, snapshot.reliability), done: doneCount(snapshot.ledger), total: catalog.length })
+      : undefined,
+  })
   const next: CampaignState = {
     ledger: slice.ledger, reliability: slice.reliability,
     shortestRequestMs: slice.shortestRequestMs, longestRequestMs: slice.longestRequestMs, interruptedItem: slice.interruptedItem,
     browser: slice.browser ?? null, fixture: slice.fixture ?? null,
   }
   if (slice.stopped !== 'complete') {
-    const done = next.ledger.rows.length
-    const total = PAC_CATALOG.length
-    const progressLine = next.reliability ? ` Reliability loop: ${next.reliability.completed} of 20 requests completed.` : ''
     return {
       status: 'paused',
       checkpoint: { version: '1', workspaceId: input.workspaceId, campaign: next },
-      reply: `Verification campaign ${PAC_CAMPAIGN_ID} in progress: ${done} of ${total} checks executed.${progressLine} It continues automatically; the evidence package will appear here when it finishes.`,
-      done, total,
+      reply: statusLine(next.ledger, next.reliability),
+      done: doneCount(next.ledger), total: catalog.length,
     }
   }
-  const certification = certifyCampaign(next.ledger, PAC_CATALOG)
-  const report = renderCampaignReport(next.ledger, PAC_CATALOG)
+  const certification = certifyCampaign(next.ledger, catalog)
+  const report = renderCampaignReport(next.ledger, catalog, scope)
   return {
     status: certification.outcome === 'PASS' ? 'succeeded' : 'failed',
     outcome: certification.outcome,
     reply: report,
-    result: { campaignId: PAC_CAMPAIGN_ID, certification, ledger: next.ledger },
+    result: { campaignId: PAC_CAMPAIGN_ID, checks: catalog.map(item => item.id), targeted: scope.targeted, certification, ledger: next.ledger },
   }
 }

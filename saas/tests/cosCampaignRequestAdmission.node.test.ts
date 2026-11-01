@@ -14,8 +14,8 @@ import { isContentGenerationRequest } from '../lib/ai/cos/contentGenerationInten
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
 const campaignDocument = read('tests/fixtures/cos-production-acceptance-campaign.txt')
 
-test('the campaign document is an external-action request, so without owner admission it would be queued in the background', () => {
-  assert.equal(namesVerificationCampaign(campaignDocument), true)
+test('a pasted campaign document is not authorization to start twenty production tests', () => {
+  assert.equal(namesVerificationCampaign(campaignDocument), false)
   assert.equal(isProvenanceIntrospection(campaignDocument), false)
   assert.equal(isContentGenerationRequest(campaignDocument), false)
   assert.equal(isExternalActionCommand(campaignDocument), true)

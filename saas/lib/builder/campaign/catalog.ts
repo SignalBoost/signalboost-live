@@ -174,3 +174,12 @@ export function namesVerificationCampaign(request: string): boolean {
   if (/^(?:please\s+)?(?:run|start|execute|launch)\s+(?:the\s+)?(?:full\s+)?(?:production\s+acceptance\s+campaign\s+)?COS-PAC-001(?:\s+(?:now|again))?[.!\s]*$/i.test(text)) return true
   return false
 }
+
+/** A pasted acceptance specification, never an authorization to execute it. */
+export function isVerificationCampaignDocument(request: string): boolean {
+  const text = String(request || '').trim()
+  const firstLine = text.split(/\r?\n/, 1)[0]
+  return /^#\s+iTMounts\s*\/\s*COS\s*[—-]\s*Production Acceptance Campaign\s*$/i.test(firstLine)
+    && /^\*\*Campaign ID:\*\*\s*COS-PAC-001\s*$/im.test(text)
+    && /^##\s*1\.\s*Mandatory Execution Rules\s*$/im.test(text)
+}

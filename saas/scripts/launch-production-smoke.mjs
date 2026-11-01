@@ -5,15 +5,24 @@ const url = new URL(base)
 if (url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) {
   throw new Error('smoke_base_must_be_https_origin')
 }
+// Follow only canonical www ↔ apex redirects. Never let a credential-free
+// acceptance probe silently certify a login page or an unrelated host.
+const permittedOrigins = new Set(['https://itmounts.com', 'https://www.itmounts.com'])
+if (!permittedOrigins.has(url.origin)) throw new Error('smoke_base_not_itmounts_origin')
 const failures = []
 async function probe(path, predicate, description) {
   const target = new URL(path, url.origin)
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 15000)
   try {
-    const response = await fetch(target, { method:'GET', redirect:'manual', cache:'no-store', signal:controller.signal, headers:{'user-agent':'itmounts-launch-smoke/1'} })
-    const good = predicate(response.status)
-    console.log(JSON.stringify({ path, status:response.status, passed:good, expectation:description }))
+    const response = await fetch(target, { method:'GET', redirect:'follow', cache:'no-store', signal:controller.signal, headers:{'user-agent':'itmounts-launch-smoke/1'} })
+    const finalUrl = new URL(response.url)
+    const canonicalDestination = permittedOrigins.has(finalUrl.origin)
+      && finalUrl.protocol === 'https:'
+      && finalUrl.pathname === target.pathname
+      && !finalUrl.search && !finalUrl.hash
+    const good = canonicalDestination && predicate(response.status)
+    console.log(JSON.stringify({ path, status:response.status, finalOrigin:finalUrl.origin, finalPath:finalUrl.pathname, passed:good, expectation:description }))
     if (!good) failures.push(path)
   } catch (error) {
     console.error(JSON.stringify({ path, passed:false, error: error instanceof Error ? error.name : 'network_error' }))

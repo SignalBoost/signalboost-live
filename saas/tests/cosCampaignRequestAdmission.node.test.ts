@@ -29,6 +29,6 @@ test("the signed-in owner's campaign request is never queued as a background COS
   const browser = read('app/api/cos-browser/route.ts')
   const admission = browser.indexOf('if (authenticatedOwner && access?.userId && mentionsVerificationCampaign(prompt)) {')
   assert.ok(admission > 0)
-  assert.ok(browser.indexOf('startVerificationCampaignResponse({ userId: access.userId, body, prompt, language, checks: campaignPlan.campaignChecks })', admission) > admission)
+  assert.ok(browser.indexOf('verificationCampaignResponse({ userId: access.userId, body, prompt, language, plan: campaignPlan })', admission) > admission)
   assert.equal(browser.slice(browser.indexOf('async function executeBrowserTurn'), admission).includes('cosPrimaryPost(req)'), true, 'only the explicit text-edit lane precedes admission')
 })

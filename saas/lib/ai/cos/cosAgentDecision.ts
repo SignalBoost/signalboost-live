@@ -45,6 +45,8 @@ export type CosAgentDecision =
       searchQueries: string[]
       /** For verification_campaign: the check ids the owner asked to run; empty or absent runs the whole campaign. */
       campaignChecks?: string[]
+      /** For verification_campaign: 'run' executes now; 'offer' answers at once with how to run it, nothing executed. */
+      campaignAction?: CampaignAction
       reason: string
       reasonerLabel: string
     }>
@@ -66,7 +68,7 @@ const CAPABILITY_DESCRIPTIONS: Record<CosAgentCapability, string> = {
   repository_read: 'Inspect the authorized repository or codebase before answering.',
   software_specialist: 'Hand off work that must build, change, run, test, debug or deploy actual software, code, files or a website to the governed Software Specialist. Not for analysis, investigation, explanation, review or planning that is answered in writing, even when its subject is software.',
   external_action: 'Request an authorized action in an external system; host policy decides whether execution is allowed.',
-  verification_campaign: 'Run the production acceptance campaign COS-PAC-001, or some of its checks (PAC-01 to PAC-20), now: a background job that executes the checks against the live site itself (real requests, deployment facts, release checks, traces) and reports PASS/FAIL/BLOCKED per check with evidence. Request it only when the owner asks for checks to be EXECUTED. A pasted campaign report or result, a question about why a check failed, or a request to fix, explain or review a failure is NOT a request to run anything: COS answers that in writing. When the owner names specific checks to run, pass their ids in checks (for example ["PAC-03"]); leave checks empty to run the whole campaign.',
+  verification_campaign: 'The production acceptance campaign COS-PAC-001 and its checks (PAC-01 to PAC-20): a background job that executes the checks against the live site itself (real requests, deployment facts, release checks, traces) and reports PASS/FAIL/BLOCKED per check with evidence. Call it with action "run" only when the owner asks for checks to be EXECUTED now. Call it with action "offer" when the owner shares the campaign document itself, or asks about running it, without clearly asking to run it now: the host answers at once that nothing has run and how to run all or some checks. A pasted campaign document is never answered in writing. Do NOT call it for a question about a past result, why a check failed, or a request to fix, explain or review a failure: COS answers that in writing. When the owner names specific checks, pass their ids in checks (for example ["PAC-03"]); leave checks empty for the whole campaign.',
 }
 
 const CAMPAIGN_CHECK_ID = /^PAC-\d{2}$/
@@ -86,9 +88,30 @@ function campaignChecksFromToolArguments(raw: unknown): string[] {
   }
 }
 
+export type CampaignAction = 'run' | 'offer'
+
+/** The planner's campaign action; anything but an explicit 'offer' is a run request (the capability itself means run). */
+export function campaignActionFrom(value: unknown): CampaignAction {
+  return String(value || '').trim().toLowerCase() === 'offer' ? 'offer' : 'run'
+}
+
+function campaignActionFromToolArguments(raw: unknown): CampaignAction {
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw
+    return campaignActionFrom((parsed as Record<string, unknown> | null)?.action)
+  } catch {
+    return 'run'
+  }
+}
+
 const VERIFICATION_CAMPAIGN_PARAMETERS = Object.freeze({
   type: 'object',
   properties: Object.freeze({
+    action: Object.freeze({
+      type: 'string',
+      enum: Object.freeze(['run', 'offer']),
+      description: '"run" to execute the checks now; "offer" when the owner shared the campaign or asked about it without asking to run it now.',
+    }),
     checks: Object.freeze({
       type: 'array',
       maxItems: 20,
@@ -179,7 +202,7 @@ export function parseCosAgentDecision(raw: string, reasonerLabel = 'unknown'): C
       )] as CosAgentCapability[]
       if (!capabilities.length) return null
       const searchQueries = capabilities.includes('live_web') ? sanitizePlannerSearchQueries(parsed.queries) : []
-      const campaign = capabilities.includes('verification_campaign') ? { campaignChecks: sanitizeCampaignChecks(parsed.checks) } : {}
+      const campaign = capabilities.includes('verification_campaign') ? { campaignChecks: sanitizeCampaignChecks(parsed.checks), campaignAction: campaignActionFrom(parsed.campaign_action) } : {}
       return { mode: 'orchestrate', answer: '', confidence: score, capabilities, searchQueries, ...campaign, reason, reasonerLabel }
     }
     return null
@@ -303,7 +326,7 @@ export async function decideCosAgentTurn(input: {
         confidence: 1,
         capabilities,
         searchQueries: liveWebCall ? plannerSearchQueriesFromToolArguments(liveWebCall.function.arguments) : [],
-        ...(campaignCall ? { campaignChecks: campaignChecksFromToolArguments(campaignCall.function.arguments) } : {}),
+        ...(campaignCall ? { campaignChecks: campaignChecksFromToolArguments(campaignCall.function.arguments), campaignAction: campaignActionFromToolArguments(campaignCall.function.arguments) } : {}),
         reason: 'native_tool_request',
         reasonerLabel: turnReasonerLabel(nativeTurn),
       }
@@ -338,7 +361,7 @@ export async function decideCosAgentTurn(input: {
       '{"mode":"answer","answer":"COS","confidence":1,"capabilities":[],"reason":"cos_answers"}',
       '{"mode":"orchestrate","answer":"","confidence":0.0,"capabilities":["live_web"],"queries":["self-contained web search"],"reason":"brief reason"}',
       tools.some(tool => tool.function.name === 'verification_campaign')
-        ? `verification_campaign: ${CAPABILITY_DESCRIPTIONS.verification_campaign} In this JSON shape pass the ids as "checks":["PAC-03"].`
+        ? `verification_campaign: ${CAPABILITY_DESCRIPTIONS.verification_campaign} In this JSON shape pass the ids as "checks":["PAC-03"] and the action as "campaign_action":"run" or "offer".`
         : '',
       LIVE_WEB_PLANNING_RULES,
       'Return the no-tool JSON when the request is reliably answerable from the request itself, conversation context supplied here, and stable model knowledge. Do not request capabilities merely to improve wording or because the topic sounds sophisticated.',

@@ -14,7 +14,8 @@ import { runCampaignSlice } from '../lib/builder/campaign/runner.ts'
 import { emptyCampaignLedger } from '../lib/builder/campaign/runner.ts'
 import { PAC_CATALOG, PAC_PARALLEL_PORTS, selectCampaignChecks, isTargetedRun } from '../lib/builder/campaign/catalog.ts'
 import { requestedAnalyticalTasks } from '../lib/ai/cos/answerTaskContract.ts'
-import { parseCosAgentDecision, sanitizeCampaignChecks } from '../lib/ai/cos/cosAgentDecision.ts'
+import { parseCosAgentDecision, sanitizeCampaignChecks, campaignActionFrom } from '../lib/ai/cos/cosAgentDecision.ts'
+import { campaignOfferReply } from '../lib/builder/campaign/catalog.ts'
 import { campaignInBackground } from '../lib/ai/cos/agentProgressClient.ts'
 import type { CampaignPorts, PortResult } from '../lib/builder/campaign/ports.ts'
 
@@ -123,8 +124,8 @@ test('the planner reads which checks to run; a pasted report is answered, not ex
   assert.deepEqual(parsed?.mode === 'orchestrate' ? parsed.campaignChecks : null, ['PAC-01', 'PAC-20'])
   const decision = read('lib/ai/cos/cosAgentDecision.ts')
   assert.match(decision, /name === 'verification_campaign' \? VERIFICATION_CAMPAIGN_PARAMETERS/)
-  assert.match(decision, /\.\.\.\(campaignCall \? \{ campaignChecks: campaignChecksFromToolArguments\(campaignCall\.function\.arguments\) \} : \{\}\)/)
-  assert.match(decision, /A pasted campaign report or result, a question about why a check failed, or a request to fix, explain or review a failure is NOT a request to run anything: COS answers that in writing\./)
+  assert.match(decision, /\.\.\.\(campaignCall \? \{ campaignChecks: campaignChecksFromToolArguments\(campaignCall\.function\.arguments\), campaignAction: campaignActionFromToolArguments\(campaignCall\.function\.arguments\) \} : \{\}\)/)
+  assert.match(decision, /Do NOT call it for a question about a past result, why a check failed, or a request to fix, explain or review a failure: COS answers that in writing\./)
 })
 
 test('the chat turn ends with the campaign receipt; the live panel shows its status', () => {
@@ -146,4 +147,32 @@ test('the chat turn ends with the campaign receipt; the live panel shows its sta
   // The production revision is read from the live ingress without running a turn.
   assert.match(read('app/api/cos-browser/route.ts'), /export async function GET\(\) \{\n\s+return withServingRevision\(/)
   assert.match(read('lib/builder/campaign/hostPorts.ts'), /fetchImpl\(`\$\{PUBLIC_BRAND\.siteUrl\}\/api\/cos-browser`, \{ method: 'GET'/)
+})
+
+test('a pasted campaign document is answered at once: nothing runs, and the reply says how to run all or some checks', () => {
+  // Production 2026-11-01: the pasted COS-PAC-001 document went to the writing pipeline and came back as
+  // "I could not finish a reliable answer". The planner now offers the campaign instead (model decision, no word rule).
+  const decision = read('lib/ai/cos/cosAgentDecision.ts')
+  assert.match(decision, /Call it with action "offer" when the owner shares the campaign document itself, or asks about running it, without clearly asking to run it now/)
+  assert.match(decision, /A pasted campaign document is never answered in writing\./)
+  assert.match(decision, /enum: Object\.freeze\(\['run', 'offer'\]\)/)
+  // Only an explicit offer is an offer; the capability itself means run.
+  assert.equal(campaignActionFrom('offer'), 'offer')
+  assert.equal(campaignActionFrom('OFFER '), 'offer')
+  assert.equal(campaignActionFrom(undefined), 'run')
+  assert.equal(campaignActionFrom('run'), 'run')
+  const offered = parseCosAgentDecision('{"mode":"orchestrate","answer":"","confidence":0.9,"capabilities":["verification_campaign"],"campaign_action":"offer","checks":[],"reason":"shared"}', 'test')
+  assert.equal(offered?.mode === 'orchestrate' ? offered.campaignAction : null, 'offer')
+  const run = parseCosAgentDecision('{"mode":"orchestrate","answer":"","confidence":0.9,"capabilities":["verification_campaign"],"reason":"run"}', 'test')
+  assert.equal(run?.mode === 'orchestrate' ? run.campaignAction : null, 'run')
+  // The offer is instant (no model call to write it) and executes nothing.
+  const whole = campaignOfferReply([])
+  assert.match(whole, /^This is the production acceptance campaign COS-PAC-001: 20 checks against the live site\. Nothing has been run\./)
+  assert.match(whole, /say "run the campaign"/)
+  assert.match(whole, /"run PAC-03 and PAC-20"/)
+  assert.match(campaignOfferReply(['PAC-03']), /To retest PAC-03, say "run PAC-03"\./)
+  const route = read('app/api/cos-browser/route.ts')
+  const offer = route.slice(route.indexOf('async function verificationCampaignResponse('), route.indexOf('async function startVerificationCampaignResponse('))
+  assert.match(offer, /campaignAction === 'offer'\) \{\n\s+return NextResponse\.json\(\{\n\s+reply: campaignOfferReply\(checks\), source: 'cos-verification-campaign-offer',\n\s+execution_allowed: false/)
+  assert.doesNotMatch(offer.slice(0, offer.indexOf('return startVerificationCampaignResponse')), /startVerificationCampaign\(/)
 })

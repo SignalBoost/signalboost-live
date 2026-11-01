@@ -85,7 +85,7 @@ test('PAC-13: the authenticated COS Assistant receives the request and responds 
   assert.equal(site.request(), checkRequest('PAC-13', session.token))
   assert.ok(site.actions.includes(`click ${UI.loginSubmit}`))
   assert.ok(site.actions.includes(`fill ${UI.assistantInput}`) && site.actions.includes(`click ${UI.assistantSend}`))
-  assert.ok(!site.actions.includes(`click ${UI.assistantSend}`), 'a public Concierge request cannot certify authenticated COS')
+  assert.ok(!site.actions.includes(`click ${UI.homeSend}`), 'a public Concierge request cannot certify authenticated COS')
   assert.ok(site.actions.includes('close'), 'the browser is closed after the check')
   assert.ok(outcome.result.evidence.some(item => /answer on the page \d+ ms after submit/.test(item.detail)))
 })

@@ -89,6 +89,8 @@ test('the signed-in owner starts the campaign on either surface: by its identifi
   assert.ok(direct < route.indexOf('const fastAuthoringIngress'))
   assert.ok(direct < route.indexOf('agentDecision = await decideCosAgentTurn('))
   assert.match(route, /agentDecision\.capabilities\.includes\('verification_campaign'\) && namesVerificationCampaign\(prompt\) && authenticatedOwner && access\?\.userId\)/)
+  assert.match(route, /if \(isVerificationCampaignDocument\(prompt\)\)/)
+  assert.match(route, /source: 'cos-verification-campaign-document'/)
   assert.doesNotMatch(route, /verification_campaign'\) && authenticatedOwner && browserSurface === 'assistant'/)
   assert.match(route, /source: 'cos-verification-campaign'/)
   const starter = read('lib/builder/campaign/start.ts')
@@ -152,7 +154,7 @@ test('the host ports execute against the live production path and read facts bac
 
 
 test('mentioning PAC in a debugging report never auto-launches the full Builder campaign', async () => {
-  const { namesVerificationCampaign } = await import('../lib/builder/campaign/catalog.ts')
+  const { namesVerificationCampaign, isVerificationCampaignDocument } = await import('../lib/builder/campaign/catalog.ts')
   const reports = [
     'COS-PAC-001 certified FAIL: 9/20 passed; diagnose PAC-01 and give me the first failure.',
     'Please debug Builder. The COS-PAC-001 campaign lasted ten minutes. Run only the smallest relevant check.',
@@ -165,4 +167,6 @@ test('mentioning PAC in a debugging report never auto-launches the full Builder 
   assert.equal(namesVerificationCampaign('Please execute COS-PAC-001.'), true)
   const fixture = read('tests/fixtures/cos-production-acceptance-campaign.txt')
   assert.equal(namesVerificationCampaign(fixture), false, 'pasting the pending manifest is not campaign authorization')
+  assert.equal(isVerificationCampaignDocument(fixture), true, 'pending acceptance specification is recognized as a document')
+  assert.equal(isVerificationCampaignDocument(reports[0]), false, 'failed PAC summary is not mistaken for a full specification')
 })

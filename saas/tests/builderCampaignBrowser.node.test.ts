@@ -12,7 +12,7 @@ import {
   BROWSER_ANSWER_WAIT_MS, BROWSER_SLICE_RESERVE_MS, UI, campaignBrowserOrigins, type BrowserDriver, type BrowserSession, type DriverStep,
 } from '../lib/builder/campaign/browserChecks.ts'
 import { runCampaignSlice, emptyCampaignLedger } from '../lib/builder/campaign/runner.ts'
-import { PAC_CATALOG } from '../lib/builder/campaign/catalog.ts'
+import { PAC_CATALOG, PAC_01_PROMPT } from '../lib/builder/campaign/catalog.ts'
 import type { CampaignPorts } from '../lib/builder/campaign/ports.ts'
 
 const ok = (stdout = ''): DriverStep => ({ ok: true, stdout, detail: 'exit=0' })
@@ -83,6 +83,7 @@ test('PAC-13: the request typed into the public Concierge receives its answer on
   if (outcome.status !== 'done') return
   assert.equal(outcome.result.verdict, 'PASS', outcome.result.actual)
   assert.equal(site.request(), checkRequest('PAC-13', session.token))
+  assert.equal(site.request(), PAC_01_PROMPT, 'PAC-13 must submit the original eight-part forensic prompt without any modification')
   assert.ok(site.actions.includes(`fill ${UI.homeInput}`) && site.actions.includes(`click ${UI.homeSend}`))
   assert.ok(site.actions.includes('close'), 'the browser is closed after the check')
   assert.ok(outcome.result.evidence.some(item => /answer on the page \d+ ms after submit/.test(item.detail)))
@@ -97,6 +98,15 @@ test('PAC-13: a failure message on the page is FAIL; no answer within the window
   const timedOut = await runBrowserCheck({ testId: 'PAC-13', session: newBrowserSession('PAC-13', silent.now(), 'sbx'), driver: silent.driver, credentials: null, records: async () => null, now: silent.now, remainingMs: () => 10 * 60_000, sleep: silent.sleep })
   assert.equal(timedOut.status === 'done' && timedOut.result.verdict, 'FAIL')
   assert.match(timedOut.status === 'done' ? timedOut.result.actual : '', /no answer on the page/)
+})
+
+test('PAC-13 never passes when the production POST status is absent or unsuccessful', async () => {
+  for (const requestsOutput of ['', '1 [GET] https://itmounts.com/ => 200', '1 [POST] https://itmounts.com/api/cos-browser => 503']) {
+    const site = fakePage({ answerAfterMs: 5_000, requestsOutput })
+    const result = await runBrowserCheck({ testId: 'PAC-13', session: newBrowserSession('PAC-13', site.now(), 'sbx'), driver: site.driver, credentials: null, records: async () => null, now: site.now, remainingMs: () => 200_000, sleep: site.sleep })
+    assert.equal(result.status === 'done' && result.result.verdict, 'FAIL', requestsOutput)
+    assert.match(result.status === 'done' ? result.result.actual : '', /verified HTTP 200/)
+  }
 })
 
 test('a check waiting for the page hands the slice back and continues from the same session in the next slice', async () => {

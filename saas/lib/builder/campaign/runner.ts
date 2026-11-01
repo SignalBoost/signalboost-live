@@ -220,9 +220,9 @@ export async function runCampaignSlice(input: Readonly<{
   const reserveFor = (testId: string) => itemReserveMs({ shortestRequestMs, longestRequestMs }, interruptedItem === testId)
   const state = (stopped: 'complete' | 'budget' | 'aborted', progress: ReliabilityProgress | null = reliability, interrupted: string | null = null) =>
     ({ ledger, reliability: progress, shortestRequestMs, longestRequestMs, interruptedItem: interrupted, browser, fixture, stopped })
-  const report = async (progress: ReliabilityProgress | null = reliability) => {
+  const report = async (progress: ReliabilityProgress | null = reliability, snapshot: CampaignLedger = ledger) => {
     if (!input.progress) return
-    try { await input.progress({ ledger, reliability: progress }) } catch { /* the slice checkpoint still records it */ }
+    try { await input.progress({ ledger: snapshot, reliability: progress }) } catch { /* the slice checkpoint still records it */ }
   }
   if (!ledger.mainCommit || !ledger.productionCommit) {
     const facts = await input.ports.deployment()
@@ -249,7 +249,8 @@ export async function runCampaignSlice(input: Readonly<{
       const executed = await executeItem(item, input.ports, base, input.signal, context)
       if (!executed.interrupted && !input.signal?.aborted) {
         ledger = { ...ledger, rows: [...ledger.rows, row(item, ledger, executedAt, now, executed.result, executed.scenario)] }
-        progressWrite = progressWrite.then(() => report())
+        const snapshot = ledger
+        progressWrite = progressWrite.then(() => report(reliability, snapshot))
       }
       return { item, executedAt, executed }
     }))

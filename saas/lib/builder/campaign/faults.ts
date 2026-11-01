@@ -168,6 +168,20 @@ function releasedUngraded(released: string, outcome: AnswerOutcome | null): bool
   return Boolean(parsed && parsed.truncated !== true && (!outcome || outcome.status === 'unverified'))
 }
 
+/**
+ * The stub result is a model DRAFT, not a user-visible release. Apply the same
+ * independent answer acceptance gate used by COS before treating text as released.
+ * A malformed/truncated candidate or a verifier-confirmed incomplete answer is
+ * withheld; an unavailable verifier is never treated as a verified PASS.
+ */
+export function faultReleasedAnswer(candidate: string | null, outcome: AnswerOutcome | null): string | null {
+  if (!candidate) return null
+  const parsed = parseLocalResult(candidate)
+  if (!parsed || parsed.truncated === true) return null
+  if (outcome?.status === 'incomplete') return null
+  return candidate
+}
+
 /** Decide PASS or FAIL for one fault from what the stub recorded and what the reasoner released. */
 export function judgeFault(observation: FaultObservation): PortResult {
   const failures: string[] = []

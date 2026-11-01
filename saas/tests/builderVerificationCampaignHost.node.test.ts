@@ -162,3 +162,31 @@ test('the host ports execute against the live production path and read facts bac
   assert.equal((await host.isolatedFault('runpod_busy', 'deadbeef', undefined, null)).verdict, 'BLOCKED', 'unknown worker revision blocks')
 })
 
+
+
+test('signed campaign request can read only an existing real correlation ID, never mint one', async () => {
+  const { campaignLiveInferenceToken, signedCampaignTurnId } = await import('../lib/ai/cos/campaignLiveInference.ts')
+  const now = 1_800_000_000_000
+  const secret = 'test-only-hmac-secret'
+  const token = campaignLiveInferenceToken(now, secret)!
+  const provenance = { turnId: '11111111-1111-4111-8111-111111111111' }
+  assert.equal(signedCampaignTurnId(provenance, token, now, secret), provenance.turnId)
+  assert.equal(signedCampaignTurnId(provenance, token, now, 'different-secret'), null)
+  assert.equal(signedCampaignTurnId(provenance, null, now, secret), null)
+  assert.equal(signedCampaignTurnId(provenance, token, now + 11 * 60_000, secret), null)
+  assert.equal(signedCampaignTurnId({}, token, now, secret), null)
+  assert.equal(signedCampaignTurnId({ turnId: 'not-a-uuid' }, token, now, secret), null)
+  const route = read('app/api/cos-provenance-browser/route.ts')
+  assert.match(route, /signedCampaignTurnId\(provenance, req\.headers\.get\(CAMPAIGN_LIVE_INFERENCE_HEADER\)\)/)
+  assert.match(route, /if \(campaignTurnId\) delivered\.headers\.set\('x-itmounts-campaign-turn-id', campaignTurnId\)/)
+})
+
+test('campaign host reads the signed correlation header despite public capsule redaction', async () => {
+  const { productionAnalysis } = await import('../lib/builder/campaign/hostPorts.ts')
+  const turnId = '11111111-1111-4111-8111-111111111111'
+  const fetchImpl = (async () => new Response(JSON.stringify({
+    reply: 'A substantive model answer.', source: 'cos-local-primary',
+    execution_provenance: { signed_public_capsule: true, local_reasoning: { invoked: true, model: null } },
+  }), { status: 200, headers: { 'x-itmounts-campaign-turn-id': turnId } })) as typeof fetch
+  assert.equal((await productionAnalysis('Investigate an incident', undefined, fetchImpl)).correlationId, turnId)
+})

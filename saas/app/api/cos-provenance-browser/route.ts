@@ -5,6 +5,7 @@ import { getAccess } from '@/lib/auth/access'
 import { isProvenanceIntrospection, requestsExternalAction } from '@/lib/ai/cos/cosOrchestration'
 import { ensureAnswerExecutionProvenance } from '@/lib/ai/cos/answerProvenance.ts'
 import { provenanceBoundarySecret } from '@/lib/ai/cos/provenanceBoundarySecret.ts'
+import { CAMPAIGN_LIVE_INFERENCE_HEADER, signedCampaignTurnId } from '@/lib/ai/cos/campaignLiveInference.ts'
 import {
   createPublicAnswerProvenanceCapsule,
   publicAnswerCapsuleAsRecordedProvenance,
@@ -19,8 +20,10 @@ import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy
 import { persistTurn, refreshSummaryAtCadence } from '@/lib/ai/tools/conversationHistory.ts'
 import { provenanceWithDeliveredVisual } from '@/lib/concierge/deliveredVisual.ts'
 import { assistanceCopy, COS_TURN_ACCEPTED } from '@/lib/ai/cos/assistanceMode'
-import { CAMPAIGN_LIVE_INFERENCE_HEADER, campaignLiveInferenceRequested } from '@/lib/ai/cos/campaignLiveInference'
 import { requestTurnIds, withRequestTurnCorrelation } from '@/lib/ai/cos/requestTurnCorrelation'
+
+/** The campaign's turn-id response header (read by lib/builder/campaign/hostPorts.ts). */
+const CAMPAIGN_TURN_ID_HEADER = 'x-itmounts-campaign-turn-id'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -167,6 +170,13 @@ async function finalizeAnswer(response: Response, req: NextRequest, body: any): 
     answer_provenance: answerProvenance,
   })
 
+  // The public signed capsule intentionally redacts internal turn IDs. For a server-signed
+  // acceptance-campaign request only, expose the EXISTING persisted-reasoner correlation ID
+  // in a response header so PAC-16/17 can read the real turn record. Never mint an ID here:
+  // an absent ID must remain BLOCKED rather than falsely certifying observability.
+  const campaignTurnId = signedCampaignTurnId(provenance, req.headers.get(CAMPAIGN_LIVE_INFERENCE_HEADER))
+  if (campaignTurnId) delivered.headers.set('x-itmounts-campaign-turn-id', campaignTurnId)
+
   if (isPublic && answerProvenance.signed) {
     const cookie = encodeCapsuleCookie(answerProvenance)
     if (cookie) {
@@ -183,25 +193,22 @@ async function finalizeAnswer(response: Response, req: NextRequest, body: any): 
 }
 
 /**
- * Every request runs with its own turn-id record (requestTurnCorrelation.ts). A verification-campaign request, proven by
- * its signed header, gets back the turn ids its answer produced, so the campaign can read the turn records (PAC-16,
- * PAC-17) and show which stage ended a request. Other callers never receive internal turn ids.
+ * Every request runs with its own turn-id record (requestTurnCorrelation.ts). The answer's provenance usually carries no
+ * turn id (production campaign 2026-11-01: every check showed "Correlation: -"), so for a server-signed campaign request
+ * the campaign header falls back to the last turn record this request actually wrote. The id is never minted here, and
+ * other callers never receive it.
  */
 export async function POST(req: NextRequest): Promise<Response> {
-  const campaignRequest = campaignLiveInferenceRequested(req.headers.get(CAMPAIGN_LIVE_INFERENCE_HEADER))
+  const campaignHeader = req.headers.get(CAMPAIGN_LIVE_INFERENCE_HEADER)
   return withRequestTurnCorrelation(async () => {
     const response = await handleBrowserTurn(req)
-    if (!campaignRequest) return response
-    return withCampaignTurnIds(response, requestTurnIds())
+    if (response.headers.get(CAMPAIGN_TURN_ID_HEADER)) return response
+    const recorded = signedCampaignTurnId({ turnId: requestTurnIds().at(-1) }, campaignHeader)
+    if (!recorded) return response
+    const headers = new Headers(response.headers)
+    headers.set(CAMPAIGN_TURN_ID_HEADER, recorded)
+    return new NextResponse(response.body, { status: response.status, statusText: response.statusText, headers })
   })
-}
-
-/** The campaign's copy of the response: the same payload plus the turn ids that carry its records. */
-async function withCampaignTurnIds(response: Response, turnIds: readonly string[]): Promise<Response> {
-  let payload: any
-  try { payload = await response.clone().json() } catch { return response }
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return response
-  return withJsonPayload(response, { ...payload, campaign_turn_ids: [...turnIds], campaign_turn_id: turnIds.at(-1) ?? null })
 }
 
 async function handleBrowserTurn(req: NextRequest): Promise<Response> {

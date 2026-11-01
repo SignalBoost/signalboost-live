@@ -87,15 +87,21 @@ test('every reasoner turn of a request is noted in that request only; outside a 
   assert.deepEqual(second, ['turn-b1'])
 })
 
-test('only a signed campaign request gets the turn ids back, and the campaign reads them as the correlation', async () => {
+test('a signed campaign request gets the last turn record the request wrote when its provenance names none', async () => {
   const route = read('app/api/cos-provenance-browser/route.ts')
   const post = route.slice(route.indexOf('export async function POST('), route.indexOf('async function handleBrowserTurn('))
-  assert.match(post, /const campaignRequest = campaignLiveInferenceRequested\(req\.headers\.get\(CAMPAIGN_LIVE_INFERENCE_HEADER\)\)/)
-  assert.match(post, /return withRequestTurnCorrelation\(async \(\) => \{\n\s+const response = await handleBrowserTurn\(req\)\n\s+if \(!campaignRequest\) return response\n\s+return withCampaignTurnIds\(response, requestTurnIds\(\)\)/)
-  assert.match(post, /campaign_turn_ids: \[\.\.\.turnIds\], campaign_turn_id: turnIds\.at\(-1\) \?\? null/)
+  assert.match(post, /return withRequestTurnCorrelation\(async \(\) => \{\n\s+const response = await handleBrowserTurn\(req\)/)
+  // The provenance's own turn id (#5186) wins; the request's recorded turn is the fallback, through the same signed check.
+  assert.match(post, /if \(response\.headers\.get\(CAMPAIGN_TURN_ID_HEADER\)\) return response/)
+  assert.match(post, /const recorded = signedCampaignTurnId\(\{ turnId: requestTurnIds\(\)\.at\(-1\) \}, campaignHeader\)\n\s+if \(!recorded\) return response/)
   // The out-of-pipeline turn record is noted only after it is written.
   assert.match(read('lib/ai/cos/cosPrimaryTurnProvenance.ts'), /if \(result\.error\) throw result\.error\n\s+noteRequestTurnId\(turnId\)/)
-  const fetchImpl = (async () => new Response(JSON.stringify({ reply: 'x', source: 'failed_closed', ok: false, campaign_turn_id: '22222222-2222-4222-8222-222222222222', execution_provenance: {} }), { status: 200 })) as typeof fetch
-  const outcome = await productionAnalysis('prompt', undefined, fetchImpl)
-  assert.equal(outcome.correlationId, '22222222-2222-4222-8222-222222222222')
+  const { signedCampaignTurnId, campaignLiveInferenceToken } = await import('../lib/ai/cos/campaignLiveInference.ts')
+  const id = '22222222-2222-4222-8222-222222222222'
+  const token = campaignLiveInferenceToken(Date.now(), 'test-secret')
+  assert.equal(signedCampaignTurnId({ turnId: id }, token, Date.now(), 'test-secret'), id)
+  assert.equal(signedCampaignTurnId({ turnId: id }, null, Date.now(), 'test-secret'), null, 'unsigned requests never get it')
+  assert.equal(signedCampaignTurnId({ turnId: undefined }, token, Date.now(), 'test-secret'), null, 'no recorded turn, no id')
+  const fetchImpl = (async () => new Response(JSON.stringify({ reply: 'x', source: 'failed_closed', ok: false, execution_provenance: {} }), { status: 200, headers: { 'x-itmounts-campaign-turn-id': id } })) as typeof fetch
+  assert.equal((await productionAnalysis('prompt', undefined, fetchImpl)).correlationId, id)
 })

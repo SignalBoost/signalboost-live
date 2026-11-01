@@ -24,6 +24,7 @@ function fakePage(options: Readonly<{
   signedInAfterSubmit?: boolean
   requestsOutput?: string
   loginWorks?: boolean
+  loginError?: boolean
   /** After a reload the Assistant page lists the conversation's title only until its entry is opened. */
   listedOnly?: boolean
 }> = {}) {
@@ -40,6 +41,7 @@ function fakePage(options: Readonly<{
   const render = () => {
     const lines: string[] = []
     if (page === 'login') lines.push('textbox "Email address"', 'textbox "Password"', 'button "Log in"')
+    if (page === 'login' && options.loginError) lines.push('alert: Authentication failed')
     if (page === 'home') lines.push('textbox "Ask COS anything…"')
     if (page === 'assistant') lines.push('textbox "Ask the concierge…"', 'button "' + (request ? request.slice(0, 40) : '') + '"')
     const transcriptHidden = page === 'assistant' && reloaded && options.listedOnly !== false && !reopened
@@ -215,4 +217,39 @@ test('PAC sign-in targets the real auth modal submit instead of the navbar login
   const modal = readFileSync(new URL('../components/AuthModal.tsx', import.meta.url), 'utf8')
   assert.equal(UI.loginSubmit, "getByTestId('auth-modal-submit')")
   assert.match(modal, /data-testid="auth-modal-submit" onClick=\{handleSubmit\}/)
+})
+
+
+test('PAC browser sign-in fails promptly on visible authentication alert without exposing server message', async () => {
+  const site = fakePage({ loginWorks: false, loginError: true })
+  const outcome = await runBrowserCheck({
+    testId: 'PAC-14', session: newBrowserSession('PAC-14', site.now(), 'sandbox'),
+    driver: site.driver, credentials, records: async () => null,
+    now: site.now, remainingMs: () => 200_000, sleep: site.sleep,
+  })
+  assert.equal(outcome.status, 'done')
+  if (outcome.status !== 'done') return
+  assert.equal(outcome.result.verdict, 'FAIL')
+  assert.equal(outcome.result.failureCause, 'sign-in rejected by authentication service')
+  assert.ok(site.actions.includes('find alert'))
+  assert.ok(!JSON.stringify(outcome.result).includes('Authentication failed'))
+  assert.ok(!JSON.stringify(outcome.result).includes(credentials.password))
+})
+
+test('PAC browser sign-in timeout records only sanitized token HTTP status', async () => {
+  const site = fakePage({
+    loginWorks: false,
+    requestsOutput: '1 [POST] https://example.supabase.co/auth/v1/token?grant_type=password => 400',
+  })
+  const outcome = await runBrowserCheck({
+    testId: 'PAC-15', session: newBrowserSession('PAC-15', site.now(), 'sandbox'),
+    driver: site.driver, credentials, records: async () => null,
+    now: site.now, remainingMs: () => 200_000, sleep: site.sleep,
+  })
+  assert.equal(outcome.status, 'done')
+  if (outcome.status !== 'done') return
+  assert.equal(outcome.result.verdict, 'FAIL')
+  assert.equal(outcome.result.failureCause, 'authentication token request returned HTTP 400')
+  assert.ok(JSON.stringify(outcome.result).includes('HTTP 400'))
+  assert.ok(!JSON.stringify(outcome.result).includes(credentials.email))
 })

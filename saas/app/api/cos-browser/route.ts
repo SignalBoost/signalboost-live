@@ -604,7 +604,7 @@ async function executeBrowserTurn(req: NextRequest) {
 
     // VERIFICATION CAMPAIGN (2026-10-27): the planner asked for the production acceptance campaign to be executed.
     // Only the signed-in owner may start it, on either surface; for anyone else the request is answered by COS.
-    if (agentDecision.capabilities.includes('verification_campaign') && authenticatedOwner && access?.userId) {
+    if (agentDecision.capabilities.includes('verification_campaign') && namesVerificationCampaign(prompt) && authenticatedOwner && access?.userId) {
       const started = await startVerificationCampaignResponse({ userId: access.userId, body, prompt, language })
       return browserSurface === 'concierge' ? publicConciergePresentation(started) : started
     }

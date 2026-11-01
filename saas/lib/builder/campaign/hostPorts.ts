@@ -21,7 +21,7 @@ import type { AnalysisOutcome, CampaignPorts, PortResult } from './ports.ts'
 import { withInferenceTransport } from '../../ai/inferenceTransport.ts'
 import { runWithTurnDeadline, runWithoutTurnDeadline } from '../../ai/cos/cosTurnBudget.ts'
 import { CAMPAIGN_LIVE_INFERENCE_HEADER, campaignLiveInferenceToken } from '../../ai/cos/campaignLiveInference.ts'
-import { createFaultStub, judgeFault, FAULT_PROMPT, FAULT_TURN_DEADLINE_MS, type CampaignFault } from './faults.ts'
+import { createFaultStub, judgeFault, faultReleasedAnswer, FAULT_PROMPT, FAULT_TURN_DEADLINE_MS, type CampaignFault } from './faults.ts'
 import { verifyAnswerOutcome } from '../../ai/cos/answerOutcomeVerifier.ts'
 import { parseLocalResult } from '../../ai/cos/reasonerOutput.ts'
 import { campaignBrowserOrigins, newBrowserSession, runBrowserCheck, BROWSER_SLICE_RESERVE_MS, type BrowserDriver, type BrowserSession, type DriverStep } from './browserChecks.ts'
@@ -239,7 +239,7 @@ export async function isolatedFault(fault: CampaignFault, productionCommit: stri
   const releasedOutcome = releasedAnswer && releasedAnswer.truncated !== true
     ? await verifyAnswerOutcome({ request: FAULT_PROMPT, answer: releasedAnswer.answer, judge: cosAnswerOutcomeJudge })
     : null
-  return judgeFault({ fault, calls: stub.calls(), released, escaped, elapsedMs, releasedOutcome })
+  return judgeFault({ fault, calls: stub.calls(), released: faultReleasedAnswer(released, releasedOutcome), escaped, elapsedMs, releasedOutcome })
 }
 
 /** The browser sandbox lives long enough for the three checks in sequence, each waited for across slices. */

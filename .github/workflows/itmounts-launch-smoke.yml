@@ -23,6 +23,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Verify redirect safety and private authorization regressions
+        run: node --test saas/tests/launchProductionSmoke.node.test.mjs
       - name: Public reachability and internal authorization
         env:
           ITMOUNTS_SMOKE_BASE_URL: ${{ inputs.base_url || 'https://www.itmounts.com' }}

@@ -5,15 +5,34 @@ const url = new URL(base)
 if (url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) {
   throw new Error('smoke_base_must_be_https_origin')
 }
+// Do not follow arbitrary redirects. Only the canonical www/apex hostname switch
+// is permitted, with the exact endpoint path preserved on every hop.
+const allowedOrigins = new Set(['https://www.itmounts.com', 'https://itmounts.com'])
+if (!allowedOrigins.has(url.origin)) throw new Error('smoke_origin_not_allowed')
+async function canonicalGet(target, signal) {
+  let current = target
+  for (let hops = 0; hops <= 3; hops++) {
+    const response = await fetch(current, { method: 'GET', redirect: 'manual', cache: 'no-store', signal, headers: { 'user-agent': 'itmounts-launch-smoke/1' } })
+    if (![301, 302, 303, 307, 308].includes(response.status)) return { response, final: current }
+    const location = response.headers.get('location')
+    if (!location || hops === 3) throw new Error('smoke_redirect_not_resolved')
+    const next = new URL(location, current)
+    if (!allowedOrigins.has(next.origin) || next.pathname !== target.pathname || next.search || next.hash) {
+      throw new Error('smoke_redirect_outside_canonical_endpoint')
+    }
+    current = next
+  }
+  throw new Error('smoke_redirect_limit')
+}
 const failures = []
 async function probe(path, predicate, description) {
   const target = new URL(path, url.origin)
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 15000)
   try {
-    const response = await fetch(target, { method:'GET', redirect:'manual', cache:'no-store', signal:controller.signal, headers:{'user-agent':'itmounts-launch-smoke/1'} })
+    const { response, final } = await canonicalGet(target, controller.signal)
     const good = predicate(response.status)
-    console.log(JSON.stringify({ path, status:response.status, passed:good, expectation:description }))
+    console.log(JSON.stringify({ path, status:response.status, finalOrigin:final.origin, passed:good, expectation:description }))
     if (!good) failures.push(path)
   } catch (error) {
     console.error(JSON.stringify({ path, passed:false, error: error instanceof Error ? error.name : 'network_error' }))

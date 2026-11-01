@@ -88,7 +88,7 @@ test('the signed-in owner starts the campaign on either surface: by its identifi
   assert.ok(direct > 0)
   assert.ok(direct < route.indexOf('const fastAuthoringIngress'))
   assert.ok(direct < route.indexOf('agentDecision = await decideCosAgentTurn('))
-  assert.match(route, /agentDecision\.capabilities\.includes\('verification_campaign'\) && authenticatedOwner && access\?\.userId\)/)
+  assert.match(route, /agentDecision\.capabilities\.includes\('verification_campaign'\) && namesVerificationCampaign\(prompt\) && authenticatedOwner && access\?\.userId\)/)
   assert.doesNotMatch(route, /verification_campaign'\) && authenticatedOwner && browserSurface === 'assistant'/)
   assert.match(route, /source: 'cos-verification-campaign'/)
   const starter = read('lib/builder/campaign/start.ts')

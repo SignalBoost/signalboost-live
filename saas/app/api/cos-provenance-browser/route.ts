@@ -20,6 +20,10 @@ import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy
 import { persistTurn, refreshSummaryAtCadence } from '@/lib/ai/tools/conversationHistory.ts'
 import { provenanceWithDeliveredVisual } from '@/lib/concierge/deliveredVisual.ts'
 import { assistanceCopy, COS_TURN_ACCEPTED } from '@/lib/ai/cos/assistanceMode'
+import { requestTurnIds, withRequestTurnCorrelation } from '@/lib/ai/cos/requestTurnCorrelation'
+
+/** The campaign's turn-id response header (read by lib/builder/campaign/hostPorts.ts). */
+const CAMPAIGN_TURN_ID_HEADER = 'x-itmounts-campaign-turn-id'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -188,7 +192,26 @@ async function finalizeAnswer(response: Response, req: NextRequest, body: any): 
   return delivered
 }
 
+/**
+ * Every request runs with its own turn-id record (requestTurnCorrelation.ts). The answer's provenance usually carries no
+ * turn id (production campaign 2026-11-01: every check showed "Correlation: -"), so for a server-signed campaign request
+ * the campaign header falls back to the last turn record this request actually wrote. The id is never minted here, and
+ * other callers never receive it.
+ */
 export async function POST(req: NextRequest): Promise<Response> {
+  const campaignHeader = req.headers.get(CAMPAIGN_LIVE_INFERENCE_HEADER)
+  return withRequestTurnCorrelation(async () => {
+    const response = await handleBrowserTurn(req)
+    if (response.headers.get(CAMPAIGN_TURN_ID_HEADER)) return response
+    const recorded = signedCampaignTurnId({ turnId: requestTurnIds().at(-1) }, campaignHeader)
+    if (!recorded) return response
+    const headers = new Headers(response.headers)
+    headers.set(CAMPAIGN_TURN_ID_HEADER, recorded)
+    return new NextResponse(response.body, { status: response.status, statusText: response.statusText, headers })
+  })
+}
+
+async function handleBrowserTurn(req: NextRequest): Promise<Response> {
   const requestStartedAt = Date.now()
   // This route is an internal network boundary, not a second public assistant endpoint. The proxy
   // injects a server-only secret after applying spend/routing policy. A direct request fails closed.

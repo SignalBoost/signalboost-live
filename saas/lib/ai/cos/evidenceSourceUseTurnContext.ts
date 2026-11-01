@@ -4,6 +4,7 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { currentAdaptiveRetrievalShadowPolicy, type AdaptiveRetrievalShadowPolicy } from './adaptiveRetrievalContext.ts'
+import { noteRequestTurnId } from './requestTurnCorrelation.ts'
 
 export type CapturedLearnedRetrievalItem = {
   sourceKind: string
@@ -99,7 +100,10 @@ export function captureSelectedLearnedSourceKinds(rows: readonly unknown[]): voi
 
 export function captureEvidenceSourceUseTurnId(turnId: string): void {
   const value = String(turnId ?? '').trim()
-  if (value) state().turnId = value
+  if (!value) return
+  state().turnId = value
+  // Every reasoner turn passes here as it records its turn experience: the request's trace keeps it.
+  noteRequestTurnId(value)
 }
 
 export function peekEvidenceSourceUseTurnId(): string | null {

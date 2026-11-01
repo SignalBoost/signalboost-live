@@ -267,13 +267,16 @@ export async function runCampaignSlice(input: Readonly<{
   }
   // Analytical and routing checks: CAMPAIGN_MODEL_CONCURRENCY requests in flight; a new one starts as soon as one ends,
   // and only while the slice still has an item's reserve. Each result is recorded and published the moment it arrives.
+  // One ordered writer for every status update of this slice: checks finishing side by side (model lane, Builder fixture)
+  // must never let a slower earlier write replace a newer status.
+  let publishing = Promise.resolve()
+  const publish = (progress: ReliabilityProgress | null, snapshot: CampaignLedger) => { publishing = publishing.then(() => report(progress, snapshot)) }
   // The model check a slice cut, so the next slice starts it only when its longest-request reserve fits.
   let cutItem: string | null = null
   const runModelLane = async (): Promise<'ok' | 'budget' | 'aborted'> => {
     const queue = pendingItems(ledger, input.catalog).filter(item => PAC_MODEL_LANE_PORTS.has(item.port))
     if (!queue.length) return 'ok'
     let stop = null as 'budget' | 'aborted' | null
-    let progressWrite = Promise.resolve()
     const context = { browser, fixture, remainingMs: input.remainingMs, lastBrowserItem: false, now }
     const worker = async () => {
       for (;;) {
@@ -291,23 +294,42 @@ export async function runCampaignSlice(input: Readonly<{
         noteRequest(executed.requestMs)
         ledger = noteServedRevision(ledger, executed.servedCommit ?? null)
         ledger = { ...ledger, rows: [...ledger.rows, row(item, ledger, executedAt, now, executed.result, executed.scenario)] }
-        const snapshot = ledger
-        progressWrite = progressWrite.then(() => report(reliability, snapshot))
+        publish(reliability, ledger)
       }
     }
     await Promise.all(Array.from({ length: Math.min(CAMPAIGN_MODEL_CONCURRENCY, queue.length) }, () => worker()))
-    await progressWrite
+    await publishing
     return stop ?? 'ok'
+  }
+  // PAC-18 runs the Builder's own coding model in its own sandbox, not the answer path the model checks measure, so it
+  // starts together with them instead of waiting for them (production 2026-11-01: 9.7 min that ran alone at the end).
+  // A fixture run that paused at its slice boundary hands the slice back, as it does when it runs in order.
+  let fixturePaused = false
+  const runFixtureAlongside = async (): Promise<'ok' | 'pending' | 'aborted' | null> => {
+    const pending = pendingItems(ledger, input.catalog)
+    const item = pending.find(candidate => candidate.port === 'builder_fixture')
+    if (!item || !pending.some(candidate => PAC_MODEL_LANE_PORTS.has(candidate.port))) return null
+    if (input.remainingMs() < reserveFor(item.id)) return null
+    const executedAt = new Date(now()).toISOString()
+    const executed = await executeItem(item, input.ports, ledger, input.signal, { browser, fixture, remainingMs: input.remainingMs, lastBrowserItem: false, now })
+    if (executed.fixture !== undefined) fixture = executed.fixture
+    if (executed.interrupted) return 'aborted'
+    if (executed.pending) { fixturePaused = true; return 'pending' }
+    ledger = { ...ledger, rows: [...ledger.rows, row(item, ledger, executedAt, now, executed.result, executed.scenario)] }
+    publish(reliability, ledger)
+    return 'ok'
   }
   for (;;) {
     const grouped = await runParallelGroup()
     if (grouped === 'aborted') return state('aborted', reliability)
     if (grouped === 'budget') return state('budget')
-    const modelLane = await runModelLane()
-    if (modelLane === 'aborted') return state('aborted', reliability, cutItem)
+    const [modelLane, fixtureAlongside] = await Promise.all([runModelLane(), runFixtureAlongside()])
+    await publishing
+    if (modelLane === 'aborted' || fixtureAlongside === 'aborted') return state('aborted', reliability, cutItem)
     if (modelLane === 'budget') return state('budget')
     const item = pendingItems(ledger, input.catalog).find(candidate => !(parallelReady() && PAC_PARALLEL_PORTS.has(candidate.port)))
     if (!item) break
+    if (item.port === 'builder_fixture' && fixturePaused) return state('budget')
     if (input.signal?.aborted) return state('aborted', reliability, item.id)
     if (input.remainingMs() < reserveFor(item.id)) return state('budget')
     const executedAt = new Date(now()).toISOString()

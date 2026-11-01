@@ -49,7 +49,7 @@ import { isSoftwareRepairRequest } from '@/lib/ai/cos/softwareRepairIntent'
 import { semanticIntentConfirmsFile, semanticIntentConfirmsPicture, semanticIntentConfirmsWriting, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
 import { cosTurnIntent, withCosTurnIntent } from '@/lib/ai/cos/cosTurnIntent'
 import { startVerificationCampaign } from '@/lib/builder/campaign/start'
-import { namesVerificationCampaign } from '@/lib/builder/campaign/catalog'
+import { namesVerificationCampaign, isVerificationCampaignDocument } from '@/lib/builder/campaign/catalog'
 import { recordCosLatencyStage, timeCosStage } from '@/lib/ai/cos/cosLatencyStages'
 import { runWithTurnDeadline, turnDeadlineRemainingMs, USER_ANSWER_WINDOW_MS } from '@/lib/ai/cos/cosTurnBudget'
 
@@ -272,6 +272,19 @@ async function executeBrowserTurn(req: NextRequest) {
   if (authenticatedOwner && access?.userId && namesVerificationCampaign(prompt)) {
     const started = await startVerificationCampaignResponse({ userId: access.userId, body, prompt, language })
     return browserSurface === 'concierge' ? publicConciergePresentation(started) : started
+  }
+
+  // A pasted acceptance specification is not an instruction to run twenty production tests.
+  // Return its accurate status immediately instead of spending the interactive answer budget on a
+  // campaign-sized task or a generic refusal. A separate explicit launch command is handled above.
+  if (isVerificationCampaignDocument(prompt)) {
+    const response = NextResponse.json({
+      reply: 'COS-PAC-001 is a production acceptance specification, not a completed test run. No campaign was started. You can request a review or execution plan, or explicitly start the full campaign with "run COS-PAC-001 now".',
+      source: 'cos-verification-campaign-document',
+      execution_allowed: false, external_action_taken: false,
+      external_ai_invoked: false, local_model_invoked: false,
+    })
+    return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
   }
 
   // AGENT TOOL LOOP: a request to chart or compute real data is a COS compute turn. It must not be

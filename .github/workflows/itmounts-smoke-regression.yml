@@ -1,0 +1,21 @@
+name: Production smoke redirect regression
+on:
+  pull_request:
+    paths:
+      - 'saas/scripts/launch-production-smoke.mjs'
+      - 'saas/tests/launchProductionSmoke.node.test.mjs'
+      - '.github/workflows/itmounts-launch-smoke.yml'
+      - '.github/workflows/itmounts-smoke-regression.yml'
+permissions:
+  contents: read
+jobs:
+  smoke-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Enforce bounded redirects and private endpoint status
+        run: node --test saas/tests/launchProductionSmoke.node.test.mjs

@@ -5,6 +5,7 @@ import { getAccess } from '@/lib/auth/access'
 import { isProvenanceIntrospection, requestsExternalAction } from '@/lib/ai/cos/cosOrchestration'
 import { ensureAnswerExecutionProvenance } from '@/lib/ai/cos/answerProvenance.ts'
 import { provenanceBoundarySecret } from '@/lib/ai/cos/provenanceBoundarySecret.ts'
+import { CAMPAIGN_LIVE_INFERENCE_HEADER, campaignLiveInferenceRequested } from '@/lib/ai/cos/campaignLiveInference.ts'
 import {
   createPublicAnswerProvenanceCapsule,
   publicAnswerCapsuleAsRecordedProvenance,
@@ -164,6 +165,15 @@ async function finalizeAnswer(response: Response, req: NextRequest, body: any): 
     execution_provenance: isPublic ? publicProvenance : (payload.execution_provenance ?? scopedProvenance),
     answer_provenance: answerProvenance,
   })
+
+  // The public signed capsule intentionally redacts internal turn IDs. For a server-signed
+  // acceptance-campaign request only, expose the EXISTING persisted-reasoner correlation ID
+  // in a response header so PAC-16/17 can read the real turn record. Never mint an ID here:
+  // an absent ID must remain BLOCKED rather than falsely certifying observability.
+  const campaignTurnId = typeof (provenance as any)?.turnId === 'string' ? (provenance as any).turnId.trim() : ''
+  if (UUID.test(campaignTurnId) && campaignLiveInferenceRequested(req.headers.get(CAMPAIGN_LIVE_INFERENCE_HEADER))) {
+    delivered.headers.set('x-itmounts-campaign-turn-id', campaignTurnId)
+  }
 
   if (isPublic && answerProvenance.signed) {
     const cookie = encodeCapsuleCookie(answerProvenance)

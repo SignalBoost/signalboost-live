@@ -106,13 +106,16 @@ test('a failure is shown in the live status the moment it is recorded, before th
     checkpoint: null, workspaceId: 'ws-1', ports, remainingMs: () => 240_000, checks: ['PAC-01', 'PAC-02', 'PAC-07', 'PAC-19'],
     progress: async update => { updates.push({ ...update, analysesSoFar: calls.filter(call => call.kind === 'analysis').length }) },
   })
-  // First update: the two fast checks, before any model request.
+  // The independent fast checks now publish individually instead of waiting for the whole group.
+  // Each snapshot represents an actual completed check, even when completions race.
   assert.equal(updates[0].analysesSoFar, 0)
-  assert.match(updates[0].reply, /^Targeted run of PAC-01, PAC-02, PAC-07, PAC-19 \(4 of 20 checks of COS-PAC-001\) in progress: 2 of 4 checks done \(2 PASS, 0 FAIL, 0 BLOCKED\)\./)
-  // Second update: PAC-01 failed, reported with its cause while PAC-02 has not run yet.
-  assert.equal(updates[1].analysesSoFar, 1)
-  assert.match(updates[1].reply, /3 of 4 checks done \(2 PASS, 1 FAIL, 0 BLOCKED\)/)
-  assert.match(updates[1].reply, /Not passing so far:\n- PAC-01 Eight-part forensic investigation: FAIL, production path did not release an answer/)
+  assert.match(updates[0].reply, /1 of 4 checks done \(1 PASS, 0 FAIL, 0 BLOCKED\)/)
+  assert.equal(updates[1].analysesSoFar, 0)
+  assert.match(updates[1].reply, /2 of 4 checks done \(2 PASS, 0 FAIL, 0 BLOCKED\)/)
+  // PAC-01 fails next, with its real cause before PAC-02 is called.
+  assert.equal(updates[2].analysesSoFar, 1)
+  assert.match(updates[2].reply, /3 of 4 checks done \(2 PASS, 1 FAIL, 0 BLOCKED\)/)
+  assert.match(updates[2].reply, /Not passing so far:\n- PAC-01 Eight-part forensic investigation: FAIL, production path did not release an answer/)
   assert.equal(updates.at(-1)!.done, 4)
   for (const update of updates) assert.equal(update.total, 4)
 })
